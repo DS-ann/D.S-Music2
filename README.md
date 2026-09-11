@@ -22,18 +22,22 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/downloads/MythicalSHUB/SpatialFlow/total?color=5C7AEA&style=for-the-badge" alt="Downloads" />
-  <img src="https://img.shields.io/github/v/release/MythicalSHUB/SpatialFlow?color=4ADE80&style=for-the-badge" alt="Release" />
-  <img src="https://img.shields.io/github/actions/workflow/status/MythicalSHUB/SpatialFlow/release.yml?style=for-the-badge&label=BUILD" alt="Build Status" />
-  <img src="https://img.shields.io/github/stars/MythicalSHUB/SpatialFlow?color=F59E0B&style=for-the-badge" alt="Stars" />
-  <img src="https://img.shields.io/github/license/MythicalSHUB/SpatialFlow?color=10B981&style=for-the-badge" alt="License" />
-  <br/>
-  <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Platform" />
-  <img src="https://img.shields.io/badge/Language-Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Language" />
-  <img src="https://img.shields.io/badge/UI-New_Compose_UI-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" alt="New Compose UI" />
-  <img src="https://img.shields.io/badge/Design-M3_Expressive-FF4081?style=for-the-badge&logo=materialdesign&logoColor=white" alt="M3 Expressive" />
-  <a href="https://t.me/SpatialFlow"><img src="https://img.shields.io/badge/Telegram-Join_Community-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram Community" /></a>
-  <a href="https://ko-fi.com/mythicalshub"><img src="https://img.shields.io/badge/Ko--fi-Support_Project-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Support on Ko-fi" /></a>
+  <a href="https://github.com/MythicalSHUB/SpatialFlow/releases"><img src="https://shieldcn.dev/github/release/MythicalSHUB/SpatialFlow.svg?theme=dark" alt="Release" /></a>
+  <a href="https://github.com/MythicalSHUB/SpatialFlow/releases"><img src="https://shieldcn.dev/github/downloads/MythicalSHUB/SpatialFlow.svg?theme=dark" alt="Downloads" /></a>
+  <a href="https://github.com/MythicalSHUB/SpatialFlow/actions"><img src="https://shieldcn.dev/github/ci/MythicalSHUB/SpatialFlow.svg?theme=dark" alt="Build Status" /></a>
+  <a href="https://github.com/MythicalSHUB/SpatialFlow/stargazers"><img src="https://shieldcn.dev/github/stars/MythicalSHUB/SpatialFlow.svg?theme=dark" alt="Stars" /></a>
+  <a href="LICENSE"><img src="https://shieldcn.dev/github/license/MythicalSHUB/SpatialFlow.svg?theme=dark" alt="License" /></a>
+</p>
+
+<p align="center">
+  <a href="https://skillicons.dev">
+    <img src="https://skillicons.dev/icons?i=androidstudio,kotlin,java,gradle,materialui,git,github" alt="Tech Stack" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://t.me/SpatialFlow"><img src="https://badgen.net/badge/Telegram/Join%20Community/2CA5E0?icon=telegram" alt="Telegram Community" /></a>
+  <a href="https://ko-fi.com/mythicalshub"><img src="https://badgen.net/badge/Ko-fi/Support%20Project/FF5E5B?icon=kofi" alt="Support on Ko-fi" /></a>
 </p>
 
 ---
@@ -102,13 +106,15 @@ Whether playing high-fidelity offline files from internal storage or streaming d
 
 | Layer | Technology |
 | :--- | :--- |
-| **Language** | Kotlin 1.9+ |
-| **UI Toolkit** | Jetpack Compose (Material Design 3 Expressive) |
-| **Architecture** | MVI (Model-View-Intent) Presentation Layer |
-| **Media Engine** | AndroidX Media3 (ExoPlayer) |
-| **Dependency Injection** | Koin for Android |
-| **Networking** | Ktor Client + Coroutines & StateFlow |
-| **Data Extraction** | InnerTube Models + NewPipe Extractor |
+| **Platform** | <img src="https://img.shields.io/badge/Android-15-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android" /> |
+| **Language** | <img src="https://img.shields.io/badge/Kotlin-1.9+-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin" /> |
+| **UI Toolkit** | <img src="https://img.shields.io/badge/Jetpack_Compose-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white" alt="Compose" /> <img src="https://img.shields.io/badge/Material_Design-3_Expressive-FF4081?style=flat-square&logo=materialdesign&logoColor=white" alt="Material Design" /> |
+| **Architecture** | <img src="https://img.shields.io/badge/Pattern-MVI-18181b?style=flat-square" alt="MVI" /> Model-View-Intent Presentation Layer |
+| **Media Engine** | <img src="https://img.shields.io/badge/AndroidX-Media3_(ExoPlayer)-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Media3" /> |
+| **Dependency Injection** | <img src="https://img.shields.io/badge/DI-Koin-F59E0B?style=flat-square&logo=kotlin&logoColor=white" alt="Koin" /> Koin for Android |
+| **Networking** | <img src="https://img.shields.io/badge/Networking-Ktor-087CFA?style=flat-square&logo=ktor&logoColor=white" alt="Ktor" /> Client + Coroutines & StateFlow |
+| **Data Extraction** | <img src="https://img.shields.io/badge/Extractor-NewPipe-E62117?style=flat-square&logo=youtube&logoColor=white" alt="NewPipe" /> InnerTube Models + NewPipe Extractor |
+| **Build System** | <img src="https://img.shields.io/badge/Gradle-02303A?style=flat-square&logo=gradle&logoColor=white" alt="Gradle" /> <img src="https://img.shields.io/badge/Android_Studio-3DDC84?style=flat-square&logo=androidstudio&logoColor=white" alt="Android Studio" /> |
 
 ---
 
@@ -162,7 +168,6 @@ Contributions, bug reports, and feature requests are welcome:
 Join the official SpatialFlow community or support ongoing development:
 - **Telegram Group:** [t.me/SpatialFlow](https://t.me/SpatialFlow) — Support, discussions, and updates.
 - **Support Development:** [<img src="https://img.shields.io/badge/Ko--fi-Support_Development-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" height="24" />](https://ko-fi.com/mythicalshub) — Help keep the project open-source and active.
-- **Pull Requests:** [<img src="https://img.shields.io/badge/PRs-Welcome-brightgreen?style=for-the-badge&logo=github" height="24" />](https://github.com/MythicalSHUB/SpatialFlow/pulls) — Contributions are always welcome!
 
 ---
 
@@ -182,6 +187,7 @@ SpatialFlow is built upon open-source software and community projects:
 
 **Shubham Karande**  
 Focused on building modern, fluid, and open-source Android applications.
+
 
 ---
 ## License
