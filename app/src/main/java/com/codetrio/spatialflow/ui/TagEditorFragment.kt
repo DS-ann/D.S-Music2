@@ -16,7 +16,6 @@ import android.provider.MediaStore
 
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -91,7 +90,6 @@ private fun Context.findActivity(): Activity? {
 }
 
 @SuppressLint("ObsoleteSdkInt")
-@RequiresApi(Build.VERSION_CODES.Q)
 @Composable
 fun TagEditorScreenEntryPoint(
     song: SongItem,
@@ -495,7 +493,6 @@ private fun ActionButtonsRow(
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.Q)
 @Composable
 private fun TagEditorScreen(
     song: SongItem,
