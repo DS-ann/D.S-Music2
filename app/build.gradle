@@ -16,10 +16,12 @@ if (localPropsFile.exists()) {
 }
 
 // Use different variable names to avoid conflict with signing config properties
-def myKeystoreFile = localProps.getProperty('KEYSTORE_FILE') ?: System.getenv("ANDROID_KEYSTORE_PATH")
-def myKeystorePassword = localProps.getProperty('KEYSTORE_PASSWORD') ?: System.getenv("ANDROID_KEYSTORE_PASSWORD")
-def myKeyAlias = localProps.getProperty('KEY_ALIAS') ?: System.getenv("ANDROID_KEY_ALIAS")
-def myKeyPassword = localProps.getProperty('KEY_PASSWORD') ?: System.getenv("ANDROID_KEY_ALIAS_PASSWORD")
+def myKeystoreFile = localProps.getProperty('KEYSTORE_FILE') ?: System.getenv("BATTERYPULSE_KEYSTORE_PATH") ?: System.getenv("ANDROID_KEYSTORE_PATH")
+def myKeystorePassword = localProps.getProperty('KEYSTORE_PASSWORD') ?: System.getenv("BATTERYPULSE_STORE_PASSWORD") ?: System.getenv("ANDROID_KEYSTORE_PASSWORD")
+def myKeyAlias = localProps.getProperty('KEY_ALIAS') ?: System.getenv("BATTERYPULSE_KEY_ALIAS") ?: System.getenv("ANDROID_KEY_ALIAS")
+def myKeyPassword = localProps.getProperty('KEY_PASSWORD') ?: System.getenv("BATTERYPULSE_KEY_PASSWORD") ?: System.getenv("ANDROID_KEY_ALIAS_PASSWORD")
+// The launcher release key is PKCS#12; legacy local/JKS signing remains supported.
+def myKeystoreType = localProps.getProperty('KEYSTORE_TYPE') ?: (System.getenv("BATTERYPULSE_KEYSTORE_PATH") ? "PKCS12" : null)
 
 // Check if all required signing properties are available
 def isReleaseSigningReady = myKeystoreFile != null && myKeystorePassword != null && myKeyAlias != null && myKeyPassword != null
@@ -33,7 +35,8 @@ android {
 
     defaultConfig {
         applicationId "com.codetrio.spatialflow"
-        minSdk 25
+        // Android 6.0 Marshmallow is API 23; keep APIs newer than 23 guarded at runtime.
+        minSdk 23
         targetSdk 37
         versionCode 8
         versionName "1.8"
@@ -46,6 +49,9 @@ android {
                 storePassword myKeystorePassword
                 keyAlias myKeyAlias
                 keyPassword myKeyPassword
+                if (myKeystoreType != null) {
+                    storeType myKeystoreType
+                }
             }
         }
     }
