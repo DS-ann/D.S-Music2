@@ -1,0 +1,109 @@
+name: Build and Sign SpatialFlow APK (Android 6+)
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'app/**'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle.properties'
+      - '.github/workflows/android6-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spatialflow-android6-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and verify signed APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle without cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+          cache-disabled: true
+
+      - name: Set up Android SDK build tools
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+
+      - name: Install Android 17 SDK and Build Tools
+        run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0"
+
+      - name: Prepare and validate launcher signing key
+        env:
+          BATTERYPULSE_KEYSTORE_BASE64: ${{ secrets.BATTERYPULSE_KEYSTORE_BASE64 }}
+          BATTERYPULSE_STORE_PASSWORD: ${{ secrets.BATTERYPULSE_STORE_PASSWORD }}
+          BATTERYPULSE_KEY_ALIAS: ${{ secrets.BATTERYPULSE_KEY_ALIAS }}
+          BATTERYPULSE_KEY_PASSWORD: ${{ secrets.BATTERYPULSE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$BATTERYPULSE_KEYSTORE_BASE64" ] || [ -z "$BATTERYPULSE_STORE_PASSWORD" ] || [ -z "$BATTERYPULSE_KEY_ALIAS" ] || [ -z "$BATTERYPULSE_KEY_PASSWORD" ]; then
+            echo "Launcher signing secrets are missing in DS-ann/SpatialFlow." >&2
+            echo "Configure BATTERYPULSE_KEYSTORE_BASE64, BATTERYPULSE_STORE_PASSWORD, BATTERYPULSE_KEY_ALIAS, and BATTERYPULSE_KEY_PASSWORD in this repository's GitHub Actions secrets." >&2
+            exit 1
+          fi
+          printf '%s' "$BATTERYPULSE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/batterypulse-release.p12"
+          keytool -list -storetype PKCS12 -keystore "$RUNNER_TEMP/batterypulse-release.p12" -storepass "$BATTERYPULSE_STORE_PASSWORD" -alias "$BATTERYPULSE_KEY_ALIAS" >/dev/null
+          chmod 600 "$RUNNER_TEMP/batterypulse-release.p12"
+          echo "BATTERYPULSE_KEYSTORE_PATH=$RUNNER_TEMP/batterypulse-release.p12" >> "$GITHUB_ENV"
+          echo "Launcher PKCS#12 signing key validated."
+
+      - name: Clean and build signed release APK
+        env:
+          BATTERYPULSE_STORE_PASSWORD: ${{ secrets.BATTERYPULSE_STORE_PASSWORD }}
+          BATTERYPULSE_KEY_ALIAS: ${{ secrets.BATTERYPULSE_KEY_ALIAS }}
+          BATTERYPULSE_KEY_PASSWORD: ${{ secrets.BATTERYPULSE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if gradle --no-daemon --no-build-cache --no-configuration-cache --stacktrace clean assembleRelease; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Gradle build attempt $attempt failed; retrying in case of a transient dependency repository error."
+              sleep $((attempt * 15))
+            fi
+          done
+          exit 1
+
+      - name: Verify APK signature and label output
+        run: |
+          set -euo pipefail
+          SOURCE_APK="app/build/outputs/apk/release/app-release.apk"
+          OUTPUT_APK="app/build/outputs/apk/release/SpatialFlow-Android6-release.apk"
+          APK_SIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
+          test -s "$SOURCE_APK"
+          test -x "$APK_SIGNER"
+          cp "$SOURCE_APK" "$OUTPUT_APK"
+          "$APK_SIGNER" verify --verbose "$OUTPUT_APK"
+          echo "Verified signed APK: $OUTPUT_APK"
+
+      - name: Upload signed APK as a single-file artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: SpatialFlow-Android6-release-APK
+          path: app/build/outputs/apk/release/SpatialFlow-Android6-release.apk
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
