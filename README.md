@@ -122,8 +122,8 @@ Whether playing high-fidelity offline files from internal storage or streaming d
 
 | Parameter | Minimum / Required |
 | :--- | :--- |
-| **Minimum SDK** | API 24 (Android 7.0 Nougat) |
-| **Target SDK** | API 35 (Android 15) |
+| **Minimum SDK** | API 23 (Android 6.0 Marshmallow) |
+| **Target SDK** | API 37 (Android 17) |
 | **JDK Version** | Java Development Kit 17 |
 
 ---
