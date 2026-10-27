@@ -8,8 +8,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.expandVertically
@@ -2597,7 +2595,6 @@ private fun RecapTabContent(
 }
 
 // Background scanner helper
-@RequiresApi(Build.VERSION_CODES.Q)
 private suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedViewModel) {
     withContext(Dispatchers.IO) {
         val songs = ArrayList<SongItem>()
