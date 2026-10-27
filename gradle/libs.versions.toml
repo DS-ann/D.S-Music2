@@ -1,5 +1,5 @@
 [versions]
-agp = "9.1.0"
+agp = "9.1.1"
 dynamicanimation = "1.0.0"
 androidxJunit = "1.3.0"
 appcompatVersion = "1.7.1"
