@@ -7,9 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
-import android.os.Build
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.core.content.edit
 import androidx.core.graphics.ColorUtils
@@ -63,7 +61,6 @@ import kotlin.time.Duration.Companion.milliseconds
  * Migrated from legacy Java/LiveData architecture to StateFlow + Coroutines.
  * Optimized for Material 3 Expressive and Media3 integration.
  */
-@RequiresApi(Build.VERSION_CODES.Q)
 @HiltViewModel
 class PlayerSharedViewModel @Inject constructor(
     private val application: Application,
