@@ -28,16 +28,16 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Set up Gradle without cache
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.3.1'
           cache-disabled: true
@@ -87,6 +87,9 @@ jobs:
             fi
           done
           exit 1
+
+      - name: Run Android Lint for API compatibility
+        run: gradle --no-daemon --no-build-cache --no-configuration-cache lintRelease
 
       - name: Require launcher signing before publishing
         run: |
