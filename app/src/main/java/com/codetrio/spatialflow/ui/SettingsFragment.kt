@@ -24,7 +24,6 @@ import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
@@ -742,7 +741,6 @@ private fun Context.findActivity(): Activity? {
     return null
 }
 
-@RequiresApi(Build.VERSION_CODES.Q)
 @Composable
 fun SettingsScreenContent(
     viewModel: SettingsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(LocalContext.current.findActivity() as androidx.activity.ComponentActivity),
