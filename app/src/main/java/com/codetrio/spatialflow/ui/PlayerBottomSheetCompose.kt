@@ -2,8 +2,6 @@ package com.codetrio.spatialflow.ui
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.AnimationVector1D
@@ -693,7 +691,6 @@ fun Modifier.miniPlayerDismissHorizontalGesture(
 // ==========================================
 // 7. STEP 7: THE MASTER ASSEMBLY CONTAINER
 // ==========================================
-@RequiresApi(Build.VERSION_CODES.Q)
 @SuppressLint("ConfigurationScreenWidthHeight")
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
