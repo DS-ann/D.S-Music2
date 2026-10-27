@@ -1,8 +1,6 @@
 package com.codetrio.spatialflow.model
 
 import android.net.Uri
-import android.os.Build
-import androidx.annotation.RequiresApi
 import java.io.File
 import java.io.Serializable
 import androidx.core.net.toUri
@@ -66,19 +64,31 @@ data class SongItem(
         return contentUri
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
+    /**
+     * Reads embedded artwork using APIs available since Android 6.
+     * MediaMetadataRetriever.release() is used instead of AutoCloseable/use,
+     * which is not available on all supported Android versions.
+     */
     fun getEmbeddedPicture(context: android.content.Context): ByteArray? {
         val currentPath = path ?: return null
         if (currentPath.startsWith("http")) return null
-        try {
+        return try {
             context.contentResolver.openFileDescriptor(contentUri, "r")?.use { pfd ->
-                android.media.MediaMetadataRetriever().use { mmr ->
-                    mmr.setDataSource(pfd.fileDescriptor)
-                    return mmr.embeddedPicture
+                val retriever = android.media.MediaMetadataRetriever()
+                try {
+                    retriever.setDataSource(pfd.fileDescriptor)
+                    retriever.embeddedPicture
+                } finally {
+                    try {
+                        retriever.release()
+                    } catch (_: Exception) {
+                        // Preserve the artwork read result if release fails.
+                    }
                 }
             }
-        } catch (_: Exception) {}
-        return null
+        } catch (_: Exception) {
+            null
+        }
     }
 
     override fun equals(other: Any?): Boolean {
