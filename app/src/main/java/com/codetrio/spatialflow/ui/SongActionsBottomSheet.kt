@@ -4,12 +4,10 @@ package com.codetrio.spatialflow.ui
 
 import android.annotation.SuppressLint
 import android.content.res.Configuration
-import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.animateDpAsState
@@ -150,7 +148,6 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
         viewModel = ViewModelProvider(requireActivity())[PlayerSharedViewModel::class.java]
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -174,7 +171,6 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
 
 enum class BottomSheetTab { OPTIONS, INFO }
 
-@RequiresApi(Build.VERSION_CODES.Q)
 @OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun BottomSheetScaffoldContent(
