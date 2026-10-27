@@ -3,11 +3,9 @@ package com.codetrio.spatialflow.ui.player
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -80,7 +78,6 @@ import com.codetrio.spatialflow.viewmodel.PlayerSharedViewModel
  * Stateful wrapper for the FullPlayer UI component.
  * Decouples the UI component from ViewModel, Activity, and direct permission handling.
  */
-@RequiresApi(Build.VERSION_CODES.Q)
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun FullPlayerScreen(
@@ -196,7 +193,6 @@ fun FullPlayerScreen(
  * Purely stateless UI representation of the Full Player.
  * Does not depend on ViewModels or Activities, ensuring great previewability and testability.
  */
-@RequiresApi(Build.VERSION_CODES.Q)
 @SuppressLint("ConfigurationScreenWidthHeight")
 @OptIn(
     ExperimentalMaterial3ExpressiveApi::class,
