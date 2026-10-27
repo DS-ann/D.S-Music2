@@ -50,7 +50,7 @@ jobs:
       - name: Install Android 17 SDK and Build Tools
         run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0"
 
-      - name: Prepare and validate launcher signing key
+      - name: Prepare launcher signing key when secrets are configured
         env:
           BATTERYPULSE_KEYSTORE_BASE64: ${{ secrets.BATTERYPULSE_KEYSTORE_BASE64 }}
           BATTERYPULSE_STORE_PASSWORD: ${{ secrets.BATTERYPULSE_STORE_PASSWORD }}
@@ -59,17 +59,18 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "$BATTERYPULSE_KEYSTORE_BASE64" ] || [ -z "$BATTERYPULSE_STORE_PASSWORD" ] || [ -z "$BATTERYPULSE_KEY_ALIAS" ] || [ -z "$BATTERYPULSE_KEY_PASSWORD" ]; then
-            echo "Launcher signing secrets are missing in DS-ann/SpatialFlow." >&2
-            echo "Configure BATTERYPULSE_KEYSTORE_BASE64, BATTERYPULSE_STORE_PASSWORD, BATTERYPULSE_KEY_ALIAS, and BATTERYPULSE_KEY_PASSWORD in this repository's GitHub Actions secrets." >&2
-            exit 1
+            echo "SPATIALFLOW_SIGNING_READY=false" >> "$GITHUB_ENV"
+            echo "::warning::Launcher signing secrets are not configured in DS-ann/SpatialFlow. The workflow will still compile the release variant, but it will not publish an unsigned APK."
+            exit 0
           fi
           printf '%s' "$BATTERYPULSE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/batterypulse-release.p12"
           keytool -list -storetype PKCS12 -keystore "$RUNNER_TEMP/batterypulse-release.p12" -storepass "$BATTERYPULSE_STORE_PASSWORD" -alias "$BATTERYPULSE_KEY_ALIAS" >/dev/null
           chmod 600 "$RUNNER_TEMP/batterypulse-release.p12"
           echo "BATTERYPULSE_KEYSTORE_PATH=$RUNNER_TEMP/batterypulse-release.p12" >> "$GITHUB_ENV"
+          echo "SPATIALFLOW_SIGNING_READY=true" >> "$GITHUB_ENV"
           echo "Launcher PKCS#12 signing key validated."
 
-      - name: Clean and build signed release APK
+      - name: Clean and build release variant
         env:
           BATTERYPULSE_STORE_PASSWORD: ${{ secrets.BATTERYPULSE_STORE_PASSWORD }}
           BATTERYPULSE_KEY_ALIAS: ${{ secrets.BATTERYPULSE_KEY_ALIAS }}
@@ -86,6 +87,14 @@ jobs:
             fi
           done
           exit 1
+
+      - name: Require launcher signing before publishing
+        run: |
+          set -euo pipefail
+          if [ "${SPATIALFLOW_SIGNING_READY:-false}" != "true" ]; then
+            echo "::error::The release variant compiled, but no signed APK will be published until the four BATTERYPULSE_* Actions secrets are configured in DS-ann/SpatialFlow."
+            exit 1
+          fi
 
       - name: Verify APK signature and label output
         run: |
