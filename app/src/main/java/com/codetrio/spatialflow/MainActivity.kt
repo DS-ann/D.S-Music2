@@ -20,7 +20,6 @@ import android.view.View
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -123,7 +122,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val serviceConnection = object : ServiceConnection {
-        @RequiresApi(Build.VERSION_CODES.Q)
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             Log.d(TAG, "Service connected")
             val binder = service as? AudioPlaybackService.LocalBinder
@@ -141,7 +139,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         enableEdgeToEdge()
@@ -724,14 +721,12 @@ class MainActivity : AppCompatActivity() {
         super.onBackPressed()
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIntent(intent)
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
 
@@ -751,7 +746,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
     private fun playExternalUri(uri: Uri) {
         var displayName = "External Track"
         if ("content" == uri.scheme) {
