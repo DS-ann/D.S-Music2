@@ -48,6 +48,8 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
@@ -84,6 +86,15 @@ private data class LyricDisplayItem(
     val originalIndex: Int,
     val isActive: Boolean = false,
     val isPast: Boolean = false
+)
+
+/**
+ * Expensive glyph geometry is created once after text layout, not again on every karaoke frame.
+ */
+private data class KaraokeTextGeometry(
+    val characterPaths: List<Path>,
+    val characterBounds: List<Rect>,
+    val controllingWordIndices: IntArray
 )
 
 // Apple Music-inspired easing curves
@@ -311,15 +322,12 @@ private fun LyricLineItem(
         label = "LyricAlpha"
     )
 
-    val rawPos = if ((isKaraoke || line.backgroundWords.isNotEmpty()) && isActive) currentPositionProvider() else lineStartMs.toInt()
-    val smoothedPos by animateFloatAsState(
-        targetValue = rawPos.toFloat(),
-        animationSpec = tween(
-            durationMillis = 200,
-            easing = LinearEasing
-        ),
-        label = "SmoothKaraokePos"
-    )
+    // Use the live playback position directly. The former 200 ms tween made karaoke visibly late.
+    val rawPos = if ((isKaraoke || line.backgroundWords.isNotEmpty()) && isActive) {
+        currentPositionProvider()
+    } else {
+        lineStartMs.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
+    }
 
     val bracketMatch = remember(line.content) {
         Regex("""^(.*?)\s*([({\[].+?[)}\]])\s*$""").find(line.content)
@@ -429,11 +437,18 @@ private fun LyricLineItem(
                     modifier = Modifier
                         .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
                         .drawWithCache {
+                            val layout = mainTextLayoutResult.value
+                            val geometry = layout?.let { buildKaraokeTextGeometry(it, line.words, 0) }
                             onDrawWithContent {
-                                val layout = mainTextLayoutResult.value
-                                if (layout != null) {
-                                    drawContent()
-                                    eraseFutureText(layout, line.words, smoothedPos.toLong(), 0, this)
+                                drawContent()
+                                if (geometry != null) {
+                                    eraseFutureText(
+                                        geometry = geometry,
+                                        words = line.words,
+                                        pos = rawPos.toLong(),
+                                        wordOffset = 0,
+                                        drawScope = this
+                                    )
                                 }
                             }
                         }
@@ -469,11 +484,18 @@ private fun LyricLineItem(
                         modifier = Modifier
                             .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
                             .drawWithCache {
+                                val layout = bracketTextLayoutResult.value
+                                val geometry = layout?.let { buildKaraokeTextGeometry(it, line.words, bracketStartIndex) }
                                 onDrawWithContent {
-                                    val layout = bracketTextLayoutResult.value
-                                    if (layout != null) {
-                                        drawContent()
-                                        eraseFutureText(layout, line.words, smoothedPos.toLong(), bracketStartIndex, this)
+                                    drawContent()
+                                    if (geometry != null) {
+                                        eraseFutureText(
+                                            geometry = geometry,
+                                            words = line.words,
+                                            pos = rawPos.toLong(),
+                                            wordOffset = bracketStartIndex,
+                                            drawScope = this
+                                        )
                                     }
                                 }
                             }
@@ -522,11 +544,18 @@ private fun LyricLineItem(
                                 compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
                             }
                             .drawWithCache {
+                                val layout = backgroundLayoutResult.value
+                                val geometry = layout?.let { buildKaraokeTextGeometry(it, line.backgroundWords, 0) }
                                 onDrawWithContent {
-                                    val layout = backgroundLayoutResult.value
-                                    if (layout != null) {
-                                        drawContent()
-                                        eraseFutureText(layout, line.backgroundWords, smoothedPos.toLong(), 0, this)
+                                    drawContent()
+                                    if (geometry != null) {
+                                        eraseFutureText(
+                                            geometry = geometry,
+                                            words = line.backgroundWords,
+                                            pos = rawPos.toLong(),
+                                            wordOffset = 0,
+                                            drawScope = this
+                                        )
                                     }
                                 }
                             },
@@ -538,96 +567,125 @@ private fun LyricLineItem(
     }
 }
 
-private fun eraseFutureText(
+private fun buildKaraokeTextGeometry(
     layout: androidx.compose.ui.text.TextLayoutResult,
+    words: List<LyricWord>,
+    wordOffset: Int
+): KaraokeTextGeometry {
+    val textLength = layout.layoutInput.text.length
+    val paths = ArrayList<Path>(textLength)
+    val bounds = ArrayList<Rect>(textLength)
+    val wordIndices = IntArray(textLength)
+
+    for (charIndex in 0 until textLength) {
+        paths.add(layout.getPathForRange(charIndex, charIndex + 1))
+        bounds.add(layout.getBoundingBox(charIndex))
+        wordIndices[charIndex] = findControllingWordIndex(charIndex + wordOffset, words)
+    }
+
+    return KaraokeTextGeometry(
+        characterPaths = paths,
+        characterBounds = bounds,
+        controllingWordIndices = wordIndices
+    )
+}
+
+private fun eraseFutureText(
+    geometry: KaraokeTextGeometry,
     words: List<LyricWord>,
     pos: Long,
     wordOffset: Int,
     drawScope: androidx.compose.ui.graphics.drawscope.DrawScope
 ) {
-    val textLength = layout.layoutInput.text.length
-    for (charIndex in 0 until textLength) {
-        val absoluteCharIndex = charIndex + wordOffset
-        val controllingWord = findControllingWord(absoluteCharIndex, words, wordOffset)
-        
-        val charProgress = if (controllingWord != null) {
+    if (geometry.characterPaths.isEmpty()) return
+
+    // Compute the playback progress once per word. Previously each character searched all words
+    // and recalculated the same timestamp interpolation, multiplying work for long lyric lines.
+    val wordProgress = FloatArray(words.size) { index ->
+        calculateWordProgress(words[index], pos)
+    }
+
+    for (charIndex in geometry.characterPaths.indices) {
+        val wordIndex = geometry.controllingWordIndices[charIndex]
+        val charProgress = if (wordIndex >= 0) {
             calculateCharProgress(
                 charIndex = charIndex,
-                word = controllingWord,
+                word = words[wordIndex],
                 wordOffset = wordOffset,
-                pos = pos
+                easedWordProgress = easeOutCubic(wordProgress[wordIndex])
             )
-        } else 0f
-        
-        if (charProgress >= 0.99f) {
-            // Fully swept character: leave it fully lit (do not erase)
-        } else if (charProgress < 0.01f) {
-            // Fully future character: erase it completely!
-            val path = layout.getPathForRange(charIndex, charIndex + 1)
-            drawScope.drawPath(path, color = Color.Black, blendMode = androidx.compose.ui.graphics.BlendMode.DstOut)
         } else {
-            // Partially sweeping character: soft gradient erase
-            val path = layout.getPathForRange(charIndex, charIndex + 1)
-            val box = layout.getBoundingBox(charIndex)
-            
-            val gradientWidth = box.width * 1.5f
-            val sweepCenter = box.left + (box.width * charProgress)
-            
-            // We want to erase the right side. So the brush goes from Transparent (left) to Black (right)
-            val brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
-                0.0f to Color.Transparent, 
-                1.0f to Color.Black,       
+            0f
+        }
+
+        if (charProgress >= 0.99f) continue
+
+        val path = geometry.characterPaths[charIndex]
+        if (charProgress < 0.01f) {
+            drawScope.drawPath(path, color = Color.Black, blendMode = BlendMode.DstOut)
+        } else {
+            val bounds = geometry.characterBounds[charIndex]
+            if (bounds.width <= 0f) continue
+            val gradientWidth = bounds.width * 1.5f
+            val sweepCenter = bounds.left + (bounds.width * charProgress)
+            val brush = Brush.horizontalGradient(
+                0.0f to Color.Transparent,
+                1.0f to Color.Black,
                 startX = sweepCenter - (gradientWidth / 2f),
                 endX = sweepCenter + (gradientWidth / 2f)
             )
-            
-            drawScope.drawPath(path, brush = brush, blendMode = androidx.compose.ui.graphics.BlendMode.DstOut)
+            drawScope.drawPath(path, brush = brush, blendMode = BlendMode.DstOut)
         }
     }
 }
 
-private fun findControllingWord(absoluteCharIndex: Int, words: List<LyricWord>, offset: Int = 0): LyricWord? {
-    if (words.isEmpty()) return null
-    
-    val exactWord = words.find { absoluteCharIndex in it.charRange }
-    if (exactWord != null) return exactWord
-    
-    if (absoluteCharIndex < words.first().charRange.first) return words.first()
-    if (absoluteCharIndex > words.last().charRange.last) return words.last()
-    
-    return words.lastOrNull { it.charRange.last < absoluteCharIndex } ?: words.first()
+/**
+ * Word ranges are sorted. Binary search preserves the old fallback behavior for characters
+ * in spaces before, between, or after word ranges without scanning every word on every frame.
+ */
+private fun findControllingWordIndex(absoluteCharIndex: Int, words: List<LyricWord>): Int {
+    if (words.isEmpty()) return -1
+
+    var low = 0
+    var high = words.lastIndex
+    while (low <= high) {
+        val middle = (low + high) ushr 1
+        val range = words[middle].charRange
+        when {
+            absoluteCharIndex < range.first -> high = middle - 1
+            absoluteCharIndex > range.last -> low = middle + 1
+            else -> return middle
+        }
+    }
+    return high.coerceIn(0, words.lastIndex)
+}
+
+private fun calculateWordProgress(word: LyricWord, pos: Long): Float {
+    val wordStartMs = word.absoluteStartTimeMs
+    val wordEndMs = wordStartMs + word.durationMs.coerceAtLeast(120L)
+    return when {
+        pos < wordStartMs -> 0f
+        pos >= wordEndMs -> 1f
+        else -> ((pos - wordStartMs).toFloat() /
+            (wordEndMs - wordStartMs).toFloat().coerceAtLeast(1f)).coerceIn(0f, 1f)
+    }
 }
 
 private fun calculateCharProgress(
     charIndex: Int,
     word: LyricWord,
     wordOffset: Int,
-    pos: Long
+    easedWordProgress: Float
 ): Float {
-    val wordStartMs = word.absoluteStartTimeMs
-    val wordEndMs = wordStartMs + word.durationMs.coerceAtLeast(120L)
-    
-    val wordProgress = when {
-        pos < wordStartMs -> 0f
-        pos >= wordEndMs -> 1f
-        else -> {
-            val duration = (wordEndMs - wordStartMs).toFloat().coerceAtLeast(1f)
-            ((pos - wordStartMs).toFloat() / duration).coerceIn(0f, 1f)
-        }
-    }
-
-    val easedWordProgress = easeOutCubic(wordProgress)
-    
     val wStart = word.charRange.first - wordOffset
     val wEnd = (word.charRange.last + 1) - wordOffset
     val wordLength = (wEnd - wStart).toFloat().coerceAtLeast(1f)
-    
+
     val sweepWidth = 0.35f
     val sweepPosition = easedWordProgress * (1f + sweepWidth)
-    
     val charOffsetInWord = (charIndex - wStart).toFloat()
     val charRelativePosition = charOffsetInWord / wordLength
-    
+
     return when {
         sweepPosition < charRelativePosition -> 0f
         sweepPosition >= (charRelativePosition + sweepWidth) -> 1f

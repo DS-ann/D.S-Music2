@@ -1419,7 +1419,8 @@ class AudioPlaybackService : MediaSessionService() {
                         }
                     }
                 }
-                handler.postDelayed(this, 250)
+                val progressIntervalMs = if (viewModel?.isLyricsModeEnabled?.value == true) 80L else 250L
+                handler.postDelayed(this, progressIntervalMs)
             }
         }
         handler.post(progressUpdateRunnable)
