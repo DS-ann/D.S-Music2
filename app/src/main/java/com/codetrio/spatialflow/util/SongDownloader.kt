@@ -412,7 +412,7 @@ object SongDownloader {
                 cacheKey = cacheKey,
                 spans = spans,
                 contentLength = contentLength,
-                mimeType = ContentMetadata.getContentType(contentMetadata),
+                mimeType = metadata.mimeType,
                 cachedBytes = cachedBytes,
                 isComplete = complete
             )
