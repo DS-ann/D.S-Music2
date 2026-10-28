@@ -83,44 +83,46 @@ public class AudioFileManager {
         }
     }
 
-    public static void scanFile(Context context, File file) {
-        scanFile(context, file, null, null, null);
+    public static boolean scanFile(Context context, File file) {
+        return scanFile(context, file, null, null, null);
     }
 
-    public static void scanFile(Context context, File file, String title, String artist, String album) {
+    public static boolean scanFile(Context context, File file, String title, String artist, String album) {
+        if (file == null || !file.isFile()) {
+            Log.e(TAG, "Download file does not exist");
+            return false;
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Copy to MediaStore Audio while preserving source metadata in the library row.
-            copyToMediaStore(context, file, title, artist, album);
-        } else {
-            // Trigger media scanner for older versions
-            try {
-                context.sendBroadcast(
-                        new android.content.Intent(android.content.Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
-                                Uri.fromFile(file)));
-                Log.d(TAG, "Media scan requested: " + file.getAbsolutePath());
-            } catch (Exception e) {
-                Log.e(TAG, "scanFile failed: " + e.getMessage());
-            }
+            return copyToMediaStore(context, file, title, artist, album);
+        }
+        try {
+            context.sendBroadcast(
+                    new android.content.Intent(android.content.Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
+                            Uri.fromFile(file)));
+            Log.d(TAG, "Media scan requested: " + file.getAbsolutePath());
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "scanFile failed: " + e.getMessage(), e);
+            return false;
         }
     }
 
-    private static void copyToMediaStore(Context context, File sourceFile, String suppliedTitle, String suppliedArtist, String suppliedAlbum) {
-        if (!sourceFile.exists()) {
-            Log.e(TAG, "Source file doesn't exist: " + sourceFile.getAbsolutePath());
-            return;
+    private static boolean copyToMediaStore(Context context, File sourceFile, String suppliedTitle, String suppliedArtist, String suppliedAlbum) {
+        if (!sourceFile.isFile() || sourceFile.length() <= 0L) {
+            Log.e(TAG, "Source audio file is missing or empty: " + sourceFile.getAbsolutePath());
+            return false;
         }
 
-        // Get clean metadata from filename
-        String nameWithoutExtension = sourceFile.getName();
-        if (nameWithoutExtension.toLowerCase().endsWith(".mp3")) {
-            nameWithoutExtension = nameWithoutExtension.substring(0, nameWithoutExtension.length() - 4);
-        } else if (nameWithoutExtension.toLowerCase().endsWith(".m4a")) {
-            nameWithoutExtension = nameWithoutExtension.substring(0, nameWithoutExtension.length() - 4);
-        }
+        String displayName = sourceFile.getName();
+        int extensionIndex = displayName.lastIndexOf('.');
+        String nameWithoutExtension = extensionIndex > 0
+                ? displayName.substring(0, extensionIndex)
+                : displayName;
 
-        // Filename parsing is only a fallback. Prefer metadata supplied by the downloader.
-        String title = suppliedTitle != null && !suppliedTitle.trim().isEmpty() ? suppliedTitle.trim() : nameWithoutExtension;
-        String artist = suppliedArtist != null && !suppliedArtist.trim().isEmpty() ? suppliedArtist.trim() : "Unknown Artist";
+        String title = suppliedTitle != null && !suppliedTitle.trim().isEmpty()
+                ? suppliedTitle.trim() : nameWithoutExtension;
+        String artist = suppliedArtist != null && !suppliedArtist.trim().isEmpty()
+                ? suppliedArtist.trim() : "Unknown Artist";
         if ((suppliedTitle == null || suppliedTitle.trim().isEmpty() ||
                 suppliedArtist == null || suppliedArtist.trim().isEmpty()) && nameWithoutExtension.contains(" - ")) {
             String[] parts = nameWithoutExtension.split(" - ", 2);
@@ -147,46 +149,50 @@ public class AudioFileManager {
         else if (lowerFileName.endsWith(".wav")) mimeType = "audio/wav";
         else mimeType = "application/octet-stream";
         values.put(MediaStore.Audio.Media.MIME_TYPE, mimeType);
-
-        // Save under Music/SpatialFlow folder
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            values.put(MediaStore.Audio.Media.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/SpatialFlow");
-            values.put(MediaStore.Audio.Media.IS_PENDING, 1);
-        }
+        values.put(MediaStore.Audio.Media.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/SpatialFlow/");
+        values.put(MediaStore.Audio.Media.IS_PENDING, 1);
 
         ContentResolver resolver = context.getContentResolver();
-        Uri collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
-        Uri itemUri = resolver.insert(collection, values);
-
+        Uri itemUri = resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values);
         if (itemUri == null) {
-            Log.e(TAG, "Failed to create MediaStore entry");
-            return;
+            Log.e(TAG, "Failed to create MediaStore entry for " + sourceFile.getName());
+            return false;
         }
 
-        try (InputStream in = new java.io.FileInputStream(sourceFile);
-             OutputStream out = resolver.openOutputStream(itemUri)) {
-
-            if (out == null) {
-                Log.e(TAG, "Failed to open output stream");
-                return;
+        try {
+            long copiedBytes = 0L;
+            try (InputStream in = new java.io.FileInputStream(sourceFile);
+                 OutputStream out = resolver.openOutputStream(itemUri)) {
+                if (out == null) throw new IOException("MediaStore returned no output stream");
+                byte[] buffer = new byte[64 * 1024];
+                int bytesRead;
+                while ((bytesRead = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, bytesRead);
+                    copiedBytes += bytesRead;
+                }
+                out.flush();
             }
 
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-            while ((bytesRead = in.read(buffer)) != -1) {
-                out.write(buffer, 0, bytesRead);
+            long sourceBytes = sourceFile.length();
+            if (copiedBytes != sourceBytes) {
+                throw new IOException("MediaStore copy was incomplete: " + copiedBytes + " of " + sourceBytes + " bytes");
             }
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                values.clear();
-                values.put(MediaStore.Audio.Media.IS_PENDING, 0);
-                resolver.update(itemUri, values, null, null);
+            ContentValues ready = new ContentValues();
+            ready.put(MediaStore.Audio.Media.IS_PENDING, 0);
+            if (resolver.update(itemUri, ready, null, null) <= 0) {
+                throw new IOException("Could not publish the completed audio file");
             }
-
             Log.d(TAG, "File copied to MediaStore successfully: Music/SpatialFlow/" + sourceFile.getName());
-
-        } catch (IOException e) {
+            return true;
+        } catch (Exception e) {
+            try {
+                resolver.delete(itemUri, null, null);
+            } catch (Exception cleanupError) {
+                Log.w(TAG, "Could not remove incomplete MediaStore entry", cleanupError);
+            }
             Log.e(TAG, "Error copying to MediaStore: " + e.getMessage(), e);
+            return false;
         }
     }
 

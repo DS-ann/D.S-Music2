@@ -39,6 +39,7 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Groups
@@ -70,6 +71,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -98,6 +100,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import coil.size.Precision
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.codetrio.spatialflow.data.innertube.HomeSection
 import com.codetrio.spatialflow.data.innertube.OnlineAlbum
 import com.codetrio.spatialflow.data.innertube.OnlineArtist
@@ -340,7 +345,7 @@ fun SearchResultItem(
         // Thumbnail Image
         Box(modifier = Modifier.size(48.dp)) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).crossfade(false).build(),
+                model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).size(160, 160).precision(Precision.INEXACT).crossfade(false).build(),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize().clip(imageShape).sharedElementIfAvailable("image-$itemId"),
                 contentScale = ContentScale.Crop
@@ -486,7 +491,7 @@ fun BentoCell(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).crossfade(true).build(),
+                model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).size(512, 512).precision(Precision.INEXACT).crossfade(false).build(),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
@@ -702,7 +707,7 @@ fun HomeSectionRow(
                                         }
                                 ) {
                                     AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).crossfade(true).build(),
+                                        model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).size(512, 512).precision(Precision.INEXACT).crossfade(false).build(),
                                         contentDescription = null,
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = ContentScale.Crop
@@ -790,7 +795,7 @@ fun HomeSectionRow(
                                 }
                         ) {
                             AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).crossfade(true).build(),
+                                model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).size(512, 512).precision(Precision.INEXACT).crossfade(false).build(),
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
@@ -890,7 +895,7 @@ fun HomeSectionRow(
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).crossfade(true).build(),
+                                        model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).size(256, 256).precision(Precision.INEXACT).crossfade(false).build(),
                                         contentDescription = null,
                                         modifier = Modifier.size(72.dp).clip(RoundedCornerShape(10.dp)),
                                         contentScale = ContentScale.Crop
@@ -1072,7 +1077,7 @@ fun HomeCarouselItem(
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).crossfade(false).build(),
+                        model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).size(384, 384).precision(Precision.INEXACT).crossfade(false).build(),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
@@ -1147,7 +1152,7 @@ fun HomeSongListItem(
     ) {
         Box(modifier = Modifier.size(56.dp)) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current).data(song.thumbnailUrl).crossfade(false).build(),
+                model = ImageRequest.Builder(LocalContext.current).data(song.thumbnailUrl).size(192, 192).precision(Precision.INEXACT).crossfade(false).build(),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(4.dp)),
                 contentScale = ContentScale.Crop
@@ -1253,6 +1258,16 @@ fun OnlineSongBottomSheet(
             song.thumbnailUrl,
             song.artistId
         )
+    }
+    var isDownloaded by remember(song.videoId) { mutableStateOf(false) }
+    LaunchedEffect(song.videoId, isSongDownloading) {
+        if (isSongDownloading) {
+            isDownloaded = false
+        } else {
+            isDownloaded = withContext(Dispatchers.IO) {
+                SongDownloader.isSongDownloaded(context, onlineSongItem)
+            }
+        }
     }
 
     val configuration = LocalConfiguration.current
@@ -1421,10 +1436,24 @@ fun OnlineSongBottomSheet(
                     onDismissRequest()
                 },
                 Triple(
-                    if (isSongDownloading) "Cancel download" else "Download",
-                    if (isSongDownloading) Icons.Default.Close else Icons.Default.Download
+                    when {
+                        isSongDownloading -> "Cancel download"
+                        isDownloaded -> "Downloaded"
+                        else -> "Download"
+                    },
+                    when {
+                        isSongDownloading -> Icons.Default.Close
+                        isDownloaded -> Icons.Default.Check
+                        else -> Icons.Default.Download
+                    }
                 ) {
-                    SongDownloader.downloadSong(context, onlineSongItem)
+                    when {
+                        isSongDownloading -> SongDownloader.downloadSong(context, onlineSongItem)
+                        isDownloaded -> com.codetrio.spatialflow.ui.SnackbarController.showMessage(
+                            "Already downloaded: ${song.title}"
+                        )
+                        else -> SongDownloader.downloadSong(context, onlineSongItem)
+                    }
                     onDismissRequest()
                 },
                 Triple("Go to album", Icons.Default.Album) {

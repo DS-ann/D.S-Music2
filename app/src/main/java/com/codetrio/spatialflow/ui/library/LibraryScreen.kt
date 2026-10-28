@@ -2705,19 +2705,18 @@ private fun RecapTabContent(
     }
 }
 
-private fun isSpatialFlowDownloadedSong(song: SongItem): Boolean {
-    val relativePath = song.mediaStoreRelativePath.orEmpty()
-        .trim('/')
-        .lowercase(java.util.Locale.ROOT)
+private fun isSpatialFlowDownloadedSong(song: SongItem): Boolean =
+    isSpatialFlowDownloadedLocation(song.mediaStoreRelativePath, song.path ?: song.data)
+
+private fun isSpatialFlowDownloadedLocation(relativePathValue: String?, rawPath: String?): Boolean {
+    val relativePath = relativePathValue.orEmpty().trim('/').lowercase(java.util.Locale.ROOT)
     if (
-        relativePath == "music/spatialflow" ||
-        relativePath == "download/spatialflow" ||
-        relativePath == "downloads/spatialflow"
+        relativePath == "music/spatialflow" || relativePath.startsWith("music/spatialflow/") ||
+        relativePath == "download/spatialflow" || relativePath.startsWith("download/spatialflow/") ||
+        relativePath == "downloads/spatialflow" || relativePath.startsWith("downloads/spatialflow/")
     ) return true
 
-    val path = (song.path ?: song.data).orEmpty()
-        .replace('\\', '/')
-        .lowercase(java.util.Locale.ROOT)
+    val path = rawPath.orEmpty().replace('\\', '/').lowercase(java.util.Locale.ROOT)
     return path.contains("/music/spatialflow/") ||
         path.contains("/download/spatialflow/") ||
         path.contains("/downloads/spatialflow/")
@@ -2731,7 +2730,9 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
             val proj = mutableListOf(
                 android.provider.MediaStore.Audio.Media._ID,
                 android.provider.MediaStore.Audio.Media.TITLE,
+                android.provider.MediaStore.Audio.Media.DISPLAY_NAME,
                 android.provider.MediaStore.Audio.Media.ARTIST,
+                android.provider.MediaStore.Audio.Media.IS_MUSIC,
                 android.provider.MediaStore.Audio.Media.ALBUM_ID,
                 android.provider.MediaStore.Audio.Media.ALBUM,
                 android.provider.MediaStore.Audio.Media.DATA,
@@ -2750,13 +2751,15 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
             context.contentResolver.query(
                 android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                 proj,
-                "${android.provider.MediaStore.Audio.Media.IS_MUSIC} != 0",
+                null,
                 null,
                 "${android.provider.MediaStore.Audio.Media.TITLE} ASC"
             )?.use { c ->
                 val idCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media._ID)
                 val titleCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.TITLE)
+                val displayNameCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.DISPLAY_NAME)
                 val artistCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.ARTIST)
+                val isMusicCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.IS_MUSIC)
                 val albumCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.ALBUM_ID)
                 val albumNameCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.ALBUM)
                 val dataCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.DATA)
@@ -2765,25 +2768,51 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
                 val dateCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.DATE_ADDED)
                 while (c.moveToNext()) {
                     val path = c.getString(dataCol)
-                    if (path != null && hiddenFolders.any { path.startsWith(it) }) {
-                        continue
-                    }
+                    val relativePath = if (relativePathCol >= 0) c.getString(relativePathCol) else null
+                    val isDownloadedFile = isSpatialFlowDownloadedLocation(relativePath, path)
+                    if (!isDownloadedFile && c.getInt(isMusicCol) == 0) continue
+                    if (!isDownloadedFile && path != null && hiddenFolders.any { path.startsWith(it) }) continue
+
                     val duration = c.getLong(durCol)
-                    if (ignoreShort && duration < minDurationMs) {
-                        continue
+                    if (!isDownloadedFile && ignoreShort && duration < minDurationMs) continue
+
+                    // Some source containers cannot store tags. Recover basic display metadata
+                    // from the downloaded filename instead of returning blank/unknown tracks.
+                    val displayName = c.getString(displayNameCol).orEmpty().ifBlank {
+                        path?.substringAfterLast('/') ?: ""
                     }
+                    val baseName = displayName.substringBeforeLast('.', displayName)
+                    val nameSeparator = baseName.lastIndexOf(" - ")
+                    val fallbackTitle = if (nameSeparator > 0) baseName.substring(0, nameSeparator).trim() else baseName
+                    val fallbackArtist = if (nameSeparator > 0) baseName.substring(nameSeparator + 3).trim() else ""
+                    val storedTitle = c.getString(titleCol).orEmpty()
+                    val storedArtist = c.getString(artistCol).orEmpty()
+                    val title = if (
+                        isDownloadedFile && (
+                            storedTitle.isBlank() ||
+                                storedTitle.equals("<unknown>", ignoreCase = true) ||
+                                storedTitle.equals(baseName, ignoreCase = true)
+                        )
+                    ) fallbackTitle else storedTitle.ifBlank { fallbackTitle }
+                    val artist = if (
+                        isDownloadedFile &&
+                            (storedArtist.isBlank() ||
+                                storedArtist.equals("<unknown>", ignoreCase = true) ||
+                                storedArtist.equals("unknown artist", ignoreCase = true)) &&
+                            fallbackArtist.isNotBlank()
+                    ) fallbackArtist else storedArtist.ifBlank { "Unknown Artist" }
 
                     songs.add(
                         SongItem(
                             c.getLong(idCol),
-                            c.getString(titleCol),
-                            c.getString(artistCol),
+                            title,
+                            artist,
                             c.getLong(albumCol),
                             c.getString(dataCol),
-                            c.getLong(durCol),
+                            duration,
                             c.getLong(dateCol)
                         ).apply {
-                            mediaStoreRelativePath = if (relativePathCol >= 0) c.getString(relativePathCol) else null
+                            mediaStoreRelativePath = relativePath
                             albumName = c.getString(albumNameCol)?.takeIf {
                                 it.isNotBlank() && !it.equals("<unknown>", ignoreCase = true)
                             }

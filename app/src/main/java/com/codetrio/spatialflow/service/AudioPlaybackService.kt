@@ -444,6 +444,9 @@ class AudioPlaybackService : MediaSessionService() {
             newPosition: Player.PositionInfo,
             reason: Int
         ) {
+            viewModel?.setCurrentPosition(
+                newPosition.positionMs.coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            )
             if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) {
                 Log.d(TAG, "Auto-transition detected natively")
             }

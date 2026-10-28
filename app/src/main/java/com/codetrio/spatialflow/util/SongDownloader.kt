@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -37,6 +38,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
@@ -279,43 +281,17 @@ object SongDownloader {
                 )
                 task.outputFile = outputFile
 
-                val connection = URL(streamUrl).openConnection() as HttpURLConnection
-                task.connection = connection
-                connection.connect()
-
-                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    throw IOException("Download server error: HTTP ${connection.responseCode}")
-                }
-
-                val totalBytes = connection.contentLength
-                connection.inputStream.use { input ->
-                    FileOutputStream(outputFile).use { output ->
-                        val buffer = ByteArray(8192)
-                        var downloadedBytes = 0L
-                        var lastProgressUpdate = 0L
-                        while (true) {
-                            coroutineContext.ensureActive()
-                            val bytesRead = input.read(buffer)
-                            if (bytesRead == -1) break
-                            output.write(buffer, 0, bytesRead)
-                            downloadedBytes += bytesRead
-
-                            if (totalBytes > 0) {
-                                val progress = ((downloadedBytes.toDouble() / totalBytes) * 88.0).toInt().coerceIn(0, 88)
-                                if (_downloadProgress.value[videoId] != progress) {
-                                    _downloadProgress.value += (videoId to progress)
-                                }
-                                val now = System.currentTimeMillis()
-                                if (now - lastProgressUpdate > 400) {
-                                    lastProgressUpdate = now
-                                    updateNotification(context, cleanTitleStr, progress, notificationId)
-                                }
-                            }
-                        }
-                    }
-                }
-                connection.disconnect()
-                task.connection = null
+                downloadNetworkStream(
+                    context = context,
+                    title = cleanTitleStr,
+                    streamUrl = streamUrl,
+                    expectedBytes = downloadStream?.contentLength,
+                    outputFile = outputFile,
+                    task = task,
+                    videoId = videoId,
+                    notificationId = notificationId,
+                    coroutineContext = coroutineContext
+                )
             }
 
             coroutineContext.ensureActive()
@@ -353,41 +329,20 @@ object SongDownloader {
 
             coroutineContext.ensureActive()
 
-            var metadataEmbedded = false
-            try {
-                val audioFile = org.jaudiotagger.audio.AudioFileIO.read(outputFile)
-                val tag = audioFile.tagOrCreateAndSetDefault
-                tag.setField(org.jaudiotagger.tag.FieldKey.TITLE, cleanTitleStr)
-                tag.setField(org.jaudiotagger.tag.FieldKey.ARTIST, cleanArtistStr)
-                tag.setField(org.jaudiotagger.tag.FieldKey.ALBUM_ARTIST, cleanArtistStr)
-                song.albumName?.takeIf { it.isNotBlank() }?.let {
-                    tag.setField(org.jaudiotagger.tag.FieldKey.ALBUM, it.trim())
-                }
-                tag.setField(
-                    org.jaudiotagger.tag.FieldKey.COMMENT,
-                    if (cachedStream != null) {
-                        "Exported from SpatialFlow cached audio (video ID: $videoId)"
-                    } else {
-                        "Downloaded from YouTube Music (video ID: $videoId)"
-                    }
-                )
-
-                if (artworkBytes != null) {
-                    val artwork = org.jaudiotagger.tag.images.StandardArtwork()
-                    artwork.binaryData = artworkBytes
-                    artwork.mimeType = "image/jpeg"
-                    tag.deleteArtworkField()
-                    tag.setField(artwork)
-                }
-
-                audioFile.commit()
-                metadataEmbedded = true
-            } catch (e: Exception) {
-                Log.w(TAG, "Embedded metadata is not supported for ${outputFile.extension}", e)
-            }
+            val metadataEmbedded = embedMetadataSafely(
+                outputFile = outputFile,
+                title = cleanTitleStr,
+                artist = cleanArtistStr,
+                album = song.albumName,
+                videoId = videoId,
+                fromCache = cachedStream != null,
+                artworkBytes = artworkBytes
+            )
 
             coroutineContext.ensureActive()
-            AudioFileManager.scanFile(context, outputFile, cleanTitleStr, cleanArtistStr, song.albumName)
+            if (!AudioFileManager.scanFile(context, outputFile, cleanTitleStr, cleanArtistStr, song.albumName)) {
+                throw IOException("Could not publish the downloaded audio to the music library")
+            }
             showFinishedNotification(context, cleanTitleStr, cleanArtistStr, notificationId)
             _downloadProgress.value += (videoId to 100)
 
@@ -421,6 +376,188 @@ object SongDownloader {
             task.connection = null
             if (task.cancelled) task.outputFile?.delete()
             _downloadProgress.value -= videoId
+        }
+    }
+
+
+    /**
+     * Downloads with browser-like headers, buffered IO, exact response-length validation,
+     * and bounded retries for transient read/network failures.
+     */
+    private suspend fun downloadNetworkStream(
+        context: Context,
+        title: String,
+        streamUrl: String,
+        expectedBytes: Long?,
+        outputFile: File,
+        task: DownloadTask,
+        videoId: String,
+        notificationId: Int,
+        coroutineContext: CoroutineContext
+    ) {
+        var lastError: Exception? = null
+        for (attempt in 1..3) {
+            var connection: HttpURLConnection? = null
+            try {
+                coroutineContext.ensureActive()
+                if (outputFile.exists() && !outputFile.delete()) {
+                    throw IOException("Could not clear an incomplete audio download")
+                }
+                outputFile.parentFile?.let { parent ->
+                    if (!parent.exists() && !parent.mkdirs()) {
+                        throw IOException("Could not create the download directory")
+                    }
+                }
+
+                connection = URL(streamUrl).openConnection() as HttpURLConnection
+                task.connection = connection
+                connection.connectTimeout = 15_000
+                connection.readTimeout = 30_000
+                connection.useCaches = false
+                connection.instanceFollowRedirects = true
+                connection.requestMethod = "GET"
+                connection.setRequestProperty(
+                    "User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0"
+                )
+                connection.setRequestProperty("Accept", "*/*")
+                connection.setRequestProperty("Accept-Encoding", "identity")
+                connection.connect()
+
+                val responseCode = connection.responseCode
+                if (responseCode != HttpURLConnection.HTTP_OK) {
+                    throw IOException("Download server returned HTTP $responseCode")
+                }
+
+                val declaredLength = connection.contentLength.toLong().takeIf { it > 0L }
+                val progressLength = declaredLength ?: expectedBytes?.takeIf { it > 0L }
+                var downloadedBytes = 0L
+                var lastProgressUpdate = 0L
+                connection.inputStream.use { input ->
+                    BufferedOutputStream(FileOutputStream(outputFile), 64 * 1024).use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            coroutineContext.ensureActive()
+                            val bytesRead = input.read(buffer)
+                            if (bytesRead < 0) break
+                            if (bytesRead == 0) continue
+                            output.write(buffer, 0, bytesRead)
+                            downloadedBytes += bytesRead.toLong()
+
+                            if (progressLength != null && progressLength > 0L) {
+                                val progress = ((downloadedBytes.toDouble() / progressLength.toDouble()) * 88.0)
+                                    .toInt().coerceIn(1, 88)
+                                if (_downloadProgress.value[videoId] != progress) {
+                                    _downloadProgress.value += (videoId to progress)
+                                }
+                                val now = System.currentTimeMillis()
+                                if (now - lastProgressUpdate > 400L) {
+                                    lastProgressUpdate = now
+                                    updateNotification(context, title, progress, notificationId)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (downloadedBytes <= 0L) {
+                    throw IOException("The server returned an empty audio stream")
+                }
+                if (declaredLength != null && downloadedBytes != declaredLength) {
+                    throw IOException(
+                        "Incomplete audio download: received $downloadedBytes of $declaredLength bytes"
+                    )
+                }
+                return
+            } catch (cancelled: CancellationException) {
+                outputFile.delete()
+                throw cancelled
+            } catch (error: Exception) {
+                lastError = error
+                outputFile.delete()
+                coroutineContext.ensureActive()
+                Log.w(TAG, "Download attempt $attempt/3 failed for $title", error)
+                if (attempt < 3) {
+                    _downloadProgress.value += (videoId to 0)
+                    delay(attempt * 500L)
+                }
+            } finally {
+                connection?.disconnect()
+                if (task.connection === connection) task.connection = null
+            }
+        }
+        throw IOException("Audio download failed after 3 attempts: ${lastError?.message ?: "unknown network error"}", lastError)
+    }
+
+    /**
+     * Tag a temporary copy and replace the original only after metadata commit succeeds.
+     * Unsupported taggers therefore cannot corrupt the downloaded audio stream.
+     */
+    private fun embedMetadataSafely(
+        outputFile: File,
+        title: String,
+        artist: String,
+        album: String?,
+        videoId: String,
+        fromCache: Boolean,
+        artworkBytes: ByteArray?
+    ): Boolean {
+        val extension = outputFile.extension
+        val taggedFile = File(outputFile.parentFile, "${outputFile.nameWithoutExtension}.tagging.$extension")
+        var backupFile: File? = null
+        try {
+            if (taggedFile.exists() && !taggedFile.delete()) {
+                throw IOException("Could not clear the metadata staging file")
+            }
+            outputFile.copyTo(taggedFile, overwrite = true)
+            val audioFile = org.jaudiotagger.audio.AudioFileIO.read(taggedFile)
+            val tag = audioFile.tagOrCreateAndSetDefault
+            tag.setField(org.jaudiotagger.tag.FieldKey.TITLE, title)
+            tag.setField(org.jaudiotagger.tag.FieldKey.ARTIST, artist)
+            tag.setField(org.jaudiotagger.tag.FieldKey.ALBUM_ARTIST, artist)
+            album?.takeIf { it.isNotBlank() }?.let {
+                tag.setField(org.jaudiotagger.tag.FieldKey.ALBUM, it.trim())
+            }
+            tag.setField(
+                org.jaudiotagger.tag.FieldKey.COMMENT,
+                if (fromCache) {
+                    "Exported from SpatialFlow cached audio (video ID: $videoId)"
+                } else {
+                    "Downloaded from YouTube Music (video ID: $videoId)"
+                }
+            )
+            if (artworkBytes != null && artworkBytes.isNotEmpty()) {
+                val artwork = org.jaudiotagger.tag.images.StandardArtwork()
+                artwork.binaryData = artworkBytes
+                artwork.mimeType = "image/jpeg"
+                tag.deleteArtworkField()
+                tag.setField(artwork)
+            }
+            audioFile.commit()
+            if (!taggedFile.isFile || taggedFile.length() <= 0L) {
+                throw IOException("Metadata write produced an empty file")
+            }
+
+            backupFile = File(outputFile.parentFile, "${outputFile.name}.raw-backup")
+            if (backupFile.exists() && !backupFile.delete()) {
+                throw IOException("Could not clear the audio backup file")
+            }
+            if (!outputFile.renameTo(backupFile)) {
+                throw IOException("Could not preserve original audio before metadata writing")
+            }
+            if (!taggedFile.renameTo(outputFile)) {
+                backupFile.renameTo(outputFile)
+                throw IOException("Could not install the tagged audio file")
+            }
+            backupFile.delete()
+            return true
+        } catch (error: Exception) {
+            Log.w(TAG, "Metadata embedding failed safely for ${outputFile.name}", error)
+            taggedFile.delete()
+            if (backupFile?.exists() == true && !outputFile.exists()) {
+                backupFile.renameTo(outputFile)
+            }
+            return false
         }
     }
 
@@ -473,7 +610,7 @@ object SongDownloader {
         outputFile.parentFile?.let { if (!it.exists()) it.mkdirs() }
         var expectedPosition = 0L
         FileOutputStream(outputFile).use { output ->
-            val buffer = ByteArray(8192)
+            val buffer = ByteArray(64 * 1024)
             for (span in cached.spans) {
                 if (span.position != expectedPosition) {
                     throw IOException("Cached audio has a gap; refusing to use the network")

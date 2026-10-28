@@ -113,6 +113,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import coil.size.Precision
 import com.codetrio.spatialflow.MainActivity
 import com.codetrio.spatialflow.data.innertube.OnlineSong
 import com.codetrio.spatialflow.data.innertube.SearchFilter
@@ -1153,8 +1154,7 @@ fun ExploreScreen(
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data(song.thumbnailUrl)
-                                    .crossfade(true)
-                                    .build(),
+                                    .size(96, 96).precision(Precision.INEXACT).crossfade(false).build(),
                                 contentDescription = null,
                                 modifier = Modifier
                                     .size(24.dp)
@@ -1202,8 +1202,7 @@ fun ExploreScreen(
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data(song.thumbnailUrl)
-                                    .crossfade(true)
-                                    .build(),
+                                    .size(512, 512).precision(Precision.INEXACT).crossfade(false).build(),
                                 contentDescription = song.title,
                                 modifier = Modifier
                                     .size(240.dp)
@@ -1269,8 +1268,7 @@ fun ExploreScreen(
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)
                                 .data(song.thumbnailUrl)
-                                .crossfade(true)
-                                .build(),
+                                .size(640, 640).precision(Precision.INEXACT).crossfade(false).build(),
                             contentDescription = song.title,
                             modifier = Modifier
                                 .size(320.dp)
@@ -1560,8 +1558,7 @@ fun ExploreScreen(
                                         AsyncImage(
                                             model = ImageRequest.Builder(LocalContext.current)
                                                 .data(song.thumbnailUrl)
-                                                .crossfade(true)
-                                                .build(),
+                                                .size(128, 128).precision(Precision.INEXACT).crossfade(false).build(),
                                             contentDescription = null,
                                             modifier = Modifier
                                                 .size(40.dp)
@@ -1696,7 +1693,9 @@ fun ExploreScreen(
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data(userProfile.avatarUrl)
-                                    .crossfade(true)
+                                    .size(96, 96)
+                                    .precision(Precision.INEXACT)
+                                    .crossfade(false)
                                     .build(),
                                 contentDescription = "Account",
                                 modifier = Modifier

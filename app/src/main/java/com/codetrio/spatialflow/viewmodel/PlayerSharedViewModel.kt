@@ -1122,7 +1122,15 @@ class PlayerSharedViewModel @Inject constructor(
         audioService?.pause()
         PlayerHapticManager.triggerInteractionHaptic(appContext, "haptic_play_pause")
     }
-    fun seekTo(position: Int) = audioService?.seekTo(position)
+    fun seekTo(position: Int) {
+        val safePosition = if (_duration.value > 0) {
+            position.coerceIn(0, _duration.value)
+        } else {
+            position.coerceAtLeast(0)
+        }
+        _currentPosition.value = safePosition
+        audioService?.seekTo(safePosition)
+    }
     fun toggleFavorite(songId: Long) = toggleFavorite()
 
     fun toggleFavorite() {
