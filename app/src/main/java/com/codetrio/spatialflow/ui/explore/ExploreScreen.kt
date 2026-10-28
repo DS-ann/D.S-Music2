@@ -1720,7 +1720,6 @@ fun ExploreScreen(
                     }
                 }
             }
-        }
 
             // Category Chips — fetched from YouTube Music (hidden during active search inputs, without animations)
             if (!isSearchActive && searchQuery.isBlank() && searchResults.isEmpty() && homeMoods.isNotEmpty()) {
