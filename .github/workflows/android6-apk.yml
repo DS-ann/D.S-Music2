@@ -8,6 +8,11 @@ on:
         required: false
         type: string
         default: master
+      run_api23_smoke_test:
+        description: Run the optional Android 6 emulator smoke test
+        required: false
+        type: boolean
+        default: false
     secrets:
       BATTERYPULSE_KEYSTORE_BASE64:
         required: true
@@ -36,6 +41,11 @@ on:
         required: true
         type: string
         default: master
+      run_api23_smoke_test:
+        description: Run optional Android 6 emulator smoke test (may be slow on hosted runners)
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -135,6 +145,8 @@ jobs:
 
       - name: Smoke-test install and launch on Android 6 (API 23)
         id: api23_smoke
+        if: inputs.run_api23_smoke_test
+        timeout-minutes: 12
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
