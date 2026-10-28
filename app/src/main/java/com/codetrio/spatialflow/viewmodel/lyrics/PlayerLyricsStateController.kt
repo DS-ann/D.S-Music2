@@ -281,17 +281,22 @@ class PlayerLyricsStateController(private val logTag: String) {
 
         val plain = result.plainLyrics
         if (!plain.isNullOrBlank()) {
-            val normalized = sanitizePlainLyrics(plain)
-            if (normalized.contains("<tt", ignoreCase = true) ||
-                normalized.contains("<?xml", ignoreCase = true) ||
-                normalized.contains("<p begin=", ignoreCase = true)) {
-                val ttmlLines = LrcParser.parse(normalized)
+            val rawPlain = plain.trim()
+            val looksLikeTtml = rawPlain.contains("<tt", ignoreCase = true) ||
+                rawPlain.contains("<?xml", ignoreCase = true) ||
+                rawPlain.contains("<p begin=", ignoreCase = true)
+            if (looksLikeTtml) {
+                // Parse the raw provider payload before stripping tags so TTML timing/word
+                // metadata is preserved rather than downgraded to unsynchronized text.
+                val ttmlLines = LrcParser.parse(rawPlain)
                 if (ttmlLines.isNotEmpty()) {
                     _syncedLyrics.value = ttmlLines
                     _plainLyrics.value = null
                     return
                 }
             }
+
+            val normalized = sanitizePlainLyrics(rawPlain)
             _syncedLyrics.value = null
             _plainLyrics.value = normalized.takeIf { it.isNotBlank() }
         } else {
@@ -329,7 +334,7 @@ class PlayerLyricsStateController(private val logTag: String) {
             ).findAll(text)
                 .map { it.groupValues[1].replace(Regex("<[^>]+>"), "").trim() }
                 .filter { it.isNotEmpty() }
-                .joinToString("\\n")
+                .joinToString("\n")
             if (paragraphText.isNotBlank()) text = paragraphText
             else text = text.replace(Regex("<[^>]+>"), " ").trim()
         } else {
