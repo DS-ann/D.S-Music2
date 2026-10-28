@@ -1275,7 +1275,7 @@ private fun MusicManagementScreen(
                 add { ImageCacheSizeRow(imageCacheSize, imageCacheMaxSize, onImageCacheMaxSizeChange, onClearImageCache) }
                 add {
                     ListItem(
-                        onClick = { onMediaCacheToggle(!mediaCacheEnabled) },
+                        modifier = Modifier.clickable { onMediaCacheToggle(!mediaCacheEnabled) },
                         headlineContent = { Text("Online audio cache", fontWeight = FontWeight.SemiBold) },
                         supportingContent = {
                             Text(if (mediaCacheEnabled) "Cache streamed audio for faster repeat playback."
