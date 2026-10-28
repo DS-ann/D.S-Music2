@@ -69,9 +69,19 @@ object YouTubeMusic {
      */
     suspend fun search(query: String, filter: SearchFilter? = null): Result<SearchResult> = withContext(Dispatchers.IO) {
         runCatching {
-            kotlinx.coroutines.withTimeout(7000L.milliseconds) {
-                val response = InnerTubeClient.search(query, filter?.value)
-                InnerTubeParser.parseSearchResponse(response)
+            // Older Android 6 devices may need longer for the first TLS/API request.
+            kotlinx.coroutines.withTimeout(15000L.milliseconds) {
+                val response = InnerTubeClient.search(query.trim(), filter?.value)
+                if (response.entrySet().isEmpty()) {
+                    throw IllegalStateException(
+                        "YouTube Music search returned an empty response; check InnerTubeClient HTTP/network logs"
+                    )
+                }
+                InnerTubeParser.parseSearchResponse(response).also { result ->
+                    if (result.items.isEmpty()) {
+                        Log.w(TAG, "Search returned a response but no parsed items for query: $query")
+                    }
+                }
             }
         }
     }
@@ -198,7 +208,14 @@ object YouTubeMusic {
                 try {
                     // Directly invoke the high-reliability local extraction engine as requested
                     // Bypasses the volatile direct-player trial cascade which accumulates latency
-                    var bestUrl = NewPipeStreamExtractor.getStreamUrl(id)
+                    // The extractor can fail on a YouTube format/API change. Do not let
+                    // that exception skip the independent InnerTube player fallback.
+                    var bestUrl: String? = try {
+                        NewPipeStreamExtractor.getStreamUrl(id)
+                    } catch (extractorEx: Exception) {
+                        Log.e(TAG, "NewPipe extraction failed for $id; trying InnerTube fallback", extractorEx)
+                        null
+                    }
 
                     if (bestUrl.isNullOrEmpty()) {
                         Log.d(TAG, "NewPipe extractor returned empty for $id. Falling back to native InnerTube player client...")
