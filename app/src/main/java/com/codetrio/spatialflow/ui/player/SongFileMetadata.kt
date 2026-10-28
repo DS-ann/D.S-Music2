@@ -110,24 +110,21 @@ internal object SongFileMetadataReader {
     }
 
     private fun querySize(context: Context, uri: Uri): Long? {
-        val fromProvider = try {
-            context.contentResolver.query(
-                uri,
-                arrayOf(android.provider.MediaStore.MediaColumns.SIZE, OpenableColumns.SIZE),
-                null, null, null
-            )?.use { cursor ->
-                val storeIndex = cursor.getColumnIndex(android.provider.MediaStore.MediaColumns.SIZE)
-                val index = if (storeIndex >= 0) storeIndex else cursor.getColumnIndex(OpenableColumns.SIZE)
-                if (index >= 0 && cursor.moveToFirst() && !cursor.isNull(index)) {
-                    cursor.getLong(index).takeIf { it > 0L }
-                } else {
-                    null
+        for (column in listOf(android.provider.MediaStore.MediaColumns.SIZE, OpenableColumns.SIZE).distinct()) {
+            val fromProvider = try {
+                context.contentResolver.query(uri, arrayOf(column), null, null, null)?.use { cursor ->
+                    val index = cursor.getColumnIndex(column)
+                    if (index >= 0 && cursor.moveToFirst() && !cursor.isNull(index)) {
+                        cursor.getLong(index).takeIf { it > 0L }
+                    } else {
+                        null
+                    }
                 }
+            } catch (_: Exception) {
+                null
             }
-        } catch (_: Exception) {
-            null
+            if (fromProvider != null) return fromProvider
         }
-        if (fromProvider != null) return fromProvider
 
         return try {
             context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { descriptor ->
@@ -139,22 +136,24 @@ internal object SongFileMetadataReader {
     }
 
     private fun queryDisplayName(context: Context, uri: Uri): String? {
-        return try {
-            context.contentResolver.query(
-                uri,
-                arrayOf(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, OpenableColumns.DISPLAY_NAME),
-                null, null, null
-            )?.use { cursor ->
-                val storeIndex = cursor.getColumnIndex(android.provider.MediaStore.MediaColumns.DISPLAY_NAME)
-                val index = if (storeIndex >= 0) storeIndex else cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                if (index >= 0 && cursor.moveToFirst() && !cursor.isNull(index)) {
-                    cursor.getString(index)?.takeIf { it.isNotBlank() }
-                } else {
-                    null
+        for (column in listOf(
+            android.provider.MediaStore.MediaColumns.DISPLAY_NAME,
+            OpenableColumns.DISPLAY_NAME
+        ).distinct()) {
+            val displayName = try {
+                context.contentResolver.query(uri, arrayOf(column), null, null, null)?.use { cursor ->
+                    val index = cursor.getColumnIndex(column)
+                    if (index >= 0 && cursor.moveToFirst() && !cursor.isNull(index)) {
+                        cursor.getString(index)?.takeIf { it.isNotBlank() }
+                    } else {
+                        null
+                    }
                 }
+            } catch (_: Exception) {
+                null
             }
-        } catch (_: Exception) {
-            null
+            if (displayName != null) return displayName
         }
+        return null
     }
 }
