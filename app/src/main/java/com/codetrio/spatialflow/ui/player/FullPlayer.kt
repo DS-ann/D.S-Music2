@@ -80,6 +80,7 @@ import com.codetrio.spatialflow.model.SongItem
 import com.codetrio.spatialflow.viewmodel.PlayerSharedViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 
 /**
  * Stateful wrapper for the FullPlayer UI component.
@@ -827,19 +828,34 @@ fun FullPlayer(
                         SongFileMetadataReader.read(context.applicationContext, song)
                     }
                 }
-                val streamFormat = remember(audioService, song.id) {
-                    audioService?.getCurrentAudioFormatDetails(song.id.toString())
+                val streamFormat by produceState(
+                    initialValue = audioService?.getCurrentAudioFormatDetails(song.id.toString()),
+                    key1 = audioService,
+                    key2 = song.id
+                ) {
+                    // Track formats and media duration may arrive shortly after opening the dialog.
+                    repeat(20) {
+                        val latest = audioService?.getCurrentAudioFormatDetails(song.id.toString())
+                        if (latest != null) value = latest
+                        if (latest?.bitrateBps != null && latest.durationMs != null) return@produceState
+                        delay(250L)
+                    }
                 }
                 val streamBitrateBps = streamFormat?.bitrateBps?.takeIf { it > 0 }
+                val durationMs = when {
+                    song.duration > 0L -> song.duration
+                    (streamFormat?.durationMs ?: 0L) > 0L -> streamFormat?.durationMs ?: 0L
+                    else -> 0L
+                }
                 val estimatedStreamSizeBytes = if (
-                    songFileMetadata.isRemote && streamBitrateBps != null && song.duration > 0L
+                    songFileMetadata.isRemote && streamBitrateBps != null && durationMs > 0L
                 ) {
-                    (streamBitrateBps.toDouble() * song.duration.toDouble() / 8000.0)
+                    (streamBitrateBps.toDouble() * durationMs.toDouble() / 8000.0)
                         .takeIf { it > 0.0 && it < Long.MAX_VALUE.toDouble() }
                         ?.toLong()
                 } else null
-                val totalSeconds = song.duration.coerceAtLeast(0L) / 1000L
-                val durationText = if (song.duration > 0L) {
+                val totalSeconds = durationMs.coerceAtLeast(0L) / 1000L
+                val durationText = if (durationMs > 0L) {
                     if (totalSeconds >= 3600L) {
                         java.lang.String.format(java.util.Locale.getDefault(), "%d:%02d:%02d",
                             totalSeconds / 3600L, (totalSeconds % 3600L) / 60L, totalSeconds % 60L)
@@ -847,7 +863,7 @@ fun FullPlayer(
                         java.lang.String.format(java.util.Locale.getDefault(), "%d:%02d",
                             totalSeconds / 60L, totalSeconds % 60L)
                     }
-                } else "Not provided by source"
+                } else "Duration unavailable until the stream finishes preparing"
                 val fileSizeBytes = songFileMetadata.sizeBytes
                 val fileBitrateBps = songFileMetadata.bitrateBps
                 val estimatedFileBitrateBps = songFileMetadata.estimatedBitrateBps
@@ -858,8 +874,8 @@ fun FullPlayer(
                         "About " + android.text.format.Formatter.formatFileSize(context, estimatedStreamSizeBytes) +
                             " (estimated from stream bitrate and duration)"
                     songFileMetadata.isRemote ->
-                        "Not exposed by the streaming source; cached data may be partial"
-                    else -> "Not exposed by this file provider"
+                        "Streaming source; full-file size varies with the selected audio stream"
+                    else -> "File provider does not expose the byte length"
                 }
                 val bitrateText = when {
                     fileBitrateBps != null ->
@@ -868,15 +884,17 @@ fun FullPlayer(
                         "${(streamBitrateBps + 500) / 1000} kb/s (active stream format)"
                     estimatedFileBitrateBps != null ->
                         "${(estimatedFileBitrateBps + 500L) / 1000L} kb/s (estimated from file size and duration)"
-                    songFileMetadata.isRemote -> "Not reported by the active stream"
-                    else -> "Not embedded in file metadata"
+                    songFileMetadata.isRemote -> "Stream bitrate is not exposed by the current audio format"
+                    else -> "Bitrate metadata is absent; no estimate can be calculated"
                 }
                 val formatText = songFileMetadata.mimeType
+                    ?: streamFormat?.mimeType
                     ?: songFileMetadata.fileName?.substringAfterLast('.', "")
                         ?.takeIf { it.isNotBlank() }
                         ?.uppercase(java.util.Locale.ROOT)
                         ?.plus(" (file extension)")
-                    ?: "Not reported by source"
+                    ?: if (songFileMetadata.isRemote) "Streaming audio (codec not identified yet)"
+                       else "Audio format not exposed by file provider"
                 val sourceText = when {
                     !song.videoId.isNullOrBlank() -> "YouTube Music stream"
                     songFileMetadata.isRemote -> "Remote audio stream"
@@ -885,13 +903,23 @@ fun FullPlayer(
                 val details = mutableListOf(
                     "Title" to song.title.ifBlank { "Unknown title" },
                     "Artist" to song.artist.ifBlank { "Unknown artist" },
-                    "Album" to (songFileMetadata.album ?: "Not tagged"),
+                    "Album" to (
+                        song.albumName?.takeIf { it.isNotBlank() && !it.equals("<unknown>", true) }
+                            ?: streamFormat?.albumTitle
+                            ?: songFileMetadata.album
+                            ?: if (song.albumId > 0L) "Album ID ${song.albumId} (title unavailable)" else "Album title unavailable in source metadata"
+                    ),
                     "Duration" to durationText,
                     "Source" to sourceText,
                     "Song size" to sizeText,
                     "Bitrate" to bitrateText,
                     "Format" to formatText
                 )
+                streamFormat?.sampleRateHz?.takeIf { it > 0 }?.let {
+                    details.add("Sample rate" to "${it} Hz")
+                }
+                details.add("Song ID" to song.id.toString())
+                if (song.albumId > 0L) details.add("Album ID" to song.albumId.toString())
                 songFileMetadata.fileName?.let { details.add("File name" to it) }
                 songFileMetadata.filePath?.let { details.add("File path" to it) }
                 if (song.dateAdded > 0L) {

@@ -79,7 +79,10 @@ data class CachedMediaMetadata(
 
 data class CurrentAudioFormatDetails(
     val bitrateBps: Int?,
-    val sampleRateHz: Int?
+    val sampleRateHz: Int?,
+    val mimeType: String? = null,
+    val durationMs: Long? = null,
+    val albumTitle: String? = null
 )
 
 @AndroidEntryPoint
@@ -1228,11 +1231,23 @@ class AudioPlaybackService : MediaSessionService() {
             val format = player.currentTracks.groups
                 .flatMap { group -> (0 until group.length).map { group.getTrackFormat(it) } }
                 .firstOrNull { it.sampleMimeType?.startsWith("audio/") == true }
-                ?: return null
-            CurrentAudioFormatDetails(
-                bitrateBps = format.bitrate.takeIf { it > 0 },
-                sampleRateHz = format.sampleRate.takeIf { it > 0 }
+            val durationMs = player.duration.takeIf {
+                it > 0L && it != androidx.media3.common.C.TIME_UNSET
+            }
+            val details = CurrentAudioFormatDetails(
+                bitrateBps = format?.bitrate?.takeIf { it > 0 },
+                sampleRateHz = format?.sampleRate?.takeIf { it > 0 },
+                mimeType = format?.sampleMimeType ?: format?.containerMimeType,
+                durationMs = durationMs,
+                albumTitle = activeItem.mediaMetadata.albumTitle?.toString()
+                    ?.takeIf { it.isNotBlank() && !it.equals("<unknown>", ignoreCase = true) }
             )
+            // Duration or descriptive media metadata is still valuable before the audio
+            // renderer has reported a complete Format object.
+            details.takeIf {
+                it.bitrateBps != null || it.sampleRateHz != null || it.mimeType != null ||
+                    it.durationMs != null || it.albumTitle != null
+            }
         } catch (error: Exception) {
             Log.d(TAG, "Current audio format is not available yet", error)
             null

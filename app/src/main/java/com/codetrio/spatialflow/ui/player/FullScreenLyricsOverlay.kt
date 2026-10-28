@@ -489,17 +489,29 @@ private fun ProvidersSelector(
     contentColor: Color,
     modifier: Modifier = Modifier
 ) {
+    // Keep a stable all-provider order, then append any providers added by future builds.
+    // Names here must exactly match LyricsProvider.getName(), because this list indexes providerResults.
     val knownProviders = listOf(
-        "SyncLRC",
+        "Apple Music (Better Lyrics)",
         "Apple Music",
+        "Bini",
+        "QQ Music",
+        "NetEase Music",
+        "KuGou",
+        "LyricsPlus",
+        "YouTube Music",
+        "YouTube (Paxsenix)",
         "Spotify",
         "Musixmatch",
+        "SyncLRC",
         "LRCLIB",
-        "YouTube Music",
-        "YouTube (Paxsenix)"
+        "EmbeddedID3",
+        "Unison",
+        "Genius"
     )
+    val allProviders = (knownProviders + providerResults.keys.sorted()).distinct()
 
-    val visibleProviders = knownProviders.filter { provider ->
+    val visibleProviders = allProviders.filter { provider ->
         val result = providerResults[provider]
         val hasFinished = providerResults.containsKey(provider)
         val hasData = result != null && result.hasLyrics() && result.confidence >= 0f

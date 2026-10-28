@@ -54,7 +54,7 @@ internal object SongFileMetadataReader {
             ?: uri?.let { querySize(context, it) }
         var bitrateBps: Long? = null
         var mimeType: String? = null
-        var album: String? = null
+        var album: String? = song.albumName?.takeIf { it.isNotBlank() && !it.equals("<unknown>", ignoreCase = true) }
 
         val retriever = MediaMetadataRetriever()
         try {
@@ -111,8 +111,13 @@ internal object SongFileMetadataReader {
 
     private fun querySize(context: Context, uri: Uri): Long? {
         val fromProvider = try {
-            context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-                val index = cursor.getColumnIndex(OpenableColumns.SIZE)
+            context.contentResolver.query(
+                uri,
+                arrayOf(android.provider.MediaStore.MediaColumns.SIZE, OpenableColumns.SIZE),
+                null, null, null
+            )?.use { cursor ->
+                val storeIndex = cursor.getColumnIndex(android.provider.MediaStore.MediaColumns.SIZE)
+                val index = if (storeIndex >= 0) storeIndex else cursor.getColumnIndex(OpenableColumns.SIZE)
                 if (index >= 0 && cursor.moveToFirst() && !cursor.isNull(index)) {
                     cursor.getLong(index).takeIf { it > 0L }
                 } else {
@@ -135,8 +140,13 @@ internal object SongFileMetadataReader {
 
     private fun queryDisplayName(context: Context, uri: Uri): String? {
         return try {
-            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            context.contentResolver.query(
+                uri,
+                arrayOf(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, OpenableColumns.DISPLAY_NAME),
+                null, null, null
+            )?.use { cursor ->
+                val storeIndex = cursor.getColumnIndex(android.provider.MediaStore.MediaColumns.DISPLAY_NAME)
+                val index = if (storeIndex >= 0) storeIndex else cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                 if (index >= 0 && cursor.moveToFirst() && !cursor.isNull(index)) {
                     cursor.getString(index)?.takeIf { it.isNotBlank() }
                 } else {

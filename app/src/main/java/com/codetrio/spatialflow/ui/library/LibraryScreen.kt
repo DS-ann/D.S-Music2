@@ -2662,6 +2662,7 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
                 android.provider.MediaStore.Audio.Media.TITLE,
                 android.provider.MediaStore.Audio.Media.ARTIST,
                 android.provider.MediaStore.Audio.Media.ALBUM_ID,
+                android.provider.MediaStore.Audio.Media.ALBUM,
                 android.provider.MediaStore.Audio.Media.DATA,
                 android.provider.MediaStore.Audio.Media.DURATION,
                 android.provider.MediaStore.Audio.Media.DATE_ADDED
@@ -2682,6 +2683,7 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
                 val titleCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.TITLE)
                 val artistCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.ARTIST)
                 val albumCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.ALBUM_ID)
+                val albumNameCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.ALBUM)
                 val dataCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.DATA)
                 val durCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.DURATION)
                 val dateCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.DATE_ADDED)
@@ -2704,7 +2706,11 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
                             c.getString(dataCol),
                             c.getLong(durCol),
                             c.getLong(dateCol)
-                        )
+                        ).apply {
+                            albumName = c.getString(albumNameCol)?.takeIf {
+                                it.isNotBlank() && !it.equals("<unknown>", ignoreCase = true)
+                            }
+                        }
                     )
                 }
             }
