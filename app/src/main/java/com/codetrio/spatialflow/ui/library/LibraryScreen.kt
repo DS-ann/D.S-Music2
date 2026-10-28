@@ -144,6 +144,7 @@ import com.codetrio.spatialflow.data.innertube.OnlineSong
 import com.codetrio.spatialflow.model.SongItem
 import com.codetrio.spatialflow.service.AudioPlaybackService
 import com.codetrio.spatialflow.service.CachedMediaMetadata
+import com.codetrio.spatialflow.util.SongDownloader
 import com.codetrio.spatialflow.model.toSongItem
 import com.codetrio.spatialflow.ui.CreateLocalPlaylistDialog
 import com.codetrio.spatialflow.ui.LocalPlaylistPickerDialog
@@ -201,6 +202,7 @@ fun LibraryScreen(
     val isLoadingStream by exploreViewModel?.isLoadingStream?.collectAsStateWithLifecycle(false) ?: remember { mutableStateOf(false) }
 
     val localSongs by viewModel.localSongs.collectAsStateWithLifecycle(emptyList())
+    val downloadProgress by SongDownloader.downloadProgress.collectAsStateWithLifecycle(emptyMap())
     val favoriteIds by viewModel.favoriteSongIds.collectAsStateWithLifecycle(emptySet())
     val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
 
@@ -231,6 +233,13 @@ fun LibraryScreen(
     // Trigger local files scan on first composition
     LaunchedEffect(Unit) {
         if (localSongs.isEmpty()) {
+            scanLocalFiles(context, viewModel)
+        }
+    }
+
+    // Refresh the downloaded-songs folder when opened and when an active download finishes.
+    LaunchedEffect(activeTab, downloadProgress.isEmpty()) {
+        if (activeTab == "Downloaded songs" && downloadProgress.isEmpty()) {
             scanLocalFiles(context, viewModel)
         }
     }
@@ -379,6 +388,7 @@ fun LibraryScreen(
                         "Songs",
                         "Albums",
                         "Artists",
+                        "Downloaded songs",
                         "Cache"
                     )
 
@@ -424,7 +434,7 @@ fun LibraryScreen(
                     "Artists" -> ArtistsTabContent(nestedScrollConnection)
                     "Recap" -> RecapTabContent(nestedScrollConnection, viewModel, onNavigateToExplore)
                     "Cache" -> StreamCacheTabContent(context)
-                    "Device Files" -> {
+                    "Device Files", "Downloaded songs" -> {
                         // Scan Local Files helper
                         val onRefreshAction = {
                             scope.launch {
@@ -500,9 +510,18 @@ fun LibraryScreen(
 
                                 Spacer(modifier = Modifier.height(6.dp))
 
+                                // Keep this folder scoped to files saved by SpatialFlow's downloader.
+                                val sourceSongs = remember(localSongs, activeTab) {
+                                    if (activeTab == "Downloaded songs") {
+                                        localSongs.filter(::isSpatialFlowDownloadedSong)
+                                    } else {
+                                        localSongs
+                                    }
+                                }
+
                                 // Filter, Sort, and Group local songs
-                                val filteredSongs = remember(localSongs, searchQuery) {
-                                    localSongs.filter {
+                                val filteredSongs = remember(sourceSongs, searchQuery) {
+                                    sourceSongs.filter {
                                         it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true)
                                     }
                                 }
@@ -580,7 +599,11 @@ fun LibraryScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            if (searchQuery.isNotEmpty()) "No matching songs found" else "Scan device files to load songs",
+                                            when {
+                                                searchQuery.isNotEmpty() -> "No matching songs found"
+                                                activeTab == "Downloaded songs" -> "No downloaded songs yet. Downloaded tracks will appear here."
+                                                else -> "Scan device files to load songs"
+                                            },
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
@@ -1038,6 +1061,9 @@ private fun UnifiedLibraryContent(
                 LibraryCategoryItem("Recap", "Your listening recap", Icons.Default.BarChart) {
                     navigateToTab.value("Recap")
                 },
+                LibraryCategoryItem("Downloaded songs", "Music saved on this device", Icons.AutoMirrored.Filled.QueueMusic) {
+                    navigateToTab.value("Downloaded songs")
+                },
                 LibraryCategoryItem("Cache", "Cached audio", Icons.Default.Folder) {
                     navigateToTab.value("Cache")
                 }
@@ -1144,14 +1170,34 @@ private data class LibraryCategoryItem(
     override val isCircle: Boolean = false
 }
 
+private fun libraryCardGradient(title: String): List<Color> {
+    val palettes = listOf(
+        listOf(Color(0xFFFF5F6D), Color(0xFFFFC371)),
+        listOf(Color(0xFF4776E6), Color(0xFF8E54E9)),
+        listOf(Color(0xFF11998E), Color(0xFF38EF7D)),
+        listOf(Color(0xFFEE0979), Color(0xFFFF6A00)),
+        listOf(Color(0xFF0575E6), Color(0xFF00F260)),
+        listOf(Color(0xFF7F00FF), Color(0xFFE100FF)),
+        listOf(Color(0xFFFC4A1A), Color(0xFFF7B733))
+    )
+    return palettes[Math.floorMod(title.hashCode(), palettes.size)]
+}
+
 @Composable
 private fun UnifiedLibraryCard(item: UnifiedLibraryItem) {
+    val accent = remember(item.title) { libraryCardGradient(item.title) }
+    val hasArtwork = !item.thumbnailUrl.isNullOrBlank()
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .background(
+                Brush.linearGradient(
+                    colors = accent.map { it.copy(alpha = if (hasArtwork) 0.13f else 0.20f) }
+                )
+            )
             .clickable { item.onClick() }
-            .padding(8.dp),
+            .padding(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
@@ -1159,10 +1205,16 @@ private fun UnifiedLibraryCard(item: UnifiedLibraryItem) {
                 .aspectRatio(1f)
                 .fillMaxWidth()
                 .clip(if (item.isCircle) CircleShape else RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                .background(
+                    if (hasArtwork) {
+                        Brush.linearGradient(accent.map { it.copy(alpha = 0.16f) })
+                    } else {
+                        Brush.linearGradient(accent)
+                    }
+                ),
             contentAlignment = Alignment.Center
         ) {
-            if (item.thumbnailUrl?.isNotEmpty() == true) {
+            if (hasArtwork) {
                 androidx.compose.foundation.Image(
                     painter = coil.compose.rememberAsyncImagePainter(
                         model = ImageRequest.Builder(LocalContext.current)
@@ -1182,7 +1234,7 @@ private fun UnifiedLibraryCard(item: UnifiedLibraryItem) {
                     Icon(
                         imageVector = item.icon ?: if (item.isCircle) Icons.Default.Person else Icons.Default.MusicNote,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = Color.White,
                         modifier = Modifier.size(36.dp)
                     )
                 }
@@ -2653,12 +2705,30 @@ private fun RecapTabContent(
     }
 }
 
+private fun isSpatialFlowDownloadedSong(song: SongItem): Boolean {
+    val relativePath = song.mediaStoreRelativePath.orEmpty()
+        .trim('/')
+        .lowercase(java.util.Locale.ROOT)
+    if (
+        relativePath == "music/spatialflow" ||
+        relativePath == "download/spatialflow" ||
+        relativePath == "downloads/spatialflow"
+    ) return true
+
+    val path = (song.path ?: song.data).orEmpty()
+        .replace('\\', '/')
+        .lowercase(java.util.Locale.ROOT)
+    return path.contains("/music/spatialflow/") ||
+        path.contains("/download/spatialflow/") ||
+        path.contains("/downloads/spatialflow/")
+}
+
 // Background scanner helper
 internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedViewModel) {
     withContext(Dispatchers.IO) {
         val songs = ArrayList<SongItem>()
         try {
-            val proj = arrayOf(
+            val proj = mutableListOf(
                 android.provider.MediaStore.Audio.Media._ID,
                 android.provider.MediaStore.Audio.Media.TITLE,
                 android.provider.MediaStore.Audio.Media.ARTIST,
@@ -2667,7 +2737,11 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
                 android.provider.MediaStore.Audio.Media.DATA,
                 android.provider.MediaStore.Audio.Media.DURATION,
                 android.provider.MediaStore.Audio.Media.DATE_ADDED
-            )
+            ).apply {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    add(android.provider.MediaStore.Audio.Media.RELATIVE_PATH)
+                }
+            }.toTypedArray()
             val prefs = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
             val hiddenFolders = (prefs.getString("hidden_folders", "") ?: "").split("||").filter { it.isNotEmpty() }
             val ignoreShort = prefs.getBoolean("ignore_short_audio", false)
@@ -2686,6 +2760,7 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
                 val albumCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.ALBUM_ID)
                 val albumNameCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.ALBUM)
                 val dataCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.DATA)
+                val relativePathCol = c.getColumnIndex("relative_path")
                 val durCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.DURATION)
                 val dateCol = c.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.DATE_ADDED)
                 while (c.moveToNext()) {
@@ -2708,6 +2783,7 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
                             c.getLong(durCol),
                             c.getLong(dateCol)
                         ).apply {
+                            mediaStoreRelativePath = if (relativePathCol >= 0) c.getString(relativePathCol) else null
                             albumName = c.getString(albumNameCol)?.takeIf {
                                 it.isNotBlank() && !it.equals("<unknown>", ignoreCase = true)
                             }

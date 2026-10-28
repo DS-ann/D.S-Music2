@@ -772,16 +772,9 @@ fun ExploreScreen(
                                                                             onClick = {
                                                                                 when (item) {
                                                                                     is SearchItem.Song -> {
-                                                                                        val songQueue =
-                                                                                            searchResults.filterIsInstance<SearchItem.Song>()
-                                                                                                .map { it.song }
-                                                                                        val songIndex =
-                                                                                            songQueue.indexOfFirst { it.videoId == item.song.videoId }
-                                                                                        viewModel.playOnlineSongWithQueue(
-                                                                                            item.song,
-                                                                                            songQueue,
-                                                                                            songIndex
-                                                                                        )
+                                                                                        // A search-song tap starts a song-seeded radio mix instead of
+                                                                                        // ending the queue at the current search-result list.
+                                                                                        viewModel.startRadio(item.song)
                                                                                     }
 
                                                                                     is SearchItem.Album -> viewModel.loadAlbum(

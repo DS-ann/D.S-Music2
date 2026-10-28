@@ -17,6 +17,7 @@ data class SongItem(
 ) : Serializable {
 
     @JvmField var thumbnailUrl: String? = null
+    @JvmField var mediaStoreRelativePath: String? = null
     @JvmField var albumName: String? = null
     @JvmField var videoId: String? = null
     @JvmField var artistId: String? = null
