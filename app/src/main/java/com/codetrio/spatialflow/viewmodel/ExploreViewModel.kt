@@ -336,7 +336,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private suspend fun getPersonalizedSections(): List<HomeSection> {
         val historyString = prefs.getString("recent_artists_list", "") ?: ""
         if (historyString.isBlank()) return emptyList()
-        val artists = historyString.split("|// A small recent-artist sample keeps optional personalization from flooding slower devices with requests.
+        // Limit the optional personalization queries on slower devices.
         val artists = historyString.split("|").map { it.trim() }.filter { it.isNotBlank() }.take(3)
         
         val sections = mutableListOf<HomeSection>()
