@@ -20,8 +20,8 @@ android {
         // Android 6.0 Marshmallow is API 23; keep APIs newer than 23 guarded at runtime.
         minSdk 23
         targetSdk 37
-        versionCode 13
-        versionName "1.8.5"
+        versionCode 14
+        versionName "1.8.6"
     }
 
     // Produce only the ARM64-v8a APK; do not emit universal or other-ABI APKs.
@@ -53,7 +53,7 @@ android {
     }
 
     compileOptions {
-        // Backport java.util.Optional and other Java APIs used by NewPipe on Android 6 (API 23).
+        // Backport Java APIs and URLDecoder/URLEncoder Charset overloads used by NewPipeExtractor on Android 6 (API 23).
         coreLibraryDesugaringEnabled true
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -70,7 +70,7 @@ configurations {
 
 dependencies {
     // Supplies java.util.Optional on API 23; NewPipe Extractor calls it internally.
-    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs_nio:2.1.5'
 
     implementation fileTree(dir: 'libs', include: ['*.aar', '*.jar'])
     implementation libs.androidx.compose.foundation
