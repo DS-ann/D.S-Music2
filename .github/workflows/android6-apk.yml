@@ -152,7 +152,7 @@ jobs:
         with:
           api-level: 23
           target: default
-          arch: x86
+          arch: arm64-v8a
           profile: Nexus 5
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
@@ -178,21 +178,24 @@ jobs:
         if: steps.signing.outputs.ready == 'true'
         run: |
           set -euo pipefail
-          SOURCE_APK="app/build/outputs/apk/release/app-release.apk"
-          OUTPUT_APK="app/build/outputs/apk/release/SpatialFlow-Android6-release.apk"
+          SOURCE_APK="app/build/outputs/apk/release/app-arm64-v8a-release.apk"
+          OUTPUT_APK="app/build/outputs/apk/release/SpatialFlow-arm64-v8a-Android6-release.apk"
           APK_SIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
           test -s "$SOURCE_APK"
           test -x "$APK_SIGNER"
+          APK_COUNT="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | wc -l | tr -d ' ')"
+          test "$APK_COUNT" -eq 1
           cp "$SOURCE_APK" "$OUTPUT_APK"
           "$APK_SIGNER" verify --verbose "$OUTPUT_APK"
-          echo "Verified signed APK: $OUTPUT_APK"
+          echo "Verified signed ARM64-v8a APK: $OUTPUT_APK"
+          echo "Expected single ABI output: arm64-v8a"
 
-      - name: Upload signed APK as a single-file artifact
+      - name: Upload signed ARM64-v8a APK as a single-file artifact
         if: steps.signing.outputs.ready == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: SpatialFlow-Android6-release-APK
-          path: app/build/outputs/apk/release/SpatialFlow-Android6-release.apk
+          name: SpatialFlow-arm64-v8a-Android6-release-APK
+          path: app/build/outputs/apk/release/SpatialFlow-arm64-v8a-Android6-release.apk
           archive: false
           if-no-files-found: error
           retention-days: 14
