@@ -60,4 +60,14 @@ class AdvancedLyricsParserTest {
         assertNotEquals(first.getCacheKey(), second.getCacheKey())
         assertFalse(first.getCacheKey().contains("||"))
     }
+
+    @Test
+    fun legacyCacheMigrationIsDisabledForUnicodeArtistOrTitle() {
+        val nonLatinTitle = TrackMetadata(cleanedTitle = "गीत", cleanedArtist = "Artist", durationMs = 123000L)
+        val nonLatinArtist = TrackMetadata(cleanedTitle = "Hello", cleanedArtist = "歌手", durationMs = 123000L)
+        val asciiTrack = TrackMetadata(cleanedTitle = "Hello", cleanedArtist = "Artist", durationMs = 123000L)
+        assertEquals(null, nonLatinTitle.getLegacyCacheKey())
+        assertEquals(null, nonLatinArtist.getLegacyCacheKey())
+        assertNotEquals(null, asciiTrack.getLegacyCacheKey())
+    }
 }

@@ -37,8 +37,15 @@ data class TrackMetadata @JvmOverloads constructor(
 
     fun getLegacyCacheKey(): String? {
         val title = cleanedTitle.lowercase().trim()
+        val artist = cleanedArtist.lowercase().trim()
+
+        // The previous ASCII-only key removed non-Latin text. Do not migrate an old entry
+        // if either side contains Unicode, because different songs could share that old key.
+        if (cleanedTitle.any { it.code > 127 } || cleanedArtist.any { it.code > 127 }) return null
         if (title.replace(Regex("[^a-z0-9]"), "").isBlank()) return null
-        val raw = cleanedArtist.lowercase().trim() + "|" + title + "|" + (durationMs / 10000L)
+        if (artist.replace(Regex("[^a-z0-9]"), "").isBlank()) return null
+
+        val raw = artist + "|" + title + "|" + (durationMs / 10000L)
         return "lyr_" + raw.replace(Regex("[^a-z0-9|]"), "")
     }
 
