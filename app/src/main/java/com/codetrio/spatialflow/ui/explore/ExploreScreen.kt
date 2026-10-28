@@ -190,7 +190,7 @@ fun ExploreScreen(
     val homeMoods = uiState.homeMoods
     val detailStack = uiState.detailStack
 
-    var isSearchActive by remember { mutableStateOf(false) }
+    var isSearchActive by rememberSaveable { mutableStateOf(false) }
     var selectedSongForMenu by remember { mutableStateOf<OnlineSong?>(null) }
     var showCreditsForSong by remember { mutableStateOf<OnlineSong?>(null) }
 
@@ -260,7 +260,7 @@ fun ExploreScreen(
     }
 
     val prefs = remember { context.getSharedPreferences("explore_prefs", 0) }
-    var lastPlayedArtist by remember { mutableStateOf(prefs.getString("last_played_artist", null)) }
+    var lastPlayedArtist by rememberSaveable { mutableStateOf(prefs.getString("last_played_artist", null)) }
 
     DisposableEffect(context) {
         val listener =

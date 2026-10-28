@@ -38,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -68,8 +69,8 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
     val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
     val favoriteIds by viewModel.favoriteSongIds.collectAsStateWithLifecycle(emptySet())
 
-    var searchQuery by remember { mutableStateOf("") }
-    var sortOrder by remember { mutableStateOf(SortOrder.A_Z) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var sortOrder by rememberSaveable { mutableStateOf(SortOrder.A_Z) }
     var isScanning by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
