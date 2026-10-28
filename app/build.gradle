@@ -8,24 +8,6 @@ plugins {
     id("com.github.ben-manes.versions") version "0.54.0"
 }
 
-// Read credentials from local.properties (secure, gitignored)
-def localProps = new Properties()
-def localPropsFile = rootProject.file('local.properties')
-if (localPropsFile.exists()) {
-    localProps.load(new FileInputStream(localPropsFile))
-}
-
-// Use different variable names to avoid conflict with signing config properties
-def myKeystoreFile = localProps.getProperty('KEYSTORE_FILE') ?: System.getenv("BATTERYPULSE_KEYSTORE_PATH") ?: System.getenv("ANDROID_KEYSTORE_PATH")
-def myKeystorePassword = localProps.getProperty('KEYSTORE_PASSWORD') ?: System.getenv("BATTERYPULSE_STORE_PASSWORD") ?: System.getenv("ANDROID_KEYSTORE_PASSWORD")
-def myKeyAlias = localProps.getProperty('KEY_ALIAS') ?: System.getenv("BATTERYPULSE_KEY_ALIAS") ?: System.getenv("ANDROID_KEY_ALIAS")
-def myKeyPassword = localProps.getProperty('KEY_PASSWORD') ?: System.getenv("BATTERYPULSE_KEY_PASSWORD") ?: System.getenv("ANDROID_KEY_ALIAS_PASSWORD")
-// The launcher release key is PKCS#12; legacy local/JKS signing remains supported.
-def myKeystoreType = localProps.getProperty('KEYSTORE_TYPE') ?: (System.getenv("BATTERYPULSE_KEYSTORE_PATH") ? "PKCS12" : null)
-
-// Check if all required signing properties are available
-def isReleaseSigningReady = myKeystoreFile != null && myKeystorePassword != null && myKeyAlias != null && myKeyPassword != null
-
 android {
     namespace 'com.codetrio.spatialflow'
     compileSdk 37
@@ -56,20 +38,6 @@ android {
         }
     }
 
-    signingConfigs {
-        release {
-            if (isReleaseSigningReady) {
-                storeFile file(myKeystoreFile)
-                storePassword myKeystorePassword
-                keyAlias myKeyAlias
-                keyPassword myKeyPassword
-                if (myKeystoreType != null) {
-                    storeType myKeystoreType
-                }
-            }
-        }
-    }
-
     buildFeatures {
         viewBinding true
         buildConfig true
@@ -80,16 +48,10 @@ android {
         release {
             minifyEnabled true
             shrinkResources true
-            if (isReleaseSigningReady) {
-                signingConfig signingConfigs.release
-            }
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
 
         debug {
-            if (isReleaseSigningReady) {
-                signingConfig signingConfigs.release
-            }
             debuggable true
         }
     }
