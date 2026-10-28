@@ -110,17 +110,33 @@ class AudioPlaybackService : MediaSessionService() {
 
         @Synchronized
         fun getCache(context: Context): SimpleCache {
-            if (cache == null) {
-                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                val enabled = prefs.getBoolean(KEY_MEDIA_CACHE_ENABLED, true)
-                val limitBytes = prefs.getInt(KEY_MEDIA_CACHE_LIMIT_GB, DEFAULT_MEDIA_CACHE_LIMIT_GB)
-                    .coerceIn(1, 10).toLong() * BYTES_PER_GB
-                val evictor = AdjustableCacheEvictor(enabled, limitBytes)
+            cache?.let { return it }
+
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val enabled = prefs.getBoolean(KEY_MEDIA_CACHE_ENABLED, true)
+            val limitBytes = prefs.getInt(KEY_MEDIA_CACHE_LIMIT_GB, DEFAULT_MEDIA_CACHE_LIMIT_GB)
+                .coerceIn(1, 10).toLong() * BYTES_PER_GB
+            val evictor = AdjustableCacheEvictor(enabled, limitBytes)
+            val createdCache = SimpleCache(
+                File(context.cacheDir, "media_cache"),
+                evictor,
+                StandaloneDatabaseProvider(context)
+            )
+            try {
+                // SimpleCache already reports its loaded spans to the evictor during construction.
+                // Configure limits without rescanning every cache key a second time.
+                evictor.configure(createdCache, enabled, limitBytes)
                 cacheEvictor = evictor
-                cache = SimpleCache(File(context.cacheDir, "media_cache"), evictor, StandaloneDatabaseProvider(context))
-                evictor.configure(cache!!, enabled, limitBytes)
+                cache = createdCache
+                return createdCache
+            } catch (error: Exception) {
+                try {
+                    createdCache.release()
+                } catch (releaseError: Exception) {
+                    Log.w(TAG, "Failed to release an incompletely initialized media cache", releaseError)
+                }
+                throw error
             }
-            return cache!!
         }
 
         @Synchronized
@@ -1873,7 +1889,10 @@ private class AdjustableCacheEvictor(initialEnabled: Boolean, initialMaxBytes: L
     fun configure(cache: Cache, enabled: Boolean, maxBytes: Long) {
         this.enabled = enabled
         this.maxBytes = maxBytes.coerceAtLeast(1L)
-        refresh(cache)
+        activeCache = cache
+        // Spans are tracked by onSpanAdded/onSpanRemoved callbacks from SimpleCache. Avoid
+        // cache.keys/getCachedSpans scans here: they duplicate SimpleCache's startup index scan.
+        if (initialized) evictIfNeeded(cache)
     }
     fun refresh(cache: Cache) {
         activeCache = cache
