@@ -153,7 +153,7 @@ jobs:
 
       - name: Smoke-test install and launch on Android 6 (API 23)
         id: api23_smoke
-        if: inputs.run_api23_smoke_test
+        if: inputs.run_api23_smoke_test || github.event_name == 'push'
         timeout-minutes: 12
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
