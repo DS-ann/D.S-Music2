@@ -70,6 +70,12 @@ import kotlin.time.Duration.Companion.milliseconds
 import android.media.AudioAttributes as LegacyAudioAttributes
 
 @OptIn(UnstableApi::class)
+data class CachedMediaMetadata(
+    val title: String,
+    val artist: String,
+    val songId: String
+)
+
 @AndroidEntryPoint
 class AudioPlaybackService : MediaSessionService() {
 
@@ -96,6 +102,8 @@ class AudioPlaybackService : MediaSessionService() {
         private const val KEY_MEDIA_CACHE_LIMIT_GB = "media_cache_limit_gb"
         private const val DEFAULT_MEDIA_CACHE_LIMIT_GB = 1
         private const val BYTES_PER_GB = 1024L * 1024L * 1024L
+        private const val PREF_MEDIA_CACHE_METADATA = "media_cache_song_metadata"
+        private const val CACHE_METADATA_ENTRY_PREFIX = "entry_"
 
         private var cache: SimpleCache? = null
         private var cacheEvictor: AdjustableCacheEvictor? = null
@@ -133,8 +141,63 @@ class AudioPlaybackService : MediaSessionService() {
             return currentCache.cacheSpace to entries
         }
 
+        /**
+         * Associates the opaque Media3 cache key (typically a signed stream URL) with safe display
+         * metadata. Only a SHA-256 digest is used as the preference key; signed URLs are not stored
+         * in the metadata preference file.
+         */
+        @Synchronized
+        fun rememberMediaCacheMetadata(
+            context: Context,
+            cacheKey: String,
+            title: String,
+            artist: String,
+            songId: String = ""
+        ) {
+            if (cacheKey.isBlank() || title.isBlank()) return
+            val digestKey = cacheMetadataEntryKey(cacheKey)
+            val payload = org.json.JSONObject()
+                .put("title", title)
+                .put("artist", artist)
+                .put("songId", songId)
+                .toString()
+            context.getSharedPreferences(PREF_MEDIA_CACHE_METADATA, Context.MODE_PRIVATE)
+                .edit().putString(digestKey, payload).apply()
+        }
+
+        @JvmStatic
+        fun getCachedMediaMetadata(context: Context, cacheKey: String): CachedMediaMetadata? {
+            val stored = context.getSharedPreferences(PREF_MEDIA_CACHE_METADATA, Context.MODE_PRIVATE)
+                .getString(cacheMetadataEntryKey(cacheKey), null) ?: return null
+            return try {
+                val json = org.json.JSONObject(stored)
+                val title = json.optString("title", "").trim()
+                if (title.isEmpty()) return null
+                CachedMediaMetadata(
+                    title = title,
+                    artist = json.optString("artist", "").trim(),
+                    songId = json.optString("songId", "")
+                )
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+        private fun cacheMetadataEntryKey(cacheKey: String): String {
+            val bytes = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(cacheKey.toByteArray(Charsets.UTF_8))
+            val hex = "0123456789abcdef"
+            val out = StringBuilder(bytes.size * 2)
+            bytes.forEach { value ->
+                val unsigned = value.toInt() and 0xff
+                out.append(hex[unsigned ushr 4]).append(hex[unsigned and 0x0f])
+            }
+            return CACHE_METADATA_ENTRY_PREFIX + out.toString()
+        }
+
         @Synchronized
         fun clearMediaCache(context: Context) {
+            context.getSharedPreferences(PREF_MEDIA_CACHE_METADATA, Context.MODE_PRIVATE).edit().clear().apply()
             val currentCache = cache
             if (currentCache == null) {
                 File(context.cacheDir, "media_cache").deleteRecursively()
@@ -953,6 +1016,16 @@ class AudioPlaybackService : MediaSessionService() {
             }
         }
         
+        if (uri.scheme == "http" || uri.scheme == "https") {
+            rememberMediaCacheMetadata(
+                this,
+                uri.toString(),
+                title,
+                artist,
+                songId
+            )
+        }
+
         return MediaItem.Builder()
             .setUri(uri)
             .setMediaId(songId) // Stable ID for shuffle-mode resync
