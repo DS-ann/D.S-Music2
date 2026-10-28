@@ -1,4 +1,4 @@
-name: Build and Sign SpatialFlow APK (Android 6+)
+name: Build ARM64-v8a SpatialFlow APK (Android 6+)
 
 on:
   workflow_call:
@@ -13,15 +13,6 @@ on:
         required: false
         type: boolean
         default: false
-    secrets:
-      BATTERYPULSE_KEYSTORE_BASE64:
-        required: true
-      BATTERYPULSE_STORE_PASSWORD:
-        required: true
-      BATTERYPULSE_KEY_ALIAS:
-        required: true
-      BATTERYPULSE_KEY_PASSWORD:
-        required: true
   push:
     branches: [ master ]
     paths:
@@ -51,12 +42,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: spatialflow-android6-apk-${{ github.ref }}
+  group: spatialflow-arm64-apk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    name: Build and verify signed APK
+    name: Build and verify temporary-key-signed APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -86,34 +77,7 @@ jobs:
       - name: Install Android 17 SDK and Build Tools
         run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0"
 
-      - name: Prepare launcher signing key when secrets are configured
-        id: signing
-        env:
-          BATTERYPULSE_KEYSTORE_BASE64: ${{ secrets.BATTERYPULSE_KEYSTORE_BASE64 }}
-          BATTERYPULSE_STORE_PASSWORD: ${{ secrets.BATTERYPULSE_STORE_PASSWORD }}
-          BATTERYPULSE_KEY_ALIAS: ${{ secrets.BATTERYPULSE_KEY_ALIAS }}
-          BATTERYPULSE_KEY_PASSWORD: ${{ secrets.BATTERYPULSE_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          if [ -z "$BATTERYPULSE_KEYSTORE_BASE64" ] || [ -z "$BATTERYPULSE_STORE_PASSWORD" ] || [ -z "$BATTERYPULSE_KEY_ALIAS" ] || [ -z "$BATTERYPULSE_KEY_PASSWORD" ]; then
-            echo "SPATIALFLOW_SIGNING_READY=false" >> "$GITHUB_ENV"
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Launcher signing secrets were not supplied to this run. The release can be compiled and smoke-tested, but no APK will be published."
-            exit 0
-          fi
-          printf '%s' "$BATTERYPULSE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/batterypulse-release.p12"
-          keytool -list -storetype PKCS12 -keystore "$RUNNER_TEMP/batterypulse-release.p12" -storepass "$BATTERYPULSE_STORE_PASSWORD" -alias "$BATTERYPULSE_KEY_ALIAS" >/dev/null
-          chmod 600 "$RUNNER_TEMP/batterypulse-release.p12"
-          echo "BATTERYPULSE_KEYSTORE_PATH=$RUNNER_TEMP/batterypulse-release.p12" >> "$GITHUB_ENV"
-          echo "SPATIALFLOW_SIGNING_READY=true" >> "$GITHUB_ENV"
-          echo "ready=true" >> "$GITHUB_OUTPUT"
-          echo "Launcher PKCS#12 signing key validated."
-
-      - name: Clean and build release variant
-        env:
-          BATTERYPULSE_STORE_PASSWORD: ${{ secrets.BATTERYPULSE_STORE_PASSWORD }}
-          BATTERYPULSE_KEY_ALIAS: ${{ secrets.BATTERYPULSE_KEY_ALIAS }}
-          BATTERYPULSE_KEY_PASSWORD: ${{ secrets.BATTERYPULSE_KEY_PASSWORD }}
+      - name: Clean and build unsigned ARM64-v8a release
         run: |
           set -euo pipefail
           for attempt in 1 2 3; do
@@ -143,6 +107,50 @@ jobs:
             echo "Lint report file was not generated."
           fi
 
+      - name: Generate temporary key and sign the ARM64-v8a APK
+        id: temporary_signing
+        run: |
+          set -euo pipefail
+          BUILD_DIR="app/build/outputs/apk/release"
+          SOURCE_APK="$BUILD_DIR/app-arm64-v8a-release-unsigned.apk"
+          ALIGNED_APK="$RUNNER_TEMP/SpatialFlow-arm64-v8a-aligned.apk"
+          OUTPUT_APK="$BUILD_DIR/SpatialFlow-arm64-v8a-Android6-release.apk"
+          KEYSTORE="$RUNNER_TEMP/spatialflow-temporary-signing-key.p12"
+          ZIPALIGN="$ANDROID_HOME/build-tools/37.0.0/zipalign"
+          APK_SIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
+
+          test -s "$SOURCE_APK"
+          test -x "$ZIPALIGN"
+          test -x "$APK_SIGNER"
+          APK_COUNT="$(find "$BUILD_DIR" -maxdepth 1 -type f -name '*.apk' | wc -l | tr -d ' ')"
+          test "$APK_COUNT" -eq 1
+
+          # This key is generated per workflow run; no D.S Launcher/BatteryPulse key is accessed.
+          export TEMP_SIGNING_PASSWORD="$(openssl rand -hex 32)"
+          keytool -genkeypair -noprompt \
+            -keystore "$KEYSTORE" -storetype PKCS12 \
+            -storepass "$TEMP_SIGNING_PASSWORD" -keypass "$TEMP_SIGNING_PASSWORD" \
+            -alias spatialflow-temporary \
+            -dname "CN=SpatialFlow Temporary Release, OU=Build, O=DS-ann, C=IN" \
+            -keyalg RSA -keysize 2048 -validity 10000
+          chmod 600 "$KEYSTORE"
+
+          "$ZIPALIGN" -f -p 4 "$SOURCE_APK" "$ALIGNED_APK"
+          "$APK_SIGNER" sign \
+            --ks "$KEYSTORE" --ks-type PKCS12 --ks-key-alias spatialflow-temporary \
+            --ks-pass env:TEMP_SIGNING_PASSWORD \
+            --key-pass env:TEMP_SIGNING_PASSWORD \
+            --out "$OUTPUT_APK" "$ALIGNED_APK"
+          "$APK_SIGNER" verify --verbose "$OUTPUT_APK"
+
+          # Ensure this artifact is ARM64-only, not a universal/multi-ABI APK.
+          ABIS="$(unzip -Z1 "$OUTPUT_APK" | awk -F/ '$1 == "lib" && NF >= 3 { print $2 }' | sort -u)"
+          if [ -n "$ABIS" ] && [ "$ABIS" != "arm64-v8a" ]; then
+            echo "::error::Unexpected ABI directories in APK: $ABIS"
+            exit 1
+          fi
+          echo "Verified ARM64-v8a APK signed with this run's temporary key."
+
       - name: Smoke-test install and launch on Android 6 (API 23)
         id: api23_smoke
         if: inputs.run_api23_smoke_test
@@ -168,30 +176,9 @@ jobs:
             echo "::error::The API 23 emulator started, but the app install/start smoke test failed."
             exit 1
           fi
-          echo "::warning::The emulator failed before the API 23 smoke-test script could start. Android 6 runtime behavior is unverified; continuing to signing checks."
+          echo "::warning::The emulator failed before the API 23 smoke-test script could start. Android 6 runtime behavior is unverified; continuing to artifact upload."
 
-      - name: Explain skipped APK publishing when signing secrets are not supplied
-        if: steps.signing.outputs.ready != 'true'
-        run: echo "::warning::No signed APK was published from this run. Use the launcher repository workflow to pass its existing signing secrets."
-
-      - name: Verify APK signature and label output
-        if: steps.signing.outputs.ready == 'true'
-        run: |
-          set -euo pipefail
-          SOURCE_APK="app/build/outputs/apk/release/app-arm64-v8a-release.apk"
-          OUTPUT_APK="app/build/outputs/apk/release/SpatialFlow-arm64-v8a-Android6-release.apk"
-          APK_SIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
-          test -s "$SOURCE_APK"
-          test -x "$APK_SIGNER"
-          APK_COUNT="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | wc -l | tr -d ' ')"
-          test "$APK_COUNT" -eq 1
-          cp "$SOURCE_APK" "$OUTPUT_APK"
-          "$APK_SIGNER" verify --verbose "$OUTPUT_APK"
-          echo "Verified signed ARM64-v8a APK: $OUTPUT_APK"
-          echo "Expected single ABI output: arm64-v8a"
-
-      - name: Upload signed ARM64-v8a APK as a single-file artifact
-        if: steps.signing.outputs.ready == 'true'
+      - name: Upload single signed ARM64-v8a APK artifact
         uses: actions/upload-artifact@v7
         with:
           name: SpatialFlow-arm64-v8a-Android6-release-APK
