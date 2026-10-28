@@ -51,6 +51,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +78,8 @@ import com.codetrio.spatialflow.data.lyrics.LyricLine
 import com.codetrio.spatialflow.data.lyrics.LyricsResult
 import com.codetrio.spatialflow.model.SongItem
 import com.codetrio.spatialflow.viewmodel.PlayerSharedViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Stateful wrapper for the FullPlayer UI component.
@@ -269,6 +272,7 @@ fun FullPlayer(
     val haptic = LocalHapticFeedback.current
     val hasLyrics = !syncedLyrics.isNullOrEmpty() || !plainLyrics.isNullOrBlank()
     val currentSongId = uiState.currentSong?.id
+    val audioService by viewModel.audioServiceState.collectAsStateWithLifecycle()
     var showSongInfoDialog by remember { mutableStateOf(false) }
     var lastLyricsFetchSongId by remember { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
@@ -813,33 +817,88 @@ fun FullPlayer(
         if (showSongInfoDialog) {
             val song = uiState.currentSong
             if (song != null) {
-                val totalSeconds = song.duration.coerceAtLeast(0L) / 1000L
-                val durationText = if (totalSeconds >= 3600L) {
-                    java.lang.String.format(java.util.Locale.getDefault(), "%d:%02d:%02d",
-                        totalSeconds / 3600L, (totalSeconds % 3600L) / 60L, totalSeconds % 60L)
-                } else {
-                    java.lang.String.format(java.util.Locale.getDefault(), "%d:%02d",
-                        totalSeconds / 60L, totalSeconds % 60L)
+                val songFileMetadata by produceState(
+                    initialValue = SongFileMetadata(isRemote = SongFileMetadataReader.isRemoteSong(song)),
+                    key1 = song.id,
+                    key2 = song.path,
+                    key3 = song.data
+                ) {
+                    value = withContext(Dispatchers.IO) {
+                        SongFileMetadataReader.read(context.applicationContext, song)
+                    }
                 }
-                val addedText = if (song.dateAdded > 0L) {
-                    java.text.DateFormat.getDateTimeInstance().format(java.util.Date(song.dateAdded * 1000L))
-                } else "Unavailable"
-                val details = listOf(
-                    "Title" to song.title,
-                    "Artist" to song.artist,
+                val streamFormat = remember(audioService, song.id) {
+                    audioService?.getCurrentAudioFormatDetails(song.id.toString())
+                }
+                val streamBitrateBps = streamFormat?.bitrateBps?.takeIf { it > 0 }
+                val estimatedStreamSizeBytes = if (
+                    songFileMetadata.isRemote && streamBitrateBps != null && song.duration > 0L
+                ) {
+                    (streamBitrateBps.toDouble() * song.duration.toDouble() / 8000.0)
+                        .takeIf { it > 0.0 && it < Long.MAX_VALUE.toDouble() }
+                        ?.toLong()
+                } else null
+                val totalSeconds = song.duration.coerceAtLeast(0L) / 1000L
+                val durationText = if (song.duration > 0L) {
+                    if (totalSeconds >= 3600L) {
+                        java.lang.String.format(java.util.Locale.getDefault(), "%d:%02d:%02d",
+                            totalSeconds / 3600L, (totalSeconds % 3600L) / 60L, totalSeconds % 60L)
+                    } else {
+                        java.lang.String.format(java.util.Locale.getDefault(), "%d:%02d",
+                            totalSeconds / 60L, totalSeconds % 60L)
+                    }
+                } else "Not provided by source"
+                val sizeText = when {
+                    songFileMetadata.sizeBytes != null ->
+                        android.text.format.Formatter.formatFileSize(context, songFileMetadata.sizeBytes)
+                    estimatedStreamSizeBytes != null ->
+                        "About " + android.text.format.Formatter.formatFileSize(context, estimatedStreamSizeBytes) +
+                            " (estimated from stream bitrate and duration)"
+                    songFileMetadata.isRemote ->
+                        "Not exposed by the streaming source; cached data may be partial"
+                    else -> "Not exposed by this file provider"
+                }
+                val bitrateText = when {
+                    songFileMetadata.bitrateBps != null ->
+                        "${(songFileMetadata.bitrateBps + 500L) / 1000L} kb/s (file metadata)"
+                    streamBitrateBps != null ->
+                        "${(streamBitrateBps + 500) / 1000} kb/s (active stream format)"
+                    songFileMetadata.estimatedBitrateBps != null ->
+                        "${(songFileMetadata.estimatedBitrateBps + 500L) / 1000L} kb/s (estimated from file size and duration)"
+                    songFileMetadata.isRemote -> "Not reported by the active stream"
+                    else -> "Not embedded in file metadata"
+                }
+                val formatText = songFileMetadata.mimeType
+                    ?: songFileMetadata.fileName?.substringAfterLast('.', "")
+                        ?.takeIf { it.isNotBlank() }
+                        ?.uppercase(java.util.Locale.ROOT)
+                        ?.plus(" (file extension)")
+                    ?: "Not reported by source"
+                val sourceText = when {
+                    !song.videoId.isNullOrBlank() -> "YouTube Music stream"
+                    songFileMetadata.isRemote -> "Remote audio stream"
+                    else -> "Device audio library"
+                }
+                val details = mutableListOf(
+                    "Title" to song.title.ifBlank { "Unknown title" },
+                    "Artist" to song.artist.ifBlank { "Unknown artist" },
+                    "Album" to (songFileMetadata.album ?: "Not tagged"),
                     "Duration" to durationText,
-                    "Source" to if (!song.videoId.isNullOrBlank()) "YouTube Music / online" else "Device audio",
-                    "Song ID" to song.id.toString(),
-                    "Album ID" to if (song.albumId > 0L) song.albumId.toString() else "Unavailable",
-                    "Date added" to addedText,
-                    "Video ID" to (song.videoId ?: "Unavailable"),
-                    "Artist ID" to (song.artistId ?: "Unavailable"),
-                    "LUFS" to (song.lufs?.toString() ?: "Not analyzed"),
-                    "File path" to (song.path ?: "Unavailable"),
-                    "Data reference" to (song.data ?: "Unavailable"),
-                    "Content URI" to song.contentUri.toString(),
-                    "Thumbnail URL" to (song.thumbnailUrl ?: "Unavailable")
+                    "Source" to sourceText,
+                    "Song size" to sizeText,
+                    "Bitrate" to bitrateText,
+                    "Format" to formatText
                 )
+                songFileMetadata.fileName?.let { details.add("File name" to it) }
+                songFileMetadata.filePath?.let { details.add("File path" to it) }
+                if (song.dateAdded > 0L) {
+                    details.add("Date added" to java.text.DateFormat.getDateTimeInstance()
+                        .format(java.util.Date(song.dateAdded * 1000L)))
+                }
+                if (!song.videoId.isNullOrBlank()) details.add("Video ID" to song.videoId!!)
+                if (!song.artistId.isNullOrBlank()) details.add("Artist ID" to song.artistId!!)
+                song.lufs?.let { details.add("LUFS" to it.toString()) }
+                    ?: details.add("Loudness" to "Not analyzed")
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { showSongInfoDialog = false },
                     title = { Text("Song information", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },

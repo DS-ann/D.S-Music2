@@ -2736,17 +2736,13 @@ private data class CachedSongEntry(
 )
 
 private data class CacheTabSnapshot(
-    val totalBytes: Long,
-    val entries: List<CachedSongEntry>,
-    val enabled: Boolean,
-    val limitGb: Int
+    val entries: List<CachedSongEntry>
 )
 
 private suspend fun readCacheTabSnapshot(
     context: Context,
     lyricsCache: LyricsCacheManager
 ): CacheTabSnapshot = withContext(Dispatchers.IO) {
-    val prefs = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
     val summary = try {
         AudioPlaybackService.getMediaCacheSnapshot(context)
     } catch (_: Exception) {
@@ -2778,7 +2774,7 @@ private suspend fun readCacheTabSnapshot(
         metadataBySong[metadata.songId] = if (existing == null) {
             metadata to bytes
         } else {
-            // A track may have several stream URLs; show it once and aggregate cache bytes.
+            // Multiple stream URLs can refer to the same track; report their combined cached bytes.
             existing.first to (existing.second + bytes)
         }
     }
@@ -2792,122 +2788,61 @@ private suspend fun readCacheTabSnapshot(
         )
     }.sortedByDescending { it.bytes }
 
-    CacheTabSnapshot(
-        totalBytes = summary.first,
-        entries = entries,
-        enabled = prefs.getBoolean("media_cache_enabled", true),
-        limitGb = prefs.getInt("media_cache_limit_gb", 1).coerceIn(1, 10)
-    )
+    CacheTabSnapshot(entries = entries)
 }
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 private fun StreamCacheTabContent(context: Context) {
-    val scope = rememberCoroutineScope()
-    var cacheBytes by remember { mutableStateOf(0L) }
     var cacheEntries by remember { mutableStateOf(emptyList<CachedSongEntry>()) }
-    var cacheEnabled by remember { mutableStateOf(true) }
-    var cacheLimitGb by remember { mutableStateOf(1) }
-    var isClearing by remember { mutableStateOf(false) }
     val lyricsCache = remember(context) { LyricsCacheManager(context.applicationContext) }
 
     LaunchedEffect(context, lyricsCache) {
+        cacheEntries = readCacheTabSnapshot(context, lyricsCache).entries
         while (true) {
-            val snapshot = readCacheTabSnapshot(context, lyricsCache)
-            cacheBytes = snapshot.totalBytes
-            cacheEntries = snapshot.entries
-            cacheEnabled = snapshot.enabled
-            cacheLimitGb = snapshot.limitGb
-            delay(1800L)
+            delay(3000L)
+            cacheEntries = readCacheTabSnapshot(context, lyricsCache).entries
         }
     }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Audio cache", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(android.text.format.Formatter.formatFileSize(context, cacheBytes) +
-                        " total stream cache • " + cacheEntries.size + " track(s) with cached cover + lyrics",
-                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(if (cacheEnabled) "Caching is on. Limit: " + cacheLimitGb + " GB"
-                        else "Caching is off. New stream data is not retained.")
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                isClearing = true
-                                try {
-                                    withContext(Dispatchers.IO) { AudioPlaybackService.clearMediaCache(context) }
-                                    val afterClear = readCacheTabSnapshot(context, lyricsCache)
-                                    cacheBytes = afterClear.totalBytes
-                                    cacheEntries = afterClear.entries
-                                } finally {
-                                    isClearing = false
-                                }
-                            }
-                        },
-                        enabled = !isClearing
-                    ) {
-                        if (isClearing) androidx.compose.material3.CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp), strokeWidth = 2.dp
-                        ) else Icon(Icons.Default.Delete, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(if (isClearing) "Clearing…" else "Clear cache")
-                    }
-                    Text("The folder lists only tracks with cached audio, saved cover art, and lyrics already stored on this device. Stream audio may still be partial while buffering or playing.",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Folder,
-                        contentDescription = "Cached songs folder",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Cached songs", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        val visibleAudioBytes = cacheEntries.sumOf { it.bytes }
-                        Text(cacheEntries.size.toString() + " item(s) • " +
-                            android.text.format.Formatter.formatFileSize(context, visibleAudioBytes),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
+                Text("Cached songs", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(
+                    "Only tracks with cached audio, cover art, and lyrics are listed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
         if (cacheEntries.isEmpty()) {
             item {
-                Box(Modifier.fillMaxWidth().padding(vertical = 36.dp), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.MusicNote, contentDescription = null, modifier = Modifier.size(42.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text("No tracks have all assets cached", style = MaterialTheme.typography.titleMedium)
-                        Text("A track appears here after its audio data, cover art, and lyrics are all cached on this device.", style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        Icons.Default.MusicNote,
+                        contentDescription = null,
+                        modifier = Modifier.size(42.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text("No cached songs yet", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "A track appears after its audio data, cover art, and lyrics have all been cached on this device.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         } else {
@@ -2918,21 +2853,27 @@ private fun StreamCacheTabContent(context: Context) {
                         AsyncImage(
                             model = artwork,
                             contentDescription = item.title + " cover art",
-                            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)),
+                            modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)),
                             contentScale = ContentScale.Crop
                         )
                     },
                     headlineContent = {
-                        Text(item.title,
-                            fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            item.title,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     },
                     supportingContent = {
                         Text(item.artist, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     },
                     trailingContent = {
-                        Text(android.text.format.Formatter.formatFileSize(context, item.bytes),
+                        Text(
+                            android.text.format.Formatter.formatFileSize(context, item.bytes) + " cached",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     },
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
                 )
@@ -2940,5 +2881,3 @@ private fun StreamCacheTabContent(context: Context) {
         }
     }
 }
-
-
