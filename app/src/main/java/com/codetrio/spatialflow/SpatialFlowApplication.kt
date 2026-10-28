@@ -56,11 +56,20 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
         super.onCreate()
         instance = this
         
-        // Proactive Initialization: Connect localized persistence cache to high-speed networking engine
-        InnerTubeClient.initialize(this)
-        // Initialize the extractor without a network request; resolve stream URLs only when needed.
-        NewPipeStreamExtractor.init(this)
-        // Initialize global theme mode
+        // Do not perform disk-cache/client initialization on the process main thread.
+        // These components are used by streaming, but are not required to draw the first screen.
+        val appContext = applicationContext
+        Thread({
+            try {
+                InnerTubeClient.initialize(appContext)
+                NewPipeStreamExtractor.init(appContext)
+                CacheManager.clearOldCache(appContext)
+            } catch (error: Exception) {
+                Log.e("SpatialFlowApplication", "Background startup initialization failed", error)
+            }
+        }, "SpatialFlow-StartupInit").start()
+
+        // Theme reads are small, synchronous preference reads needed for the first activity.
         val prefs = getSharedPreferences("AppSettings", MODE_PRIVATE)
         val isDarkMode = prefs.getBoolean("dark_mode", true)
         AppCompatDelegate.setDefaultNightMode(
@@ -79,7 +88,6 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
         // Suppress expected Glide warnings for missing album arts
         Glide.init(this, GlideBuilder().setLogLevel(Log.ERROR))
 
-        // Clean up old temp files on app start
-        CacheManager.clearOldCache(this)
+        // Cache cleanup is already scheduled on the startup worker above.
     }
 }
