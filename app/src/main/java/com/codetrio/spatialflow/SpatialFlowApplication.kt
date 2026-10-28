@@ -59,8 +59,7 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
         // Proactive Initialization: Connect localized persistence cache to high-speed networking engine
         InnerTubeClient.initialize(this)
         // Initialize the extractor without a network request; resolve stream URLs only when needed.
-        NewPipeStreamExtractor.init(this)
-// Initialize global theme mode
+        NewPipeStreamExtractor.init(this)\n        // Initialize global theme mode
         val prefs = getSharedPreferences("AppSettings", MODE_PRIVATE)
         val isDarkMode = prefs.getBoolean("dark_mode", true)
         AppCompatDelegate.setDefaultNightMode(

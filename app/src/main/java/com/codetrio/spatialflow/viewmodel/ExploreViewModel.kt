@@ -178,6 +178,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     private var searchJob: Job? = null
     private var suggestJob: Job? = null
+    private var personalizationJob: Job? = null
 
 
     // ========== Search Methods ==========
@@ -492,6 +493,40 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         processedSections
     }
 
+    private fun loadPersonalizedSectionsInBackground() {
+        if (_uiState.value.currentMood != null || personalizationJob?.isActive == true) return
+
+        personalizationJob = viewModelScope.launch {
+            try {
+                val localStats = getPersonalizedSections()
+                if (localStats.isNotEmpty()) {
+                    _uiState.update { state ->
+                        if (state.currentMood != null) {
+                            state
+                        } else {
+                            val updatedSections = state.homeSections.toMutableList()
+                            val additions = localStats.filter { section ->
+                                updatedSections.none {
+                                    it.title.equals(section.title, ignoreCase = true)
+                                }
+                            }
+                            if (additions.isEmpty()) {
+                                state
+                            } else {
+                                updatedSections.addAll(minOf(3, updatedSections.size), additions)
+                                state.copy(homeSections = updatedSections)
+                            }
+                        }
+                    }
+                    prefetchThumbnails(localStats.take(2).flatMap { it.items.take(3) })
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Log.w(TAG, "Personalized sections failed to load", e)
+            }
+        }
+    }
+
     fun loadHomeFeed() {
         if (homeLoaded || _uiState.value.isLoadingHome) return
 
@@ -504,33 +539,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 _uiState.update { it.copy(homeSections = mergedSections, isLoadingHome = false) }
                 homeLoaded = true
                 prefetchThumbnails(mergedSections.take(3).flatMap { it.items.take(3) })
-
-                if (_uiState.value.currentMood == null) {
-                    viewModelScope.launch {
-                        try {
-                            val localStats = getPersonalizedSections()
-                            if (localStats.isNotEmpty()) {
-                                _uiState.update { state ->
-                                    if (state.currentMood != null) {
-                                        state
-                                    } else {
-                                        val updatedSections = state.homeSections.toMutableList()
-                                        val additions = localStats.filter { section ->
-                                            updatedSections.none {
-                                                it.title.equals(section.title, ignoreCase = true)
-                                            }
-                                        }
-                                        updatedSections.addAll(minOf(3, updatedSections.size), additions)
-                                        state.copy(homeSections = updatedSections)
-                                    }
-                                }
-                                prefetchThumbnails(localStats.take(2).flatMap { it.items.take(3) })
-                            }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Personalized sections failed to load", e)
-                        }
-                    }
-                }
+                loadPersonalizedSectionsInBackground()
             } catch (e: Exception) {
                 Log.e(TAG, "Home feed error", e)
                 _uiState.update { it.copy(error = e.message) }
@@ -549,7 +558,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 val mergedSections = fetchMergedHomeFeed()
                 _uiState.update { it.copy(homeSections = mergedSections) }
                 homeLoaded = true
-                prefetchThumbnails(mergedSections.take(4).flatMap { it.items.take(4) })
+                prefetchThumbnails(mergedSections.take(3).flatMap { it.items.take(3) })
+                loadPersonalizedSectionsInBackground()
             } catch (e: Exception) {
                 Log.e(TAG, "Refresh error", e)
                 _uiState.update { it.copy(error = e.message) }
