@@ -141,8 +141,8 @@ object NewPipeStreamExtractor {
         }
 
         // Deduplication
-        val deferred = inFlightRequests.computeIfAbsent(videoId) {
-            extractorScope.async {
+        val deferred = synchronized(inFlightRequests) {
+            inFlightRequests[videoId] ?: extractorScope.async(start = kotlinx.coroutines.CoroutineStart.LAZY) {
                 try {
                     val start = System.currentTimeMillis()
                     val info = fetchStreamInfo(videoId)
@@ -167,6 +167,12 @@ object NewPipeStreamExtractor {
                 } finally {
                     inFlightRequests.remove(videoId)
                 }
+            }.also {
+                inFlightRequests[videoId] = it
+                it.start()
+            }.also {
+                inFlightPlayerResults[videoId] = it
+                it.start()
             }
         }
 
@@ -185,8 +191,8 @@ object NewPipeStreamExtractor {
             return@coroutineScope cachedResult
         }
 
-        val deferred = inFlightPlayerResults.computeIfAbsent(videoId) {
-            extractorScope.async {
+        val deferred = synchronized(inFlightPlayerResults) {
+            inFlightPlayerResults[videoId] ?: extractorScope.async(start = kotlinx.coroutines.CoroutineStart.LAZY) {
                 try {
                     val info = fetchStreamInfo(videoId)
                     if (info == null) return@async null
