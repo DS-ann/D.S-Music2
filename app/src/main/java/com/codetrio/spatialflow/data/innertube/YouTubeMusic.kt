@@ -290,6 +290,17 @@ object YouTubeMusic {
             }
         }
 
+    /** Resolve a decoder-compatible NewPipe audio stream for the final recovery attempt. */
+    suspend fun getCompatibleFallbackStreamUrl(videoId: String?): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val id = videoId?.takeIf { it.isNotBlank() }
+                    ?: throw IllegalArgumentException("Video ID is blank")
+                NewPipeStreamExtractor.getFallbackAudioStreamUrl(id)
+                    ?: throw IllegalStateException("No compatible fallback audio stream for $id")
+            }
+        }
+
     /**
      * Invalidate a possibly expired/broken stream URL so the next request re-runs extraction.
      */
