@@ -1,5 +1,7 @@
 package com.codetrio.spatialflow.ui.library
 
+import android.os.Environment
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,12 +14,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -54,6 +62,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+private data class LocalMusicFolder(
+    val name: String,
+    val path: String,
+    val songCount: Int
+)
+
+private data class LocalMusicFolderListing(
+    val folders: List<LocalMusicFolder> = emptyList(),
+    val songs: List<SongItem> = emptyList()
+)
+
 /**
  * A separate, local-only music destination.
  *
@@ -70,9 +89,22 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
     val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
     val favoriteIds by viewModel.favoriteSongIds.collectAsStateWithLifecycle(emptySet())
 
+    val storageRootPath = remember {
+        Environment.getExternalStorageDirectory().absolutePath.trimEnd('/')
+    }
+    var showAsFolders by rememberSaveable { mutableStateOf(false) }
+    var currentFolderPath by rememberSaveable { mutableStateOf(storageRootPath) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var sortOrder by rememberSaveable { mutableStateOf(SortOrder.A_Z) }
     var isScanning by remember { mutableStateOf(false) }
+
+    LaunchedEffect(storageRootPath) {
+        if (currentFolderPath != storageRootPath &&
+            !currentFolderPath.startsWith("$storageRootPath/")
+        ) {
+            currentFolderPath = storageRootPath
+        }
+    }
 
     LaunchedEffect(Unit) {
         if (localSongs.isEmpty()) {
@@ -108,6 +140,66 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
             }
         }
     }
+
+    val folderListing by produceState(
+        initialValue = LocalMusicFolderListing(),
+        visibleSongs,
+        currentFolderPath,
+        storageRootPath
+    ) {
+        value = withContext(Dispatchers.Default) {
+            val storageRoot = storageRootPath.replace('\\', '/').trimEnd('/')
+            val currentPathRaw = currentFolderPath.replace('\\', '/').trimEnd('/')
+            val currentPath = if (
+                currentPathRaw == storageRoot || currentPathRaw.startsWith("$storageRoot/")
+            ) currentPathRaw else storageRoot
+            val folderCounts = linkedMapOf<String, MutableSet<Long>>()
+            val songsInFolder = ArrayList<SongItem>()
+            val prefix = "$currentPath/"
+
+            for (song in visibleSongs) {
+                val rawPath = (song.path ?: song.data).orEmpty()
+                if (rawPath.isBlank()) continue
+                val path = rawPath.replace('\\', '/').trimEnd('/')
+                if (!path.startsWith(prefix)) continue
+
+                val relative = path.removePrefix(prefix)
+                if (relative.isBlank()) continue
+                val slash = relative.indexOf('/')
+                if (slash < 0) {
+                    songsInFolder.add(song)
+                } else {
+                    val childName = relative.substring(0, slash)
+                    if (childName.isBlank()) continue
+                    val childPath = "$currentPath/$childName"
+                    folderCounts.getOrPut(childPath) { linkedSetOf() }.add(song.id)
+                }
+            }
+
+            val folders = folderCounts.map { (path, ids) ->
+                LocalMusicFolder(
+                    name = path.substringAfterLast('/'),
+                    path = path,
+                    songCount = ids.size
+                )
+            }.sortedBy { it.name.lowercase() }
+
+            LocalMusicFolderListing(folders = folders, songs = songsInFolder)
+        }
+    }
+
+    val visibleSongsInView = if (showAsFolders) folderListing.songs else visibleSongs
+    val contentIsEmpty = if (showAsFolders) {
+        folderListing.folders.isEmpty() && folderListing.songs.isEmpty()
+    } else {
+        visibleSongs.isEmpty()
+    }
+    val parentFolderPath = remember(currentFolderPath, storageRootPath) {
+        val current = currentFolderPath.trimEnd('/')
+        if (current == storageRootPath) storageRootPath
+        else current.substringBeforeLast('/', storageRootPath).ifBlank { storageRootPath }
+    }
+
 
     Column(
         modifier = Modifier
@@ -182,10 +274,10 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
-                enabled = visibleSongs.isNotEmpty(),
+                enabled = visibleSongsInView.isNotEmpty(),
                 onClick = {
-                    // The queue is replaced by local MediaStore entries only.
-                    viewModel.setSongList(visibleSongs)
+                    // The queue is scoped to the current folder when folder view is active.
+                    viewModel.setSongList(visibleSongsInView)
                     viewModel.playSongAtIndex(0)
                 },
                 modifier = Modifier.weight(1f)
@@ -195,9 +287,9 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                 Text("Play all")
             }
             OutlinedButton(
-                enabled = visibleSongs.isNotEmpty(),
+                enabled = visibleSongsInView.isNotEmpty(),
                 onClick = {
-                    val shuffledLocalSongs = visibleSongs.shuffled()
+                    val shuffledLocalSongs = visibleSongsInView.shuffled()
                     viewModel.setSongList(shuffledLocalSongs)
                     viewModel.playSongAtIndex(0)
                 },
@@ -235,9 +327,24 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                     )
                 )
             }
+            FilterChip(
+                selected = showAsFolders,
+                onClick = {
+                    showAsFolders = !showAsFolders
+                    currentFolderPath = storageRootPath
+                },
+                label = { Text("Folders", maxLines = 1) },
+                leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) },
+                border = null,
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
         }
 
-        if (visibleSongs.isEmpty()) {
+        if (contentIsEmpty) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -278,7 +385,67 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                 contentPadding = PaddingValues(bottom = 160.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                itemsIndexed(visibleSongs, key = { _, song -> song.id }) { index, song ->
+                if (showAsFolders && currentFolderPath != storageRootPath) {
+                    item(key = "folder_parent") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { currentFolderPath = parentFolderPath }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.ChevronLeft, contentDescription = "Parent folder")
+                            Column(modifier = Modifier.padding(start = 10.dp)) {
+                                Text("..", fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    text = if (parentFolderPath == storageRootPath) "Internal storage" else parentFolderPath.substringAfter(storageRootPath).trimStart('/'),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+                if (showAsFolders) {
+                    items(folderListing.folders, key = { folder -> "folder:${folder.path}" }) { folder ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { currentFolderPath = folder.path }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Folder,
+                                contentDescription = "Folder",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                                Text(
+                                    text = folder.name,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "${folder.songCount} songs",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Icon(
+                                Icons.Default.ChevronRight,
+                                contentDescription = "Open folder",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                itemsIndexed(visibleSongsInView, key = { _, song -> "song:${song.id}" }) { index, song ->
                     val isCurrentLocalSong =
                         currentSong?.videoId.isNullOrEmpty() && currentSong?.id == song.id
                     SongListItem(

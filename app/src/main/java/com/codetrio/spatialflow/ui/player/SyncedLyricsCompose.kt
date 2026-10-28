@@ -322,12 +322,6 @@ private fun LyricLineItem(
         label = "LyricAlpha"
     )
 
-    // Use the live playback position directly. The former 200 ms tween made karaoke visibly late.
-    val rawPos = if ((isKaraoke || line.backgroundWords.isNotEmpty()) && isActive) {
-        currentPositionProvider()
-    } else {
-        lineStartMs.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
-    }
 
     val bracketMatch = remember(line.content) {
         Regex("""^(.*?)\s*([({\[].+?[)}\]])\s*$""").find(line.content)
@@ -445,7 +439,7 @@ private fun LyricLineItem(
                                     eraseFutureText(
                                         geometry = geometry,
                                         words = line.words,
-                                        pos = rawPos.toLong(),
+                                        pos = currentPositionProvider().toLong(),
                                         wordOffset = 0,
                                         drawScope = this
                                     )
@@ -492,7 +486,7 @@ private fun LyricLineItem(
                                         eraseFutureText(
                                             geometry = geometry,
                                             words = line.words,
-                                            pos = rawPos.toLong(),
+                                            pos = currentPositionProvider().toLong(),
                                             wordOffset = bracketStartIndex,
                                             drawScope = this
                                         )
@@ -552,7 +546,7 @@ private fun LyricLineItem(
                                         eraseFutureText(
                                             geometry = geometry,
                                             words = line.backgroundWords,
-                                            pos = rawPos.toLong(),
+                                            pos = currentPositionProvider().toLong(),
                                             wordOffset = 0,
                                             drawScope = this
                                         )
