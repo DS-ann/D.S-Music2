@@ -127,6 +127,7 @@ class MainActivity : AppCompatActivity() {
             val binder = service as? AudioPlaybackService.LocalBinder
             audioService = binder?.getService()
             isServiceBound = true
+            audioServiceStartupRequested = false
             audioService?.let {
                 playerViewModel.audioService = it
             }
@@ -135,6 +136,7 @@ class MainActivity : AppCompatActivity() {
         override fun onServiceDisconnected(name: ComponentName?) {
             Log.d(TAG, "Service disconnected")
             isServiceBound = false
+            audioServiceStartupRequested = false
             audioService = null
         }
     }
@@ -660,7 +662,7 @@ class MainActivity : AppCompatActivity() {
         val isRunning = manager.getRunningServices(Int.MAX_VALUE).any {
             it.service.className == AudioPlaybackService::class.java.name
         }
-        if (!isRunning) startAudioService()
+        if (!isRunning) prepareAndStartAudioService()
     }
 
     private fun checkAudioPermission() {
