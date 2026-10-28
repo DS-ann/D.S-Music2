@@ -845,6 +845,7 @@ fun FullPlayer(
                 val durationMs = when {
                     song.duration > 0L -> song.duration
                     (streamFormat?.durationMs ?: 0L) > 0L -> streamFormat?.durationMs ?: 0L
+                    (songFileMetadata.durationMs ?: 0L) > 0L -> songFileMetadata.durationMs ?: 0L
                     else -> 0L
                 }
                 val estimatedStreamSizeBytes = if (
@@ -922,8 +923,8 @@ fun FullPlayer(
                 if (song.albumId > 0L) details.add("Album ID" to song.albumId.toString())
                 songFileMetadata.fileName?.let { details.add("File name" to it) }
                 songFileMetadata.filePath?.let { details.add("File path" to it) }
-                if (song.dateAdded > 0L) {
-                    details.add("Date added" to java.text.DateFormat.getDateTimeInstance()
+                if (!songFileMetadata.isRemote && song.dateAdded > 0L) {
+                    details.add("Added to device library" to java.text.DateFormat.getDateTimeInstance()
                         .format(java.util.Date(song.dateAdded * 1000L)))
                 }
                 if (!song.videoId.isNullOrBlank()) details.add("Video ID" to song.videoId!!)

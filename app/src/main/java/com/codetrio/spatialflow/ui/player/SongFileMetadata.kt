@@ -14,6 +14,7 @@ import java.io.File
 internal data class SongFileMetadata(
     val isRemote: Boolean,
     val sizeBytes: Long? = null,
+    val durationMs: Long? = null,
     val bitrateBps: Long? = null,
     val estimatedBitrateBps: Long? = null,
     val mimeType: String? = null,
@@ -52,6 +53,7 @@ internal object SongFileMetadataReader {
         val uri = runCatching { song.contentUri }.getOrNull()
         val sizeBytes = localFile?.length()?.takeIf { it > 0L }
             ?: uri?.let { querySize(context, it) }
+        var durationMs: Long? = null
         var bitrateBps: Long? = null
         var mimeType: String? = null
         var album: String? = song.albumName?.takeIf { it.isNotBlank() && !it.equals("<unknown>", ignoreCase = true) }
@@ -62,6 +64,9 @@ internal object SongFileMetadataReader {
                 localFile != null -> retriever.setDataSource(localFile.absolutePath)
                 uri?.scheme == "content" || uri?.scheme == "file" -> retriever.setDataSource(context, uri)
             }
+            durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                ?.toLongOrNull()
+                ?.takeIf { it > 0L }
             bitrateBps = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)
                 ?.toLongOrNull()
                 ?.takeIf { it > 0L }
@@ -100,6 +105,7 @@ internal object SongFileMetadataReader {
         return SongFileMetadata(
             isRemote = false,
             sizeBytes = sizeBytes,
+            durationMs = durationMs,
             bitrateBps = bitrateBps,
             estimatedBitrateBps = estimate,
             mimeType = mimeType,

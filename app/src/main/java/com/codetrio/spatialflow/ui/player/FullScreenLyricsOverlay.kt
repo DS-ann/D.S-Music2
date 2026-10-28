@@ -511,14 +511,8 @@ private fun ProvidersSelector(
     )
     val allProviders = (knownProviders + providerResults.keys.sorted()).distinct()
 
-    val visibleProviders = allProviders.filter { provider ->
-        val result = providerResults[provider]
-        val hasFinished = providerResults.containsKey(provider)
-        val hasData = result != null && result.hasLyrics() && result.confidence >= 0f
-        
-        // Show if it hasn't finished searching, has lyrics, or is the currently selected provider
-        !hasFinished || hasData || selectedProvider == provider
-    }
+    // Keep failed/no-match providers visible too, so the user can see every searched source.
+    val visibleProviders = allProviders
 
     Column(
         modifier = modifier
