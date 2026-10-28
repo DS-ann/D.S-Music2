@@ -281,6 +281,9 @@ class MainActivity : AppCompatActivity() {
                 ) { paddingValues ->
                     val navBackStackEntry by currentNavController.currentBackStackEntryAsState()
                     val currentDestination = navBackStackEntry?.destination
+                    LaunchedEffect(currentDestination?.route) {
+                        exploreViewModel.setExplorePageActive(currentDestination?.route == "explore")
+                    }
                     val showBottomBar = currentDestination?.route in listOf("explore", "library", "local_music", "settings")
 
                     val playerExpansionFractionState = playerViewModel.playerExpansionFraction.collectAsState()

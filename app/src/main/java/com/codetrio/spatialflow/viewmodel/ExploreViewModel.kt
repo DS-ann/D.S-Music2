@@ -96,6 +96,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private var searchContinuation: String? = null
     private var homeContinuationToken: String? = null
     private var homeLoaded = false
+    private var explorePageActive = false
 
     fun setMood(mood: String?) {
         if (_uiState.value.currentMood == mood) return
@@ -179,6 +180,50 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private var searchJob: Job? = null
     private var suggestJob: Job? = null
     private var personalizationJob: Job? = null
+    private var homeFeedJob: Job? = null
+    private var homeRefreshJob: Job? = null
+    private var homeContinuationJob: Job? = null
+    private var searchContinuationJob: Job? = null
+    private var detailLoadJob: Job? = null
+
+    /**
+     * Stop page content requests when Explore is hidden but preserve its already-loaded state.
+     * Thumbnail prefetches remain cache-only and do not cause hidden pages to be composed.
+     */
+    fun setExplorePageActive(active: Boolean) {
+        if (explorePageActive == active) return
+        explorePageActive = active
+        if (active) {
+            if (!homeLoaded) loadHomeFeed()
+            return
+        }
+
+        searchJob?.cancel()
+        searchJob = null
+        suggestJob?.cancel()
+        suggestJob = null
+        personalizationJob?.cancel()
+        personalizationJob = null
+        homeFeedJob?.cancel()
+        homeFeedJob = null
+        homeRefreshJob?.cancel()
+        homeRefreshJob = null
+        homeContinuationJob?.cancel()
+        homeContinuationJob = null
+        searchContinuationJob?.cancel()
+        searchContinuationJob = null
+        detailLoadJob?.cancel()
+        detailLoadJob = null
+        _uiState.update {
+            it.copy(
+                isSearching = false,
+                isLoadingHome = false,
+                isRefreshing = false,
+                isLoadingMoreHome = false,
+                isLoadingDetail = false
+            )
+        }
+    }
 
 
     // ========== Search Methods ==========
@@ -257,13 +302,15 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun loadMoreResults() {
+        if (!explorePageActive) return
         val cont = searchContinuation ?: return
         if (_uiState.value.isSearching) return
         
         // Synchronously set to true to prevent any other triggers in the same frame/recomposition loop
         _uiState.update { it.copy(isSearching = true) }
 
-        viewModelScope.launch {
+        searchContinuationJob?.cancel()
+        searchContinuationJob = viewModelScope.launch {
             try {
                 val result = YouTubeMusic.searchContinuation(cont)
                 result.onSuccess { searchResult ->
@@ -297,6 +344,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     prefetchThumbnails(newItemsToPrefetch.take(8))
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "Load more failed", e)
             } finally {
                 _uiState.update { it.copy(isSearching = false) }
@@ -305,6 +353,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun fetchSuggestions(query: String) {
+        if (!explorePageActive) return
         suggestJob?.cancel()
         suggestJob = viewModelScope.launch {
             delay(300.milliseconds) // Debounce
@@ -494,7 +543,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun loadPersonalizedSectionsInBackground() {
-        if (_uiState.value.currentMood != null || personalizationJob?.isActive == true) return
+        if (!explorePageActive || _uiState.value.currentMood != null || personalizationJob?.isActive == true) return
 
         personalizationJob = viewModelScope.launch {
             try {
@@ -528,11 +577,12 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun loadHomeFeed() {
-        if (homeLoaded || _uiState.value.isLoadingHome) return
+        if (!explorePageActive || homeLoaded || _uiState.value.isLoadingHome) return
 
         syncCookieFromDisk()
         _uiState.update { it.copy(isLoadingHome = true) }
-        viewModelScope.launch {
+        homeFeedJob?.cancel()
+        homeFeedJob = viewModelScope.launch {
             try {
                 val mergedSections = fetchMergedHomeFeed()
                 // Publish the main feed immediately; personalization is optional and loaded afterwards.
@@ -541,6 +591,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 prefetchThumbnails(mergedSections.take(3).flatMap { it.items.take(3) })
                 loadPersonalizedSectionsInBackground()
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "Home feed error", e)
                 _uiState.update { it.copy(error = e.message) }
             } finally {
@@ -550,10 +601,13 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun refreshHomeFeed() {
+        if (!explorePageActive) return
         syncCookieFromDisk()
         homeLoaded = false
         _uiState.update { it.copy(isRefreshing = true) }
-        viewModelScope.launch {
+        homeFeedJob?.cancel()
+        homeRefreshJob?.cancel()
+        homeRefreshJob = viewModelScope.launch {
             try {
                 val mergedSections = fetchMergedHomeFeed()
                 _uiState.update { it.copy(homeSections = mergedSections) }
@@ -561,6 +615,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 prefetchThumbnails(mergedSections.take(3).flatMap { it.items.take(3) })
                 loadPersonalizedSectionsInBackground()
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "Refresh error", e)
                 _uiState.update { it.copy(error = e.message) }
             } finally {
@@ -570,11 +625,13 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun loadMoreHomeSections() {
+        if (!explorePageActive) return
         val token = homeContinuationToken ?: return
         if (_uiState.value.isLoadingHome || _uiState.value.isLoadingMoreHome) return
 
         _uiState.update { it.copy(isLoadingMoreHome = true) }
-        viewModelScope.launch {
+        homeContinuationJob?.cancel()
+        homeContinuationJob = viewModelScope.launch {
             try {
                 val result = YouTubeMusic.homeContinuation(token)
                 result.onSuccess { page ->
@@ -589,6 +646,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     prefetchThumbnails(page.sections.take(3).flatMap { it.items.take(4) })
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "Load more home sections failed", e)
             } finally {
                 _uiState.update { it.copy(isLoadingMoreHome = false) }
@@ -676,7 +734,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     fun loadAlbum(browseId: String) {
         _uiState.update { it.copy(isLoadingDetail = true) }
-        viewModelScope.launch {
+        detailLoadJob?.cancel()
+        detailLoadJob = viewModelScope.launch {
             try {
                 val result = YouTubeMusic.album(browseId)
                 result.onSuccess { res ->
@@ -697,7 +756,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     fun loadArtist(browseId: String, fallbackThumbnailUrl: String? = null) {
         _uiState.update { it.copy(isLoadingDetail = true) }
-        viewModelScope.launch {
+        detailLoadJob?.cancel()
+        detailLoadJob = viewModelScope.launch {
             try {
                 val result = YouTubeMusic.artist(browseId)
                 result.onSuccess { res ->
@@ -721,7 +781,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     fun loadPlaylist(playlistId: String) {
         _uiState.update { it.copy(isLoadingDetail = true) }
-        viewModelScope.launch {
+        detailLoadJob?.cancel()
+        detailLoadJob = viewModelScope.launch {
             try {
                 val result = YouTubeMusic.playlist(playlistId)
                 result.onSuccess { res ->
@@ -742,7 +803,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     fun loadSectionDetails(browseId: String, params: String?, fallbackTitle: String = "Section") {
         _uiState.update { it.copy(isLoadingDetail = true) }
-        viewModelScope.launch {
+        detailLoadJob?.cancel()
+        detailLoadJob = viewModelScope.launch {
             try {
                 val result = YouTubeMusic.section(browseId, params)
                 result.onSuccess { res ->
