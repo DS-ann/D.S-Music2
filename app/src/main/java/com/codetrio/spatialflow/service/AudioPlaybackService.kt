@@ -126,6 +126,8 @@ class AudioPlaybackService : MediaSessionService() {
     private var lastPlaybackRecoveryVideoId: String? = null
     private var failedStreamVideoId: String? = null
     private var forceInnerTubeOnNextResolveVideoId: String? = null
+    private var forceNewPipeOnNextResolveVideoId: String? = null
+    private var playbackRecoveryStage = 0
     private var isRecoveringPlaybackError = false
     private var isFetchingRelatedProactively = false
 
@@ -196,15 +198,27 @@ class AudioPlaybackService : MediaSessionService() {
 
             val song = viewModel?.currentSong?.value
             val videoId = song?.videoId?.takeIf { it.isNotBlank() }
-            if (videoId != null && lastPlaybackRecoveryVideoId != videoId) {
-                lastPlaybackRecoveryVideoId = videoId
+            if (videoId != null && playbackRecoveryStage < 2) {
+                if (lastPlaybackRecoveryVideoId != videoId) {
+                    lastPlaybackRecoveryVideoId = videoId
+                    playbackRecoveryStage = 1
+                    forceInnerTubeOnNextResolveVideoId = videoId
+                    Log.w(TAG, "Playback recovery 1/2: retrying $videoId with a fresh InnerTube URL")
+                    com.codetrio.spatialflow.ui.SnackbarController.showMessage("Trying an alternate song stream…")
+                } else {
+                    playbackRecoveryStage = 2
+                    forceNewPipeOnNextResolveVideoId = videoId
+                    Log.w(TAG, "Playback recovery 2/2: retrying $videoId with a fresh NewPipe URL")
+                    com.codetrio.spatialflow.ui.SnackbarController.showMessage("Trying another stream source…")
+                }
+
                 val resumePosition = player.currentPosition.coerceAtLeast(0L)
-                Log.w(TAG, "Retrying failed stream once with a fresh URL for $videoId")
-                com.codetrio.spatialflow.ui.SnackbarController.showMessage("Retrying song stream…")
                 handler.postDelayed({
                     if (viewModel?.currentSong?.value?.videoId == videoId) {
+                        // Invalidate both application-level and NewPipe URL/player caches before
+                        // asking the next resolver. Media3 gets a new URI instead of reusing the
+                        // URL that just failed.
                         YouTubeMusic.invalidateStreamUrl(videoId)
-                        forceInnerTubeOnNextResolveVideoId = videoId
                         isRecoveringPlaybackError = true
                         try {
                             loadAndPlay("innertube://$videoId".toUri(), resumePosition)
@@ -435,9 +449,20 @@ class AudioPlaybackService : MediaSessionService() {
         }
         
         val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
-            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0") // CRITICAL: Prevent ExoPlayer 403 blocks
-            .setConnectTimeoutMs(5000)
-            .setReadTimeoutMs(5000)
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0")
+            // YouTube's CDN can reject otherwise-valid extracted media URLs when the stream
+            // request omits the same web origin/referrer used during extraction.
+            .setDefaultRequestProperties(
+                mapOf(
+                    "Origin" to "https://www.youtube.com",
+                    "Referer" to "https://www.youtube.com/",
+                    "Accept" to "audio/*,*/*;q=0.8",
+                    "Accept-Encoding" to "identity"
+                )
+            )
+            // Stream URLs and CDN range requests can take longer than metadata API calls.
+            .setConnectTimeoutMs(20000)
+            .setReadTimeoutMs(30000)
             .setAllowCrossProtocolRedirects(true)
             
         val upstreamFactory = androidx.media3.datasource.DefaultDataSource.Factory(this, httpDataSourceFactory)
@@ -513,7 +538,12 @@ class AudioPlaybackService : MediaSessionService() {
     fun loadAndPlay(uri: Uri, startPosition: Long = -1) {
         // A user-initiated track load permits one new recovery attempt. The automatic
         // recovery itself must not reset its guard, or a broken URL can retry forever.
-        if (!isRecoveringPlaybackError) lastPlaybackRecoveryVideoId = null
+        if (!isRecoveringPlaybackError) {
+            lastPlaybackRecoveryVideoId = null
+            playbackRecoveryStage = 0
+            forceInnerTubeOnNextResolveVideoId = null
+            forceNewPipeOnNextResolveVideoId = null
+        }
         shouldAutoPlay = true
         pendingSeekPos = startPosition
         resolveAndLoad(uri)
@@ -528,7 +558,9 @@ class AudioPlaybackService : MediaSessionService() {
         if (uri.scheme == "innertube") {
             val videoId = uri.host ?: return
             val useInnerTubeRetry = forceInnerTubeOnNextResolveVideoId == videoId
+            val useFreshNewPipeRetry = forceNewPipeOnNextResolveVideoId == videoId
             if (useInnerTubeRetry) forceInnerTubeOnNextResolveVideoId = null
+            if (useFreshNewPipeRetry) forceNewPipeOnNextResolveVideoId = null
             
             // INSTANT CANCELLATION: Kill any in-flight resolution immediately
             resolveJob?.cancel()
@@ -539,26 +571,31 @@ class AudioPlaybackService : MediaSessionService() {
                 
                 // Fetch stream URL only, don't wait for position yet
                 var streamUrl = async(Dispatchers.IO) {
-                    if (useInnerTubeRetry) {
-                        YouTubeMusic.getStreamUrlFromInnerTube(videoId).getOrNull()
-                    } else {
-                        YouTubeMusic.getStreamUrl(videoId).getOrNull()
+                    when {
+                        useInnerTubeRetry -> YouTubeMusic.getStreamUrlFromInnerTube(videoId).getOrNull()
+                        else -> YouTubeMusic.getStreamUrl(videoId).getOrNull()
                     }
                 }.await()
 
                 if (streamUrl.isNullOrEmpty()) {
-                    if (useInnerTubeRetry) {
-                        Log.w(TAG, "InnerTube recovery URL unavailable for $videoId; trying a fresh NewPipe extraction")
-                        streamUrl = async(Dispatchers.IO) {
-                            YouTubeMusic.getStreamUrl(videoId).getOrNull()
-                        }.await()
-                    } else {
-                        Log.w(TAG, "Initial stream resolution failed for $videoId; invalidating caches and retrying once")
-                        withContext(Dispatchers.IO) { YouTubeMusic.invalidateStreamUrl(videoId) }
-                        delay(250L)
-                        streamUrl = async(Dispatchers.IO) {
-                            YouTubeMusic.getStreamUrl(videoId).getOrNull()
-                        }.await()
+                    when {
+                        useInnerTubeRetry -> {
+                            Log.w(TAG, "InnerTube recovery URL unavailable for $videoId; trying NewPipe")
+                            streamUrl = async(Dispatchers.IO) {
+                                YouTubeMusic.getStreamUrl(videoId).getOrNull()
+                            }.await()
+                        }
+                        useFreshNewPipeRetry -> {
+                            Log.e(TAG, "Fresh NewPipe stream resolution failed for $videoId")
+                        }
+                        else -> {
+                            Log.w(TAG, "Initial stream resolution failed for $videoId; invalidating caches and retrying once")
+                            withContext(Dispatchers.IO) { YouTubeMusic.invalidateStreamUrl(videoId) }
+                            delay(250L)
+                            streamUrl = async(Dispatchers.IO) {
+                                YouTubeMusic.getStreamUrl(videoId).getOrNull()
+                            }.await()
+                        }
                     }
                 }
 
