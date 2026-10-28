@@ -155,7 +155,9 @@ class MainActivity : AppCompatActivity() {
 
         playerViewModel.loadLastPlaybackState()
 
-        startAudioService()
+        // Media3 cache index loading can be slow on cold/large caches. Prepare it off
+        // the UI thread before creating the playback service.
+        prepareAndStartAudioService()
         // Permissions are now handled in Onboarding Screen
 
         setContent {
@@ -608,6 +610,38 @@ class MainActivity : AppCompatActivity() {
             putBoolean("update_check_disabled", true)
         }
         Log.d(TAG, "Auto update check disabled by user")
+    }
+
+    private var audioServiceStartupRequested = false
+
+    private fun prepareAndStartAudioService() {
+        if (audioServiceStartupRequested || isServiceBound) return
+        audioServiceStartupRequested = true
+
+        lifecycleScope.launch {
+            val cacheReady = withContext(Dispatchers.IO) {
+                try {
+                    AudioPlaybackService.getCache(applicationContext)
+                    true
+                } catch (firstError: Exception) {
+                    Log.e(TAG, "Media cache initialization failed; retrying after clearing the damaged cache", firstError)
+                    try {
+                        AudioPlaybackService.clearMediaCache(applicationContext)
+                        AudioPlaybackService.getCache(applicationContext)
+                        true
+                    } catch (retryError: Exception) {
+                        Log.e(TAG, "Playback service start postponed because the media cache could not be opened", retryError)
+                        false
+                    }
+                }
+            }
+
+            if (cacheReady && !isFinishing && !isDestroyed) {
+                startAudioService()
+            } else {
+                audioServiceStartupRequested = false
+            }
+        }
     }
 
     private fun startAudioService() {
