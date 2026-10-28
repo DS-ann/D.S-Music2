@@ -412,7 +412,7 @@ object SongDownloader {
                 cacheKey = cacheKey,
                 spans = spans,
                 contentLength = contentLength,
-                mimeType = metadata.mimeType,
+                mimeType = null, // CachedMediaMetadata stores display metadata, not MIME type.
                 cachedBytes = cachedBytes,
                 isComplete = complete
             )
