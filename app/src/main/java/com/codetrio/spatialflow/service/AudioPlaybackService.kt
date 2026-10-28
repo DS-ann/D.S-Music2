@@ -234,6 +234,7 @@ class AudioPlaybackService : MediaSessionService() {
     // Service callbacks must return quickly on older devices. Disk-cache initialization is
     // performed on IO before ExoPlayer is built; local UI binding remains available meanwhile.
     private var isPlayerInitialized = false
+    private val playerReadyCallbacks = mutableListOf<() -> Unit>()
     private var pendingViewModel: PlayerSharedViewModel? = null
     private val pendingServiceActions = mutableListOf<String>()
     private var pendingPlaybackRequest: PendingPlaybackRequest? = null
@@ -527,6 +528,16 @@ class AudioPlaybackService : MediaSessionService() {
                     setViewModel(vm)
                 }
 
+                val readyCallbacks = playerReadyCallbacks.toList()
+                playerReadyCallbacks.clear()
+                readyCallbacks.forEach { callback ->
+                    try {
+                        callback()
+                    } catch (error: Exception) {
+                        Log.e(TAG, "Player-ready callback failed", error)
+                    }
+                }
+
                 pendingPlaybackRequest?.let { request ->
                     pendingPlaybackRequest = null
                     if (request.autoPlay) {
@@ -547,6 +558,18 @@ class AudioPlaybackService : MediaSessionService() {
             } catch (error: Exception) {
                 Log.e(TAG, "Asynchronous playback service initialization failed", error)
             }
+        }
+    }
+
+    /**
+     * Run code that needs ExoPlayer only after its disk cache and player are ready.
+     * Callbacks run on the service main thread.
+     */
+    fun runWhenPlayerReady(callback: () -> Unit) {
+        if (isPlayerInitialized) {
+            callback()
+        } else {
+            playerReadyCallbacks.add(callback)
         }
     }
 
@@ -619,6 +642,7 @@ class AudioPlaybackService : MediaSessionService() {
             nextPlayer?.release()
         }
         mediaSession?.release()
+        playerReadyCallbacks.clear()
         serviceScope.cancel()
     }
 
