@@ -184,6 +184,19 @@ object SongDownloader {
         val coroutineContext = currentCoroutineContext()
 
         try {
+            // Do not let a stale player UI state launch a duplicate download. This check runs
+            // inside the IO download job, never on the main thread.
+            if (isSongDownloaded(context, song)) {
+                cancelNotification(context, notificationId)
+                withContext(Dispatchers.Main) {
+                    com.codetrio.spatialflow.ui.SnackbarController.showMessage(
+                        "Already downloaded: $cleanTitleStr",
+                        iconResId = R.drawable.ic_downloaded
+                    )
+                }
+                return
+            }
+
             updateNotification(context, cleanTitleStr, 0, notificationId)
 
             // Use local cached audio when available. Never fetch a stream or remote
@@ -524,39 +537,44 @@ object SongDownloader {
     }
 
     fun isSongDownloaded(context: Context, song: SongItem): Boolean {
-        if (song.videoId.isNullOrEmpty()) return true // Local songs are always offline
-        
+        if (song.videoId.isNullOrEmpty()) return true // Local songs are already available offline
+
         val cleanTitleStr = cleanTitle(song.title)
         val cleanArtistStr = cleanArtist(song.artist)
-        val fileName = "$cleanTitleStr - $cleanArtistStr.mp3"
-        val cleanName = fileName.replace(Regex("[^a-zA-Z0-9._\\s()\\[\\]-]"), "_")
+        val extensions = listOf("m4a", "mp3", "webm", "ogg", "flac", "aac", "wav", "opus")
+        val cleanNames = extensions.map { extension ->
+            "$cleanTitleStr - $cleanArtistStr.$extension"
+                .replace(Regex("[^a-zA-Z0-9._\\s()\\[\\]-]"), "_")
+        }
 
-        // 1. Check legacy direct file path if pre-Q
+        // 1. Check legacy direct file paths on Android versions before scoped storage.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            val downloadsDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "SpatialFlow")
-            val file = File(downloadsDir, cleanName)
-            if (file.exists()) return true
+            val downloadsDir = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                "SpatialFlow"
+            )
+            if (cleanNames.any { File(downloadsDir, it).isFile }) return true
         }
 
-        // 2. Query MediaStore
+        // 2. Match every container the downloader can create. Previously only .mp3 was
+        // checked, so valid .m4a/.webm exports appeared undownloaded and the player state
+        // could stay stale or offer a duplicate download.
         val projection = arrayOf(MediaStore.Audio.Media._ID)
-        val selection = "${MediaStore.Audio.Media.DISPLAY_NAME} = ?"
-        val selectionArgs = arrayOf(cleanName)
-        
-        try {
-            context.contentResolver.query(
-                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                projection,
-                selection,
-                selectionArgs,
-                null
-            )?.use { cursor ->
-                if (cursor.count > 0) return true
+        for (cleanName in cleanNames) {
+            try {
+                context.contentResolver.query(
+                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                    projection,
+                    "${MediaStore.Audio.Media.DISPLAY_NAME} = ?",
+                    arrayOf(cleanName),
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) return true
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error checking if song is downloaded as $cleanName", e)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error checking if song is downloaded", e)
         }
-
         return false
     }
 }

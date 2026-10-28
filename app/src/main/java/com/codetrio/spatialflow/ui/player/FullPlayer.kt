@@ -557,7 +557,10 @@ fun FullPlayer(
                             // lag behind the user's tap by one frame, especially during startup.
                             if (com.codetrio.spatialflow.util.SongDownloader.isDownloading(currentSong.videoId)) {
                                 com.codetrio.spatialflow.util.SongDownloader.cancelDownload(context, currentSong)
-                            } else if (!realDownloaded) {
+                            } else {
+                                // The downloaded-state flow may still contain the previous track's
+                                // value immediately after a song change. Start the action regardless;
+                                // SongDownloader verifies the actual file state off the UI thread.
                                 com.codetrio.spatialflow.util.SongDownloader.downloadSong(context, currentSong)
                             }
                         }
