@@ -177,6 +177,37 @@ object NewPipeStreamExtractor {
     }
 
     /**
+     * Resolve a conservative recovery stream after the preferred stream failed in Media3.
+     * Prefer AAC in an MP4 container for broad decoder compatibility, especially on Android 6;
+     * if YouTube offers no AAC audio-only stream, use the lowest-bitrate audio-only stream.
+     * The caller invalidates the video cache before calling this method.
+     */
+    suspend fun getFallbackAudioStreamUrl(videoId: String?): String? = coroutineScope {
+        if (videoId.isNullOrBlank()) return@coroutineScope null
+
+        val info = fetchStreamInfo(videoId) ?: return@coroutineScope null
+        val audioStreams = info.audioStreams
+        if (audioStreams.isEmpty()) return@coroutineScope null
+
+        val aacStreams = audioStreams.filter { stream ->
+            val mimeType = stream.format?.mimeType.orEmpty()
+            mimeType.startsWith("audio/mp4", ignoreCase = true) ||
+                stream.codec?.contains("mp4a", ignoreCase = true) == true ||
+                stream.itag == 140
+        }
+        val selected = aacStreams.maxByOrNull { maxOf(it.bitrate, it.averageBitrate) }
+            ?: audioStreams.minByOrNull { maxOf(it.bitrate, it.averageBitrate) }
+
+        val url = selected?.content?.takeIf { it.startsWith("https://", ignoreCase = true) }
+        Log.i(
+            TAG,
+            "Selected compatible recovery format for $videoId: " +
+                "itag=${selected?.itag}, mime=${selected?.format?.mimeType}, codec=${selected?.codec}"
+        )
+        url
+    }
+
+    /**
      * Extract full stream info including metadata lazily.
      */
     suspend fun getPlayerResult(videoId: String?): PlayerResult? = coroutineScope {
