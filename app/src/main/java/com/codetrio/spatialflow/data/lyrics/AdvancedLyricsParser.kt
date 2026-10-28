@@ -18,6 +18,144 @@ object AdvancedLyricsParser {
     enum class WordKind { QRC, YRC, KRC }
 
     private data class TimedToken(val startMs: Long, val durationMs: Long, val text: String)
+    private data class WordPiece(val startMs: Long, val endMs: Long, val text: String)
+
+    private val lineHeader = Regex("""^\[(\d+),(\d+)]""")
+    private val qrcMarker = Regex("""\((\d+),(\d+)\)""")
+    private val yrcMarker = Regex("""\((\d+),(\d+),-?\d+\)""")
+    private val krcMarker = Regex("""<(\d+),(\d+),-?\d+>""")
+
+    fun wrapWords(kind: WordKind, content: String): String = "$WORD_PREFIX${kind.name}\n$content"
+    fun wrapLyricsPlus(json: String): String = LYRICS_PLUS_PREFIX + json
+
+    fun recognizes(content: String): Boolean =
+        content.startsWith(WORD_PREFIX) || content.startsWith(LYRICS_PLUS_PREFIX)
+
+    /** Returns null only when this is a format we do not own; a malformed wrapped payload returns an empty list. */
+    fun parse(content: String): List<LyricLine>? {
+        return when {
+            content.startsWith(WORD_PREFIX) -> {
+                val kind = runCatching {
+                    WordKind.valueOf(content.substringAfter(WORD_PREFIX).substringBefore('\n').trim())
+                }.getOrNull() ?: return emptyList()
+                parseWordLines(kind, content.substringAfter('\n', ""))
+            }
+            content.startsWith(LYRICS_PLUS_PREFIX) -> parseLyricsPlus(content.removePrefix(LYRICS_PLUS_PREFIX))
+            else -> null
+        }
+    }
+
+    private fun parseWordLines(kind: WordKind, content: String): List<LyricLine> {
+        val lines = mutableListOf<LyricLine>()
+        content.lineSequence().forEach { raw ->
+            val line = raw.trim()
+            val header = lineHeader.find(line) ?: return@forEach
+            val lineStart = header.groupValues[1].toLongOrNull() ?: return@forEach
+            val lineDuration = header.groupValues[2].toLongOrNull() ?: 0L
+            val tail = line.substring(header.range.last + 1)
+            val tokens = mutableListOf<TimedToken>()
+
+            when (kind) {
+                WordKind.QRC -> {
+                    // QQ QRC attaches each timing marker to the lyric segment immediately before it.
+                    var lastEnd = 0
+                    qrcMarker.findAll(tail).forEach { marker ->
+                        tokens += TimedToken(
+                            marker.groupValues[1].toLongOrNull() ?: lineStart,
+                            marker.groupValues[2].toLongOrNull() ?: 0L,
+                            tail.substring(lastEnd, marker.range.first)
+                        )
+                        lastEnd = marker.range.last + 1
+                    }
+                }
+                WordKind.YRC, WordKind.KRC -> {
+                    // NetEase YRC uses absolute milliseconds; KuGou KRC uses offsets from the line start.
+                    val regex = if (kind == WordKind.YRC) yrcMarker else krcMarker
+                    val markers = regex.findAll(tail).toList()
+                    markers.forEachIndexed { index, marker ->
+                        val textStart = marker.range.last + 1
+                        val textEnd = markers.getOrNull(index + 1)?.range?.first ?: tail.length
+                        val rawStart = marker.groupValues[1].toLongOrNull() ?: lineStart
+                        val start = if (kind == WordKind.KRC) lineStart + rawStart else rawStart
+                        val duration = marker.groupValues[2].toLongOrNull() ?: 0L
+                        tokens += TimedToken(start, duration, tail.substring(textStart, textEnd))
+                    }
+                }
+            }
+
+            if (tokens.isEmpty()) return@forEach
+            val words = buildWords(tokens)
+            val text = words.joinToString("") { it.text }.trim()
+            if (text.isBlank() || isCreditLine(text)) return@forEach
+            // QQ/KuGou may include a title/artist card before the first real lyric line.
+            if (lines.isEmpty() && lineStart < 1000L && text.contains(" - ")) return@forEach
+            val normalizedWords = alignWordRanges(words, text)
+            lines += LyricLine(
+                startTimeMs = lineStart,
+                content = text,
+                isWordByWord = normalizedWords.isNotEmpty(),
+                words = normalizedWords
+            )
+            @Suppress("UNUSED_VARIABLE")
+            val ignoredLineDuration = lineDuration
+        }
+        return addInterludes(lines)
+    }
+
+    private fun parseLyricsPlus(json: String): List<LyricLine> {
+        val root = try {
+            JsonParser.parseString(json).asJsonObject
+        } catch (_: Exception) {
+            return emptyList()
+        }
+        if (root.string("type")?.equals("None", ignoreCase = true) == true) return emptyList()
+        val rawLines = root.array("lyrics") ?: return emptyList()
+        val agents = root.obj("metadata")?.obj("agents")
+        val multipleVoices = agents != null && agents.size() > 1
+        val lines = mutableListOf<LyricLine>()
+
+        rawLines.forEach { element ->
+            val line = element.asObject() ?: return@forEach
+            val start = line.string("time")?.toLongOrNull() ?: return@forEach
+            val duration = line.string("duration")?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+            val syllables = line.array("syllabus") ?: line.array("syllables") ?: JsonArray()
+            val mainTokens = mutableListOf<TimedToken>()
+            val backgroundTokens = mutableListOf<TimedToken>()
+            syllables.forEach { syllableElement ->
+                val syllable = syllableElement.asObject() ?: return@forEach
+                val tokenText = syllable.string("text").orEmpty()
+                val tokenTime = syllable.string("time")?.toLongOrNull() ?: return@forEach
+                val tokenDuration = syllable.string("duration")?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+                val token = TimedToken(tokenTime, tokenDuration, tokenText)
+                val background = syllable.string("isBackground")?.equals("true", true) == true
+                if (background) backgroundTokens += token else mainTokens += token
+            }
+            val words = buildWords(mainTokens)
+            val bgWordsRaw = buildWords(backgroundTokens)
+            val fallbackText = line.string("text")?.trim().orEmpty()
+            val text = if (words.isNotEmpty()) words.joinToString("") { it.text }.trim() else fallbackText
+            if (text.isBlank()) return@forEach
+            val finalWords = alignWordRanges(words, text)
+            val bgText = bgWordsRaw.joinToString("") { it.text }.trim().ifBlank { null }
+            val bgWords = if (bgText == null) emptyList() else alignWordRanges(bgWordsRaw, bgText)
+                .map { it.copy(isBackground = true) }
+            val singer = line.obj("element")?.string("singer")
+            lines += LyricLine(
+                startTimeMs = start,
+                content = text,
+                isWordByWord = finalWords.isNotEmpty(),
+                words = finalWords,
+                backgroundContent = bgText,
+                backgroundWords = bgWords,
+                agent = singer,
+                isRightAligned = multipleVoices && singer != null && singer != "v1"
+            )
+            @Suppress("UNUSED_VARIABLE")
+            val ignoredLineDuration = duration
+        }
+        return addInterludes(lines)
+    }
+
     /** Preserve timed segments even when a lyric line contains no spaces. */
     private fun buildWords(tokens: List<TimedToken>): List<LyricWord> {
         val output = mutableListOf<LyricWord>()
