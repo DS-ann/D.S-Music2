@@ -91,22 +91,6 @@ jobs:
           done
           exit 1
 
-      - name: Run Android Lint for API compatibility
-        id: android_lint
-        continue-on-error: true
-        run: gradle --no-daemon --no-build-cache --no-configuration-cache lintRelease
-
-      - name: Print Android Lint diagnostics
-        if: steps.android_lint.outcome == 'failure'
-        run: |
-          REPORT="app/build/intermediates/lint_intermediate_text_report/release/lintReportRelease/lint-results-release.txt"
-          if [ -f "$REPORT" ]; then
-            echo "Existing project lint backlog (first 100 diagnostic lines):"
-            grep -E 'Error:|Warning:' "$REPORT" | head -n 100 || true
-          else
-            echo "Lint report file was not generated."
-          fi
-
       - name: Generate temporary key and sign the ARM64-v8a APK
         id: temporary_signing
         run: |
@@ -159,6 +143,22 @@ jobs:
           archive: false
           if-no-files-found: error
           retention-days: 14
+
+      - name: Run Android Lint for API compatibility
+        id: android_lint
+        continue-on-error: true
+        run: gradle --no-daemon --no-build-cache --no-configuration-cache lintRelease
+
+      - name: Print Android Lint diagnostics
+        if: steps.android_lint.outcome == 'failure'
+        run: |
+          REPORT="app/build/intermediates/lint_intermediate_text_report/release/lintReportRelease/lint-results-release.txt"
+          if [ -f "$REPORT" ]; then
+            echo "Existing project lint backlog (first 100 diagnostic lines):"
+            grep -E 'Error:|Warning:' "$REPORT" | head -n 100 || true
+          else
+            echo "Lint report file was not generated."
+          fi
 
       - name: Smoke-test install and launch on Android 6 (API 23)
         id: api23_smoke
