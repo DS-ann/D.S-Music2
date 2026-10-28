@@ -39,6 +39,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 object SongDownloader {
     private const val TAG = "SongDownloader"
     private const val CHANNEL_ID = "spatialflow_downloads"
