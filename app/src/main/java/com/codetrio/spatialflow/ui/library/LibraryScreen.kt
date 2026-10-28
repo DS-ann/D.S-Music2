@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
@@ -2785,7 +2786,7 @@ private fun StreamCacheTabContent(context: Context) {
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Icon(
-                        painter = painterResource(android.R.drawable.ic_menu_agenda),
+                        imageVector = Icons.Default.Folder,
                         contentDescription = "Cached songs folder",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(28.dp)
