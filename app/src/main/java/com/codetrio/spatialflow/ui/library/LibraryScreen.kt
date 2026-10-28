@@ -2805,7 +2805,7 @@ private suspend fun readCacheTabSnapshot(
 private fun StreamCacheTabContent(context: Context) {
     val scope = rememberCoroutineScope()
     var cacheBytes by remember { mutableStateOf(0L) }
-    var cacheEntries by remember { mutableStateOf(emptyList<Pair<String, Long>>()) }
+    var cacheEntries by remember { mutableStateOf(emptyList<CachedSongEntry>()) }
     var cacheEnabled by remember { mutableStateOf(true) }
     var cacheLimitGb by remember { mutableStateOf(1) }
     var isClearing by remember { mutableStateOf(false) }
