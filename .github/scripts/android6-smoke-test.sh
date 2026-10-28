@@ -3,10 +3,10 @@ set -euo pipefail
 
 touch "$RUNNER_TEMP/spatialflow-api23-smoke-started"
 
-APK="app/build/outputs/apk/release/app-release.apk"
+APK="app/build/outputs/apk/release/app-arm64-v8a-release.apk"
 if [ ! -s "$APK" ]; then
   # Use an isolated test key only for the emulator test. It is never published.
-  SOURCE_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
+  SOURCE_APK="app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk"
   test -s "$SOURCE_APK"
   TEST_KEYSTORE="$RUNNER_TEMP/spatialflow-smoke-test.p12"
   ALIGNED_APK="$RUNNER_TEMP/SpatialFlow-Android6-smoke-aligned.apk"
