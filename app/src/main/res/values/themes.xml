@@ -2,7 +2,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Light app theme -->
-    <style name="Theme.SpatialFlow" parent="Base.Theme.SpatialFlow">
+    <style name="Theme.SpatialFlow" parent="Base.Theme.SpatialFlow" tools:targetApi="28">
         <item name="colorSurfaceContainer">@color/md_theme_light_surfaceContainer</item>
         <item name="colorSurfaceContainerHigh">@color/md_theme_light_surfaceContainerHigh</item>
         <item name="colorSurfaceContainerHighest">@color/md_theme_light_surfaceContainerHighest</item>
