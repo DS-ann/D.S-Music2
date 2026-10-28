@@ -103,6 +103,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -984,37 +985,39 @@ private fun UnifiedLibraryContent(
     val onlineArtists by accountViewModel?.artists?.collectAsStateWithLifecycle(emptyList()) ?: remember { mutableStateOf(emptyList()) }
     val onlinePodcasts by accountViewModel?.podcasts?.collectAsStateWithLifecycle(emptyList()) ?: remember { mutableStateOf(emptyList()) }
     val onlineSongs by accountViewModel?.songs?.collectAsStateWithLifecycle(emptyList()) ?: remember { mutableStateOf(emptyList()) }
+    // Keep category callbacks current without rebuilding all library tiles on parent recomposition.
+    val navigateToTab = rememberUpdatedState(onNavigateToTab)
 
     LaunchedEffect(Unit) {
         accountViewModel?.refreshAll()
     }
 
-    val unifiedItems = remember(onlinePlaylists, onlineAlbums, onlineArtists, onlinePodcasts, onlineSongs, onNavigateToTab) {
+    val unifiedItems = remember(onlinePlaylists, onlineAlbums, onlineArtists, onlinePodcasts, onlineSongs) {
         val list = mutableListOf<UnifiedLibraryItem>()
 
         // Keep the key library actions first, in a stable Prism-style tile order.
         list.addAll(
             listOf(
                 LibraryCategoryItem("Playlists", "Your playlists", Icons.AutoMirrored.Filled.PlaylistPlay) {
-                    onNavigateToTab("Playlists")
+                    navigateToTab.value("Playlists")
                 },
                 LibraryCategoryItem("Liked songs", "Your YouTube Music likes", Icons.Default.Favorite) {
-                    onNavigateToTab("Songs")
+                    navigateToTab.value("Songs")
                 },
                 LibraryCategoryItem("Albums", "Browse saved albums", Icons.Default.Album) {
-                    onNavigateToTab("Albums")
+                    navigateToTab.value("Albums")
                 },
                 LibraryCategoryItem("Artists", "Browse artists", Icons.Default.Person) {
-                    onNavigateToTab("Artists")
+                    navigateToTab.value("Artists")
                 },
                 LibraryCategoryItem("Podcasts", "Podcast library", Icons.Default.Podcasts) {
-                    onNavigateToTab("Podcasts")
+                    navigateToTab.value("Podcasts")
                 },
                 LibraryCategoryItem("Recap", "Your listening recap", Icons.Default.BarChart) {
-                    onNavigateToTab("Recap")
+                    navigateToTab.value("Recap")
                 },
                 LibraryCategoryItem("Cache", "Cached audio", Icons.Default.Folder) {
-                    onNavigateToTab("Cache")
+                    navigateToTab.value("Cache")
                 }
             )
         )
