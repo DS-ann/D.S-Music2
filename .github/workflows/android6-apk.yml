@@ -68,32 +68,38 @@ jobs:
       - name: Compile ARM64-v8a release APK
         run: gradle --no-daemon assembleRelease
 
-      - name: Sign and highly compress APK
+      - name: Sign with repository release key and highly compress APK
+        env:
+          # Preferred names plus common alternatives; repository secrets themselves are never printed.
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 || secrets.ANDROID_KEYSTORE_BASE64 || secrets.KEYSTORE_BASE64 || secrets.RELEASE_KEYSTORE_BASE64 || secrets.SIGNING_KEY }}
+          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD || secrets.RELEASE_KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS || secrets.ANDROID_KEY_ALIAS || secrets.KEY_ALIAS || secrets.RELEASE_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD || secrets.ANDROID_KEY_PASSWORD || secrets.KEY_PASSWORD || secrets.RELEASE_KEY_PASSWORD || secrets.SIGNING_KEYSTORE_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD || secrets.RELEASE_KEYSTORE_PASSWORD }}
+          SIGNING_KEYSTORE_TYPE: ${{ secrets.SIGNING_KEYSTORE_TYPE || secrets.ANDROID_KEYSTORE_TYPE || 'JKS' }}
         run: |
           set -euo pipefail
+          : "${SIGNING_KEYSTORE_BASE64:?Missing the base64-encoded release keystore secret}"
+          : "${SIGNING_KEYSTORE_PASSWORD:?Missing the release keystore password secret}"
+          : "${SIGNING_KEY_ALIAS:?Missing the release key alias secret}"
+          : "${SIGNING_KEY_PASSWORD:?Missing the release key password secret}"
+
           BUILD_DIR="app/build/outputs/apk/release"
           SOURCE_APK="$BUILD_DIR/app-arm64-v8a-release-unsigned.apk"
           ALIGNED_APK="$RUNNER_TEMP/SpatialFlow-arm64-v8a-aligned.apk"
           OUTPUT_APK="$BUILD_DIR/SpatialFlow-arm64-v8a-Android6-release.apk"
           OUTPUT_ZIP="$BUILD_DIR/SpatialFlow-arm64-v8a-Android6-release.zip"
-          KEYSTORE="$RUNNER_TEMP/spatialflow-temporary-signing-key.p12"
+          KEYSTORE="$RUNNER_TEMP/spatialflow-release-keystore"
           ZIPALIGN="$ANDROID_HOME/build-tools/37.0.0/zipalign"
           APK_SIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
 
-          export TEMP_SIGNING_PASSWORD="$(openssl rand -hex 32)"
-          keytool -genkeypair -noprompt \
-            -keystore "$KEYSTORE" -storetype PKCS12 \
-            -storepass "$TEMP_SIGNING_PASSWORD" -keypass "$TEMP_SIGNING_PASSWORD" \
-            -alias spatialflow-temporary \
-            -dname "CN=SpatialFlow Temporary Release, OU=Build, O=DS-ann, C=IN" \
-            -keyalg RSA -keysize 2048 -validity 10000
+          printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
           chmod 600 "$KEYSTORE"
 
           "$ZIPALIGN" -f -p 4 "$SOURCE_APK" "$ALIGNED_APK"
           "$APK_SIGNER" sign \
-            --ks "$KEYSTORE" --ks-type PKCS12 --ks-key-alias spatialflow-temporary \
-            --ks-pass env:TEMP_SIGNING_PASSWORD \
-            --key-pass env:TEMP_SIGNING_PASSWORD \
+            --ks "$KEYSTORE" --ks-type "$SIGNING_KEYSTORE_TYPE" --ks-key-alias "$SIGNING_KEY_ALIAS" \
+            --ks-pass env:SIGNING_KEYSTORE_PASSWORD \
+            --key-pass env:SIGNING_KEY_PASSWORD \
             --out "$OUTPUT_APK" "$ALIGNED_APK"
 
           zip -9 -j "$OUTPUT_ZIP" "$OUTPUT_APK"
