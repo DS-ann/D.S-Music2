@@ -1098,7 +1098,9 @@ fun JsonElement?.path(path: String): JsonElement? {
     var current: JsonElement? = this
     
     // Atomically fetch pre-digested path fragments (Instant retrieval, 0 garbage generated)
-    val keys = jsonPathCache.computeIfAbsent(path) { it.split(".") }
+    val keys = jsonPathCache[path] ?: path.split(".").let { computed ->
+        jsonPathCache.putIfAbsent(path, computed) ?: computed
+    }
     
     for (key in keys) {
         if (current == null) return null
