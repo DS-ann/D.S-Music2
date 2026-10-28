@@ -716,7 +716,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 // ═══════════════════════════════════════════════════════════════════════════════
 
 private fun getPathFromUri(uri: Uri): String {
-    if (android.provider.DocumentsContract.isTreeUri(uri)) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && android.provider.DocumentsContract.isTreeUri(uri)) {
         val docId = android.provider.DocumentsContract.getTreeDocumentId(uri)
         val split = docId.split(":")
         if (split.size >= 2) {
