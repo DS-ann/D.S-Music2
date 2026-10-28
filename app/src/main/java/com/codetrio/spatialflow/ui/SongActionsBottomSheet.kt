@@ -3,8 +3,15 @@
 package com.codetrio.spatialflow.ui
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.res.Configuration
+import android.media.MediaMetadataRetriever
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
+import android.text.format.Formatter
+import java.io.File
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -79,6 +86,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -100,8 +108,11 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bumptech.glide.Glide
+import com.codetrio.spatialflow.MainActivity
 import com.codetrio.spatialflow.R
 import com.codetrio.spatialflow.model.SongItem
+import com.codetrio.spatialflow.service.AudioPlaybackService
+import com.codetrio.spatialflow.service.CurrentAudioFormatDetails
 import com.codetrio.spatialflow.ui.theme.GoogleSansFlex
 import com.codetrio.spatialflow.ui.theme.SpatialFlowTheme
 import com.codetrio.spatialflow.viewmodel.PlayerSharedViewModel
@@ -1018,33 +1029,260 @@ fun ExpressiveTabSwitcher(selectedTab: BottomSheetTab, onTabSelected: (BottomShe
     }
 }
 
+private data class SongInfoDetails(
+    val duration: String,
+    val album: String,
+    val artist: String,
+    val size: String,
+    val bitrate: String,
+    val format: String,
+    val sampleRate: String,
+    val location: String
+)
+
 @Composable
 fun InfoContent(song: SongItem?) {
+    val context = LocalContext.current
+    val mainActivity = remember(context) { findMainActivity(context) }
+    val info by produceState(
+        initialValue = SongInfoDetails(
+            duration = "Reading metadata…",
+            album = "Reading metadata…",
+            artist = song?.artist ?: "Reading metadata…",
+            size = "Calculating file size…",
+            bitrate = "Reading audio format…",
+            format = "Detecting format…",
+            sampleRate = "Reading audio format…",
+            location = song?.path?.takeIf { it.isNotBlank() } ?: "Online source"
+        ),
+        song,
+        context,
+        mainActivity?.audioService
+    ) {
+        val liveFormat = song?.let {
+            mainActivity?.audioService?.getCurrentAudioFormatDetails(it.id.toString())
+        }
+        value = withContext(Dispatchers.IO) {
+            readSongInfoDetails(context, song, liveFormat)
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        InfoRow(
-            label = "Duration",
-            value = song?.getFormattedDuration() ?: "03:18",
-            icon = Icons.Filled.DateRange
-        )
-        InfoRow(
-            label = "Album",
-            value = song?.title ?: "Animals x Starboy",
-            icon = Icons.Filled.Face
-        )
-        InfoRow(
-            label = "Artist",
-            value = song?.artist ?: "Unknown Artist",
-            icon = Icons.Filled.Person
-        )
-        InfoRow(
-            label = "Path",
-            value = song?.path ?: "/storage/emulated/0/Download/Seal/Audio/Animals x Starboy.mp3",
-            icon = Icons.Filled.Menu
+        InfoRow("Duration", info.duration, Icons.Filled.DateRange)
+        InfoRow("Album", info.album, Icons.Filled.Face)
+        InfoRow("Artist", info.artist, Icons.Filled.Person)
+        InfoRow("Size", info.size, Icons.Filled.Download)
+        InfoRow("Bitrate", info.bitrate, Icons.Filled.Info)
+        InfoRow("Format", info.format, Icons.Filled.Info)
+        InfoRow("Sample rate", info.sampleRate, Icons.Filled.Info)
+        InfoRow(if (song?.videoId.isNullOrBlank()) "Location" else "Source", info.location, Icons.Filled.Menu)
+    }
+}
+
+private fun findMainActivity(context: Context): MainActivity? {
+    var current = context
+    while (current is ContextWrapper) {
+        if (current is MainActivity) return current
+        current = current.baseContext
+    }
+    return current as? MainActivity
+}
+
+private fun readSongInfoDetails(
+    context: Context,
+    song: SongItem?,
+    liveFormat: CurrentAudioFormatDetails?
+): SongInfoDetails {
+    if (song == null) {
+        return SongInfoDetails(
+            duration = "No track selected",
+            album = "No track selected",
+            artist = "No track selected",
+            size = "No track selected",
+            bitrate = "No track selected",
+            format = "No track selected",
+            sampleRate = "No track selected",
+            location = "No track selected"
         )
     }
+
+    val rawPath = song.path?.trim().orEmpty()
+    val uriFromPath = rawPath.takeIf {
+        it.startsWith("content://", ignoreCase = true) ||
+            it.startsWith("file://", ignoreCase = true)
+    }?.let { Uri.parse(it) }
+    val sourceUri = uriFromPath ?: song.contentUri
+    val file = rawPath.takeIf {
+        it.isNotBlank() &&
+            !it.startsWith("http://", ignoreCase = true) &&
+            !it.startsWith("https://", ignoreCase = true) &&
+            !it.startsWith("content://", ignoreCase = true) &&
+            !it.startsWith("file://", ignoreCase = true)
+    }?.let { File(it) }?.takeIf { it.isFile }
+    val remote = !song.videoId.isNullOrBlank() ||
+        rawPath.startsWith("http://", ignoreCase = true) ||
+        rawPath.startsWith("https://", ignoreCase = true) ||
+        sourceUri.scheme == "http" || sourceUri.scheme == "https"
+    val localUri = !remote && (sourceUri.scheme == "content" || sourceUri.scheme == "file")
+
+    var durationMs = song.duration
+    var albumTag: String? = null
+    var artistTag: String? = null
+    var bitrateBps: Long? = null
+    var sampleRateHz: Long? = null
+    var mimeType: String? = null
+
+    val retriever = MediaMetadataRetriever()
+    try {
+        when {
+            file != null -> retriever.setDataSource(file.absolutePath)
+            localUri -> retriever.setDataSource(context, sourceUri)
+        }
+        albumTag = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+            ?.trim()?.takeIf { it.isNotEmpty() && !it.equals("<unknown>", ignoreCase = true) }
+        artistTag = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+            ?.trim()?.takeIf { it.isNotEmpty() && !it.equals("<unknown>", ignoreCase = true) }
+        durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+            ?.toLongOrNull()?.takeIf { it > 0L } ?: durationMs
+        bitrateBps = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)
+            ?.toLongOrNull()?.takeIf { it > 0L }
+        sampleRateHz = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_SAMPLERATE)
+            ?.toLongOrNull()?.takeIf { it > 0L }
+        mimeType = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
+            ?.trim()?.takeIf { it.isNotEmpty() }
+    } catch (_: Exception) {
+        // Older decoders and some MediaStore providers omit optional tags.
+    } finally {
+        try {
+            retriever.release()
+        } catch (_: Exception) {
+            // Preserve metadata already extracted.
+        }
+    }
+
+    var sizeBytes = file?.length()?.takeIf { it > 0L } ?: 0L
+    if (sizeBytes <= 0L && localUri) {
+        try {
+            context.contentResolver.openAssetFileDescriptor(sourceUri, "r")?.use { descriptor ->
+                if (descriptor.length > 0L) sizeBytes = descriptor.length
+            }
+        } catch (_: Exception) {
+            // Use OpenableColumns as a secondary fallback.
+        }
+        if (sizeBytes <= 0L) {
+            try {
+                context.contentResolver.query(
+                    sourceUri,
+                    arrayOf(OpenableColumns.SIZE),
+                    null,
+                    null,
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val index = cursor.getColumnIndex(OpenableColumns.SIZE)
+                        if (index >= 0 && !cursor.isNull(index)) {
+                            sizeBytes = cursor.getLong(index).takeIf { it > 0L } ?: 0L
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                // Some content providers intentionally hide file size.
+            }
+        }
+    }
+
+    var cachedStreamBytes = 0L
+    if (remote) {
+        try {
+            val snapshot = AudioPlaybackService.getMediaCacheSnapshot(context)
+            cachedStreamBytes = snapshot.second.sumOf { entry ->
+                val metadata = AudioPlaybackService.getCachedMediaMetadata(context, entry.first)
+                if (metadata?.songId == song.id.toString()) entry.second else 0L
+            }
+        } catch (_: Exception) {
+            // The current track information remains valid if cache data isn't available.
+        }
+    }
+
+    val effectiveBitrate = bitrateBps ?: liveFormat?.bitrateBps?.toLong()?.takeIf { it > 0L }
+    val effectiveSampleRate = sampleRateHz ?: liveFormat?.sampleRateHz?.toLong()?.takeIf { it > 0L }
+    val durationText = if (durationMs > 0L) {
+        val seconds = durationMs / 1000L
+        String.format(java.util.Locale.US, "%02d:%02d", seconds / 60L, seconds % 60L)
+    } else {
+        "Duration not supplied by source"
+    }
+    val album = albumTag ?: if (remote) {
+        "Online track; album metadata not supplied"
+    } else {
+        "No album tag embedded in this file"
+    }
+    val artist = artistTag ?: song.artist.trim().takeIf {
+        it.isNotEmpty() &&
+            !it.equals("Unknown Artist", ignoreCase = true) &&
+            !it.equals("<unknown>", ignoreCase = true)
+    } ?: "Artist metadata not supplied"
+
+    val estimatedRemoteBytes = if (remote && effectiveBitrate != null && durationMs > 0L) {
+        (effectiveBitrate * durationMs / 8000L).takeIf { it > 0L }
+    } else null
+    val sizeText = when {
+        sizeBytes > 0L -> Formatter.formatFileSize(context, sizeBytes)
+        remote && cachedStreamBytes > 0L && estimatedRemoteBytes != null ->
+            Formatter.formatFileSize(context, cachedStreamBytes) + " cached of about " +
+                Formatter.formatFileSize(context, estimatedRemoteBytes) + " estimated stream size"
+        remote && cachedStreamBytes > 0L ->
+            Formatter.formatFileSize(context, cachedStreamBytes) + " of stream data cached so far"
+        remote && estimatedRemoteBytes != null ->
+            Formatter.formatFileSize(context, estimatedRemoteBytes) + " estimated from bitrate and duration"
+        remote -> "Online stream; no fixed local file size"
+        else -> "Size is not exposed by this media provider"
+    }
+    val bitrateText = when {
+        effectiveBitrate != null ->
+            String.format(java.util.Locale.US, "%.0f kbps", effectiveBitrate / 1000.0) +
+                if (remote && liveFormat?.bitrateBps != null) " (current stream)" else ""
+        sizeBytes > 0L && durationMs > 0L ->
+            String.format(java.util.Locale.US, "%.0f kbps estimated from file size", sizeBytes * 8.0 / durationMs)
+        remote -> "Selected dynamically by the stream"
+        else -> "Bitrate tag not embedded; no reliable estimate"
+    }
+    val format = file?.extension?.takeIf { it.isNotBlank() }?.uppercase(java.util.Locale.US)
+        ?: mimeType?.substringAfter('/', "")?.takeIf { it.isNotBlank() }?.uppercase(java.util.Locale.US)
+        ?: if (remote) "Online audio stream" else "Audio format not tagged"
+    val sampleRateText = effectiveSampleRate?.let {
+        if (it % 1000L == 0L) (it / 1000L).toString() + " kHz"
+        else String.format(java.util.Locale.US, "%.1f kHz", it / 1000.0)
+    } ?: if (remote) {
+        "Reported by decoder during playback"
+    } else {
+        "Sample rate tag not included"
+    }
+    val location = when {
+        file != null -> file.absolutePath
+        localUri -> sourceUri.toString()
+        remote -> {
+            val host = runCatching { Uri.parse(rawPath).host }.getOrNull()
+            if (!host.isNullOrBlank()) "Online stream (" + host + ")"
+            else "YouTube Music stream • " + song.videoId
+        }
+        rawPath.isNotBlank() -> rawPath
+        else -> "MediaStore audio item " + song.id
+    }
+
+    return SongInfoDetails(
+        duration = durationText,
+        album = album,
+        artist = artist,
+        size = sizeText,
+        bitrate = bitrateText,
+        format = format,
+        sampleRate = sampleRateText,
+        location = location
+    )
 }
 
 @Composable

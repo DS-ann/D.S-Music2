@@ -520,12 +520,19 @@ class MainActivity : AppCompatActivity() {
         
         if (cameFromOutside) {
             isNavigating = true
-            controller.navigate("explore") {
-                popUpTo(controller.graph.findStartDestination().id) {
-                    saveState = true
+            if (controller.currentDestination?.route == "library") {
+                // Keep Library below the Explore detail page, so Back returns to Library.
+                controller.navigate("explore") {
+                    launchSingleTop = true
                 }
-                launchSingleTop = true
-                restoreState = true
+            } else {
+                controller.navigate("explore") {
+                    popUpTo(controller.graph.findStartDestination().id) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
+                }
             }
             previousDestination = "explore"
             isNavigating = false

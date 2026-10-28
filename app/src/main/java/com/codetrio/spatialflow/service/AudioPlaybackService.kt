@@ -73,7 +73,13 @@ import android.media.AudioAttributes as LegacyAudioAttributes
 data class CachedMediaMetadata(
     val title: String,
     val artist: String,
-    val songId: String
+    val songId: String,
+    val durationMs: Long = 0L
+)
+
+data class CurrentAudioFormatDetails(
+    val bitrateBps: Int?,
+    val sampleRateHz: Int?
 )
 
 @AndroidEntryPoint
@@ -168,7 +174,8 @@ class AudioPlaybackService : MediaSessionService() {
             cacheKey: String,
             title: String,
             artist: String,
-            songId: String = ""
+            songId: String = "",
+            durationMs: Long = 0L
         ) {
             if (cacheKey.isBlank() || title.isBlank()) return
             val digestKey = cacheMetadataEntryKey(cacheKey)
@@ -176,6 +183,7 @@ class AudioPlaybackService : MediaSessionService() {
                 .put("title", title)
                 .put("artist", artist)
                 .put("songId", songId)
+                .put("durationMs", durationMs)
                 .toString()
             context.getSharedPreferences(PREF_MEDIA_CACHE_METADATA, Context.MODE_PRIVATE)
                 .edit().putString(digestKey, payload).apply()
@@ -192,10 +200,38 @@ class AudioPlaybackService : MediaSessionService() {
                 CachedMediaMetadata(
                     title = title,
                     artist = json.optString("artist", "").trim(),
-                    songId = json.optString("songId", "")
+                    songId = json.optString("songId", ""),
+                    durationMs = json.optLong("durationMs", 0L)
                 )
             } catch (_: Exception) {
                 null
+            }
+        }
+
+        @JvmStatic
+        fun getCachedMediaArtworkFile(context: Context, songId: String): File {
+            val directory = File(context.cacheDir, "media_artwork")
+            return File(directory, cacheMetadataEntryKey("artwork:" + songId) + ".jpg")
+        }
+
+        @JvmStatic
+        fun storeCachedMediaArtwork(context: Context, songId: String, bitmap: Bitmap): Boolean {
+            if (songId.isBlank()) return false
+            val file = getCachedMediaArtworkFile(context, songId)
+            val directory = file.parentFile ?: return false
+            if (!directory.exists() && !directory.mkdirs()) return false
+            return try {
+                val written = java.io.FileOutputStream(file).use { output ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output)
+                }
+                if (written && file.isFile && file.length() > 0L) true
+                else {
+                    file.delete()
+                    false
+                }
+            } catch (error: Exception) {
+                Log.w(TAG, "Unable to persist cached artwork", error)
+                false
             }
         }
 
@@ -214,6 +250,7 @@ class AudioPlaybackService : MediaSessionService() {
         @Synchronized
         fun clearMediaCache(context: Context) {
             context.getSharedPreferences(PREF_MEDIA_CACHE_METADATA, Context.MODE_PRIVATE).edit().clear().apply()
+            File(context.cacheDir, "media_artwork").deleteRecursively()
             val currentCache = cache
             if (currentCache == null) {
                 File(context.cacheDir, "media_cache").deleteRecursively()
@@ -1147,12 +1184,15 @@ class AudioPlaybackService : MediaSessionService() {
         }
         
         if (uri.scheme == "http" || uri.scheme == "https") {
+            val cachedSong = viewModel?.songList?.value?.firstOrNull { it.id.toString() == songId }
+                ?: viewModel?.currentSong?.value?.takeIf { it.id.toString() == songId }
             rememberMediaCacheMetadata(
                 this,
                 uri.toString(),
                 title,
                 artist,
-                songId
+                songId,
+                cachedSong?.duration ?: 0L
             )
         }
 
@@ -1163,12 +1203,49 @@ class AudioPlaybackService : MediaSessionService() {
             .build()
     }
 
+    private fun persistCurrentSongArtwork(bitmap: Bitmap?) {
+        val artwork = bitmap ?: return
+        val mediaItem = if (isPlayerInitialized) player.currentMediaItem else null
+        val activeSong = viewModel?.currentSong?.value
+        val mediaUri = mediaItem?.localConfiguration?.uri
+        val isRemoteTrack = !activeSong?.videoId.isNullOrBlank() ||
+            mediaUri?.scheme == "http" || mediaUri?.scheme == "https"
+        if (!isRemoteTrack) return
+
+        val songId = mediaItem?.mediaId?.takeIf { it.isNotBlank() }
+            ?: activeSong?.id?.toString()?.takeIf { it.isNotBlank() }
+            ?: return
+        serviceScope.launch(Dispatchers.IO) {
+            storeCachedMediaArtwork(applicationContext, songId, artwork)
+        }
+    }
+
+    fun getCurrentAudioFormatDetails(songId: String): CurrentAudioFormatDetails? {
+        if (!isPlayerInitialized) return null
+        return try {
+            val activeItem = player.currentMediaItem ?: return null
+            if (activeItem.mediaId != songId) return null
+            val format = player.currentTracks.groups
+                .flatMap { group -> (0 until group.length).map { group.getTrackFormat(it) } }
+                .firstOrNull { it.sampleMimeType?.startsWith("audio/") == true }
+                ?: return null
+            CurrentAudioFormatDetails(
+                bitrateBps = format.bitrate.takeIf { it > 0 },
+                sampleRateHz = format.sampleRate.takeIf { it > 0 }
+            )
+        } catch (error: Exception) {
+            Log.d(TAG, "Current audio format is not available yet", error)
+            null
+        }
+    }
+
     fun setSongMetadata(songName: String?, albumArt: Bitmap?) {
         this.currentSongName = songName ?: "SpatialFlow"
         this.currentAlbumArt = albumArt?.let { 
             val size = min(it.width, it.height)
             Bitmap.createBitmap(it, (it.width - size) / 2, (it.height - size) / 2, size, size).scale(512, 512, true)
         }
+        persistCurrentSongArtwork(this.currentAlbumArt)
         val mediaItem = player.currentMediaItem
         if (mediaItem != null) {
             val metadataBuilder = mediaItem.mediaMetadata.buildUpon()

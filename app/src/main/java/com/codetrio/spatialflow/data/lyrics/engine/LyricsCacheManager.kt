@@ -68,6 +68,8 @@ class LyricsCacheManager(context: Context) {
     /**
      * Store a lyrics result in cache (both memory and disk).
      */
+    fun hasCachedLyrics(track: TrackMetadata): Boolean = get(track)?.hasLyrics() == true
+
     fun put(track: TrackMetadata, result: LyricsResult?) {
         val key = track.getCacheKey()
 
