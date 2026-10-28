@@ -122,11 +122,12 @@ class ConfidenceScorer {
 
     private fun scoreProviderTrust(providerName: String?): Float {
         return when (providerName) {
-            "LRCLIB" -> 0.95f
-            "SyncLRC" -> 0.95f
-            "EmbeddedID3" -> 0.90f
-            "LocalLrc" -> 0.90f
+            "LRCLIB", "SyncLRC" -> 0.95f
+            "EmbeddedID3", "LocalLrc" -> 0.90f
             "YouTube Music" -> 0.85f
+            "Apple Music (Better Lyrics)", "Bini", "QQ Music", "NetEase Music", "KuGou" -> 0.78f
+            "LyricsPlus", "Unison" -> 0.72f
+            "Genius" -> 0.60f
             "OVH" -> 0.70f
             "SomeRandom" -> 0.60f
             else -> 0.50f
@@ -135,7 +136,13 @@ class ConfidenceScorer {
 
     private fun countSyncedLines(lyrics: String): Int {
         if (lyrics.isEmpty()) return 0
-        return lyrics.lines().count { it.matches("^\\[\\d{2}:\\d{2}\\.\\d{2,3}].*".toRegex()) }
+        val lrcLines = Regex("""(?m)^\s*\[\d{1,2}:\d{2}(?:[.:]\d{1,3})?]""")
+            .findAll(lyrics).count()
+        val karaokeLines = Regex("""(?m)^\s*\[\d+,\d+]""")
+            .findAll(lyrics.substringAfter('\\n', "")).count()
+        val ttmlLines = Regex("""(?i)<p\b[^>]*\bbegin\s*=""")
+            .findAll(lyrics).count()
+        return maxOf(lrcLines, karaokeLines, ttmlLines)
     }
 
     enum class Action {

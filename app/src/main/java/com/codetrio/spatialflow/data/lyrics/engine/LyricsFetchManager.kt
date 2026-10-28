@@ -11,6 +11,14 @@ import com.codetrio.spatialflow.data.lyrics.LyricsResult
 import com.codetrio.spatialflow.data.lyrics.MetadataRepair
 import com.codetrio.spatialflow.data.lyrics.TrackMetadata
 import com.codetrio.spatialflow.data.lyrics.providers.EmbeddedLyricsProvider
+import com.codetrio.spatialflow.data.lyrics.providers.BetterLyricsAppleProvider
+import com.codetrio.spatialflow.data.lyrics.providers.QqMusicLyricsProvider
+import com.codetrio.spatialflow.data.lyrics.providers.NetEaseLyricsProvider
+import com.codetrio.spatialflow.data.lyrics.providers.KuGouLyricsProvider
+import com.codetrio.spatialflow.data.lyrics.providers.LyricsPlusProvider
+import com.codetrio.spatialflow.data.lyrics.providers.BiniLyricsProvider
+import com.codetrio.spatialflow.data.lyrics.providers.UnisonLyricsProvider
+import com.codetrio.spatialflow.data.lyrics.providers.GeniusLyricsProvider
 import com.codetrio.spatialflow.data.lyrics.providers.LrcLibProvider
 import com.codetrio.spatialflow.data.lyrics.providers.LyricsProvider
 import okhttp3.OkHttpClient
@@ -412,6 +420,16 @@ class LyricsFetchManager private constructor(context: Context) {
         providers.add(com.codetrio.spatialflow.data.lyrics.providers.paxsenix.PaxsenixSpotifyProvider(paxsenixApi))
         providers.add(com.codetrio.spatialflow.data.lyrics.providers.paxsenix.PaxsenixMusixmatchProvider(paxsenixApi))
         providers.add(com.codetrio.spatialflow.data.lyrics.providers.paxsenix.PaxsenixYoutubeProvider(paxsenixApi))
+
+        // Additional catalogues remain separate entries so results stay selectable.
+        providers.add(BetterLyricsAppleProvider(client))
+        providers.add(QqMusicLyricsProvider(client))
+        providers.add(NetEaseLyricsProvider(client))
+        providers.add(KuGouLyricsProvider(client))
+        providers.add(LyricsPlusProvider(client))
+        providers.add(BiniLyricsProvider(client))
+        providers.add(UnisonLyricsProvider(client))
+        providers.add(GeniusLyricsProvider(client))
 
         Log.d(TAG, "Initialized ${providers.size} lyrics providers")
         return providers

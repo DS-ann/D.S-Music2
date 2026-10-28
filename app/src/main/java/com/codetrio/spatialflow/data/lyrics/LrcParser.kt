@@ -21,6 +21,9 @@ object LrcParser {
         }
 
         val trimmed = lrcContent.trim()
+        if (AdvancedLyricsParser.recognizes(trimmed)) {
+            return AdvancedLyricsParser.parse(trimmed).orEmpty()
+        }
         val rawTtml = extractTtmlContent(trimmed)
         if (rawTtml != null) {
             val ttmlLines = TtmlParser.parse(rawTtml)

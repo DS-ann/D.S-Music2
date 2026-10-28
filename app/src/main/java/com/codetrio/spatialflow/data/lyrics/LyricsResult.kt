@@ -34,12 +34,15 @@ data class LyricsResult(
 
     fun setSyncedLyrics(syncedLyrics: String?): LyricsResult {
         this.syncedLyrics = syncedLyrics
-        this.isSynced = !syncedLyrics.isNullOrEmpty() && (
-            syncedLyrics.matches("(?s).*\\[\\d{2}:\\d{2}\\.\\d{2,3}].*".toRegex()) ||
-                syncedLyrics.contains("<tt", ignoreCase = true) ||
-                syncedLyrics.contains("<?xml", ignoreCase = true) ||
-                syncedLyrics.contains("<p begin=", ignoreCase = true) ||
-                syncedLyrics.contains("ttm:begin", ignoreCase = true)
+        val raw = syncedLyrics.orEmpty().trimStart()
+        this.isSynced = raw.isNotEmpty() && (
+            raw.matches("(?s).*\\[\\d{2}:\\d{2}\\.\\d{2,3}].*".toRegex()) ||
+                raw.contains("<tt", ignoreCase = true) ||
+                raw.contains("<?xml", ignoreCase = true) ||
+                raw.contains("<p begin=", ignoreCase = true) ||
+                raw.contains("ttm:begin", ignoreCase = true) ||
+                AdvancedLyricsParser.recognizes(raw) ||
+                Regex("""<\d{1,2}:\d{2}[.:]\d+>""").containsMatchIn(raw)
         )
         return this
     }
