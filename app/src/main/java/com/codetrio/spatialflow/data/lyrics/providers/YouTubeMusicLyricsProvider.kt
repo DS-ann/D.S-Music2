@@ -2,8 +2,11 @@ package com.codetrio.spatialflow.data.lyrics.providers
 
 import android.util.Log
 import com.codetrio.spatialflow.data.innertube.YouTubeMusic
+import com.codetrio.spatialflow.data.lyrics.AdvancedLyricsParser
+import com.codetrio.spatialflow.data.lyrics.LrcParser
 import com.codetrio.spatialflow.data.lyrics.LyricsResult
 import com.codetrio.spatialflow.data.lyrics.TrackMetadata
+import com.codetrio.spatialflow.data.lyrics.TtmlParser
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -41,14 +44,24 @@ class YouTubeMusicLyricsProvider : LyricsProvider {
                 return null
             }
 
+            val raw = lyricsText.trim()
             LyricsResult().apply {
-                plainLyrics = lyricsText
                 providerName = getName()
-                confidence = 1.0f // Perfect match — same source as the song
+                confidence = 1.0f
                 matchedTitle = track.rawTitle
                 matchedArtist = track.rawArtist
-                isSynced = false // YouTube Music plain text lyrics are not synced
-                isWordByWord = false
+                if (LyricsResult.looksSynchronized(raw)) {
+                    setSyncedLyrics(raw)
+                    isWordByWord = when {
+                        AdvancedLyricsParser.recognizes(raw) ->
+                            AdvancedLyricsParser.parse(raw).orEmpty().any { it.isWordByWord && it.words.isNotEmpty() }
+                        raw.contains("<tt", ignoreCase = true) || raw.contains("<?xml", ignoreCase = true) ->
+                            TtmlParser.parse(raw).any { it.isWordByWord && it.words.isNotEmpty() }
+                        else -> LrcParser.parse(raw).any { it.isWordByWord && it.words.isNotEmpty() }
+                    }
+                } else {
+                    plainLyrics = raw
+                }
             }
         } catch (e: Exception) {
             Log.w(TAG, "YouTube Music lyrics fetch failed for $videoId: ${e.message}")

@@ -24,6 +24,14 @@ object LrcParser {
         if (AdvancedLyricsParser.recognizes(trimmed)) {
             return AdvancedLyricsParser.parse(trimmed).orEmpty()
         }
+        when {
+            Regex("""(?m)^\s*\[\d+,\d+].*<\d+,\d+,-?\d+>""").containsMatchIn(trimmed) ->
+                return AdvancedLyricsParser.parse(AdvancedLyricsParser.wrapWords(AdvancedLyricsParser.WordKind.KRC, trimmed)).orEmpty()
+            Regex("""(?m)^\s*\[\d+,\d+]\(\d+,\d+,-?\d+\)""").containsMatchIn(trimmed) ->
+                return AdvancedLyricsParser.parse(AdvancedLyricsParser.wrapWords(AdvancedLyricsParser.WordKind.YRC, trimmed)).orEmpty()
+            Regex("""(?m)^\s*\[\d+,\d+].*\(\d+,\d+\)""").containsMatchIn(trimmed) ->
+                return AdvancedLyricsParser.parse(AdvancedLyricsParser.wrapWords(AdvancedLyricsParser.WordKind.QRC, trimmed)).orEmpty()
+        }
         val rawTtml = extractTtmlContent(trimmed)
         if (rawTtml != null) {
             val ttmlLines = TtmlParser.parse(rawTtml)

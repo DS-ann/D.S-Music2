@@ -22,12 +22,31 @@ data class TrackMetadata @JvmOverloads constructor(
      * Uses cleaned artist + title + duration bucket (10-second granularity).
      */
     fun getCacheKey(): String {
-        val artist = cleanedArtist.lowercase().trim()
-        val title = cleanedTitle.lowercase().trim()
-        val durationBucket = durationMs / 10000 // 10-second granularity
-        val raw = "$artist|$title|$durationBucket"
-        return "lyr_" + raw.replace("[^a-z0-9|]".toRegex(), "")
+        val raw = normalizeCachePart(cleanedArtist) + "|" +
+            normalizeCachePart(cleanedTitle) + "|" + (durationMs / 10000L)
+        val bytes = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(raw.toByteArray(Charsets.UTF_8))
+        val hex = "0123456789abcdef"
+        val out = StringBuilder(bytes.size * 2)
+        for (byte in bytes) {
+            val value = byte.toInt() and 0xff
+            out.append(hex[value ushr 4]).append(hex[value and 0x0f])
+        }
+        return "lyr_v2_" + out.toString()
     }
+
+    fun getLegacyCacheKey(): String? {
+        val title = cleanedTitle.lowercase().trim()
+        if (title.replace(Regex("[^a-z0-9]"), "").isBlank()) return null
+        val raw = cleanedArtist.lowercase().trim() + "|" + title + "|" + (durationMs / 10000L)
+        return "lyr_" + raw.replace(Regex("[^a-z0-9|]"), "")
+    }
+
+    private fun normalizeCachePart(value: String): String =
+        java.text.Normalizer.normalize(
+            value.lowercase(java.util.Locale.ROOT).trim(),
+            java.text.Normalizer.Form.NFC
+        ).replace(Regex("\\s+"), " ")
 
     override fun toString(): String {
         return "TrackMetadata(title='$cleanedTitle', artist='$cleanedArtist', version='$version', lang='$detectedLanguage', duration=$durationMs)"

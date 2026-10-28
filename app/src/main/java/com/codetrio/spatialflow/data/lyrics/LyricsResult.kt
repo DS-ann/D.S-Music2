@@ -35,17 +35,31 @@ data class LyricsResult(
     fun setSyncedLyrics(syncedLyrics: String?): LyricsResult {
         this.syncedLyrics = syncedLyrics
         val raw = syncedLyrics.orEmpty().trimStart()
-        this.isSynced = raw.isNotEmpty() && (
-            raw.matches("(?s).*\\[\\d{2}:\\d{2}\\.\\d{2,3}].*".toRegex()) ||
+        this.isSynced = looksSynchronized(raw)
+        if (this.isSynced) {
+            this.isWordByWord = LrcParser.parse(raw).any { it.isWordByWord && it.words.isNotEmpty() }
+        }
+        return this
+    }
+
+    companion object {
+        @JvmStatic
+        fun looksSynchronized(content: String): Boolean {
+            val raw = content.trimStart()
+            if (raw.isEmpty()) return false
+            return AdvancedLyricsParser.recognizes(raw) ||
                 raw.contains("<tt", ignoreCase = true) ||
                 raw.contains("<?xml", ignoreCase = true) ||
                 raw.contains("<p begin=", ignoreCase = true) ||
                 raw.contains("ttm:begin", ignoreCase = true) ||
-                AdvancedLyricsParser.recognizes(raw) ||
-                Regex("""<\d{1,2}:\d{2}[.:]\d+>""").containsMatchIn(raw)
-        )
-        return this
+                Regex("""(?m)^\s*\[\d{1,3}:\d{2}(?:[.:]\d{1,3})?]""").containsMatchIn(raw) ||
+                Regex("""<\d{1,3}:\d{2}[.:]\d{1,3}>""").containsMatchIn(raw) ||
+                Regex("""(?m)^\s*\[\d+,\d+].*<\d+,\d+,-?\d+>""").containsMatchIn(raw) ||
+                Regex("""(?m)^\s*\[\d+,\d+]\(\d+,\d+,-?\d+\)""").containsMatchIn(raw) ||
+                Regex("""(?m)^\s*\[\d+,\d+].*\(\d+,\d+\)""").containsMatchIn(raw)
+        }
     }
+
     fun setPlainLyrics(plainLyrics: String?): LyricsResult {
         this.plainLyrics = plainLyrics
         return this

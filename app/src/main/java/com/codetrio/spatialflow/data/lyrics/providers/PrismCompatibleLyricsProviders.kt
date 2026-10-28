@@ -41,7 +41,7 @@ private fun lyricsRequest(
         if (response.isSuccessful) response.body?.string() else null
     }
 } catch (error: Exception) {
-    Log.d("ExternalLyrics", "Lyrics request failed: §{error.message}")
+    Log.d("ExternalLyrics", "Lyrics request failed: ${error.message}")
     null
 }
 
@@ -205,7 +205,7 @@ class NetEaseLyricsProvider(client: OkHttpClient) : LyricsProvider {
 
     override fun search(track: TrackMetadata): LyricsResult? {
         val searchUrl = "https://music.163.com/api/search/get".toHttpUrl().newBuilder()
-            .addQueryParameter("s", "§{cleanLyricTitle(track.cleanedTitle)} §{track.cleanedArtist}")
+            .addQueryParameter("s", "${cleanLyricTitle(track.cleanedTitle)} ${track.cleanedArtist}")
             .addQueryParameter("type", "1")
             .addQueryParameter("limit", "10")
             .build()
@@ -268,8 +268,8 @@ class KuGouLyricsProvider(client: OkHttpClient) : LyricsProvider {
     override fun search(track: TrackMetadata): LyricsResult? {
         val durationMs = track.durationMs.coerceAtLeast(0L).toString()
         val keywords = listOf(
-            "§{track.cleanedArtist} - §{cleanLyricTitle(track.cleanedTitle)}",
-            "§{cleanLyricTitle(track.cleanedTitle)} - §{track.cleanedArtist}"
+            "${track.cleanedArtist} - ${cleanLyricTitle(track.cleanedTitle)}",
+            "${cleanLyricTitle(track.cleanedTitle)} - ${track.cleanedArtist}"
         )
         val candidates = keywords.asSequence().mapNotNull { keyword ->
             val url = "https://lyrics.kugou.com/search".toHttpUrl().newBuilder()
@@ -348,7 +348,9 @@ class LyricsPlusProvider(client: OkHttpClient) : LyricsProvider {
     private val mirrors = listOf(
         "https://lyricsplus.binimum.org",
         "https://lyricsplus.prjktla.workers.dev",
+        "https://lyricsplus.prjktla.my.id",
         "https://lyricsplus.atomix.one",
+        "https://lyricsplus-seven.vercel.app",
         "https://lyrics-plus-backend.vercel.app"
     )
     @Volatile private var workingMirror: String? = null
@@ -458,7 +460,7 @@ class GeniusLyricsProvider(client: OkHttpClient) : LyricsProvider {
             .replace(Regex("""\s*[\[(](?:feat|ft|with)\.?\s[^)\]]*[)\]]""", RegexOption.IGNORE_CASE), "")
             .trim()
         val searchUrl = "https://genius.com/api/search/multi".toHttpUrl().newBuilder()
-            .addQueryParameter("q", "§{bareTitle} §{track.cleanedArtist}")
+            .addQueryParameter("q", "${bareTitle} ${track.cleanedArtist}")
             .build()
         val sections = lyricsJson(http, searchUrl).field("response").field("sections").asArrayOrNull()
             ?: return null

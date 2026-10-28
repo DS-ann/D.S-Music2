@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import android.util.LruCache
+import com.codetrio.spatialflow.data.lyrics.LrcParser
 import com.codetrio.spatialflow.data.lyrics.LyricsResult
 import com.codetrio.spatialflow.data.lyrics.TrackMetadata
 import com.google.gson.Gson
@@ -38,37 +39,39 @@ class LyricsCacheManager(context: Context) {
      */
     fun get(track: TrackMetadata): LyricsResult? {
         val key = track.getCacheKey()
-
-        // Check memory first
-        val memResult = memoryCache.get(key)
-        if (memResult != null) {
-            Log.d(TAG, "Memory cache hit for: $key")
-            return memResult
+        memoryCache.get(key)?.let {
+            Log.d(TAG, "Memory cache hit")
+            return it
         }
-
-        // Check disk
-        val json = prefs.getString(key, null)
-        if (json != null) {
+        val legacyKey = track.getLegacyCacheKey()?.takeIf { it != key }
+        for (candidateKey in listOfNotNull(key, legacyKey)) {
+            val json = prefs.getString(candidateKey, null) ?: continue
             try {
-                val diskResult = gson.fromJson(json, LyricsResult::class.java)
-                if (diskResult != null && diskResult.hasLyrics()) {
-                    memoryCache.put(key, diskResult) // Promote to memory
-                    Log.d(TAG, "Disk cache hit for: $key")
-                    return diskResult
+                val result = gson.fromJson(json, LyricsResult::class.java)
+                if (result != null && result.hasLyrics()) {
+                    val timed = result.syncedLyrics
+                    if (!timed.isNullOrBlank() && LyricsResult.looksSynchronized(timed)) {
+                        result.isSynced = true
+                        if (!result.isWordByWord) {
+                            result.isWordByWord = LrcParser.parse(timed).any {
+                                it.isWordByWord && it.words.isNotEmpty()
+                            }
+                        }
+                    }
+                    memoryCache.put(key, result)
+                    if (candidateKey != key) {
+                        prefs.edit { putString(key, json); remove(candidateKey) }
+                    }
+                    return result
                 }
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to deserialize cache: ${e.message}")
-                prefs.edit { remove(key) } // Clean corrupted entry
+                prefs.edit { remove(candidateKey) }
+            } catch (error: Exception) {
+                Log.w(TAG, "Could not decode stored lyrics: " + error.message)
+                prefs.edit { remove(candidateKey) }
             }
         }
-
         return null
     }
-
-    /**
-     * Store a lyrics result in cache (both memory and disk).
-     */
-    fun hasCachedLyrics(track: TrackMetadata): Boolean = get(track)?.hasLyrics() == true
 
     fun put(track: TrackMetadata, result: LyricsResult?) {
         val key = track.getCacheKey()
@@ -94,24 +97,25 @@ class LyricsCacheManager(context: Context) {
      */
     fun isNegativeCacheActive(track: TrackMetadata): Boolean {
         val key = track.getCacheKey()
-        val timestamp = negativePrefs.getLong(key, 0)
-        if (timestamp <= 0) return false
-
-        val age = System.currentTimeMillis() - timestamp
-        if (age > NEGATIVE_CACHE_TTL_MS) {
-            // Expired — remove and allow re-search
-            negativePrefs.edit { remove(key) }
-            Log.d(TAG, "Negative cache expired for: $key")
+        val legacyKey = track.getLegacyCacheKey()?.takeIf { it != key }
+        var timestamp = negativePrefs.getLong(key, 0L)
+        if (timestamp <= 0L && legacyKey != null) {
+            timestamp = negativePrefs.getLong(legacyKey, 0L)
+            if (timestamp > 0L) {
+                negativePrefs.edit { putLong(key, timestamp); remove(legacyKey) }
+            }
+        }
+        if (timestamp <= 0L) return false
+        if (System.currentTimeMillis() - timestamp > NEGATIVE_CACHE_TTL_MS) {
+            negativePrefs.edit {
+                remove(key)
+                if (legacyKey != null) remove(legacyKey)
+            }
             return false
         }
-
-        Log.d(TAG, "Negative cache active for: $key (age=${age / 1000}s)")
         return true
     }
 
-    /**
-     * Mark a track as "no lyrics found" in negative cache.
-     */
     fun putNegative(track: TrackMetadata) {
         val key = track.getCacheKey()
         negativePrefs.edit { putLong(key, System.currentTimeMillis()) }
@@ -130,9 +134,15 @@ class LyricsCacheManager(context: Context) {
      */
     fun evict(track: TrackMetadata) {
         val key = track.getCacheKey()
+        val legacyKey = track.getLegacyCacheKey()
         memoryCache.remove(key)
-        prefs.edit { remove(key) }
-        negativePrefs.edit { remove(key) }
-        Log.d(TAG, "Evicted cache for: $key")
+        prefs.edit {
+            remove(key)
+            if (legacyKey != null) remove(legacyKey)
+        }
+        negativePrefs.edit {
+            remove(key)
+            if (legacyKey != null) remove(legacyKey)
+        }
     }
 }
