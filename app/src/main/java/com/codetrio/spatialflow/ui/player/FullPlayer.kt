@@ -535,11 +535,12 @@ fun FullPlayer(
                 
                 val downloadLabel = when {
                     realDownloaded -> "Downloaded"
-                    isDownloading -> "Downloading ${realDownloadProgress}%"
+                    isDownloading -> "Cancel download"
                     else -> "Download"
                 }
                 val downloadIcon: Any = when {
                     realDownloaded -> painterResource(id = R.drawable.ic_downloaded)
+                    isDownloading -> painterResource(id = R.drawable.ic_close)
                     else -> painterResource(id = R.drawable.ic_download)
                 }
                 PillChip(
@@ -549,8 +550,12 @@ fun FullPlayer(
                     progress = if (isDownloading) realDownloadProgress / 100f else null,
                     onClick = {
                         val currentSong = uiState.currentSong
-                        if (currentSong != null && !realDownloaded && !isDownloading) {
-                            com.codetrio.spatialflow.util.SongDownloader.downloadSong(context, currentSong)
+                        if (currentSong != null && !realDownloaded) {
+                            if (isDownloading) {
+                                com.codetrio.spatialflow.util.SongDownloader.cancelDownload(context, currentSong)
+                            } else {
+                                com.codetrio.spatialflow.util.SongDownloader.downloadSong(context, currentSong)
+                            }
                         }
                     },
                     contentColor = contentColor,
