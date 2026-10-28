@@ -265,6 +265,32 @@ object YouTubeMusic {
     }
 
     /**
+     * Resolve an alternate audio URL through InnerTube directly, bypassing NewPipe and both
+     * URL caches. This is deliberately reserved for recovery after Media3 rejected an extracted
+     * URL; repeating the same resolver can otherwise return another URL of the same failing type.
+     */
+    suspend fun getStreamUrlFromInnerTube(videoId: String?): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val id = videoId?.takeIf { it.isNotBlank() }
+                    ?: throw IllegalArgumentException("Video ID is blank")
+                val playerJson = InnerTubeClient.player(id)
+                val parsed = InnerTubeParser.parsePlayerResponse(playerJson)
+                val streams = parsed?.streams.orEmpty()
+                    .filter { it.mimeType.contains("audio", ignoreCase = true) && !it.url.isNullOrBlank() }
+                val (audioQuality, dataSaver) = NewPipeStreamExtractor.getPreferencesSnapshot()
+                val bestStream = when {
+                    streams.isEmpty() -> null
+                    audioQuality == "Data Saver" || dataSaver -> streams.minByOrNull { it.bitrate }
+                    audioQuality == "Normal" -> streams.sortedBy { it.bitrate }.let { it[it.size / 2] }
+                    else -> streams.maxByOrNull { it.bitrate }
+                }
+                bestStream?.url?.takeIf { it.startsWith("http", ignoreCase = true) }
+                    ?: throw IllegalStateException("InnerTube returned no usable audio stream for $id")
+            }
+        }
+
+    /**
      * Invalidate a possibly expired/broken stream URL so the next request re-runs extraction.
      */
     fun invalidateStreamUrl(videoId: String?) {
