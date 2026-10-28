@@ -125,7 +125,7 @@ class AudioPlaybackService : MediaSessionService() {
     private var resolveTargetSongId: String? = null
     private var lastPlaybackRecoveryVideoId: String? = null
     private var failedStreamVideoId: String? = null
-    private var forceInnerTubeOnNextResolveVideoId: String? = null
+    private var forceWebRemixOnNextResolveVideoId: String? = null
     private var forceCompatibleFallbackOnNextResolveVideoId: String? = null
     private var playbackRecoveryStage = 0
     private var isRecoveringPlaybackError = false
@@ -137,6 +137,14 @@ class AudioPlaybackService : MediaSessionService() {
     private var audioFocusRequest: AudioFocusRequest? = null
     private var isPausedByFocusLoss = false
     private var audioFocusEnabled = true
+
+    private val streamHttpClient: okhttp3.OkHttpClient by lazy {
+        com.codetrio.spatialflow.data.innertube.InnerTubeClient.httpClient.newBuilder()
+            .connectTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .addInterceptor(com.codetrio.spatialflow.data.stream.YouTubeStreamInterceptor())
+            .build()
+    }
 
     private var mainProcessor = HapticsAudioProcessor()
     private var nextProcessor: HapticsAudioProcessor? = null
@@ -202,8 +210,8 @@ class AudioPlaybackService : MediaSessionService() {
                 if (lastPlaybackRecoveryVideoId != videoId) {
                     lastPlaybackRecoveryVideoId = videoId
                     playbackRecoveryStage = 1
-                    forceInnerTubeOnNextResolveVideoId = videoId
-                    Log.w(TAG, "Playback recovery 1/2: retrying $videoId with a fresh InnerTube URL")
+                    forceWebRemixOnNextResolveVideoId = videoId
+                    Log.w(TAG, "Playback recovery 1/2: retrying $videoId with a fresh WEB_REMIX URL")
                     com.codetrio.spatialflow.ui.SnackbarController.showMessage("Trying an alternate song stream…")
                 } else {
                     playbackRecoveryStage = 2
@@ -420,16 +428,19 @@ class AudioPlaybackService : MediaSessionService() {
         mediaSession?.release()
     }
 
-    private fun initializePlayer() {
-        player = buildExoPlayer(mainProcessor)
+    private fun configurePlayerAudio(target: ExoPlayer) {
         val attrs = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
-        
-        player.setAudioAttributes(attrs, false) 
-        player.setWakeMode(C.WAKE_MODE_NETWORK) 
-        player.skipSilenceEnabled = false
+        target.setAudioAttributes(attrs, audioFocusEnabled)
+        target.setWakeMode(C.WAKE_MODE_NETWORK)
+        target.skipSilenceEnabled = false
+    }
+
+    private fun initializePlayer() {
+        player = buildExoPlayer(mainProcessor)
+        configurePlayerAudio(player)
         player.addListener(mainPlayerListener)
     }
 
@@ -448,23 +459,11 @@ class AudioPlaybackService : MediaSessionService() {
             }
         }
         
-        val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
+        val httpDataSourceFactory = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(streamHttpClient)
             .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0")
-            // YouTube's CDN can reject otherwise-valid extracted media URLs when the stream
-            // request omits the same web origin/referrer used during extraction.
-            .setDefaultRequestProperties(
-                mapOf(
-                    "Origin" to "https://www.youtube.com",
-                    "Referer" to "https://www.youtube.com/",
-                    "Accept" to "audio/*,*/*;q=0.8",
-                    "Accept-Encoding" to "identity"
-                )
-            )
-            // Stream URLs and CDN range requests can take longer than metadata API calls.
-            .setConnectTimeoutMs(20000)
-            .setReadTimeoutMs(30000)
-            .setAllowCrossProtocolRedirects(true)
-            
+
+        // DefaultDataSource handles content:// and file:// media locally, while HTTP(S)
+        // streams use the YouTube-aware OkHttp transport above.
         val upstreamFactory = androidx.media3.datasource.DefaultDataSource.Factory(this, httpDataSourceFactory)
         
         // ULTIMATE FIX: Directly feed upstream into cache, ABSOLUTELY NO blocking dynamic resolver architecture inside pipeline
@@ -541,7 +540,7 @@ class AudioPlaybackService : MediaSessionService() {
         if (!isRecoveringPlaybackError) {
             lastPlaybackRecoveryVideoId = null
             playbackRecoveryStage = 0
-            forceInnerTubeOnNextResolveVideoId = null
+            forceWebRemixOnNextResolveVideoId = null
             forceCompatibleFallbackOnNextResolveVideoId = null
         }
         shouldAutoPlay = true
@@ -557,9 +556,9 @@ class AudioPlaybackService : MediaSessionService() {
         originalSourceUri = uri
         if (uri.scheme == "innertube") {
             val videoId = uri.host ?: return
-            val useInnerTubeRetry = forceInnerTubeOnNextResolveVideoId == videoId
+            val useWebRemixRetry = forceWebRemixOnNextResolveVideoId == videoId
             val useCompatibleFallbackRetry = forceCompatibleFallbackOnNextResolveVideoId == videoId
-            if (useInnerTubeRetry) forceInnerTubeOnNextResolveVideoId = null
+            if (useWebRemixRetry) forceWebRemixOnNextResolveVideoId = null
             if (useCompatibleFallbackRetry) forceCompatibleFallbackOnNextResolveVideoId = null
             
             // INSTANT CANCELLATION: Kill any in-flight resolution immediately
@@ -572,7 +571,7 @@ class AudioPlaybackService : MediaSessionService() {
                 // Fetch stream URL only, don't wait for position yet
                 var streamUrl = async(Dispatchers.IO) {
                     when {
-                        useInnerTubeRetry -> YouTubeMusic.getStreamUrlFromInnerTube(videoId).getOrNull()
+                        useWebRemixRetry -> YouTubeMusic.getStreamUrlFromWebRemix(videoId).getOrNull()
                         useCompatibleFallbackRetry -> YouTubeMusic.getCompatibleFallbackStreamUrl(videoId).getOrNull()
                         else -> YouTubeMusic.getStreamUrl(videoId).getOrNull()
                     }
@@ -580,11 +579,16 @@ class AudioPlaybackService : MediaSessionService() {
 
                 if (streamUrl.isNullOrEmpty()) {
                     when {
-                        useInnerTubeRetry -> {
-                            Log.w(TAG, "InnerTube recovery URL unavailable for $videoId; trying NewPipe")
+                        useWebRemixRetry -> {
+                            Log.w(TAG, "WEB_REMIX recovery URL unavailable for $videoId; trying Android/iOS InnerTube")
                             streamUrl = async(Dispatchers.IO) {
-                                YouTubeMusic.getStreamUrl(videoId).getOrNull()
+                                YouTubeMusic.getStreamUrlFromInnerTube(videoId).getOrNull()
                             }.await()
+                            if (streamUrl.isNullOrEmpty()) {
+                                streamUrl = async(Dispatchers.IO) {
+                                    YouTubeMusic.getStreamUrl(videoId).getOrNull()
+                                }.await()
+                            }
                         }
                         useCompatibleFallbackRetry -> {
                             Log.e(TAG, "Compatible fallback stream resolution failed for $videoId")
@@ -696,6 +700,7 @@ class AudioPlaybackService : MediaSessionService() {
                     if (nextPlayer == null) {
                         nextProcessor = HapticsAudioProcessor()
                         nextPlayer = buildExoPlayer(nextProcessor!!)
+                    configurePlayerAudio(nextPlayer!!)
                     }
                     val nextItem = buildMediaItem(nextUri, nextSong.title, nextSong.artist, nextSong.id.toString())
                     nextPlayer?.setMediaItem(nextItem)
@@ -782,12 +787,9 @@ class AudioPlaybackService : MediaSessionService() {
     private fun preCacheFirstChunk(streamUrl: String) {
         serviceScope.launch(Dispatchers.IO) {
             try {
-                val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
-                    .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0")
-                    .setConnectTimeoutMs(5000)
-                    .setReadTimeoutMs(5000)
-                    .setAllowCrossProtocolRedirects(true)
-                
+                val httpDataSourceFactory = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(streamHttpClient)
+                    .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0")
+
                 val upstreamFactory = androidx.media3.datasource.DefaultDataSource.Factory(applicationContext, httpDataSourceFactory)
                 val cacheDataSourceFactory = androidx.media3.datasource.cache.CacheDataSource.Factory()
                     .setCache(getCache(applicationContext))
@@ -838,7 +840,7 @@ class AudioPlaybackService : MediaSessionService() {
                 return
             }
         }
-        if (!player.isPlaying && requestAudioFocus()) {
+        if (!player.isPlaying) {
             player.play()
             if (isCrossfading) {
                 nextPlayer?.play()
@@ -1018,10 +1020,10 @@ class AudioPlaybackService : MediaSessionService() {
             player.prepare()
 
             if (shouldAutoPlay) {
-                if (requestAudioFocus()) {
-                    player.play()
-                    isPausedByFocusLoss = false
-                }
+                // Media3 manages focus from AudioAttributes. Do not gate playback on a
+                // separate focus request that can be denied/delayed before service promotion.
+                player.play()
+                isPausedByFocusLoss = false
                 shouldAutoPlay = false
             }
 
@@ -1381,6 +1383,7 @@ class AudioPlaybackService : MediaSessionService() {
         // Re-initialize a fresh nextPlayer for the future
         nextProcessor = HapticsAudioProcessor()
         nextPlayer = buildExoPlayer(nextProcessor!!)
+                    configurePlayerAudio(nextPlayer!!)
 
         // Apply listeners to the new primary player
         player.addListener(mainPlayerListener)
@@ -1427,6 +1430,8 @@ class AudioPlaybackService : MediaSessionService() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         crossfadeDurationMs = (prefs.getFloat(KEY_CROSSFADE_DURATION, 0f) * 1000).toInt()
         audioFocusEnabled = prefs.getBoolean(KEY_AUDIO_FOCUS, true)
+        if (::player.isInitialized) configurePlayerAudio(player)
+        nextPlayer?.let(::configurePlayerAudio)
     }
 
     private fun setupPreferenceListener() {

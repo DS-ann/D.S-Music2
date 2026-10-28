@@ -290,6 +290,25 @@ object YouTubeMusic {
             }
         }
 
+    /**
+     * Resolve a playback URL using YouTube Music's WEB_REMIX player client.
+     * This is a separate recovery route, used when Media3 rejects the initial stream.
+     */
+    suspend fun getStreamUrlFromWebRemix(videoId: String?): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val id = videoId?.takeIf { it.isNotBlank() }
+                    ?: throw IllegalArgumentException("Video ID is blank")
+                val response = InnerTubeClient.playerWebRemix(id)
+                val parsed = InnerTubeParser.parsePlayerResponse(response)
+                val url = parsed?.streams.orEmpty()
+                    .firstOrNull { it.mimeType.contains("audio", ignoreCase = true) }
+                    ?.url
+                    ?.takeIf { it.startsWith("https://", ignoreCase = true) }
+                url ?: throw IllegalStateException("WEB_REMIX returned no usable audio stream for $id")
+            }
+        }
+
     /** Resolve a decoder-compatible NewPipe audio stream for the final recovery attempt. */
     suspend fun getCompatibleFallbackStreamUrl(videoId: String?): Result<String> =
         withContext(Dispatchers.IO) {
