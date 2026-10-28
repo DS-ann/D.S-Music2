@@ -262,9 +262,6 @@ class MainActivity : AppCompatActivity() {
                                 NavigationBarItem(
                                     selected = selected,
                                     onClick = {
-                                        if (route == "explore") {
-                                            exploreViewModel.resetToHome()
-                                        }
                                         if (!selected) {
                                             currentNavController.navigate(route) {
                                                 popUpTo(currentNavController.graph.findStartDestination().id) {

@@ -109,6 +109,9 @@ fun FullPlayerScreen(
     val providerResults by viewModel.providerResults.collectAsStateWithLifecycle()
     val selectedProvider by viewModel.selectedProvider.collectAsStateWithLifecycle()
     val currentPositionState = viewModel.currentPosition.collectAsStateWithLifecycle()
+    val currentPositionProvider: () -> Int = remember(currentPositionState) {
+        { currentPositionState.value }
+    }
 
     // Handle back button when lyrics mode is enabled
     BackHandler(enabled = isLyricsModeEnabled) {
@@ -147,7 +150,7 @@ fun FullPlayerScreen(
         providerResults = providerResults,
         selectedProvider = selectedProvider,
         onProviderSelected = { viewModel.selectLyricsProvider(it) },
-        currentPositionProvider = { currentPositionState.value },
+        currentPositionProvider = currentPositionProvider,
         onCollapse = onCollapse,
         onPlayPauseClick = {
             if (uiState.isPlaying) viewModel.pauseAudio() else viewModel.playAudio()

@@ -1,7 +1,6 @@
 package com.codetrio.spatialflow.ui.player
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.AnimationState
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -9,7 +8,6 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateTo
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
@@ -201,7 +199,6 @@ internal fun SyncedLyricsCompose(
 
                 Box(
                     modifier = Modifier
-                        .animateItem()
                         .fillMaxWidth()
                 ) {
                     if (line.isInterlude) {
@@ -826,40 +823,25 @@ private suspend fun performSmoothedScroll(
     activeIndex: Int,
     displayItems: List<LyricDisplayItem>
 ) {
-    val visibleItem = listState.layoutInfo.visibleItemsInfo
-        .firstOrNull { it.index == activeIndex }
+    if (activeIndex !in displayItems.indices) return
+    val layout = listState.layoutInfo
+    val viewportHeight = layout.viewportEndOffset - layout.viewportStartOffset
+    if (viewportHeight <= 0) return
 
-    val viewportHeight = listState.layoutInfo.viewportEndOffset -
-            listState.layoutInfo.viewportStartOffset
-
-    if (visibleItem != null && viewportHeight > 0) {
-        val targetCenterOffset = visibleItem.offset -
-                (viewportHeight / 2 - visibleItem.size / 2)
-
-        if (targetCenterOffset != 0) {
-            var previousValue = 0f
-            val animState = AnimationState(initialValue = 0f)
-
-            listState.scroll {
-                animState.animateTo(
-                    targetValue = targetCenterOffset.toFloat(),
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = 85f
-                    )
-                ) {
-                    val delta = this.value - previousValue
-                    scrollBy(delta)
-                    previousValue = this.value
-                }
-            }
-        }
-    } else {
-        listState.animateScrollToItem(
-            index = activeIndex,
-            scrollOffset = -350
-        )
+    val visibleItem = layout.visibleItemsInfo.firstOrNull { it.index == activeIndex }
+    if (visibleItem != null) {
+        val itemCenter = visibleItem.offset + visibleItem.size / 2
+        val viewportCenter = viewportHeight / 2
+        // Avoid starting a costly scroll animation on every line transition when the
+        // active line is already close to the reading focus.
+        if (kotlin.math.abs(itemCenter - viewportCenter) < viewportHeight * 0.22f) return
     }
+
+    // Use LazyList's optimized scroll animation rather than a manual per-frame scrollBy loop.
+    listState.animateScrollToItem(
+        index = activeIndex,
+        scrollOffset = -(viewportHeight / 2)
+    )
 }
 
 /**

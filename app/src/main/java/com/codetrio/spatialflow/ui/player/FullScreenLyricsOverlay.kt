@@ -238,12 +238,7 @@ internal fun FullScreenLyricsOverlay(
                             letterSpacing = 1.sp
                         )
 
-                        val activeResult = providerResults[selectedProvider] ?: providerResults.values
-                            .filter { it.confidence >= 0f }
-                            .maxWithOrNull(
-                                compareBy<LyricsResult> { it.providerName == "SyncLRC" }
-                                    .thenBy { it.confidence }
-                            )
+                        val activeResult = providerResults[selectedProvider] ?: bestLyricsProviderResult(providerResults.values)
 
                         val lyricTypeBadge = when {
                             activeResult == null -> null
@@ -489,30 +484,34 @@ private fun ProvidersSelector(
     contentColor: Color,
     modifier: Modifier = Modifier
 ) {
-    // Keep a stable all-provider order, then append any providers added by future builds.
-    // Names here must exactly match LyricsProvider.getName(), because this list indexes providerResults.
-    val knownProviders = listOf(
-        "Apple Music (Better Lyrics)",
-        "Apple Music",
-        "Bini",
-        "QQ Music",
-        "NetEase Music",
-        "KuGou",
-        "LyricsPlus",
-        "YouTube Music",
-        "YouTube (Paxsenix)",
-        "Spotify",
-        "Musixmatch",
-        "SyncLRC",
-        "LRCLIB",
-        "EmbeddedID3",
-        "Unison",
-        "Genius"
-    )
-    val allProviders = (knownProviders + providerResults.keys.sorted()).distinct()
+    // Provider order is static. Rank once per result-map update rather than once per row.
+    val knownProviders = remember {
+        listOf(
+            "Apple Music (Better Lyrics)",
+            "Apple Music",
+            "Bini",
+            "QQ Music",
+            "NetEase Music",
+            "KuGou",
+            "LyricsPlus",
+            "YouTube Music",
+            "YouTube (Paxsenix)",
+            "Spotify",
+            "Musixmatch",
+            "SyncLRC",
+            "LRCLIB",
+            "EmbeddedID3",
+            "Unison",
+            "Genius"
+        )
+    }
+    val allProviders = remember(providerResults.keys) {
+        (knownProviders + providerResults.keys.sorted()).distinct()
+    }
 
     // Keep failed/no-match providers visible too, so the user can see every searched source.
     val visibleProviders = allProviders
+    val bestResult = remember(providerResults) { bestLyricsProviderResult(providerResults.values) }
 
     Column(
         modifier = modifier
@@ -545,10 +544,8 @@ private fun ProvidersSelector(
             visibleProviders.forEachIndexed { index, provider ->
                 val result = providerResults[provider]
 
-                val isSelected = selectedProvider == provider || (selectedProvider == null && result != null && result.confidence >= 0f && result == providerResults.values.filter { it.confidence >= 0f }.maxWithOrNull(
-                    compareBy<LyricsResult> { it.providerName == "SyncLRC" }
-                        .thenBy { it.confidence }
-                ))
+                val isSelected = selectedProvider == provider ||
+                    (selectedProvider == null && result != null && result == bestResult)
 
                 val hasData = result != null && result.hasLyrics() && result.confidence >= 0f
 
@@ -691,3 +688,20 @@ private fun getSegmentedShape(index: Int, count: Int): androidx.compose.ui.graph
         else -> RoundedCornerShape(inner)
     }
 }
+
+
+/** Karaoke > line-synchronized > plain; prefer KuGou within a quality tier, then confidence. */
+private fun bestLyricsProviderResult(results: Collection<LyricsResult>): LyricsResult? =
+    results.asSequence()
+        .filter { it.hasLyrics() && it.confidence >= 0f }
+        .maxWithOrNull(
+            compareBy<LyricsResult> {
+                when {
+                    it.isWordByWord -> 3
+                    it.isSynced -> 2
+                    !it.isInstrumental && it.hasLyrics() -> 1
+                    else -> 0
+                }
+            }.thenBy { it.providerName.equals("KuGou", ignoreCase = true) }
+                .thenBy { it.confidence }
+        )

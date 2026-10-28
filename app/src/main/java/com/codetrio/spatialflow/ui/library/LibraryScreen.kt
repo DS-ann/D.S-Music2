@@ -103,6 +103,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -180,9 +181,9 @@ fun LibraryScreen(
     val isPlayerExpanded by viewModel.isPlayerExpanded.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
-    var activeTab by remember { mutableStateOf("") }
-    var searchQuery by remember { mutableStateOf("") }
-    var sortOrder by remember { mutableStateOf(SortOrder.A_Z) }
+    var activeTab by rememberSaveable { mutableStateOf("") }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var sortOrder by rememberSaveable { mutableStateOf(SortOrder.A_Z) }
     var isRefreshing by remember { mutableStateOf(false) }
 
     var showAccountScreen by remember { mutableStateOf(false) }

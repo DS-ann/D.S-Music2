@@ -17,6 +17,10 @@ import kotlinx.coroutines.flow.asStateFlow
  * Kotlin + StateFlow implementation for modern reactive architecture.
  */
 class PlayerLyricsStateController(private val logTag: String) {
+    private companion object {
+        const val DEFAULT_PROVIDER = "KuGou"
+    }
+
     private var activeLyricsSongId: Long? = null
 
     private val _syncedLyrics = MutableStateFlow<List<LyricLine>?>(null)
@@ -132,38 +136,40 @@ class PlayerLyricsStateController(private val logTag: String) {
     fun selectProvider(providerName: String) {
         val result = _providerResults.value[providerName]
         if (result != null && result.hasLyrics()) {
+            // Clear the previous rendered lyrics before applying the new provider's payload.
+            // Keep provider search results available so switching back remains immediate.
+            _syncedLyrics.value = null
+            _plainLyrics.value = null
             _selectedProvider.value = providerName
             applyLyricsResult(result)
             _lyricsState.value = LyricsState.SUCCESS
+            _isLoading.value = false
             _error.value = null
+            _statusMessage.value = "Lyrics from ${result.providerName ?: providerName}"
         }
     }
 
     fun determineBestResult(results: Map<String, LyricsResult>): LyricsResult? {
-        val candidates = results.values
+        // Failed providers are represented by empty confidence=-1 sentinels. Ignore them.
+        val candidates = results.values.filter { it.hasLyrics() && it.confidence >= 0f }
 
-        // First priority: Karaoke (word-by-word)
-        val karaokeCandidates = candidates.filter { it.isWordByWord }
-        if (karaokeCandidates.isNotEmpty()) {
-            return karaokeCandidates.maxWithOrNull(
-                compareBy<LyricsResult> { it.providerName == "SyncLRC" }
-                    .thenBy { it.confidence }
+        fun preferKugouWithinTier(items: List<LyricsResult>): LyricsResult? =
+            items.maxWithOrNull(
+                compareBy<LyricsResult> {
+                    it.providerName.equals(DEFAULT_PROVIDER, ignoreCase = true)
+                }.thenBy { it.confidence }
             )
-        }
 
-        // Second priority: Synced
+        // Keep quality priority: karaoke first, then line-synchronized, then plain text.
+        val karaokeCandidates = candidates.filter { it.isWordByWord }
+        if (karaokeCandidates.isNotEmpty()) return preferKugouWithinTier(karaokeCandidates)
+
         val syncedCandidates = candidates.filter { it.isSynced }
-        if (syncedCandidates.isNotEmpty()) {
-            return syncedCandidates.maxByOrNull { it.confidence }
-        }
+        if (syncedCandidates.isNotEmpty()) return preferKugouWithinTier(syncedCandidates)
 
-        // Third priority: Plain lyrics
         val plainCandidates = candidates.filter { !it.isSynced && !it.isWordByWord && !it.isInstrumental }
-        if (plainCandidates.isNotEmpty()) {
-            return plainCandidates.maxByOrNull { it.confidence }
-        }
+        if (plainCandidates.isNotEmpty()) return preferKugouWithinTier(plainCandidates)
 
-        // Fourth priority: Instrumental
         return candidates.firstOrNull { it.isInstrumental }
     }
 
@@ -246,16 +252,34 @@ class PlayerLyricsStateController(private val logTag: String) {
                 }
                 _providerResults.value = currentMap
 
-                if (_selectedProvider.value == null) {
+                val selected = _selectedProvider.value
+                if (selected != null) {
+                    // Re-apply only updates from the active source; ignore unrelated providers.
+                    if (selected == providerName && result != null && result.hasLyrics()) {
+                        _syncedLyrics.value = null
+                        _plainLyrics.value = null
+                        applyLyricsResult(result)
+                        _lyricsState.value = LyricsState.SUCCESS
+                        _isLoading.value = false
+                        _error.value = null
+                    }
+                } else {
                     val best = determineBestResult(currentMap)
                     if (best != null && best.hasLyrics()) {
+                        if (best.providerName.equals(DEFAULT_PROVIDER, ignoreCase = true)) {
+                            _selectedProvider.value = DEFAULT_PROVIDER
+                        }
+                        _syncedLyrics.value = null
+                        _plainLyrics.value = null
                         applyLyricsResult(best)
                         _lyricsState.value = LyricsState.SUCCESS
+                        _isLoading.value = false
                         _error.value = null
                     } else if (best != null && best.isInstrumental) {
                         _syncedLyrics.value = null
                         _plainLyrics.value = null
                         _lyricsState.value = LyricsState.FAILED
+                        _isLoading.value = false
                         _error.value = Exception(instrumentalMessage)
                     }
                 }
