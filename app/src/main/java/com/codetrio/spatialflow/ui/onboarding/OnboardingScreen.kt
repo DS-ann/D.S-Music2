@@ -7,8 +7,6 @@ package com.codetrio.spatialflow.ui.onboarding
     import android.content.Context
     import android.content.pm.PackageManager
     import android.os.Build
-    import android.os.VibrationEffect
-    import android.os.Vibrator
     import androidx.activity.compose.rememberLauncherForActivityResult
     import androidx.activity.result.contract.ActivityResultContracts
     import androidx.compose.animation.AnimatedContent
@@ -55,7 +53,6 @@ package com.codetrio.spatialflow.ui.onboarding
     import androidx.compose.material.icons.filled.Home
     import androidx.compose.material.icons.filled.LibraryMusic
     import androidx.compose.material.icons.filled.LightMode
-    import androidx.compose.material.icons.filled.Mic
     import androidx.compose.material.icons.filled.Notifications
     import androidx.compose.material.icons.filled.Search
     import androidx.compose.material.icons.filled.Settings
@@ -75,7 +72,6 @@ package com.codetrio.spatialflow.ui.onboarding
     import androidx.compose.runtime.Composable
     import androidx.compose.runtime.LaunchedEffect
     import androidx.compose.runtime.getValue
-    import androidx.compose.runtime.mutableFloatStateOf
     import androidx.compose.runtime.mutableStateOf
     import androidx.compose.runtime.remember
     import androidx.compose.runtime.rememberCoroutineScope
@@ -105,10 +101,8 @@ package com.codetrio.spatialflow.ui.onboarding
     ) {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
-        val pagerState = rememberPagerState(pageCount = { 9 })
+        val pagerState = rememberPagerState(pageCount = { 8 })
         val prefs = remember { context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE) }
-        val vibrator = remember { context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator }
-        val hasHaptics = remember { vibrator?.hasVibrator() == true }
         
         var isLoggedIn by remember { mutableStateOf(com.codetrio.spatialflow.data.innertube.AccountManager.isLoggedIn(context)) }
         var userName by remember { mutableStateOf("Connected User") }
@@ -122,20 +116,17 @@ package com.codetrio.spatialflow.ui.onboarding
             }
         }
         
-        var hapticsLevel by rememberSaveable { mutableFloatStateOf(prefs.getFloat("vibration_strength", 80f)) }
         var themeMode by rememberSaveable { mutableStateOf(prefs.getString("theme_mode", "system") ?: "system") }
         var hideNavLabels by rememberSaveable { mutableStateOf(prefs.getBoolean("hide_nav_labels", false)) }
         var dynamicNavStyle by rememberSaveable { mutableStateOf(prefs.getBoolean("dynamic_nav_style", false)) }
     
         val audioPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE
         val notifPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Manifest.permission.POST_NOTIFICATIONS else null
-        val micPermission = Manifest.permission.RECORD_AUDIO
     
         var audioGranted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, audioPermission) == PackageManager.PERMISSION_GRANTED) }
         var notifGranted by remember { mutableStateOf(notifPermission?.let { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED } ?: true) }
-        var micGranted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, micPermission) == PackageManager.PERMISSION_GRANTED) }
         
-        val allPermissionsGranted = audioGranted && notifGranted && micGranted
+        val allPermissionsGranted = audioGranted && notifGranted
     
         val permissionLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -144,7 +135,6 @@ package com.codetrio.spatialflow.ui.onboarding
             if (notifPermission != null) {
                 notifGranted = permissions[notifPermission] ?: notifGranted
             }
-            micGranted = permissions[micPermission] ?: micGranted
         }
     
         Scaffold(
@@ -176,7 +166,6 @@ package com.codetrio.spatialflow.ui.onboarding
                     onFinishClicked = {
                         prefs.edit {
                             putBoolean("has_seen_onboarding_1_8", true)
-                                .putFloat("vibration_strength", hapticsLevel)
                                 .putString("theme_mode", themeMode)
                                 .putBoolean("hide_nav_labels", hideNavLabels)
                                 .putBoolean("dynamic_nav_style", dynamicNavStyle)
@@ -218,10 +207,8 @@ package com.codetrio.spatialflow.ui.onboarding
                             pageOffsetProvider = pageOffsetProvider,
                             audioGranted = audioGranted,
                             notifGranted = notifGranted,
-                            micGranted = micGranted,
                             onRequestAudio = { permissionLauncher.launch(arrayOf(audioPermission)) },
-                            onRequestNotif = { notifPermission?.let { permissionLauncher.launch(arrayOf(it)) } },
-                            onRequestMic = { permissionLauncher.launch(arrayOf(micPermission)) }
+                            onRequestNotif = { notifPermission?.let { permissionLauncher.launch(arrayOf(it)) } }
                         )
                         5 -> ThemeSelectionPage(
                             pageOffsetProvider = pageOffsetProvider,
@@ -244,24 +231,7 @@ package com.codetrio.spatialflow.ui.onboarding
                                 prefs.edit { putBoolean("dynamic_nav_style", it) }
                             }
                         )
-                        7 -> PreferencesPage(
-                            pageOffsetProvider = pageOffsetProvider,
-                            hapticsLevel = hapticsLevel,
-                            onHapticsLevelChanged = {
-                                hapticsLevel = it
-                                prefs.edit {putFloat("vibration_strength", it) }
-                                if (it > 0 && hasHaptics && vibrator != null) {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                        val amplitude = (it / 100f * 255).toInt().coerceIn(1, 255)
-                                        vibrator.vibrate(VibrationEffect.createOneShot(50, amplitude))
-                                    } else {
-                                        @Suppress("DEPRECATION")
-                                        vibrator.vibrate(50)
-                                    }
-                                }
-                            }
-                        )
-                        8 -> FinishPage(
+                        7 -> FinishPage(
                             pageOffsetProvider = pageOffsetProvider,
                             isLoggedIn = isLoggedIn,
                             userProfileUrl = userProfileUrl
@@ -718,85 +688,12 @@ package com.codetrio.spatialflow.ui.onboarding
     }
     
     @Composable
-    fun PreferencesPage(
-        pageOffsetProvider: () -> Float,
-        hapticsLevel: Float,
-        onHapticsLevelChanged: (Float) -> Unit
-    ) {
-        ImmersivePageLayout(
-            pageOffsetProvider = pageOffsetProvider,
-            drawableRes = R.drawable.ic_haptic,
-            iconTint = MaterialTheme.colorScheme.onSurface
-        ) {
-            Text(
-                text = "Sensory\nExperience.",
-                style = MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.Black,
-                fontSize = 42.sp,
-                lineHeight = 48.sp,
-                letterSpacing = (-0.5).sp,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.graphicsLayer { 
-                    val offset = pageOffsetProvider()
-                    translationY = offset * -30f
-                    alpha = 1f - kotlin.math.abs(offset * 1.5f)
-                }
-            )
-    
-            Spacer(modifier = Modifier.height(48.dp))
-    
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 72.dp)
-                    .graphicsLayer {
-                        val offset = pageOffsetProvider()
-                        translationY = offset * 50f
-                        alpha = 1f - kotlin.math.abs(offset * 1.5f)
-                    },
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(20.dp)
-                        .fillMaxWidth()
-                ) {
-                    Text(
-                        text = "Music Haptics",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Adjust the intensity of beat-synced vibrations.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    androidx.compose.material3.Slider(
-                        value = hapticsLevel,
-                        onValueChange = onHapticsLevelChanged,
-                        valueRange = 0f..100f,
-                        steps = 3,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-    }
-    
-    @Composable
     fun PermissionsPage(
         pageOffsetProvider: () -> Float,
         audioGranted: Boolean,
         notifGranted: Boolean,
-        micGranted: Boolean,
         onRequestAudio: () -> Unit,
-        onRequestNotif: () -> Unit,
-        onRequestMic: () -> Unit
+        onRequestNotif: () -> Unit
     ) {
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
@@ -847,16 +744,6 @@ package com.codetrio.spatialflow.ui.onboarding
                 Spacer(modifier = Modifier.height(12.dp))
             }
     
-            // Microphone Permission Card
-            PermissionCard(
-                title = "Audio Engine",
-                description = "Required for immersive effects and synced lyrics.",
-                icon = Icons.Default.Mic,
-                isGranted = micGranted,
-                pageOffsetProvider = pageOffsetProvider,
-                offsetMultiplier = 400f,
-                onRequest = onRequestMic
-            )
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
