@@ -531,29 +531,33 @@ fun FullPlayer(
 
                 val realDownloaded = uiState.isCurrentSongDownloaded
                 val realDownloadProgress = uiState.currentSongDownloadProgress
-                val isDownloading = realDownloadProgress != null
-                
+                val currentSongForDownload = uiState.currentSong
+                val isDownloading = realDownloadProgress != null ||
+                    com.codetrio.spatialflow.util.SongDownloader.isDownloading(currentSongForDownload?.videoId)
+
                 val downloadLabel = when {
-                    realDownloaded -> "Downloaded"
                     isDownloading -> "Cancel download"
+                    realDownloaded -> "Downloaded"
                     else -> "Download"
                 }
                 val downloadIcon: Any = when {
-                    realDownloaded -> painterResource(id = R.drawable.ic_downloaded)
                     isDownloading -> painterResource(id = R.drawable.ic_close)
+                    realDownloaded -> painterResource(id = R.drawable.ic_downloaded)
                     else -> painterResource(id = R.drawable.ic_download)
                 }
                 PillChip(
                     icon = downloadIcon,
                     label = downloadLabel,
                     isSelected = realDownloaded || isDownloading,
-                    progress = if (isDownloading) realDownloadProgress / 100f else null,
+                    progress = if (isDownloading) (realDownloadProgress ?: 0) / 100f else null,
                     onClick = {
                         val currentSong = uiState.currentSong
-                        if (currentSong != null && !realDownloaded) {
-                            if (isDownloading) {
+                        if (currentSong != null) {
+                            // Use the download manager's live task map: the Compose state can
+                            // lag behind the user's tap by one frame, especially during startup.
+                            if (com.codetrio.spatialflow.util.SongDownloader.isDownloading(currentSong.videoId)) {
                                 com.codetrio.spatialflow.util.SongDownloader.cancelDownload(context, currentSong)
-                            } else {
+                            } else if (!realDownloaded) {
                                 com.codetrio.spatialflow.util.SongDownloader.downloadSong(context, currentSong)
                             }
                         }
