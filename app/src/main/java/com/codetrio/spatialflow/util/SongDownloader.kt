@@ -160,10 +160,14 @@ object SongDownloader {
         // HttpURLConnection.disconnect() can perform TLS socket shutdown synchronously.
         // On Android 6 this throws NetworkOnMainThreadException when cancellation is
         // triggered from a UI click, so always disconnect from an IO coroutine.
+        // Both disconnect and Job.cancel can run synchronous HTTP/TLS cancellation handlers.
+        // Schedule both off the UI thread so Android 6 StrictMode cannot crash the app.
         scope.launch(Dispatchers.IO) {
             runCatching { task.connection?.disconnect() }
         }
-        task.job?.cancel(CancellationException("Download cancelled by user"))
+        scope.launch(Dispatchers.IO) {
+            task.job?.cancel(CancellationException("Download cancelled by user"))
+        }
         cancelNotification(context.applicationContext, song.id.toInt().coerceAtLeast(1))
         com.codetrio.spatialflow.ui.SnackbarController.showMessage("Download cancelled: ${cleanTitle(song.title)}")
     }
