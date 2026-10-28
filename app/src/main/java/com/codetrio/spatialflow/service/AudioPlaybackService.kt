@@ -126,7 +126,7 @@ class AudioPlaybackService : MediaSessionService() {
     private var lastPlaybackRecoveryVideoId: String? = null
     private var failedStreamVideoId: String? = null
     private var forceInnerTubeOnNextResolveVideoId: String? = null
-    private var forceNewPipeOnNextResolveVideoId: String? = null
+    private var forceCompatibleFallbackOnNextResolveVideoId: String? = null
     private var playbackRecoveryStage = 0
     private var isRecoveringPlaybackError = false
     private var isFetchingRelatedProactively = false
@@ -207,9 +207,9 @@ class AudioPlaybackService : MediaSessionService() {
                     com.codetrio.spatialflow.ui.SnackbarController.showMessage("Trying an alternate song stream…")
                 } else {
                     playbackRecoveryStage = 2
-                    forceNewPipeOnNextResolveVideoId = videoId
-                    Log.w(TAG, "Playback recovery 2/2: retrying $videoId with a fresh NewPipe URL")
-                    com.codetrio.spatialflow.ui.SnackbarController.showMessage("Trying another stream source…")
+                    forceCompatibleFallbackOnNextResolveVideoId = videoId
+                    Log.w(TAG, "Playback recovery 2/2: retrying $videoId with an AAC-compatible stream")
+                    com.codetrio.spatialflow.ui.SnackbarController.showMessage("Trying a more compatible audio stream…")
                 }
 
                 val resumePosition = player.currentPosition.coerceAtLeast(0L)
@@ -542,7 +542,7 @@ class AudioPlaybackService : MediaSessionService() {
             lastPlaybackRecoveryVideoId = null
             playbackRecoveryStage = 0
             forceInnerTubeOnNextResolveVideoId = null
-            forceNewPipeOnNextResolveVideoId = null
+            forceCompatibleFallbackOnNextResolveVideoId = null
         }
         shouldAutoPlay = true
         pendingSeekPos = startPosition
@@ -558,9 +558,9 @@ class AudioPlaybackService : MediaSessionService() {
         if (uri.scheme == "innertube") {
             val videoId = uri.host ?: return
             val useInnerTubeRetry = forceInnerTubeOnNextResolveVideoId == videoId
-            val useFreshNewPipeRetry = forceNewPipeOnNextResolveVideoId == videoId
+            val useCompatibleFallbackRetry = forceCompatibleFallbackOnNextResolveVideoId == videoId
             if (useInnerTubeRetry) forceInnerTubeOnNextResolveVideoId = null
-            if (useFreshNewPipeRetry) forceNewPipeOnNextResolveVideoId = null
+            if (useCompatibleFallbackRetry) forceCompatibleFallbackOnNextResolveVideoId = null
             
             // INSTANT CANCELLATION: Kill any in-flight resolution immediately
             resolveJob?.cancel()
@@ -573,6 +573,7 @@ class AudioPlaybackService : MediaSessionService() {
                 var streamUrl = async(Dispatchers.IO) {
                     when {
                         useInnerTubeRetry -> YouTubeMusic.getStreamUrlFromInnerTube(videoId).getOrNull()
+                        useCompatibleFallbackRetry -> YouTubeMusic.getCompatibleFallbackStreamUrl(videoId).getOrNull()
                         else -> YouTubeMusic.getStreamUrl(videoId).getOrNull()
                     }
                 }.await()
@@ -585,8 +586,8 @@ class AudioPlaybackService : MediaSessionService() {
                                 YouTubeMusic.getStreamUrl(videoId).getOrNull()
                             }.await()
                         }
-                        useFreshNewPipeRetry -> {
-                            Log.e(TAG, "Fresh NewPipe stream resolution failed for $videoId")
+                        useCompatibleFallbackRetry -> {
+                            Log.e(TAG, "Compatible fallback stream resolution failed for $videoId")
                         }
                         else -> {
                             Log.w(TAG, "Initial stream resolution failed for $videoId; invalidating caches and retrying once")
