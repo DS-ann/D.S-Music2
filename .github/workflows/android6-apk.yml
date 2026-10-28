@@ -68,27 +68,30 @@ jobs:
       - name: Compile ARM64-v8a release APK
         run: gradle --no-daemon assembleRelease
 
-      - name: Sign with repository release key and highly compress APK
+      - name: Sign with shared D.S-Apps release key and highly compress APK
         env:
-          # Preferred names plus common alternatives; repository secrets themselves are never printed.
-          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 || secrets.ANDROID_KEYSTORE_BASE64 || secrets.KEYSTORE_BASE64 || secrets.RELEASE_KEYSTORE_BASE64 || secrets.SIGNING_KEY }}
-          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD || secrets.RELEASE_KEYSTORE_PASSWORD }}
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS || secrets.ANDROID_KEY_ALIAS || secrets.KEY_ALIAS || secrets.RELEASE_KEY_ALIAS }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD || secrets.ANDROID_KEY_PASSWORD || secrets.KEY_PASSWORD || secrets.RELEASE_KEY_PASSWORD || secrets.SIGNING_KEYSTORE_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD || secrets.RELEASE_KEYSTORE_PASSWORD }}
-          SIGNING_KEYSTORE_TYPE: ${{ secrets.SIGNING_KEYSTORE_TYPE || secrets.ANDROID_KEYSTORE_TYPE || 'JKS' }}
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.BATTERYPULSE_KEYSTORE_BASE64 }}
+          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.BATTERYPULSE_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.BATTERYPULSE_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.BATTERYPULSE_KEY_PASSWORD }}
+          SIGNING_KEYSTORE_TYPE: PKCS12
         run: |
           set -euo pipefail
           : "${SIGNING_KEYSTORE_BASE64:?Missing the base64-encoded release keystore secret}"
           : "${SIGNING_KEYSTORE_PASSWORD:?Missing the release keystore password secret}"
           : "${SIGNING_KEY_ALIAS:?Missing the release key alias secret}"
           : "${SIGNING_KEY_PASSWORD:?Missing the release key password secret}"
+          KEYSTORE="$RUNNER_TEMP/spatialflow-release-keystore"
+          printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          chmod 600 "$KEYSTORE"
+          keytool -list -storetype PKCS12 -keystore "$KEYSTORE" -storepass "$SIGNING_KEYSTORE_PASSWORD" -alias "$SIGNING_KEY_ALIAS" >/dev/null
+          echo "Shared D.S-Apps PKCS12 signing key validated."
 
           BUILD_DIR="app/build/outputs/apk/release"
           SOURCE_APK="$BUILD_DIR/app-arm64-v8a-release-unsigned.apk"
           ALIGNED_APK="$RUNNER_TEMP/SpatialFlow-arm64-v8a-aligned.apk"
           OUTPUT_APK="$BUILD_DIR/SpatialFlow-arm64-v8a-Android6-release.apk"
           OUTPUT_ZIP="$BUILD_DIR/SpatialFlow-arm64-v8a-Android6-release.zip"
-          KEYSTORE="$RUNNER_TEMP/spatialflow-release-keystore"
           ZIPALIGN="$ANDROID_HOME/build-tools/37.0.0/zipalign"
           APK_SIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
 
