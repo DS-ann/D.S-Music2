@@ -183,6 +183,7 @@ class AudioPlaybackService : MediaSessionService() {
 
         @RequiresApi(Build.VERSION_CODES.O)
         override fun onPlaybackStateChanged(state: Int) {
+            Log.d(TAG, "Player state=${state} ready=${state == Player.STATE_READY} playWhenReady=${player.playWhenReady} uri=${player.currentMediaItem?.localConfiguration?.uri}")
             val isPlayingState = player.playWhenReady && state == Player.STATE_READY
             viewModel?.postIsPlaying(isPlayingState)
 
@@ -201,7 +202,13 @@ class AudioPlaybackService : MediaSessionService() {
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            Log.e(TAG, "ExoPlayer error: ${error.message}", error)
+            val sourceUri = player.currentMediaItem?.localConfiguration?.uri ?: currentSourceUri
+            Log.e(
+                TAG,
+                "Player failure: code=${error.errorCodeName} type=${error.javaClass.simpleName} " +
+                    "source=$sourceUri cause=${error.cause?.javaClass?.name}: ${error.cause?.message}",
+                error
+            )
             viewModel?.setIsPlaying(false)
 
             val song = viewModel?.currentSong?.value
@@ -444,51 +451,34 @@ class AudioPlaybackService : MediaSessionService() {
         player.addListener(mainPlayerListener)
     }
 
+    /**
+     * Use Media3's stock audio renderer/sink for maximum decoder and output compatibility.
+     * Custom PCM processing is deliberately kept out of the critical audio path: a failure
+     * in a visualizer/haptics processor must never prevent both local and remote tracks.
+     */
     private fun buildExoPlayer(processor: HapticsAudioProcessor): ExoPlayer {
-        val renderersFactory = object : androidx.media3.exoplayer.DefaultRenderersFactory(this) {
-            override fun buildAudioRenderers(
-                context: Context, extensionRendererMode: Int, mediaCodecSelector: androidx.media3.exoplayer.mediacodec.MediaCodecSelector,
-                enableDecoderFallback: Boolean, audioSink: androidx.media3.exoplayer.audio.AudioSink, eventHandler: Handler,
-                eventListener: androidx.media3.exoplayer.audio.AudioRendererEventListener, out: java.util.ArrayList<androidx.media3.exoplayer.Renderer>
-            ) {
-                val customAudioSink = androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
-                    .setAudioProcessors(arrayOf(
-                        processor
-                    )).build()
-                super.buildAudioRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, customAudioSink, eventHandler, eventListener, out)
-            }
-        }
-        
+        val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(this)
+            .setEnableDecoderFallback(true)
+
         val httpDataSourceFactory = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(streamHttpClient)
             .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0")
 
-        // DefaultDataSource handles content:// and file:// media locally, while HTTP(S)
-        // streams use the YouTube-aware OkHttp transport above.
+        // DefaultDataSource handles content:// and file:// locally; only HTTP(S) traffic
+        // reaches OkHttp and the YouTube stream interceptor.
         val upstreamFactory = androidx.media3.datasource.DefaultDataSource.Factory(this, httpDataSourceFactory)
-        
-        // ULTIMATE FIX: Directly feed upstream into cache, ABSOLUTELY NO blocking dynamic resolver architecture inside pipeline
         val cacheDataSourceFactory = androidx.media3.datasource.cache.CacheDataSource.Factory()
             .setCache(getCache(this))
             .setUpstreamDataSourceFactory(upstreamFactory)
             .setFlags(androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
-            
+
         val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(this)
             .setDataSourceFactory(cacheDataSourceFactory)
 
-        val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                50000,  // minBufferMs (Aggressively buffer 50s to prevent starvation)
-                60000,  // maxBufferMs (Allow up to 60s in memory)
-                250,    // bufferForPlaybackMs (Extreme Reactivity - start playing after 250ms)
-                1500    // bufferForPlaybackAfterRebufferMs (Recover quickly with 1.5s buffer)
-            )
-            .setPrioritizeTimeOverSizeThresholds(true) // Ensures playback starts instantly on low buffer
-            .build()
-
+        // Leave load control at Media3's tested defaults instead of forcing unusually long
+        // buffers for local files and short tracks.
         return ExoPlayer.Builder(this)
             .setRenderersFactory(renderersFactory)
             .setMediaSourceFactory(mediaSourceFactory)
-            .setLoadControl(loadControl)
             .build()
     }
 
