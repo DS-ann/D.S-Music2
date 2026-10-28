@@ -70,15 +70,12 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.hapticfeedback.HapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -556,7 +553,6 @@ fun Modifier.playerSheetVerticalDragGesture(
 class MiniPlayerDismissGestureHandler(
     private val scope: CoroutineScope,
     private val density: Density,
-    private val hapticFeedback: HapticFeedback,
     private val offsetAnimatable: Animatable<Float, AnimationVector1D>,
     private val screenWidthPx: Float,
     private val onDismissQueue: () -> Unit
@@ -596,8 +592,6 @@ class MiniPlayerDismissGestureHandler(
             }
 
             MiniDismissDragPhase.SNAPPING -> {
-                // Triggers tactile haptic pulse upon snapping
-                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                 offsetJob?.cancel()
                 offsetJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
                     offsetAnimatable.animateTo(
@@ -652,17 +646,15 @@ class MiniPlayerDismissGestureHandler(
 fun rememberMiniPlayerDismissGestureHandler(
     scope: CoroutineScope,
     density: Density,
-    hapticFeedback: HapticFeedback,
     offsetAnimatable: Animatable<Float, AnimationVector1D>,
     screenWidthPx: Float,
     onDismissQueue: () -> Unit
 ): MiniPlayerDismissGestureHandler {
     val onDismissQueueState = rememberUpdatedState(onDismissQueue)
-    return remember(scope, density, hapticFeedback, offsetAnimatable, screenWidthPx) {
+    return remember(scope, density, offsetAnimatable, screenWidthPx) {
         MiniPlayerDismissGestureHandler(
             scope = scope,
             density = density,
-            hapticFeedback = hapticFeedback,
             offsetAnimatable = offsetAnimatable,
             screenWidthPx = screenWidthPx,
             onDismissQueue = { onDismissQueueState.value() }
@@ -702,7 +694,6 @@ fun PlayerBottomSheetCompose(
         val context = LocalContext.current
         val density = LocalDensity.current
         val scope = rememberCoroutineScope()
-        val hapticFeedback = LocalHapticFeedback.current
         
         // Playback state observers combined into stable UI model
         val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
@@ -710,7 +701,6 @@ fun PlayerBottomSheetCompose(
         val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
         val duration by viewModel.duration.collectAsStateWithLifecycle()
         val currentSongIndex by viewModel.currentSongIndex.collectAsStateWithLifecycle()
-        val isHapticsEnabled by viewModel.isHapticsEnabled.collectAsStateWithLifecycle()
         val miniPlayerBlendColor by viewModel.miniPlayerBlendColor.collectAsStateWithLifecycle()
         val isCurrentSongFavorite by viewModel.isCurrentSongFavoriteFlow.collectAsStateWithLifecycle()
         val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
@@ -781,7 +771,7 @@ fun PlayerBottomSheetCompose(
  
         val uiState = remember(
             currentSong, isPlaying, isLoading, duration, currentSongIndex,
-            isHapticsEnabled, miniPlayerBlendColor, isCurrentSongFavorite, isCurrentSongDisliked, repeatMode, isShuffleEnabled,
+            miniPlayerBlendColor, isCurrentSongFavorite, isCurrentSongDisliked, repeatMode, isShuffleEnabled,
             playerBackgroundColor, likesCount, isCurrentSongDownloaded, currentSongDownloadProgress
         ) {
             PlayerUiState(
@@ -790,7 +780,6 @@ fun PlayerBottomSheetCompose(
                 isLoading = isLoading,
                 duration = duration,
                 currentSongIndex = currentSongIndex,
-                isHapticsEnabled = isHapticsEnabled,
                 miniPlayerBlendColor = miniPlayerBlendColor,
                 isCurrentSongFavorite = isCurrentSongFavorite,
                 isCurrentSongDisliked = isCurrentSongDisliked,
@@ -1001,7 +990,6 @@ fun PlayerBottomSheetCompose(
         val miniDismissGestureHandler = rememberMiniPlayerDismissGestureHandler(
             scope = scope,
             density = density,
-            hapticFeedback = hapticFeedback,
             offsetAnimatable = offsetAnimatable,
             screenWidthPx = screenWidthPx,
             onDismissQueue = {

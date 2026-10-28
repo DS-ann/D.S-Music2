@@ -32,7 +32,6 @@ import com.codetrio.spatialflow.model.toPlaylistSongEntity
 import com.codetrio.spatialflow.service.AudioPlaybackService
 import com.codetrio.spatialflow.util.FavoritesManager
 import com.codetrio.spatialflow.util.PlaybackStateManager
-import com.codetrio.spatialflow.util.PlayerHapticManager
 import com.codetrio.spatialflow.util.SongDownloader
 import com.codetrio.spatialflow.viewmodel.lyrics.PlayerLyricsStateController
 import com.google.gson.JsonElement
@@ -344,7 +343,6 @@ class PlayerSharedViewModel @Inject constructor(
         // Ensure UI stays in sync with ExoPlayer if active
         _isPlaybackReady.value = oldVm._isPlaybackReady.value
     }
-    var hapticManager: PlayerHapticManager? = null
 
     // ========== STATEFLOW DEFINITIONS ==========
 
@@ -423,10 +421,6 @@ class PlayerSharedViewModel @Inject constructor(
 
     private val _isCurrentSongDisliked = MutableStateFlow(false)
     val isCurrentSongDisliked: StateFlow<Boolean> = _isCurrentSongDisliked.asStateFlow()
-
-    // Haptics
-    private val _isHapticsEnabled = MutableStateFlow(appContext.getSharedPreferences("AppSettings", Context.MODE_PRIVATE).getBoolean("haptics_enabled", false))
-    val isHapticsEnabled: StateFlow<Boolean> = _isHapticsEnabled.asStateFlow()
 
     // Service Reference
     private val _audioServiceState = MutableStateFlow<AudioPlaybackService?>(null)
@@ -1116,11 +1110,9 @@ class PlayerSharedViewModel @Inject constructor(
 
     fun playAudio() {
         audioService?.play()
-        PlayerHapticManager.triggerInteractionHaptic(appContext, "haptic_play_pause")
     }
     fun pauseAudio() {
         audioService?.pause()
-        PlayerHapticManager.triggerInteractionHaptic(appContext, "haptic_play_pause")
     }
     fun seekTo(position: Int) {
         val safePosition = if (_duration.value > 0) {
@@ -1147,7 +1139,6 @@ class PlayerSharedViewModel @Inject constructor(
         manager.setFavorite(song.id, newState)
         _isCurrentSongFavorite.value = newState
         updateLikesCountDisplay(newState)
-        PlayerHapticManager.triggerInteractionHaptic(appContext, "haptic_favorite")
 
         // If we liked it, we cannot have it disliked
         if (newState) {
@@ -1523,7 +1514,6 @@ class PlayerSharedViewModel @Inject constructor(
     fun reorderQueue(fromIndex: Int, toIndex: Int) {
         val songs = _songList.value
         if (fromIndex !in songs.indices || toIndex !in songs.indices) return
-        PlayerHapticManager.triggerInteractionHaptic(appContext, "haptic_queue")
 
         val newList = ArrayList(songs)
         val moved = newList.removeAt(fromIndex)
@@ -1568,13 +1558,6 @@ class PlayerSharedViewModel @Inject constructor(
 
     // ========== UTILS ==========
 
-    fun setHapticsEnabled(enabled: Boolean) {
-        _isHapticsEnabled.value = enabled
-        appContext.getSharedPreferences("AppSettings", Context.MODE_PRIVATE).edit {
-            putBoolean("haptics_enabled", enabled)
-        }
-        hapticManager?.setHapticsEnabled(enabled)
-    }
     fun setShuffleEnabled(enabled: Boolean) {
         if (_isShuffleEnabled.value != enabled) {
             _isShuffleEnabled.value = enabled

@@ -325,8 +325,6 @@ class AudioPlaybackService : MediaSessionService() {
             .build()
     }
 
-    private var mainProcessor = HapticsAudioProcessor()
-    private var nextProcessor: HapticsAudioProcessor? = null
 
     private var crossfadeDurationMs = 0
     private var isCrossfading = false
@@ -374,7 +372,6 @@ class AudioPlaybackService : MediaSessionService() {
                     player.seekTo(pendingSeekPos)
                     pendingSeekPos = -1
                 }
-                ensureHapticManager()
             }
             
             if (state == Player.STATE_ENDED) {
@@ -675,7 +672,6 @@ class AudioPlaybackService : MediaSessionService() {
         if (::progressUpdateRunnable.isInitialized) {
             handler.removeCallbacks(progressUpdateRunnable)
         }
-        releaseHapticManager()
         abandonAudioFocus()
 
         if (isPlayerInitialized) {
@@ -700,7 +696,7 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     private fun initializePlayer() {
-        player = buildExoPlayer(mainProcessor)
+        player = buildExoPlayer()
         configurePlayerAudio(player)
         player.addListener(mainPlayerListener)
     }
@@ -710,7 +706,7 @@ class AudioPlaybackService : MediaSessionService() {
      * Custom PCM processing is deliberately kept out of the critical audio path: a failure
      * in a visualizer/haptics processor must never prevent both local and remote tracks.
      */
-    private fun buildExoPlayer(processor: HapticsAudioProcessor): ExoPlayer {
+    private fun buildExoPlayer(): ExoPlayer {
         val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(this)
             .setEnableDecoderFallback(true)
 
@@ -961,8 +957,7 @@ class AudioPlaybackService : MediaSessionService() {
             withContext(Dispatchers.Main) {
                 if (crossfadeDurationMs > 0) {
                     if (nextPlayer == null) {
-                        nextProcessor = HapticsAudioProcessor()
-                        nextPlayer = buildExoPlayer(nextProcessor!!)
+                        nextPlayer = buildExoPlayer()
                     configurePlayerAudio(nextPlayer!!)
                     }
                     val nextItem = buildMediaItem(nextUri, nextSong.title, nextSong.artist, nextSong.id.toString())
@@ -1334,7 +1329,6 @@ class AudioPlaybackService : MediaSessionService() {
             nextPlayer?.stop()
             nextPlayer?.release()
             nextPlayer = null
-            nextProcessor = null
             crossfadeAnimator?.cancel()
             crossfadeAnimator = null
             isCrossfading = false
@@ -1384,23 +1378,6 @@ class AudioPlaybackService : MediaSessionService() {
         } catch (e: Exception) {
             viewModel?.setLoading(false)
             Log.e(TAG, "Failed to load audio: ${e.message}")
-        }
-    }
-
-    private fun ensureHapticManager() {
-        viewModel?.let { vm ->
-            if (vm.hapticManager == null) {
-                vm.hapticManager = com.codetrio.spatialflow.util.PlayerHapticManager(applicationContext)
-            }
-        }
-    }
-
-    private fun releaseHapticManager() {
-        viewModel?.let { vm ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                vm.hapticManager?.release()
-            }
-            vm.hapticManager = null
         }
     }
 
@@ -1723,7 +1700,6 @@ class AudioPlaybackService : MediaSessionService() {
         val newPlayer = nextPlayer ?: return
 
         player = newPlayer
-        mainProcessor = nextProcessor!!
         
 
         // Stop old player and release it
@@ -1732,8 +1708,7 @@ class AudioPlaybackService : MediaSessionService() {
         oldPlayer.release()
 
         // Re-initialize a fresh nextPlayer for the future
-        nextProcessor = HapticsAudioProcessor()
-        nextPlayer = buildExoPlayer(nextProcessor!!)
+        nextPlayer = buildExoPlayer()
                     configurePlayerAudio(nextPlayer!!)
 
         // Apply listeners to the new primary player
@@ -1741,7 +1716,6 @@ class AudioPlaybackService : MediaSessionService() {
         mediaSession?.player = player
 
         // Re-attach hardware audio effects to the new audio session ID!
-        ensureHapticManager()
 
         isCrossfading = false
         crossfadeNextSongStarted = false
@@ -1798,105 +1772,6 @@ class AudioPlaybackService : MediaSessionService() {
 
     inner class LocalBinder : Binder() {
         fun getService(): AudioPlaybackService = this@AudioPlaybackService
-    }
-
-    inner class HapticsAudioProcessor : androidx.media3.common.audio.BaseAudioProcessor() {
-
-        // Optional haptics analysis state. Audio output itself remains byte-for-byte pass-through.
-        private var subBassFilterState = 0f
-        private var bassFilterState = 0f
-        private var midFilterState = 0f
-
-        override fun onConfigure(inputAudioFormat: androidx.media3.common.audio.AudioProcessor.AudioFormat): androidx.media3.common.audio.AudioProcessor.AudioFormat {
-            // Keep the decoder's format unchanged. Rewriting mono/multichannel streams to stereo
-            // can overflow buffers or fail decoding on unusual local files and stream formats.
-            return inputAudioFormat
-        }
-
-        @OptIn(UnstableApi::class)
-        override fun queueInput(inputBuffer: ByteBuffer) {
-            val format = inputAudioFormat
-            val is16Bit = format.encoding == C.ENCODING_PCM_16BIT
-            val isFloat = format.encoding == C.ENCODING_PCM_FLOAT
-            val isMonoOrStereo = format.channelCount in 1..2
-            if ((is16Bit || isFloat) && isMonoOrStereo) {
-                val bytesPerSample = if (is16Bit) 2 else 4
-                val frameSize = bytesPerSample * format.channelCount
-                val frameCount = inputBuffer.remaining() / frameSize
-                analyzePcmForHaptics(inputBuffer, is16Bit, format.channelCount == 2, frameCount)
-            }
-
-            val outBuffer = replaceOutputBuffer(inputBuffer.remaining())
-            outBuffer.put(inputBuffer)
-            outBuffer.flip()
-        }
-
-        @OptIn(UnstableApi::class)
-        private fun analyzePcmForHaptics(buffer: ByteBuffer, is16Bit: Boolean, isStereo: Boolean, frameCount: Int) {
-            val haptic = viewModel?.hapticManager
-            if (haptic == null || !haptic.isHapticsEnabled) return
-
-            var sumSubBass = 0f
-            var sumBass = 0f
-            var sumMid = 0f
-            var sumHigh = 0f
-            var count = 0
-
-            // Downsample by processing every 8th frame to save CPU
-            val step = 8
-            val bytesPerSample = if (is16Bit) 2 else 4
-            val bytesPerFrame = bytesPerSample * (if (isStereo) 2 else 1)
-            val startPos = buffer.position()
-
-            for (i in 0 until frameCount step step) {
-                val bytePos = startPos + i * bytesPerFrame
-                if (bytePos + bytesPerFrame > buffer.limit()) break
-
-                val sampleVal = if (is16Bit) {
-                    val left = buffer.getShort(bytePos).toFloat()
-                    val right = if (isStereo) buffer.getShort(bytePos + 2).toFloat() else left
-                    (left + right) / (2f * 32768f)
-                } else {
-                    val left = buffer.getFloat(bytePos)
-                    val right = if (isStereo) buffer.getFloat(bytePos + 4) else left
-                    (left + right) / 2f
-                }
-
-                // Apply running DSP crossover filters (1st order IIR)
-                subBassFilterState = 0.007f * sampleVal + 0.993f * subBassFilterState
-                bassFilterState = 0.028f * sampleVal + 0.972f * bassFilterState
-                midFilterState = 0.42f * sampleVal + 0.58f * midFilterState
-
-                val subBassSample = subBassFilterState
-                val bassSample = bassFilterState - subBassFilterState
-                val midSample = midFilterState - bassFilterState
-                val highSample = sampleVal - midFilterState
-
-                sumSubBass += kotlin.math.abs(subBassSample)
-                sumBass += kotlin.math.abs(bassSample)
-                sumMid += kotlin.math.abs(midSample)
-                sumHigh += kotlin.math.abs(highSample)
-                count++
-            }
-
-            if (count > 0) {
-                // Map the accumulated band absolute averages to normalized visualizer-equivalent inputs (0 to 1 range)
-                val subBassEnergy = (sumSubBass / count) * 4f
-                val bassEnergy = (sumBass / count) * 4f
-                val midEnergy = (sumMid / count) * 4f
-                val highEnergy = (sumHigh / count) * 4f
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                    haptic.processPcmHaptics(
-                        subBassEnergy.coerceIn(0f, 1f),
-                        bassEnergy.coerceIn(0f, 1f),
-                        midEnergy.coerceIn(0f, 1f),
-                        highEnergy.coerceIn(0f, 1f)
-                    )
-                }
-            }
-        }
-
     }
 
     @OptIn(UnstableApi::class)

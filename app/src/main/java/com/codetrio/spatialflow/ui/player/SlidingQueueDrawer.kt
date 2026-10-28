@@ -18,9 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -127,8 +125,6 @@ fun SlidingQueueDrawer(
             Color.White
         }
     }
-
-    val haptic = LocalHapticFeedback.current
 
     Surface(
         modifier = modifier
@@ -311,7 +307,6 @@ fun SlidingQueueDrawer(
                                 androidx.compose.material3.Button(
                                     onClick = {
                                         onToggleShuffle()
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     },
                                     modifier = with(scope) {
                                         Modifier
@@ -355,7 +350,6 @@ fun SlidingQueueDrawer(
                                 androidx.compose.material3.Button(
                                     onClick = {
                                         onToggleLoopMode()
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     },
                                     modifier = with(scope) {
                                         Modifier
@@ -398,7 +392,6 @@ fun SlidingQueueDrawer(
                                 androidx.compose.material3.Button(
                                     onClick = {
                                         onShowSleepTimerDialog()
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     },
                                     modifier = with(scope) {
                                         Modifier

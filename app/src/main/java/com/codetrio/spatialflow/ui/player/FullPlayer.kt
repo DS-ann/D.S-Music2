@@ -4,8 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -59,15 +57,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -100,8 +95,6 @@ fun FullPlayerScreen(
     dragModifier: Modifier = Modifier,
     modifier: Modifier = Modifier
 ) {
-    val view = LocalView.current
-    val hapticManager = viewModel.hapticManager
     val isLyricsModeEnabled by viewModel.isLyricsModeEnabled.collectAsStateWithLifecycle()
     val syncedLyrics by viewModel.syncedLyrics.collectAsStateWithLifecycle()
     val plainLyrics by viewModel.plainLyrics.collectAsStateWithLifecycle()
@@ -117,25 +110,6 @@ fun FullPlayerScreen(
     // Handle back button when lyrics mode is enabled
     BackHandler(enabled = isLyricsModeEnabled) {
         viewModel.setLyricsModeEnabled(false)
-    }
-
-    // Dynamically register the active Compose view hosting FullPlayer inside PlayerHapticManager.
-    DisposableEffect(view, hapticManager) {
-        hapticManager?.attachView(view)
-        onDispose {
-            hapticManager?.detachView()
-        }
-    }
-
-    // Modern Compose-way of handling audio recording permission
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            viewModel.setHapticsEnabled(true)
-        } else {
-            com.codetrio.spatialflow.ui.SnackbarController.showMessage("Microphone permission required for haptics")
-        }
     }
 
     FullPlayer(
@@ -161,18 +135,6 @@ fun FullPlayerScreen(
         },
         onNextClick = {
             viewModel.playNextSong(force = true)
-        },
-        onHapticChipClick = {
-            val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
-                context,
-                android.Manifest.permission.RECORD_AUDIO
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-
-            if (!hasPermission) {
-                permissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
-            } else {
-                viewModel.setHapticsEnabled(!uiState.isHapticsEnabled)
-            }
         },
         onLyricsModeChanged = { enabled ->
             viewModel.setLyricsModeEnabled(enabled)
@@ -226,7 +188,6 @@ fun FullPlayer(
     onPlayPauseClick: () -> Unit,
     onPreviousClick: () -> Unit,
     onNextClick: () -> Unit,
-    onHapticChipClick: () -> Unit,
     onLyricsModeChanged: (Boolean) -> Unit,
     onFetchLyrics: () -> Unit,
     onRetryLyrics: () -> Unit,
@@ -274,7 +235,6 @@ fun FullPlayer(
         androidx.compose.ui.graphics.SolidColor(finalColor)
     }
 
-    val haptic = LocalHapticFeedback.current
     val hasLyrics = !syncedLyrics.isNullOrEmpty() || !plainLyrics.isNullOrBlank()
     val currentSongId = uiState.currentSong?.id
     val audioService by viewModel.audioServiceState.collectAsStateWithLifecycle()
@@ -472,20 +432,6 @@ fun FullPlayer(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 // Like/dislike controls are removed from the player.
-
-                // Interactive Music Haptics Chip inside the same row
-                PillChip(
-                    icon = painterResource(id = R.drawable.ic_haptic),
-                    label = "Music Haptics",
-                    isSelected = uiState.isHapticsEnabled,
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onHapticChipClick()
-                    },
-                    contentColor = contentColor,
-                    accentColor = dynamicAccentColor,
-                    isDark = isDark
-                )
 
                 // Interactive Lyrics Chip inside the same row
                 PillChip(
@@ -743,7 +689,6 @@ fun FullPlayer(
                     .pointerInput(Unit) {
                         detectVerticalDragGestures { _, dragAmount ->
                             if (dragAmount < -10f && !isQueueExpanded && !isLyricsModeEnabled) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 viewModel.setQueueExpanded(true)
                             }
                         }
@@ -752,7 +697,6 @@ fun FullPlayer(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         viewModel.setQueueExpanded(true)
                     },
                 contentAlignment = Alignment.Center

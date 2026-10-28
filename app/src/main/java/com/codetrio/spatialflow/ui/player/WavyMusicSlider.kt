@@ -25,8 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import kotlin.math.*
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -117,7 +115,6 @@ fun WavyMusicSlider(
         max(trackHeight * 2, max(thumbRadius * 2, thumbLineHeightWhenInteracting) + 8.dp)
     }
 
-    val hapticFeedback = LocalHapticFeedback.current
     val clampedValue = value.coerceIn(valueRange.start, valueRange.endInclusive)
     val normalizedValue = if (valueRange.endInclusive == valueRange.start) 0f
         else ((clampedValue - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
@@ -151,20 +148,9 @@ fun WavyMusicSlider(
     }
 
     BoxWithConstraints(modifier = modifier.clipToBounds()) {
-        val lastHapticStep = remember { mutableIntStateOf(-1) }
-
         Slider(
             value = clampedValue,
             onValueChange = { newValue ->
-                val normalizedNew = if (valueRange.endInclusive == valueRange.start) 0f
-                    else ((newValue - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
-                
-                // Quantum trigger for drag vibration ticks
-                val currentStep = (normalizedNew * 50f).roundToInt()
-                if (currentStep != lastHapticStep.intValue) {
-                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    lastHapticStep.intValue = currentStep
-                }
                 onValueChange(newValue)
             },
             modifier = Modifier
