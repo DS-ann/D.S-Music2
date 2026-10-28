@@ -111,6 +111,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -345,45 +346,47 @@ fun LibraryScreen(
                     }
                 }
 
-                // Horizontal scroll chips row
-            val tabs = listOf(
-                "Playlists",
-                "Recap",
-                "Podcasts",
-                "Songs",
-                "Albums",
-                "Artists",
-                "Device Files",
-                "Cache"
-            )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                tabs.forEach { tabName ->
-                    val isSelected = activeTab == tabName
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = {
-                            activeTab = if (isSelected) "" else tabName
-                        },
-                        label = { Text(tabName, fontWeight = FontWeight.SemiBold) },
-                        shape = RoundedCornerShape(8.dp),
-                        border = null,
-                        colors = FilterChipDefaults.filterChipColors(
-                            containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                // Prism-style category chips are shown only inside a selected library section.
+                // The landing page uses large library tiles instead of making the user scan this row.
+                if (activeTab.isNotEmpty()) {
+                    val tabs = listOf(
+                        "Playlists",
+                        "Recap",
+                        "Podcasts",
+                        "Songs",
+                        "Albums",
+                        "Artists",
+                        "Cache"
                     )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        tabs.forEach { tabName ->
+                            val isSelected = activeTab == tabName
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    activeTab = if (isSelected) "" else tabName
+                                },
+                                label = { Text(tabName, fontWeight = FontWeight.SemiBold) },
+                                shape = RoundedCornerShape(8.dp),
+                                border = null,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            )
+                        }
+                    }
                 }
-            }
 
             Box(
                 modifier = Modifier
@@ -744,7 +747,7 @@ fun LibraryScreen(
                             }
                         }
                     }
-                    "" -> UnifiedLibraryContent(nestedScrollConnection)
+                    "" -> UnifiedLibraryContent(nestedScrollConnection) { selectedSection -> activeTab = selectedSection }
                 }
             }
         }
@@ -964,7 +967,8 @@ fun SongListItem(
 
 @Composable
 private fun UnifiedLibraryContent(
-    nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+    nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection,
+    onNavigateToTab: (String) -> Unit
 ) {
     val context = LocalContext.current
     val activity = remember { getActivityFromContext(context) as? androidx.fragment.app.FragmentActivity }
@@ -985,22 +989,35 @@ private fun UnifiedLibraryContent(
         accountViewModel?.refreshAll()
     }
 
-    val unifiedItems = remember(onlinePlaylists, onlineAlbums, onlineArtists, onlinePodcasts, onlineSongs) {
+    val unifiedItems = remember(onlinePlaylists, onlineAlbums, onlineArtists, onlinePodcasts, onlineSongs, onNavigateToTab) {
         val list = mutableListOf<UnifiedLibraryItem>()
 
-        if (onlineSongs.isNotEmpty()) {
-            list.add(object : UnifiedLibraryItem {
-                override val title = "Liked Songs"
-                override val thumbnailUrl = onlineSongs.firstOrNull()?.thumbnailUrl
-                override val subtitle = "Auto playlist • ${onlineSongs.size} songs"
-                override val onClick = {
-                    exploreViewModel?.cameFromLibrary = true
-                    exploreViewModel?.loadPlaylist("LM")
-                    navigateToExplore(activity)
+        // Keep the key library actions first, in a stable Prism-style tile order.
+        list.addAll(
+            listOf(
+                LibraryCategoryItem("Playlists", "Your playlists", Icons.AutoMirrored.Filled.PlaylistPlay) {
+                    onNavigateToTab("Playlists")
+                },
+                LibraryCategoryItem("Liked songs", "Your YouTube Music likes", Icons.Default.Favorite) {
+                    onNavigateToTab("Songs")
+                },
+                LibraryCategoryItem("Albums", "Browse saved albums", Icons.Default.Album) {
+                    onNavigateToTab("Albums")
+                },
+                LibraryCategoryItem("Artists", "Browse artists", Icons.Default.Person) {
+                    onNavigateToTab("Artists")
+                },
+                LibraryCategoryItem("Podcasts", "Podcast library", Icons.Default.Podcasts) {
+                    onNavigateToTab("Podcasts")
+                },
+                LibraryCategoryItem("Recap", "Your listening recap", Icons.Default.BarChart) {
+                    onNavigateToTab("Recap")
+                },
+                LibraryCategoryItem("Cache", "Cached audio", Icons.Default.Folder) {
+                    onNavigateToTab("Cache")
                 }
-                override val isCircle = false
-            })
-        }
+            )
+        )
 
         onlinePlaylists.forEach { playlist ->
             list.add(object : UnifiedLibraryItem {
@@ -1058,7 +1075,7 @@ private fun UnifiedLibraryContent(
             })
         }
 
-        list.sortBy { it.title.lowercase() }
+        // Categories stay first; the saved items below retain their source order.
         list
     }
 
@@ -1089,6 +1106,17 @@ private interface UnifiedLibraryItem {
     val subtitle: String
     val onClick: () -> Unit
     val isCircle: Boolean
+    val icon: ImageVector? get() = null
+}
+
+private data class LibraryCategoryItem(
+    override val title: String,
+    override val subtitle: String,
+    override val icon: ImageVector,
+    override val onClick: () -> Unit
+) : UnifiedLibraryItem {
+    override val thumbnailUrl: String? = null
+    override val isCircle: Boolean = false
 }
 
 @Composable
@@ -1127,7 +1155,7 @@ private fun UnifiedLibraryCard(item: UnifiedLibraryItem) {
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (item.isCircle) Icons.Default.Person else Icons.Default.MusicNote,
+                        imageVector = item.icon ?: if (item.isCircle) Icons.Default.Person else Icons.Default.MusicNote,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(36.dp)
@@ -2601,7 +2629,7 @@ private fun RecapTabContent(
 }
 
 // Background scanner helper
-private suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedViewModel) {
+internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedViewModel) {
     withContext(Dispatchers.IO) {
         val songs = ArrayList<SongItem>()
         try {
