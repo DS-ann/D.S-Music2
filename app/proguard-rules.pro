@@ -1,3 +1,7 @@
+# Keep the manifest Application class and its Hilt-injected startup entry point stable on older ART runtimes.
+-keep class com.codetrio.spatialflow.SpatialFlowApplication { *; }
+-keep class com.codetrio.spatialflow.Hilt_SpatialFlowApplication { *; }
+
 # Add project specific ProGuard rules here.
 # You can control the set of applied configuration files using the
 # proguardFiles setting in build.gradle.
