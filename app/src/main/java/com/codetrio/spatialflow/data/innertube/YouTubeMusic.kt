@@ -34,7 +34,13 @@ object YouTubeMusic {
 
     private fun cleanExpiredCache() {
         val now = System.currentTimeMillis()
-        streamUrlCache.entries.removeIf { it.value.second < now }
+        // ConcurrentHashMap entry removeIf is API 24+ on Android. Conditional
+        // remove(key, value) is available on API 23 and remains race-safe.
+        for ((key, value) in streamUrlCache.entries) {
+            if (value.second < now) {
+                streamUrlCache.remove(key, value)
+            }
+        }
     }
 
     /**
