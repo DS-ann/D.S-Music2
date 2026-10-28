@@ -407,6 +407,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     allMixedSongs.addAll(shuffledItems)
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "Failed to load personalized section for $artist", e)
             }
         }
@@ -466,6 +467,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     if (res.items.isNotEmpty()) sections.add(HomeSection("$mood Spotlight", res.items.shuffled().take(12)))
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "Failed to synthesize mood feed", e)
             }
             return@coroutineScope sections
