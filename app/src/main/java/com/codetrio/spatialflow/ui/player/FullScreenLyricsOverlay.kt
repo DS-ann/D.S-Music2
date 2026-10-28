@@ -390,6 +390,7 @@ internal fun FullScreenLyricsOverlay(
                                 providerResults = providerResults,
                                 selectedProvider = selectedProvider,
                                 onProviderSelected = onProviderSelected,
+                                onRefindClick = onRetryLyrics,
                                 accentColor = dynamicAccentColor,
                                 contentColor = contentColor,
                                 modifier = Modifier
@@ -478,6 +479,7 @@ private fun ProvidersSelector(
     providerResults: Map<String, LyricsResult>,
     selectedProvider: String?,
     onProviderSelected: (String) -> Unit,
+    onRefindClick: () -> Unit,
     accentColor: Color,
     contentColor: Color,
     modifier: Modifier = Modifier
