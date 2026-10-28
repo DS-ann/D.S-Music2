@@ -316,7 +316,8 @@ class MainActivity : AppCompatActivity() {
                                 mapOf(
                                     "explore" to 0,
                                     "library" to 1,
-                                    "settings" to 2
+                                    "local_music" to 2,
+                                    "settings" to 3
                                 )
                             }
 
