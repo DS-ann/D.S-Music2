@@ -124,6 +124,7 @@ class AudioPlaybackService : MediaSessionService() {
     // Track the unique song ID that the current resolution is targeting
     private var resolveTargetSongId: String? = null
     private var lastPlaybackRecoveryVideoId: String? = null
+    private var isRecoveringPlaybackError = false
     private var isFetchingRelatedProactively = false
 
     private lateinit var telemetryManager: com.codetrio.spatialflow.data.innertube.YouTubeTelemetryManager
@@ -182,9 +183,6 @@ class AudioPlaybackService : MediaSessionService() {
                 ensureHapticManager()
             }
             
-            if (state == Player.STATE_READY) {
-                lastPlaybackRecoveryVideoId = null
-            }
             if (state == Player.STATE_ENDED) {
                 handlePlaybackCompleted()
             }
@@ -204,7 +202,12 @@ class AudioPlaybackService : MediaSessionService() {
                 handler.postDelayed({
                     if (viewModel?.currentSong?.value?.videoId == videoId) {
                         YouTubeMusic.invalidateStreamUrl(videoId)
-                        loadAndPlay("innertube://$videoId".toUri(), resumePosition)
+                        isRecoveringPlaybackError = true
+                        try {
+                            loadAndPlay("innertube://$videoId".toUri(), resumePosition)
+                        } finally {
+                            isRecoveringPlaybackError = false
+                        }
                     }
                 }, 250)
                 return
@@ -505,6 +508,9 @@ class AudioPlaybackService : MediaSessionService() {
 
     @JvmOverloads
     fun loadAndPlay(uri: Uri, startPosition: Long = -1) {
+        // A user-initiated track load permits one new recovery attempt. The automatic
+        // recovery itself must not reset its guard, or a broken URL can retry forever.
+        if (!isRecoveringPlaybackError) lastPlaybackRecoveryVideoId = null
         shouldAutoPlay = true
         pendingSeekPos = startPosition
         resolveAndLoad(uri)
