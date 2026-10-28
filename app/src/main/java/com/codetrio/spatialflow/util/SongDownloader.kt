@@ -199,9 +199,32 @@ object SongDownloader {
 
             updateNotification(context, cleanTitleStr, 0, notificationId)
 
-            // Use local cached audio when available. Never fetch a stream or remote
-            // artwork for a track that already has cache data.
-            val cachedStream = findCachedStream(context, song.id.toString())
+            // Reuse playback cache only when playback and download are both in Auto mode
+            // with the same target bitrate. Otherwise resolve a fresh stream so the download
+            // format and bitrate selectors are actually applied (cached spans have no MIME
+            // metadata, so they cannot safely satisfy a different format choice).
+            val settings = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+            val playbackFormat = NewPipeStreamExtractor.normalizeAudioFormat(
+                settings.getString("audio_format", "auto")
+            )
+            val downloadFormat = NewPipeStreamExtractor.normalizeAudioFormat(
+                settings.getString("download_audio_format", "auto")
+            )
+            val playbackBitrate = NewPipeStreamExtractor.normalizeAudioQuality(
+                settings.getString("audio_quality", "256 kbps")
+            )
+            val downloadBitrate = NewPipeStreamExtractor.normalizeAudioQuality(
+                settings.getString("download_bitrate", "256 kbps")
+            )
+            val cacheMatchesDownloadSelection =
+                playbackFormat == "auto" &&
+                downloadFormat == "auto" &&
+                playbackBitrate == downloadBitrate
+            val cachedStream = if (cacheMatchesDownloadSelection) {
+                findCachedStream(context, song.id.toString())
+            } else {
+                null
+            }
             coroutineContext.ensureActive()
 
             val outputFile: File

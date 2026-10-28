@@ -42,6 +42,9 @@ object NewPipeStreamExtractor {
     private data class PreferenceSnapshot(
         val audioQuality: String,
         val dataSaver: Boolean,
+        val playbackFormat: String,
+        val downloadFormat: String,
+        val downloadBitrate: String,
         val timestamp: Long
     )
     private var cachedPrefs: PreferenceSnapshot? = null
@@ -61,6 +64,51 @@ object NewPipeStreamExtractor {
         return "${parsed?.takeIf { it in supportedBitratesKbps } ?: 256} kbps"
     }
 
+    fun normalizeAudioFormat(format: String?): String = when (
+        format?.trim()?.lowercase()?.replace('_', '-')?.replace(' ', '-')
+    ) {
+        "m4a", "aac", "m4a/aac", "mp4" -> "m4a"
+        "webm" -> "webm"
+        "opus", "ogg/opus" -> "opus"
+        "mp3", "mpeg" -> "mp3"
+        "ogg", "vorbis" -> "ogg"
+        else -> "auto"
+    }
+
+    private fun getPreferenceSnapshot(): PreferenceSnapshot {
+        val now = System.currentTimeMillis()
+        val cached = cachedPrefs
+        if (cached != null && now - cached.timestamp < PREF_CACHE_TTL_MS) return cached
+
+        val prefs = try {
+            appContext?.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+        } catch (_: Exception) {
+            null
+        }
+        val snapshot = PreferenceSnapshot(
+            audioQuality = normalizeAudioQuality(prefs?.getString("audio_quality", "256 kbps")),
+            dataSaver = prefs?.getBoolean("data_saver", false) ?: false,
+            playbackFormat = normalizeAudioFormat(prefs?.getString("audio_format", "auto")),
+            downloadFormat = normalizeAudioFormat(prefs?.getString("download_audio_format", "auto")),
+            downloadBitrate = normalizeAudioQuality(prefs?.getString("download_bitrate", "256 kbps")),
+            timestamp = now
+        )
+        cachedPrefs = snapshot
+        return snapshot
+    }
+
+    fun getPreferencesSnapshot(): Pair<String, Boolean> {
+        val snapshot = getPreferenceSnapshot()
+        return snapshot.audioQuality to snapshot.dataSaver
+    }
+
+    fun getPlaybackAudioFormat(): String = getPreferenceSnapshot().playbackFormat
+
+    fun getDownloadAudioFormat(): String = getPreferenceSnapshot().downloadFormat
+
+    fun getDownloadTargetBitrateKbps(): Int =
+        getPreferenceSnapshot().downloadBitrate.substringBefore(' ').toIntOrNull() ?: 256
+
     fun getTargetBitrateKbps(quality: String? = null): Int =
         normalizeAudioQuality(quality ?: getPreferencesSnapshot().first)
             .substringBefore(' ')
@@ -68,6 +116,50 @@ object NewPipeStreamExtractor {
             ?: 256
 
     fun getTargetBitrateBps(): Int = getTargetBitrateKbps() * 1000
+
+    fun matchesAudioFormat(
+        mimeType: String?,
+        codec: String? = null,
+        preferredFormat: String = getPlaybackAudioFormat()
+    ): Boolean {
+        val format = normalizeAudioFormat(preferredFormat)
+        if (format == "auto") return true
+
+        val mime = mimeType.orEmpty().lowercase()
+        val codecName = codec.orEmpty().lowercase()
+        return when (format) {
+            "m4a" -> mime.contains("audio/mp4") || mime.contains("mp4a") || codecName.contains("mp4a")
+            "webm" -> mime.contains("webm")
+            "opus" -> mime.contains("opus") || codecName.contains("opus")
+            "mp3" -> mime.contains("audio/mpeg") || mime.contains("mp3") || codecName.contains("mp3")
+            "ogg" -> mime.contains("audio/ogg") || mime.contains("ogg") || codecName.contains("vorbis")
+            else -> true
+        }
+    }
+
+    private fun isM4aAudio(stream: AudioStream): Boolean {
+        val mime = stream.format?.mimeType.orEmpty()
+        return mime.startsWith("audio/mp4", ignoreCase = true) ||
+            stream.codec?.contains("mp4a", ignoreCase = true) == true ||
+            stream.itag == 140
+    }
+
+    private fun candidatesForFormat(
+        audioStreams: List<AudioStream>,
+        preferredFormat: String
+    ): List<AudioStream> {
+        if (audioStreams.isEmpty()) return emptyList()
+        val normalizedFormat = normalizeAudioFormat(preferredFormat)
+        return when (normalizedFormat) {
+            "auto" -> audioStreams.filter(::isM4aAudio).ifEmpty { audioStreams }
+            else -> audioStreams.filter { stream ->
+                matchesAudioFormat(stream.format?.mimeType, stream.codec, normalizedFormat)
+            }.ifEmpty {
+                Log.w(TAG, "Requested audio format '$normalizedFormat' unavailable; falling back to source formats")
+                audioStreams
+            }
+        }
+    }
 
     private fun streamBitrateKbps(stream: AudioStream): Int {
         // NewPipe average bitrate is in kbps; precise itag bitrate is bits/sec.
@@ -98,25 +190,6 @@ object NewPipeStreamExtractor {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize NewPipe Extractor", e)
         }
-    }
-
-    fun getPreferencesSnapshot(): Pair<String, Boolean> {
-        val now = System.currentTimeMillis()
-        val cached = cachedPrefs
-        
-        if (cached != null && (now - cached.timestamp) < PREF_CACHE_TTL_MS) {
-            return cached.audioQuality to cached.dataSaver
-        }
-        
-        val prefs = try {
-            appContext?.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
-        } catch (e: Exception) { null }
-        
-        val quality = normalizeAudioQuality(prefs?.getString("audio_quality", "256 kbps"))
-        val dataSaver = prefs?.getBoolean("data_saver", false) ?: false
-        
-        cachedPrefs = PreferenceSnapshot(quality, dataSaver, now)
-        return quality to dataSaver
     }
 
     fun clearCache() {
@@ -162,17 +235,24 @@ object NewPipeStreamExtractor {
         }
     }
 
-    private fun selectBestStream(audioStreams: List<AudioStream>): AudioStream? {
+    private fun selectBestStream(
+        audioStreams: List<AudioStream>,
+        preferredFormat: String = getPlaybackAudioFormat(),
+        targetKbps: Int = getTargetBitrateKbps()
+    ): AudioStream? {
         val selectStart = System.currentTimeMillis()
-        val audioQuality = getPreferencesSnapshot().first
         if (audioStreams.isEmpty()) return null
 
-        val targetKbps = getTargetBitrateKbps(audioQuality)
-        val best = audioStreams.minByOrNull { stream ->
+        val candidates = candidatesForFormat(audioStreams, preferredFormat)
+        val best = candidates.minByOrNull { stream ->
             val candidateKbps = streamBitrateKbps(stream)
             if (candidateKbps > 0) abs(candidateKbps - targetKbps) else Int.MAX_VALUE
         }
-        Log.d(TAG, "selectBestStream took ${System.currentTimeMillis() - selectStart}ms")
+        Log.d(
+            TAG,
+            "selectBestStream format=$preferredFormat target=${targetKbps}kbps " +
+                "took ${System.currentTimeMillis() - selectStart}ms"
+        )
         return best
     }
 
@@ -266,24 +346,29 @@ object NewPipeStreamExtractor {
         val audioStreams = info.audioStreams
         if (audioStreams.isEmpty()) return@coroutineScope null
 
-        val mp4Audio = audioStreams.filter { stream ->
-            val mime = stream.format?.mimeType.orEmpty()
-            mime.startsWith("audio/mp4", ignoreCase = true) ||
-                stream.codec?.contains("mp4a", ignoreCase = true) == true ||
-                stream.itag == 140
-        }
-        val selected = mp4Audio.maxByOrNull { streamBitrateKbps(it) }
-            ?: selectBestStream(audioStreams)
-            ?: return@coroutineScope null
+        val downloadFormat = getDownloadAudioFormat()
+        val targetKbps = getDownloadTargetBitrateKbps()
+        val candidates = candidatesForFormat(audioStreams, downloadFormat)
+        val selected = candidates.minByOrNull { stream ->
+            val candidateKbps = streamBitrateKbps(stream)
+            if (candidateKbps > 0) abs(candidateKbps - targetKbps) else Int.MAX_VALUE
+        } ?: return@coroutineScope null
+
         val reportedMime = selected.format?.mimeType?.substringBefore(';')?.trim().orEmpty()
         val mime = when {
             reportedMime.isNotBlank() -> reportedMime
             selected.codec?.contains("mp4a", ignoreCase = true) == true -> "audio/mp4"
             selected.codec?.contains("opus", ignoreCase = true) == true -> "audio/webm"
             selected.codec?.contains("vorbis", ignoreCase = true) == true -> "audio/ogg"
+            selected.codec?.contains("mp3", ignoreCase = true) == true -> "audio/mpeg"
             else -> "application/octet-stream"
         }
         val bitrateKbps = streamBitrateKbps(selected)
+        Log.i(
+            TAG,
+            "Selected download stream for $videoId: format=$downloadFormat target=${targetKbps}kbps " +
+                "actual=${bitrateKbps}kbps mime=$mime itag=${selected.itag}"
+        )
         StreamData(
             url = selected.content,
             mimeType = mime,

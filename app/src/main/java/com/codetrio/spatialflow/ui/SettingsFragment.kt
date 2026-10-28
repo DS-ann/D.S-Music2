@@ -336,7 +336,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor.clearCache()
     }
 
-    // ── Audio Quality ────────────────────────────────────────────────────────
+    // ── Playback bitrate and format ───────────────────────────────────────────
     private val _audioQuality = MutableStateFlow(
         com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor.normalizeAudioQuality(
             prefs.getString(KEY_AUDIO_QUALITY, "256 kbps")
@@ -344,12 +344,54 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     )
     val audioQuality: StateFlow<String> = _audioQuality.asStateFlow()
 
+    private val _playbackAudioFormat = MutableStateFlow(
+        com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor.normalizeAudioFormat(
+            prefs.getString(KEY_PLAYBACK_FORMAT, "auto")
+        )
+    )
+    val playbackAudioFormat: StateFlow<String> = _playbackAudioFormat.asStateFlow()
+
+    private val _downloadAudioFormat = MutableStateFlow(
+        com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor.normalizeAudioFormat(
+            prefs.getString(KEY_DOWNLOAD_FORMAT, "auto")
+        )
+    )
+    val downloadAudioFormat: StateFlow<String> = _downloadAudioFormat.asStateFlow()
+
+    private val _downloadBitrate = MutableStateFlow(
+        com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor.normalizeAudioQuality(
+            prefs.getString(KEY_DOWNLOAD_BITRATE, "256 kbps")
+        )
+    )
+    val downloadBitrate: StateFlow<String> = _downloadBitrate.asStateFlow()
+
     fun setAudioQuality(quality: String) {
         val normalized = com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor
             .normalizeAudioQuality(quality)
         _audioQuality.value = normalized
         prefs.edit { putString(KEY_AUDIO_QUALITY, normalized) }
         com.codetrio.spatialflow.data.innertube.YouTubeMusic.invalidateAllStreamUrls()
+    }
+
+    fun setPlaybackAudioFormat(format: String) {
+        val normalized = com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor.normalizeAudioFormat(format)
+        _playbackAudioFormat.value = normalized
+        prefs.edit { putString(KEY_PLAYBACK_FORMAT, normalized) }
+        com.codetrio.spatialflow.data.innertube.YouTubeMusic.invalidateAllStreamUrls()
+    }
+
+    fun setDownloadAudioFormat(format: String) {
+        val normalized = com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor.normalizeAudioFormat(format)
+        _downloadAudioFormat.value = normalized
+        prefs.edit { putString(KEY_DOWNLOAD_FORMAT, normalized) }
+        com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor.clearCache()
+    }
+
+    fun setDownloadBitrate(quality: String) {
+        val normalized = com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor.normalizeAudioQuality(quality)
+        _downloadBitrate.value = normalized
+        prefs.edit { putString(KEY_DOWNLOAD_BITRATE, normalized) }
+        com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor.clearCache()
     }
 
     // ── Pause Listening History ────────────────────────────────────────────────
@@ -565,6 +607,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     _audioQuality.value =
                         com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor
                             .normalizeAudioQuality(prefs.getString(KEY_AUDIO_QUALITY, "256 kbps"))
+                    _playbackAudioFormat.value =
+                        com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor
+                            .normalizeAudioFormat(prefs.getString(KEY_PLAYBACK_FORMAT, "auto"))
+                    _downloadAudioFormat.value =
+                        com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor
+                            .normalizeAudioFormat(prefs.getString(KEY_DOWNLOAD_FORMAT, "auto"))
+                    _downloadBitrate.value =
+                        com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor
+                            .normalizeAudioQuality(prefs.getString(KEY_DOWNLOAD_BITRATE, "256 kbps"))
                     _pauseHistory.value = prefs.getBoolean("pause_history", false)
                     _downloadFolder.value = prefs.getString("download_folder", null)
                     _songCacheMaxSize.value = prefs.getInt("song_cache_max_size", 1024)
@@ -707,6 +758,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         const val KEY_IGNORE_SHORT_AUDIO_DURATION = "ignore_short_audio_duration"
         const val KEY_DATA_SAVER = "data_saver"
         const val KEY_AUDIO_QUALITY = "audio_quality"
+        const val KEY_PLAYBACK_FORMAT = "audio_format"
+        const val KEY_DOWNLOAD_FORMAT = "download_audio_format"
+        const val KEY_DOWNLOAD_BITRATE = "download_bitrate"
         const val KEY_SYNC_FREQUENCY = "sync_frequency"
         const val KEY_HAPTIC_PLAY_PAUSE = "haptic_play_pause"
         const val KEY_HAPTIC_QUEUE = "haptic_queue"
@@ -778,6 +832,9 @@ fun SettingsScreenContent(
 
     val dataSaver by viewModel.dataSaver.collectAsStateWithLifecycle()
     val audioQuality by viewModel.audioQuality.collectAsStateWithLifecycle()
+    val playbackAudioFormat by viewModel.playbackAudioFormat.collectAsStateWithLifecycle()
+    val downloadAudioFormat by viewModel.downloadAudioFormat.collectAsStateWithLifecycle()
+    val downloadBitrate by viewModel.downloadBitrate.collectAsStateWithLifecycle()
     val pauseHistory by viewModel.pauseHistory.collectAsStateWithLifecycle()
     val downloadFolder by viewModel.downloadFolder.collectAsStateWithLifecycle()
     val songCacheMaxSize by viewModel.songCacheMaxSize.collectAsStateWithLifecycle()
@@ -960,6 +1017,12 @@ fun SettingsScreenContent(
                 },
                 audioQuality = audioQuality,
                 onAudioQualityChange = { viewModel.setAudioQuality(it) },
+                playbackAudioFormat = playbackAudioFormat,
+                onPlaybackAudioFormatChange = { viewModel.setPlaybackAudioFormat(it) },
+                downloadAudioFormat = downloadAudioFormat,
+                onDownloadAudioFormatChange = { viewModel.setDownloadAudioFormat(it) },
+                downloadBitrate = downloadBitrate,
+                onDownloadBitrateChange = { viewModel.setDownloadBitrate(it) },
             )
         }
         composable(SettingsRoute.Haptics.route) {
@@ -1876,6 +1939,12 @@ private fun PlaybackScreen(
     onSetEndOfSong: (Boolean) -> Unit,
     audioQuality: String,
     onAudioQualityChange: (String) -> Unit,
+    playbackAudioFormat: String,
+    onPlaybackAudioFormatChange: (String) -> Unit,
+    downloadAudioFormat: String,
+    onDownloadAudioFormatChange: (String) -> Unit,
+    downloadBitrate: String,
+    onDownloadBitrateChange: (String) -> Unit,
 ) {
     Scaffold(
         topBar = { SettingsDetailTopBar("Playback") { navController.popBackStack() } }
@@ -1893,11 +1962,26 @@ private fun PlaybackScreen(
                 { CrossfadeRow(crossfadeEnabled, onCrossfadeToggle, crossfadeDuration, onCrossfadeDurationChange) }
             ))
 
-            SettingsHeader("Streaming Quality")
+            SettingsHeader("Playback Format")
             SettingsGroupCard(listOf(
-                { AudioQualityRow(audioQuality, onAudioQualityChange) }
+                { AudioFormatRow("Playback Format", playbackAudioFormat, onPlaybackAudioFormatChange) }
             ))
-            
+
+            SettingsHeader("Playback Bitrate")
+            SettingsGroupCard(listOf(
+                { AudioQualityRow("Playback Bitrate", audioQuality, onAudioQualityChange) }
+            ))
+
+            SettingsHeader("Download Format")
+            SettingsGroupCard(listOf(
+                { AudioFormatRow("Download Format", downloadAudioFormat, onDownloadAudioFormatChange) }
+            ))
+
+            SettingsHeader("Download Bitrate")
+            SettingsGroupCard(listOf(
+                { AudioQualityRow("Download Bitrate", downloadBitrate, onDownloadBitrateChange) }
+            ))
+
             SettingsHeader("Audio Focus")
             SettingsGroupCard(listOf(
                 { AudioFocusRow(audioFocus, onAudioFocusToggle) }
@@ -1914,26 +1998,22 @@ private fun PlaybackScreen(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AudioQualityRow(
+    title: String,
     currentQuality: String,
     onQualityChange: (String) -> Unit
 ) {
     val options = listOf("48 kbps", "64 kbps", "96 kbps", "128 kbps", "160 kbps", "192 kbps", "256 kbps", "320 kbps")
-    
+
     ListItem(
         headlineContent = {
             Column {
+                Text(text = title, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    text = "Streaming Quality",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text = "Target bitrate; the closest audio stream available from the source is selected.",
+                    text = "Target bitrate; the closest matching source stream is selected. The source may not offer the exact rate.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                
                 Spacer(modifier = Modifier.height(12.dp))
-                
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1950,6 +2030,62 @@ private fun AudioQualityRow(
                         ) {
                             Text(
                                 text = option,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun AudioFormatRow(
+    title: String,
+    currentFormat: String,
+    onFormatChange: (String) -> Unit
+) {
+    val options = listOf(
+        "auto" to "Auto",
+        "m4a" to "M4A / AAC",
+        "webm" to "WebM",
+        "opus" to "Opus",
+        "mp3" to "MP3",
+        "ogg" to "Ogg"
+    )
+    val selectedFormat = com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor
+        .normalizeAudioFormat(currentFormat)
+
+    ListItem(
+        headlineContent = {
+            Column {
+                Text(text = title, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = "Prefers this source format when available. No transcoding is performed; if a track has no matching stream, the closest available source format is used.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    options.forEach { (value, label) ->
+                        val isSelected = value == selectedFormat
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                            onClick = { onFormatChange(value) }
+                        ) {
+                            Text(
+                                text = label,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                                 style = MaterialTheme.typography.labelLarge
                             )

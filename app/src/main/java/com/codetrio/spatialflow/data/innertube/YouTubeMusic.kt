@@ -235,18 +235,12 @@ object YouTubeMusic {
                         try {
                             val playerJson = InnerTubeClient.player(id)
                             val parsed = InnerTubeParser.parsePlayerResponse(playerJson)
-                            val (audioQuality, dataSaver) = NewPipeStreamExtractor.getPreferencesSnapshot()
-
-                            val audioStreams = parsed?.streams
-                                ?.filter { it.mimeType.contains("audio", ignoreCase = true) }
-                            
-                            val streamsList = audioStreams.orEmpty()
-                            val bestStream = when {
-                                audioQuality == "Data Saver" || dataSaver -> streamsList.minByOrNull { it.bitrate }
-                                audioQuality == "Normal" -> streamsList.elementAtOrNull(streamsList.size / 2)
-                                else -> streamsList.maxByOrNull { it.bitrate }
-                            }
-                            bestUrl = bestStream?.url
+                            // InnerTubeParser has already applied the configured playback format and
+                            // bitrate when it chose its stream. Do not replace it with a max/min
+                            // bitrate choice here.
+                            bestUrl = parsed?.streams
+                                ?.firstOrNull { it.mimeType.contains("audio", ignoreCase = true) }
+                                ?.url
                             if (!bestUrl.isNullOrEmpty()) {
                                 Log.d(TAG, "Successfully resolved fallback stream via InnerTube player for $id")
                             }
@@ -300,14 +294,11 @@ object YouTubeMusic {
                 val parsed = InnerTubeParser.parsePlayerResponse(playerJson)
                 val streams = parsed?.streams.orEmpty()
                     .filter { it.mimeType.contains("audio", ignoreCase = true) && !it.url.isNullOrBlank() }
-                val (audioQuality, dataSaver) = NewPipeStreamExtractor.getPreferencesSnapshot()
-                val bestStream = when {
-                    streams.isEmpty() -> null
-                    audioQuality == "Data Saver" || dataSaver -> streams.minByOrNull { it.bitrate }
-                    audioQuality == "Normal" -> streams.sortedBy { it.bitrate }.let { it[it.size / 2] }
-                    else -> streams.maxByOrNull { it.bitrate }
-                }
-                bestStream?.url?.takeIf { it.startsWith("http", ignoreCase = true) }
+                // The parser selects by configured format and bitrate, with a native-source
+                // fallback when the preferred format is unavailable.
+                streams.firstOrNull()
+                    ?.url
+                    ?.takeIf { it.startsWith("http", ignoreCase = true) }
                     ?: throw IllegalStateException("InnerTube returned no usable audio stream for $id")
             }
         }

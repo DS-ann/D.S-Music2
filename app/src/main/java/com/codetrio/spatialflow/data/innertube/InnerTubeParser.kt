@@ -344,8 +344,10 @@ object InnerTubeParser {
             streamingData.getAsJsonArray("formats")?.let { allFormats.addAll(it) }
 
             var bestStream: StreamData? = null
+            var bestStreamFormatPenalty = Int.MAX_VALUE
             var bestStreamDistance = Int.MAX_VALUE
             val targetBitrateBps = NewPipeStreamExtractor.getTargetBitrateBps()
+            val preferredAudioFormat = NewPipeStreamExtractor.getPlaybackAudioFormat()
 
             allFormats.forEach { format ->
                 val obj = format.asJsonObject
@@ -387,9 +389,23 @@ object InnerTubeParser {
                     }
                 }
 
-                // InnerTube provides bitrate in bits/second. Keep the candidate nearest the target.
+                // Prefer the requested native format first, then the stream closest to the
+                // requested bitrate. If the source has no matching format, any playable format
+                // remains eligible as a fallback.
+                val formatPenalty = if (
+                    NewPipeStreamExtractor.matchesAudioFormat(
+                        mimeType,
+                        preferredFormat = preferredAudioFormat
+                    )
+                ) 0 else 1
                 val distance = if (bitrate > 0) abs(bitrate - targetBitrateBps) else Int.MAX_VALUE
-                if (url != null && (bestStream == null || distance < bestStreamDistance)) {
+                if (
+                    url != null &&
+                    (bestStream == null ||
+                        formatPenalty < bestStreamFormatPenalty ||
+                        (formatPenalty == bestStreamFormatPenalty && distance < bestStreamDistance))
+                ) {
+                    bestStreamFormatPenalty = formatPenalty
                     bestStreamDistance = distance
                     bestStream = StreamData(
                         url = url,
