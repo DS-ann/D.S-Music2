@@ -125,6 +125,7 @@ class AudioPlaybackService : MediaSessionService() {
     private var resolveTargetSongId: String? = null
     private var lastPlaybackRecoveryVideoId: String? = null
     private var failedStreamVideoId: String? = null
+    private var forceInnerTubeOnNextResolveVideoId: String? = null
     private var isRecoveringPlaybackError = false
     private var isFetchingRelatedProactively = false
 
@@ -203,6 +204,7 @@ class AudioPlaybackService : MediaSessionService() {
                 handler.postDelayed({
                     if (viewModel?.currentSong?.value?.videoId == videoId) {
                         YouTubeMusic.invalidateStreamUrl(videoId)
+                        forceInnerTubeOnNextResolveVideoId = videoId
                         isRecoveringPlaybackError = true
                         try {
                             loadAndPlay("innertube://$videoId".toUri(), resumePosition)
@@ -525,6 +527,8 @@ class AudioPlaybackService : MediaSessionService() {
         originalSourceUri = uri
         if (uri.scheme == "innertube") {
             val videoId = uri.host ?: return
+            val useInnerTubeRetry = forceInnerTubeOnNextResolveVideoId == videoId
+            if (useInnerTubeRetry) forceInnerTubeOnNextResolveVideoId = null
             
             // INSTANT CANCELLATION: Kill any in-flight resolution immediately
             resolveJob?.cancel()
@@ -535,16 +539,27 @@ class AudioPlaybackService : MediaSessionService() {
                 
                 // Fetch stream URL only, don't wait for position yet
                 var streamUrl = async(Dispatchers.IO) {
-                    YouTubeMusic.getStreamUrl(videoId).getOrNull()
+                    if (useInnerTubeRetry) {
+                        YouTubeMusic.getStreamUrlFromInnerTube(videoId).getOrNull()
+                    } else {
+                        YouTubeMusic.getStreamUrl(videoId).getOrNull()
+                    }
                 }.await()
 
                 if (streamUrl.isNullOrEmpty()) {
-                    Log.w(TAG, "Initial stream resolution failed for $videoId; invalidating caches and retrying once")
-                    withContext(Dispatchers.IO) { YouTubeMusic.invalidateStreamUrl(videoId) }
-                    delay(250L)
-                    streamUrl = async(Dispatchers.IO) {
-                        YouTubeMusic.getStreamUrl(videoId).getOrNull()
-                    }.await()
+                    if (useInnerTubeRetry) {
+                        Log.w(TAG, "InnerTube recovery URL unavailable for $videoId; trying a fresh NewPipe extraction")
+                        streamUrl = async(Dispatchers.IO) {
+                            YouTubeMusic.getStreamUrl(videoId).getOrNull()
+                        }.await()
+                    } else {
+                        Log.w(TAG, "Initial stream resolution failed for $videoId; invalidating caches and retrying once")
+                        withContext(Dispatchers.IO) { YouTubeMusic.invalidateStreamUrl(videoId) }
+                        delay(250L)
+                        streamUrl = async(Dispatchers.IO) {
+                            YouTubeMusic.getStreamUrl(videoId).getOrNull()
+                        }.await()
+                    }
                 }
 
                 // Guard: If user clicked another song while we were resolving, abort silently
