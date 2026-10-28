@@ -17,8 +17,8 @@ import java.util.concurrent.ConcurrentHashMap
 object NewPipeStreamExtractor {
 
     private const val TAG = "NewPipeExtractor"
-    private var isInitialized = false
-    private var appContext: Context? = null
+    @Volatile private var isInitialized = false
+    @Volatile private var appContext: Context? = null
 
     // === Multi-Level Caching ===
     // Tier 1: Fastest. Just the URL.
@@ -46,6 +46,7 @@ object NewPipeStreamExtractor {
     private var cachedPrefs: PreferenceSnapshot? = null
     private const val PREF_CACHE_TTL_MS = 60000L // 1 minute
 
+    @Synchronized
     fun init(context: Context) {
         if (isInitialized) return
         appContext = context.applicationContext
@@ -94,6 +95,16 @@ object NewPipeStreamExtractor {
      * Internal generic fetcher that populates the streamInfoCache.
      */
     private suspend fun fetchStreamInfo(videoId: String): StreamInfo? {
+        // Application startup initializes NewPipe off the UI thread. If a track is requested
+        // before that worker finishes, initialize it here on the extraction dispatcher.
+        if (!isInitialized) {
+            withContext(Dispatchers.IO) {
+                if (!isInitialized) {
+                    val context = appContext ?: com.codetrio.spatialflow.SpatialFlowApplication.instance.applicationContext
+                    init(context)
+                }
+            }
+        }
         val cachedInfo = synchronized(cacheLock) { streamInfoCache.get(videoId) }
         if (cachedInfo != null) return cachedInfo
 
