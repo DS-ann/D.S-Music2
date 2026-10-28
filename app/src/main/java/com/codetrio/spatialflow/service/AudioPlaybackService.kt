@@ -122,6 +122,7 @@ class AudioPlaybackService : MediaSessionService() {
     private var resolveJob: Job? = null
     // Track the unique song ID that the current resolution is targeting
     private var resolveTargetSongId: String? = null
+    private var lastPlaybackRecoveryVideoId: String? = null
     private var isFetchingRelatedProactively = false
 
     private lateinit var telemetryManager: com.codetrio.spatialflow.data.innertube.YouTubeTelemetryManager
@@ -180,6 +181,9 @@ class AudioPlaybackService : MediaSessionService() {
                 ensureHapticManager()
             }
             
+            if (state == Player.STATE_READY) {
+                lastPlaybackRecoveryVideoId = null
+            }
             if (state == Player.STATE_ENDED) {
                 handlePlaybackCompleted()
             }
@@ -188,17 +192,32 @@ class AudioPlaybackService : MediaSessionService() {
         override fun onPlayerError(error: PlaybackException) {
             Log.e(TAG, "ExoPlayer error: ${error.message}", error)
             viewModel?.setIsPlaying(false)
-            
-            // Auto-recovery: reset player and attempt to skip to next song
-            try {
-                player.stop()
-                player.clearMediaItems()
-            } catch (e: Exception) {
-                Log.w(TAG, "Player reset during error recovery failed: ${e.message}")
+
+            val song = viewModel?.currentSong?.value
+            val videoId = song?.videoId?.takeIf { it.isNotBlank() }
+            if (videoId != null && lastPlaybackRecoveryVideoId != videoId) {
+                lastPlaybackRecoveryVideoId = videoId
+                val resumePosition = player.currentPosition.coerceAtLeast(0L)
+                Log.w(TAG, "Retrying failed stream once with a fresh URL for $videoId")
+                com.codetrio.spatialflow.ui.SnackbarController.showMessage("Retrying song stream…")
+                handler.postDelayed({
+                    if (viewModel?.currentSong?.value?.videoId == videoId) {
+                        YouTubeMusic.invalidateStreamUrl(videoId)
+                        loadAndPlay("innertube://$videoId".toUri(), resumePosition)
+                    }
+                }, 250)
+                return
             }
-            handler.postDelayed({
-                viewModel?.playNextSong(true)
-            }, 200)
+
+            val message = if (videoId != null) {
+                "Playback failed after retry. Check your connection and try again."
+            } else {
+                "This audio file could not be played. Try another file."
+            }
+            com.codetrio.spatialflow.ui.SnackbarController.showMessage(message)
+            // Keep the failed item selected so the user can retry or inspect the failure.
+            // Silently skipping every errored track made a complete stream failure look like
+            // the Play button was broken.
         }
 
         override fun onPositionDiscontinuity(
@@ -507,9 +526,19 @@ class AudioPlaybackService : MediaSessionService() {
                 Log.d(TAG, "Pre-resolving stream ahead of injector injection: $videoId")
                 
                 // Fetch stream URL only, don't wait for position yet
-                val streamDeferred = async(Dispatchers.IO) { YouTubeMusic.getStreamUrl(videoId).getOrNull() }
-                val streamUrl = streamDeferred.await()
-                
+                var streamUrl = async(Dispatchers.IO) {
+                    YouTubeMusic.getStreamUrl(videoId).getOrNull()
+                }.await()
+
+                if (streamUrl.isNullOrEmpty()) {
+                    Log.w(TAG, "Initial stream resolution failed for $videoId; invalidating caches and retrying once")
+                    withContext(Dispatchers.IO) { YouTubeMusic.invalidateStreamUrl(videoId) }
+                    delay(250L)
+                    streamUrl = async(Dispatchers.IO) {
+                        YouTubeMusic.getStreamUrl(videoId).getOrNull()
+                    }.await()
+                }
+
                 // Guard: If user clicked another song while we were resolving, abort silently
                 ensureActive()
                 if (resolveTargetSongId != videoId) {
@@ -541,9 +570,12 @@ class AudioPlaybackService : MediaSessionService() {
                         }
                     }
                 } else {
-                    Log.e(TAG, "Failed resolving upfront for: $videoId")
-                    // Auto-skip on resolution failure
-                    viewModel?.playNextSong(true)
+                    Log.e(TAG, "Failed resolving stream after retry for: $videoId")
+                    shouldAutoPlay = false
+                    viewModel?.setIsPlaying(false)
+                    com.codetrio.spatialflow.ui.SnackbarController.showMessage(
+                        "Couldn't load this song. Check your connection and tap Play to retry."
+                    )
                 }
             }
         } else {
@@ -902,8 +934,11 @@ class AudioPlaybackService : MediaSessionService() {
                 pendingSeekPos = -1
             }
             
+            // Effects/normalization were removed; every newly loaded track must start
+            // with normal playback gain rather than inherit a stale crossfade volume.
+            player.volume = currentBaseVolume.coerceIn(0f, 1f)
             player.prepare()
-            
+
             if (shouldAutoPlay) {
                 if (requestAudioFocus()) {
                     player.play()
@@ -1333,43 +1368,32 @@ class AudioPlaybackService : MediaSessionService() {
 
     inner class HapticsAudioProcessor : androidx.media3.common.audio.BaseAudioProcessor() {
 
-        // Filter states for pure PCM-based premium real-time haptics crossover
+        // Optional haptics analysis state. Audio output itself remains byte-for-byte pass-through.
         private var subBassFilterState = 0f
         private var bassFilterState = 0f
         private var midFilterState = 0f
 
         override fun onConfigure(inputAudioFormat: androidx.media3.common.audio.AudioProcessor.AudioFormat): androidx.media3.common.audio.AudioProcessor.AudioFormat {
-            if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT && inputAudioFormat.encoding != C.ENCODING_PCM_FLOAT) {
-                throw androidx.media3.common.audio.AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
-            }
-            return androidx.media3.common.audio.AudioProcessor.AudioFormat(inputAudioFormat.sampleRate, 2, inputAudioFormat.encoding)
+            // Keep the decoder's format unchanged. Rewriting mono/multichannel streams to stereo
+            // can overflow buffers or fail decoding on unusual local files and stream formats.
+            return inputAudioFormat
         }
 
         @OptIn(UnstableApi::class)
         override fun queueInput(inputBuffer: ByteBuffer) {
-            val isStereo = inputAudioFormat.channelCount == 2
-            val is16Bit = inputAudioFormat.encoding == C.ENCODING_PCM_16BIT
-            val bytesPerSample = if (is16Bit) 2 else 4
-            val frameSize = bytesPerSample * inputAudioFormat.channelCount
-            val frameCount = inputBuffer.remaining() / frameSize
-            val outBuffer = replaceOutputBuffer(frameCount * bytesPerSample * 2)
-            // Preserve the decoded samples; sampling is used only for optional music haptics.
-            analyzePcmForHaptics(inputBuffer, is16Bit, isStereo, frameCount)
-            if (isStereo) {
-                outBuffer.put(inputBuffer)
-            } else if (is16Bit) {
-                while (inputBuffer.remaining() >= bytesPerSample) {
-                    val sample = inputBuffer.short
-                    outBuffer.putShort(sample)
-                    outBuffer.putShort(sample)
-                }
-            } else {
-                while (inputBuffer.remaining() >= bytesPerSample) {
-                    val sample = inputBuffer.float
-                    outBuffer.putFloat(sample)
-                    outBuffer.putFloat(sample)
-                }
+            val format = inputAudioFormat
+            val is16Bit = format.encoding == C.ENCODING_PCM_16BIT
+            val isFloat = format.encoding == C.ENCODING_PCM_FLOAT
+            val isMonoOrStereo = format.channelCount in 1..2
+            if ((is16Bit || isFloat) && isMonoOrStereo) {
+                val bytesPerSample = if (is16Bit) 2 else 4
+                val frameSize = bytesPerSample * format.channelCount
+                val frameCount = inputBuffer.remaining() / frameSize
+                analyzePcmForHaptics(inputBuffer, is16Bit, format.channelCount == 2, frameCount)
             }
+
+            val outBuffer = replaceOutputBuffer(inputBuffer.remaining())
+            outBuffer.put(inputBuffer)
             outBuffer.flip()
         }
 

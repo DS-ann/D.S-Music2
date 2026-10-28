@@ -265,6 +265,15 @@ object YouTubeMusic {
     }
 
     /**
+     * Invalidate a possibly expired/broken stream URL so the next request re-runs extraction.
+     */
+    fun invalidateStreamUrl(videoId: String?) {
+        if (videoId.isNullOrBlank()) return
+        streamUrlCache.remove(videoId)
+        NewPipeStreamExtractor.clearVideoCache(videoId)
+    }
+
+    /**
      * Extracts YouTube's native 'loudnessDb' parameter for a given video ID.
      * This metric indicates how much the track deviates from YouTube's target of -14 LUFS.
      */
