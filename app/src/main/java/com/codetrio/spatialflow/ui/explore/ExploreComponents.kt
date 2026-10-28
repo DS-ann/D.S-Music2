@@ -70,6 +70,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -1237,6 +1238,8 @@ fun OnlineSongBottomSheet(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val downloadProgress by SongDownloader.downloadProgress.collectAsState()
+    val isSongDownloading = downloadProgress.containsKey(song.videoId)
     val favoritesManager = remember { FavoritesManager(context) }
     var isFavorite by remember(song.videoId) { mutableStateOf(favoritesManager.isFavorite(song.videoId.hashCode().toLong())) }
 
@@ -1417,7 +1420,10 @@ fun OnlineSongBottomSheet(
                     onPlaylistAddClick(onlineSongItem)
                     onDismissRequest()
                 },
-                Triple("Download", Icons.Default.Download) {
+                Triple(
+                    if (isSongDownloading) "Cancel download" else "Download",
+                    if (isSongDownloading) Icons.Default.Close else Icons.Default.Download
+                ) {
                     SongDownloader.downloadSong(context, onlineSongItem)
                     onDismissRequest()
                 },
