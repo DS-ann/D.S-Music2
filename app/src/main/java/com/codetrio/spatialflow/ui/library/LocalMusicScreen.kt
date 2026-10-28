@@ -36,6 +36,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -45,8 +46,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.codetrio.spatialflow.model.SongItem
 import com.codetrio.spatialflow.viewmodel.PlayerSharedViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * A separate, local-only music destination.
@@ -79,19 +83,27 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
         }
     }
 
-    val visibleSongs = remember(localSongs, searchQuery, sortOrder) {
-        val filtered = localSongs.filter {
-            it.title.contains(searchQuery, ignoreCase = true) ||
-                it.artist.contains(searchQuery, ignoreCase = true) ||
-                (it.path?.contains(searchQuery, ignoreCase = true) == true)
-        }
-        when (sortOrder) {
-            SortOrder.A_Z -> filtered.sortedBy { it.title.lowercase() }
-            SortOrder.DATE_ADDED -> filtered.sortedByDescending { it.dateAdded }
-            SortOrder.ARTIST -> filtered.sortedWith(
-                compareBy({ it.artist.lowercase() }, { it.title.lowercase() })
-            )
-            SortOrder.DURATION -> filtered.sortedByDescending { it.duration }
+    // A large MediaStore library must not be filtered/sorted on the main thread.
+    val visibleSongs by produceState(
+        initialValue = emptyList<SongItem>(),
+        localSongs,
+        searchQuery,
+        sortOrder
+    ) {
+        value = withContext(Dispatchers.Default) {
+            val filtered = localSongs.filter {
+                it.title.contains(searchQuery, ignoreCase = true) ||
+                    it.artist.contains(searchQuery, ignoreCase = true) ||
+                    (it.path?.contains(searchQuery, ignoreCase = true) == true)
+            }
+            when (sortOrder) {
+                SortOrder.A_Z -> filtered.sortedBy { it.title.lowercase() }
+                SortOrder.DATE_ADDED -> filtered.sortedByDescending { it.dateAdded }
+                SortOrder.ARTIST -> filtered.sortedWith(
+                    compareBy({ it.artist.lowercase() }, { it.title.lowercase() })
+                )
+                SortOrder.DURATION -> filtered.sortedByDescending { it.duration }
+            }
         }
     }
 
