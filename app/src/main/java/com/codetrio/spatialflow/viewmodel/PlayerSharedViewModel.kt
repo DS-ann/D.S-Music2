@@ -356,12 +356,6 @@ class PlayerSharedViewModel @Inject constructor(
     private val _duration = MutableStateFlow(0)
     val duration: StateFlow<Int> = _duration.asStateFlow()
 
-    private val _isProcessing = MutableStateFlow(false)
-    val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
-
-    private val _processingProgress = MutableStateFlow(0)
-    val processingProgress: StateFlow<Int> = _processingProgress.asStateFlow()
-
     // Song Library Management
     private val _songList = MutableStateFlow<List<SongItem>>(emptyList())
     val songList: StateFlow<List<SongItem>> = _songList.asStateFlow()
@@ -402,66 +396,8 @@ class PlayerSharedViewModel @Inject constructor(
 
     private val _currentSongArtwork = MutableStateFlow<ByteArray?>(null)
 
-    private val _shouldPromptEffects = MutableStateFlow(false)
-
-    private val _effectsRefreshTrigger = MutableStateFlow(false)
-
-
     // Lyrics State (Delegated to Controller)
     val lyricsController = PlayerLyricsStateController(TAG)
-
-    // Effects settings
-    private val _is8DEnabled = MutableStateFlow(false)
-    val is8DEnabled: StateFlow<Boolean> = _is8DEnabled.asStateFlow()
-
-    private val _isBassEnabled = MutableStateFlow(false)
-    val isBassEnabled: StateFlow<Boolean> = _isBassEnabled.asStateFlow()
-
-    private val _isReverbEnabled = MutableStateFlow(false)
-    val isReverbEnabled: StateFlow<Boolean> = _isReverbEnabled.asStateFlow()
-
-    private val _reverbPreset = MutableStateFlow<Short>(0)
-    val reverbPreset: StateFlow<Short> = _reverbPreset.asStateFlow()
-
-    private val _speed8D = MutableStateFlow(0.2f)
-    val speed8D: StateFlow<Float> = _speed8D.asStateFlow()
-
-    private val _bassBoost = MutableStateFlow(0)
-    val bassBoost: StateFlow<Int> = _bassBoost.asStateFlow()
-
-    // 5-Band Equalizer
-    private val _isEqualizerEnabled = MutableStateFlow(false)
-    val isEqualizerEnabled: StateFlow<Boolean> = _isEqualizerEnabled.asStateFlow()
-
-    private val _eqBand1 = MutableStateFlow(0) // 60Hz
-    private val _eqBand2 = MutableStateFlow(0) // 230Hz
-    private val _eqBand3 = MutableStateFlow(0) // 910Hz
-    private val _eqBand4 = MutableStateFlow(0) // 3600Hz
-    private val _eqBand5 = MutableStateFlow(0) // 14000Hz
-
-    val eqBand1: StateFlow<Int> = _eqBand1.asStateFlow()
-    val eqBand2: StateFlow<Int> = _eqBand2.asStateFlow()
-    val eqBand3: StateFlow<Int> = _eqBand3.asStateFlow()
-    val eqBand4: StateFlow<Int> = _eqBand4.asStateFlow()
-    val eqBand5: StateFlow<Int> = _eqBand5.asStateFlow()
-
-    // Loudness Enhancer
-    private val _isLoudnessEnabled = MutableStateFlow(false)
-    val isLoudnessEnabled: StateFlow<Boolean> = _isLoudnessEnabled.asStateFlow()
-
-    private val _loudnessGain = MutableStateFlow(0) // 0-12 dB
-    val loudnessGain: StateFlow<Int> = _loudnessGain.asStateFlow()
-
-    // Balance (L/R)
-    private val _balance = MutableStateFlow(0f) // -50.0 to +50.0
-    val balance: StateFlow<Float> = _balance.asStateFlow()
-
-    // Playback Speed
-    private val _playbackSpeed = MutableStateFlow(1.0f)
-    val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
-
-    private val _isPitchMatched = MutableStateFlow(true)
-    val isPitchMatched: StateFlow<Boolean> = _isPitchMatched.asStateFlow()
 
     // Shuffle & Repeat
     private val _isShuffleEnabled = MutableStateFlow(false)
@@ -1155,24 +1091,6 @@ class PlayerSharedViewModel @Inject constructor(
     // ========== SERVICE & MANAGERS ==========
 
 
-    val isProcessingFlow get() = isProcessing
-    val processingProgressFlow get() = processingProgress
-    val isEqualizerEnabledFlow get() = isEqualizerEnabled
-    val isBassEnabledFlow get() = isBassEnabled
-    val isReverbEnabledFlow get() = isReverbEnabled
-    val isLoudnessEnabledFlow get() = isLoudnessEnabled
-    val is8DEnabledFlow get() = is8DEnabled
-    val bassBoostFlow get() = bassBoost
-    val reverbPresetFlow get() = reverbPreset
-    val loudnessGainFlow get() = loudnessGain
-    val balanceFlow get() = balance
-    val playbackSpeedFlow get() = playbackSpeed
-    val isPitchMatchedFlow get() = isPitchMatched
-    val eqBand1Flow get() = eqBand1
-    val eqBand2Flow get() = eqBand2
-    val eqBand3Flow get() = eqBand3
-    val eqBand4Flow get() = eqBand4
-    val eqBand5Flow get() = eqBand5
     val songListFlow get() = songList
     val currentSongIndexFlow get() = currentSongIndex
     val isCurrentSongFavoriteFlow get() = isCurrentSongFavorite
@@ -1311,13 +1229,6 @@ class PlayerSharedViewModel @Inject constructor(
             _currentSong.value = song
         }
     }
-    fun postIsProcessing(processing: Boolean) {
-        _isProcessing.value = processing
-    }
-
-    fun triggerEffectsRefresh() {
-        _effectsRefreshTrigger.value = !_effectsRefreshTrigger.value
-    }
     
     fun retryLyrics() = lyricsController.retryLyrics(appContext, _currentSong.value)
 
@@ -1348,86 +1259,6 @@ class PlayerSharedViewModel @Inject constructor(
 
     fun setDuration(dur: Int) {
         _duration.value = dur
-    }
-
-    // ========== AUDIO EFFECTS ==========
-
-    fun set8DEnabled(enabled: Boolean) {
-        if (enabled && _isReverbEnabled.value) {
-            setReverbEnabled(false)
-        }
-        _is8DEnabled.value = enabled
-        audioService?.set8DEnabled(enabled)
-    }
-
-    fun setBassEnabled(enabled: Boolean) {
-        _isBassEnabled.value = enabled
-        audioService?.setBassEnabled(enabled)
-    }
-
-    fun setBassBoost(boost: Int) {
-        _bassBoost.value = boost
-        if (audioService != null) {
-            if (_isEqualizerEnabled.value && boost > 0) {
-                if (_eqBand1.value > 500) setEqBand1(500)
-            }
-            audioService?.setBassBoost(boost)
-        }
-    }
-
-    fun setReverbEnabled(enabled: Boolean) {
-        if (enabled && _is8DEnabled.value) {
-            set8DEnabled(false)
-        }
-        _isReverbEnabled.value = enabled
-        audioService?.setReverbEnabled(enabled)
-    }
-
-    fun setReverbPreset(preset: Int) {
-        val shortPreset = preset.toShort()
-        _reverbPreset.value = shortPreset
-        audioService?.setReverbPreset(shortPreset)
-    }
-
-    fun setEqualizerEnabled(enabled: Boolean) {
-        _isEqualizerEnabled.value = enabled
-        if (audioService != null) {
-            audioService?.setEqualizerEnabled(enabled)
-            if (enabled && _isLoudnessEnabled.value) {
-                if (_loudnessGain.value > 800) setLoudnessGain(600)
-            }
-        }
-    }
-
-    fun setEqBand1(gainDb: Int) { _eqBand1.value = gainDb; audioService?.setEqBandGain(0, gainDb) }
-    fun setEqBand2(gainDb: Int) { _eqBand2.value = gainDb; audioService?.setEqBandGain(1, gainDb) }
-    fun setEqBand3(gainDb: Int) { _eqBand3.value = gainDb; audioService?.setEqBandGain(2, gainDb) }
-    fun setEqBand4(gainDb: Int) { _eqBand4.value = gainDb; audioService?.setEqBandGain(3, gainDb) }
-    fun setEqBand5(gainDb: Int) { _eqBand5.value = gainDb; audioService?.setEqBandGain(4, gainDb) }
-
-    fun setLoudnessEnabled(enabled: Boolean) {
-        _isLoudnessEnabled.value = enabled
-        audioService?.setLoudnessEnabled(enabled)
-    }
-
-    fun setLoudnessGain(gain: Int) {
-        _loudnessGain.value = gain
-        audioService?.setLoudnessGain(gain)
-    }
-
-    fun setBalance(balanceValue: Float) {
-        _balance.value = balanceValue
-        audioService?.setBalance(balanceValue)
-    }
-
-    fun setPlaybackSpeed(speed: Float) {
-        _playbackSpeed.value = speed
-        audioService?.setPlaybackSpeed(speed, _isPitchMatched.value)
-    }
-
-    fun setPitchMatched(enabled: Boolean) {
-        _isPitchMatched.value = enabled
-        audioService?.setPlaybackSpeed(_playbackSpeed.value, enabled)
     }
 
     // ========== LIBRARY MANAGEMENT ==========
@@ -1472,23 +1303,11 @@ class PlayerSharedViewModel @Inject constructor(
             Log.d(TAG, "Injected lazy resolver URI for: ${song.title}")
         }
 
-        // Auto-reset 8D
-        if (_currentSong.value?.id != song.id) {
-            if (_is8DEnabled.value) {
-                _is8DEnabled.value = false
-                audioService?.set8DEnabled(false)
-            }
-        }
-
         _currentSongIndex.value = index
         lyricsController.clearForSongChange(song)
         _currentSong.value = song
         _songUri.value = song.contentUri
         _isPlaybackReady.value = false
-
-        if (hasActiveEffects()) {
-            _shouldPromptEffects.value = true
-        }
 
         _isCurrentSongFavorite.value = favoritesManager?.isFavorite(song.id) ?: false
         baseLikesCountInt = 0
@@ -1731,13 +1550,6 @@ class PlayerSharedViewModel @Inject constructor(
 
     // ========== UTILS ==========
 
-    fun hasActiveEffects(): Boolean {
-        return _is8DEnabled.value || _isBassEnabled.value || _isEqualizerEnabled.value || 
-               _isLoudnessEnabled.value || _isReverbEnabled.value
-    }
-
-    fun setIsProcessing(processing: Boolean) { _isProcessing.value = processing }
-    fun setProcessingProgress(progress: Int) { _processingProgress.value = progress }
     fun setHapticsEnabled(enabled: Boolean) {
         _isHapticsEnabled.value = enabled
         appContext.getSharedPreferences("AppSettings", Context.MODE_PRIVATE).edit {

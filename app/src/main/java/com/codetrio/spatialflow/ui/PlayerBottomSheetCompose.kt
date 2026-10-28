@@ -326,7 +326,6 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
             viewModel = viewModel,
             currentSong = currentSong,
             isPlaying = isPlaying,
-            isProcessing = uiState.isProcessing,
             accentColor = baseAccentColor,
             onClick = onExpand,
             modifier = Modifier.fillMaxSize()
@@ -709,7 +708,6 @@ fun PlayerBottomSheetCompose(
         val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
         val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
         val duration by viewModel.duration.collectAsStateWithLifecycle()
-        val isProcessing by viewModel.isProcessing.collectAsStateWithLifecycle()
         val currentSongIndex by viewModel.currentSongIndex.collectAsStateWithLifecycle()
         val isHapticsEnabled by viewModel.isHapticsEnabled.collectAsStateWithLifecycle()
         val miniPlayerBlendColor by viewModel.miniPlayerBlendColor.collectAsStateWithLifecycle()
@@ -781,7 +779,7 @@ fun PlayerBottomSheetCompose(
         )
  
         val uiState = remember(
-            currentSong, isPlaying, duration, isProcessing, currentSongIndex,
+            currentSong, isPlaying, duration, currentSongIndex,
             isHapticsEnabled, miniPlayerBlendColor, isCurrentSongFavorite, isCurrentSongDisliked, repeatMode, isShuffleEnabled,
             playerBackgroundColor, likesCount, isCurrentSongDownloaded, currentSongDownloadProgress
         ) {
@@ -789,7 +787,6 @@ fun PlayerBottomSheetCompose(
                 currentSong = currentSong,
                 isPlaying = isPlaying,
                 duration = duration,
-                isProcessing = isProcessing,
                 currentSongIndex = currentSongIndex,
                 isHapticsEnabled = isHapticsEnabled,
                 miniPlayerBlendColor = miniPlayerBlendColor,
@@ -1268,7 +1265,6 @@ private fun MiniPlayerContentInternal(
     viewModel: PlayerSharedViewModel,
     currentSong: SongItem,
     isPlaying: Boolean,
-    isProcessing: Boolean,
     accentColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -1314,22 +1310,6 @@ private fun MiniPlayerContentInternal(
                 )
             }
 
-            if (isProcessing) {
-                CircularWavyProgressIndicator(
-                    modifier = Modifier.size(58.dp),
-                    color = accentColor,
-                    trackColor = accentColor.copy(alpha = 0.25f),
-                    amplitude = amplitudeAnimatable.value,
-                    stroke = androidx.compose.ui.graphics.drawscope.Stroke(
-                        width = with(LocalDensity.current) { 6.dp.toPx() },
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round
-                    ),
-                    trackStroke = androidx.compose.ui.graphics.drawscope.Stroke(
-                        width = with(LocalDensity.current) { 6.dp.toPx() },
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round
-                    )
-                )
-            } else {
                 CircularWavyProgressIndicator(
                     progress = { progressAnimatable.value },
                     modifier = Modifier.size(58.dp),
@@ -1346,7 +1326,6 @@ private fun MiniPlayerContentInternal(
                         cap = androidx.compose.ui.graphics.StrokeCap.Round
                     )
                 )
-            }
 
             Box(modifier = Modifier.size(48.dp)) {
                 // Placeholder Box for structure: AsyncImage is managed globally via parent's floating shared element!

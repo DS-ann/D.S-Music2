@@ -11,8 +11,7 @@ import java.util.concurrent.Executors;
 
 /**
  * Utility class to manage app cache and clean up temp files.
- * Clears old temporary files (FFmpeg output, temp audio copies) on startup
- * while preserving persistent artwork caches to avoid repeated image downloads.
+ * Clears temporary local-audio copies left by file handling.
  */
 public class CacheManager {
 
@@ -21,12 +20,6 @@ public class CacheManager {
     // File patterns to clean
     private static final String[] TEMP_FILE_PREFIXES = {
             "temp_", // Audio temp copies from AudioFileManager
-            "8d_audio_", // 8D processed audio from AudioPlaybackService
-    };
-
-    // Directories to clean
-    private static final String[] CACHE_SUBDIRS = {
-            "SpatialFlow_output" // FFmpeg output directory
     };
 
     /**
@@ -56,17 +49,6 @@ public class CacheManager {
                         }
                     }
 
-                    // Clean subdirectories
-                    for (String subdir : CACHE_SUBDIRS) {
-                        File dir = new File(cacheDir, subdir);
-                        if (dir.exists() && dir.isDirectory()) {
-                            long dirSize = deleteDirectory(dir);
-                            if (dirSize > 0) {
-                                deletedCount++;
-                                freedBytes += dirSize;
-                            }
-                        }
-                    }
                 }
 if (deletedCount > 0) {
                     Log.d(TAG, "Cache cleanup: deleted " + deletedCount + " files, freed " +
@@ -103,27 +85,6 @@ if (deletedCount > 0) {
      * 
      * @return Total bytes deleted
      */
-    private static long deleteDirectory(File dir) {
-        long totalSize = 0;
-
-        if (dir == null || !dir.exists())
-            return 0;
-
-        File[] files = dir.listFiles();
-        if (files != null) {
-            for (File file : files) {
-                if (file.isDirectory()) {
-                    totalSize += deleteDirectory(file);
-                } else {
-                    totalSize += file.length();
-                    file.delete();
-                }
-            }
-        }
-        dir.delete();
-        return totalSize;
-    }
-
     /**
      * Format bytes to human-readable string.
      */

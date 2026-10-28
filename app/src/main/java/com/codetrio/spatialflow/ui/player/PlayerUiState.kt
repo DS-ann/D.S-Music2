@@ -8,7 +8,6 @@ data class PlayerUiState(
     val currentSong: SongItem? = null,
     val isPlaying: Boolean = false,
     val duration: Int = 0,
-    val isProcessing: Boolean = false,
     val currentSongIndex: Int = -1,
     val isHapticsEnabled: Boolean = false,
     val miniPlayerBlendColor: Int = 0,

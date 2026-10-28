@@ -245,23 +245,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit {putFloat(KEY_CROSSFADE_DURATION, duration)}
     }
 
-    // ── Volume Normalization ─────────────────────────────────────────────────
-    private val _volumeNormalizationEnabled = MutableStateFlow(prefs.getBoolean(KEY_VOLUME_NORMALIZATION_ENABLED, false))
-    val volumeNormalizationEnabled: StateFlow<Boolean> = _volumeNormalizationEnabled.asStateFlow()
-
-    private val _targetLufs = MutableStateFlow(prefs.getFloat(KEY_TARGET_LUFS, -14f))
-    val targetLufs: StateFlow<Float> = _targetLufs.asStateFlow()
-
-    fun setVolumeNormalizationEnabled(enabled: Boolean) {
-        _volumeNormalizationEnabled.value = enabled
-        prefs.edit {putBoolean(KEY_VOLUME_NORMALIZATION_ENABLED, enabled)}
-    }
-
-    fun setTargetLufs(lufs: Float) {
-        _targetLufs.value = lufs
-        prefs.edit {putFloat(KEY_TARGET_LUFS, lufs)}
-    }
-
     // ── Audio Focus ──────────────────────────────────────────────────────────
     private val _audioFocus = MutableStateFlow(prefs.getBoolean(KEY_AUDIO_FOCUS, true))
     val audioFocus: StateFlow<Boolean> = _audioFocus.asStateFlow()
@@ -562,8 +545,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     _hapticPlayPause.value = prefs.getBoolean(KEY_HAPTIC_PLAY_PAUSE, true)
                     _hapticQueue.value = prefs.getBoolean(KEY_HAPTIC_QUEUE, true)
                     _hapticFavorite.value = prefs.getBoolean(KEY_HAPTIC_FAVORITE, true)
-                    _volumeNormalizationEnabled.value = prefs.getBoolean(KEY_VOLUME_NORMALIZATION_ENABLED, false)
-                    _targetLufs.value = prefs.getFloat(KEY_TARGET_LUFS, -14f)
                 }
 
                 if (backupObject.has("favorites")) {
@@ -758,8 +739,6 @@ fun SettingsScreenContent(
     val audioFocus by viewModel.audioFocus.collectAsStateWithLifecycle()
     val sleepTimerEndTime by playerSharedViewModel.sleepTimerEndTime.collectAsStateWithLifecycle()
     val sleepTimerMode by playerSharedViewModel.sleepTimerMode.collectAsStateWithLifecycle()
-    val volumeNormalizationEnabled by viewModel.volumeNormalizationEnabled.collectAsStateWithLifecycle()
-    val targetLufs by viewModel.targetLufs.collectAsStateWithLifecycle()
     val libraryPaths by viewModel.libraryPaths.collectAsStateWithLifecycle()
     val songCacheSize by viewModel.songCacheSize.collectAsStateWithLifecycle()
     val imageCacheSize by viewModel.imageCacheSize.collectAsStateWithLifecycle()
@@ -946,10 +925,6 @@ fun SettingsScreenContent(
                 },
                 audioQuality = audioQuality,
                 onAudioQualityChange = { viewModel.setAudioQuality(it) },
-                volumeNormalizationEnabled = volumeNormalizationEnabled,
-                onVolumeNormalizationChange = { viewModel.setVolumeNormalizationEnabled(it) },
-                targetLufs = targetLufs,
-                onTargetLufsChange = { viewModel.setTargetLufs(it) }
             )
         }
         composable(SettingsRoute.Haptics.route) {
@@ -1832,10 +1807,6 @@ private fun PlaybackScreen(
     onSetEndOfSong: (Boolean) -> Unit,
     audioQuality: String,
     onAudioQualityChange: (String) -> Unit,
-    volumeNormalizationEnabled: Boolean,
-    onVolumeNormalizationChange: (Boolean) -> Unit,
-    targetLufs: Float,
-    onTargetLufsChange: (Float) -> Unit
 ) {
     Scaffold(
         topBar = { SettingsDetailTopBar("Playback") { navController.popBackStack() } }
@@ -1861,11 +1832,6 @@ private fun PlaybackScreen(
             SettingsHeader("Audio Focus")
             SettingsGroupCard(listOf(
                 { AudioFocusRow(audioFocus, onAudioFocusToggle) }
-            ))
-
-            SettingsHeader("Volume Controls")
-            SettingsGroupCard(listOf(
-                { VolumeNormalizationRow(volumeNormalizationEnabled, onVolumeNormalizationChange, targetLufs, onTargetLufsChange) }
             ))
 
             SettingsHeader("Sleep Timer")
@@ -1923,79 +1889,6 @@ private fun AudioQualityRow(
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun VolumeNormalizationRow(
-    enabled: Boolean,
-    onToggle: (Boolean) -> Unit,
-    targetLufs: Float,
-    onTargetLufsChange: (Float) -> Unit
-) {
-    val options = listOf(
-        Pair("Quiet", -19f),
-        Pair("Normal", -14f),
-        Pair("Loud", -11f)
-    )
-
-    Column {
-        ListItem(
-            headlineContent = {
-                Text("Volume Normalization", style = MaterialTheme.typography.bodyLarge)
-            },
-            supportingContent = {
-                Text(
-                    "Automatically adjust playback volume so all songs sound equally loud.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            trailingContent = {
-                Switch(
-                    checked = enabled,
-                    onCheckedChange = onToggle
-                )
-            },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-        )
-
-        AnimatedVisibility(visible = enabled) {
-            ListItem(
-                headlineContent = {
-                    Column {
-                        Text(
-                            text = "Target Loudness",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            options.forEach { option ->
-                                val isSelected = option.second == targetLufs
-                                Surface(
-                                    shape = RoundedCornerShape(50),
-                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                    contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    onClick = { onTargetLufsChange(option.second) }
-                                ) {
-                                    Text(
-                                        text = option.first,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                        style = MaterialTheme.typography.labelLarge
-                                    )
-                                }
-                            }
-                        }
-                    }
-                },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
-        }
-    }
 }
 
 @Composable

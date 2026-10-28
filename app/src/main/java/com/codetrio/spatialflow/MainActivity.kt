@@ -73,7 +73,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.codetrio.spatialflow.model.SongItem
 import com.codetrio.spatialflow.service.AudioPlaybackService
-import com.codetrio.spatialflow.ui.EffectsScreenEntryPoint
 import com.codetrio.spatialflow.ui.PlayerBottomSheetCompose
 import com.codetrio.spatialflow.ui.SettingsScreenContent
 import com.codetrio.spatialflow.ui.TagEditorScreenEntryPoint
@@ -192,7 +191,7 @@ class MainActivity : AppCompatActivity() {
                         val navBackStackEntry by currentNavController.currentBackStackEntryAsState()
                         val currentDestination = navBackStackEntry?.destination
 
-                        val showBottomBar = currentDestination?.route in listOf("explore", "library", "effects", "settings")
+                        val showBottomBar = currentDestination?.route in listOf("explore", "library", "settings")
 
                         val density = LocalDensity.current
                         val navigationBarsHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
@@ -250,7 +249,6 @@ class MainActivity : AppCompatActivity() {
                             val items = listOf(
                                 Triple("explore", "Explore", R.drawable.ic_explore),
                                 Triple("library", "Library", R.drawable.ic_library_music),
-                                Triple("effects", "Effects", R.drawable.ic_equalizer),
                                 Triple("settings", "Settings", R.drawable.ic_settings)
                             )
                              items.forEach { (route, label, iconResId) ->
@@ -280,7 +278,7 @@ class MainActivity : AppCompatActivity() {
                 ) { paddingValues ->
                     val navBackStackEntry by currentNavController.currentBackStackEntryAsState()
                     val currentDestination = navBackStackEntry?.destination
-                    val showBottomBar = currentDestination?.route in listOf("explore", "library", "effects", "settings")
+                    val showBottomBar = currentDestination?.route in listOf("explore", "library", "settings")
 
                     val playerExpansionFractionState = playerViewModel.playerExpansionFraction.collectAsState()
 
@@ -316,8 +314,7 @@ class MainActivity : AppCompatActivity() {
                                 mapOf(
                                     "explore" to 0,
                                     "library" to 1,
-                                    "effects" to 2,
-                                    "settings" to 3
+                                    "settings" to 2
                                 )
                             }
 
@@ -439,9 +436,6 @@ class MainActivity : AppCompatActivity() {
                                             }
                                         }
                                     )
-                                }
-                                composable("effects") {
-                                    EffectsScreenEntryPoint(viewmodel = playerViewModel)
                                 }
                                 composable("settings") {
                                     SettingsScreenContent(

@@ -8,10 +8,6 @@ import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.media.AudioFocusRequest
 import android.media.AudioManager
-import android.media.audiofx.BassBoost
-import android.media.audiofx.EnvironmentalReverb
-import android.media.audiofx.Equalizer
-import android.media.audiofx.LoudnessEnhancer
 import android.net.Uri
 import android.os.Binder
 import android.os.Build
@@ -31,7 +27,6 @@ import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
-import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
@@ -46,13 +41,9 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
 import com.codetrio.spatialflow.R
 import com.codetrio.spatialflow.data.innertube.YouTubeMusic
 import com.codetrio.spatialflow.ui.widget.SpatialFlowWidgetProvider
-import com.codetrio.spatialflow.util.AudioFileManager
-import com.codetrio.spatialflow.util.FFmpegCommandBuilder
 import com.codetrio.spatialflow.viewmodel.PlayerSharedViewModel
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -67,8 +58,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.ByteBuffer
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -120,17 +109,12 @@ class AudioPlaybackService : MediaSessionService() {
     private var viewModel: PlayerSharedViewModel? = null
     private lateinit var handler: Handler
     private lateinit var progressUpdateRunnable: Runnable
-    private val effectsExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
     private var currentSourceUri: Uri? = null
     private var originalSourceUri: Uri? = null
-    private var isProcessing = false
     private var isNextSongPreCached = false
     private var currentSongName = "SpatialFlow"
     private var currentAlbumArt: Bitmap? = null
-    private var is8DEnabled = false
-    private var hasProcessed8D = false
-    private var currentlyLoadedPath: String? = null
     private var shouldAutoPlay = false
     private var pendingSeekPos: Long = -1
     
@@ -147,13 +131,8 @@ class AudioPlaybackService : MediaSessionService() {
     private var isPausedByFocusLoss = false
     private var audioFocusEnabled = true
 
-    private var bassBoostEffect: BassBoost? = null
-    private var equalizerEffect: Equalizer? = null
-    private var loudnessEnhancer: LoudnessEnhancer? = null
-    private var reverbEffect: EnvironmentalReverb? = null
-    private var lastEffectsSessionId = -1
-    private var mainProcessor = StereoBalanceProcessor()
-    private var nextProcessor: StereoBalanceProcessor? = null
+    private var mainProcessor = HapticsAudioProcessor()
+    private var nextProcessor: HapticsAudioProcessor? = null
 
     private var crossfadeDurationMs = 0
     private var isCrossfading = false
@@ -198,7 +177,7 @@ class AudioPlaybackService : MediaSessionService() {
                     player.seekTo(pendingSeekPos)
                     pendingSeekPos = -1
                 }
-                initializeAudioEffectsSafe()
+                ensureHapticManager()
             }
             
             if (state == Player.STATE_ENDED) {
@@ -288,7 +267,6 @@ class AudioPlaybackService : MediaSessionService() {
                             vm.setSleepTimerMode(PlayerSharedViewModel.SleepTimerMode.OFF)
                         }
 
-                        updateBaseVolume()
                         handler.postDelayed({ preloadNextSongIntoQueue() }, 300)
                     }
                 }
@@ -337,7 +315,6 @@ class AudioPlaybackService : MediaSessionService() {
         loadAudioPreferences()
         setupPreferenceListener()
         setupProgressTracking()
-        cleanCache()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
@@ -392,7 +369,7 @@ class AudioPlaybackService : MediaSessionService() {
             getSharedPreferences(PREFS_NAME, MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(it)
         }
         handler.removeCallbacks(progressUpdateRunnable)
-        releaseAudioEffects()
+        releaseHapticManager()
         abandonAudioFocus()
         
         viewModel?.cleanupBgScope()
@@ -401,7 +378,6 @@ class AudioPlaybackService : MediaSessionService() {
         player.release()
         nextPlayer?.release()
         mediaSession?.release()
-        effectsExecutor.shutdownNow()
     }
 
     private fun initializePlayer() {
@@ -417,7 +393,7 @@ class AudioPlaybackService : MediaSessionService() {
         player.addListener(mainPlayerListener)
     }
 
-    private fun buildExoPlayer(processor: StereoBalanceProcessor): ExoPlayer {
+    private fun buildExoPlayer(processor: HapticsAudioProcessor): ExoPlayer {
         val renderersFactory = object : androidx.media3.exoplayer.DefaultRenderersFactory(this) {
             override fun buildAudioRenderers(
                 context: Context, extensionRendererMode: Int, mediaCodecSelector: androidx.media3.exoplayer.mediacodec.MediaCodecSelector,
@@ -426,7 +402,6 @@ class AudioPlaybackService : MediaSessionService() {
             ) {
                 val customAudioSink = androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
                     .setAudioProcessors(arrayOf(
-                        androidx.media3.common.audio.SonicAudioProcessor(),
                         processor
                     )).build()
                 super.buildAudioRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, customAudioSink, eventHandler, eventListener, out)
@@ -624,7 +599,7 @@ class AudioPlaybackService : MediaSessionService() {
             withContext(Dispatchers.Main) {
                 if (crossfadeDurationMs > 0) {
                     if (nextPlayer == null) {
-                        nextProcessor = StereoBalanceProcessor()
+                        nextProcessor = HapticsAudioProcessor()
                         nextPlayer = buildExoPlayer(nextProcessor!!)
                     }
                     val nextItem = buildMediaItem(nextUri, nextSong.title, nextSong.artist, nextSong.id.toString())
@@ -791,7 +766,6 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     fun seekTo(position: Int) {
-        if (isProcessing) pendingSeekPos = position.toLong()
         player.seekTo(position.toLong())
     }
 
@@ -884,259 +858,8 @@ class AudioPlaybackService : MediaSessionService() {
             })
     }
 
-    fun set8DEnabled(enabled: Boolean) {
-        this.is8DEnabled = enabled
-        if (!enabled) FFmpegKit.cancel()
-        viewModel?.let { vm ->
-            applyEffects(enabled, vm.speed8D.value)
-        }
-    }
-
-    fun setBassEnabled(enabled: Boolean) {
-        effectsExecutor.execute {
-            bassBoostEffect?.enabled = enabled
-            applyEffectsFromViewModelAsync()
-        }
-    }
-
-    fun setBassBoost(boostDb: Int) {
-        effectsExecutor.execute {
-            try {
-                equalizerEffect?.let { eq ->
-                    val minLevel = eq.bandLevelRange[0].toInt()
-                    val maxLevel = eq.bandLevelRange[1].toInt()
-                    eq.setBandLevel(0, max(minLevel, min(maxLevel, (boostDb * 100))).toShort())
-                    if (eq.numberOfBands > 1) eq.setBandLevel(1, max(minLevel, min(maxLevel, (boostDb * 45))).toShort())
-                }
-                bassBoostEffect?.setStrength(max(0, min(1000, ((boostDb / 15.0f).pow(1.3f) * 1000).roundToInt())).toShort())
-            } catch (e: Exception) {
-                Log.e(TAG, "Bass boost update failed: ${e.message}")
-            }
-        }
-    }
-
-    fun setReverbEnabled(enabled: Boolean) {
-        effectsExecutor.execute {
-            reverbEffect?.enabled = enabled
-            applyEffectsFromViewModelAsync()
-        }
-    }
-
-    fun setReverbPreset(preset: Short) {
-        effectsExecutor.execute {
-            try {
-                reverbEffect?.let { effect ->
-                    when (preset.toInt()) {
-                        0 -> { // None
-                            effect.decayTime = 100
-                            effect.reverbLevel = -9000
-                        }
-                        1 -> { // Small Room
-                            effect.roomLevel = -1500
-                            effect.roomHFLevel = -100
-                            effect.decayTime = 4000
-                            effect.decayHFRatio = 1200
-                            effect.reflectionsLevel = 0
-                            effect.reflectionsDelay = 50
-                            effect.reverbLevel = 500
-                            effect.reverbDelay = 40
-                            effect.diffusion = 1000
-                            effect.density = 1000
-                        }
-                        2 -> { // Medium Room
-                            effect.roomLevel = -1500
-                            effect.roomHFLevel = 0
-                            effect.decayTime = 6000
-                            effect.decayHFRatio = 1400
-                            effect.reflectionsLevel = 200
-                            effect.reflectionsDelay = 80
-                            effect.reverbLevel = 700
-                            effect.reverbDelay = 60
-                            effect.diffusion = 1000
-                            effect.density = 1000
-                        }
-                        3 -> { // Large Room
-                            effect.roomLevel = -1500
-                            effect.roomHFLevel = 0
-                            effect.decayTime = 8000
-                            effect.decayHFRatio = 1600
-                            effect.reflectionsLevel = 400
-                            effect.reflectionsDelay = 120
-                            effect.reverbLevel = 900
-                            effect.reverbDelay = 80
-                            effect.diffusion = 1000
-                            effect.density = 1000
-                        }
-                        4 -> { // Medium Hall
-                            effect.roomLevel = -1500
-                            effect.roomHFLevel = 0
-                            effect.decayTime = 12000
-                            effect.decayHFRatio = 1800
-                            effect.reflectionsLevel = 600
-                            effect.reflectionsDelay = 160
-                            effect.reverbLevel = 1100
-                            effect.reverbDelay = 100
-                            effect.diffusion = 1000
-                            effect.density = 1000
-                        }
-                        5 -> { // Large Hall
-                            effect.roomLevel = -1500
-                            effect.roomHFLevel = 0
-                            effect.decayTime = 16000
-                            effect.decayHFRatio = 1900
-                            effect.reflectionsLevel = 800
-                            effect.reflectionsDelay = 220
-                            effect.reverbLevel = 1300
-                            effect.reverbDelay = 100
-                            effect.diffusion = 1000
-                            effect.density = 1000
-                        }
-                        6 -> { // Plate / Massive Echo
-                            effect.roomLevel = -1500
-                            effect.roomHFLevel = 0
-                            effect.decayTime = 20000
-                            effect.decayHFRatio = 2000
-                            effect.reflectionsLevel = 1000
-                            effect.reflectionsDelay = 300
-                            effect.reverbLevel = 1600
-                            effect.reverbDelay = 100
-                            effect.diffusion = 1000
-                            effect.density = 1000
-                        }
-                        else -> {}
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Reverb preset update failed: ${e.message}")
-            }
-        }
-    }
-
-    fun setEqualizerEnabled(enabled: Boolean) {
-        effectsExecutor.execute { 
-            equalizerEffect?.enabled = enabled
-            applyEffectsFromViewModelAsync()
-        }
-    }
-
-    fun setEqBandGain(bandIndex: Int, gainDb: Int) {
-        effectsExecutor.execute {
-            try {
-                if ((bandIndex == 0 || bandIndex == 1) && viewModel?.isBassEnabled?.value == true) return@execute 
-                equalizerEffect?.setBandLevel(bandIndex.toShort(), (gainDb * 100).toShort())
-            } catch (_: Exception) {}
-        }
-    }
-
-    fun setLoudnessEnabled(enabled: Boolean) {
-        effectsExecutor.execute { loudnessEnhancer?.enabled = enabled }
-    }
-
-    fun setLoudnessGain(gainDb: Int) {
-        effectsExecutor.execute {
-            try { loudnessEnhancer?.setTargetGain(gainDb * 1000) } catch (_: Exception) {}
-        }
-    }
-
-    fun setBalance(balanceValue: Float) {
-        val balance = balanceValue / 50.0f
-        mainProcessor.setBalance(balance)
-        nextProcessor?.setBalance(balance)
-    }
-
-    fun setPlaybackSpeed(speed: Float, matchPitch: Boolean) {
-        player.playbackParameters = PlaybackParameters(speed, if (matchPitch) 1.0f else speed)
-    }
-
     fun isPlaying(): Boolean = player.isPlaying
     fun getCurrentSourceUri(): Uri? = originalSourceUri ?: currentSourceUri
-
-    fun applyEffects(enable8D: Boolean, speed8D: Float) {
-        val uri = currentSourceUri ?: return
-        FFmpegKit.cancel()
-        
-        val scheme = uri.scheme
-        val sourcePath = if (scheme == "http" || scheme == "https" || scheme == "innertube") {
-            uri.toString()
-        } else {
-            AudioFileManager.getRealPathFromURI(this, uri) ?: return
-        }
-        if (!enable8D) {
-            is8DEnabled = false
-            hasProcessed8D = false
-            loadOriginalAudio()
-            return
-        }
-
-        val cacheKey = "${sourcePath}${speed8D}".hashCode()
-        val outputFile = File(cacheDir, "8d$cacheKey.m4a")
-        
-        val wasPlaying = player.isPlaying
-        if (outputFile.exists()) {
-            on8DProcessingSuccess(outputFile.absolutePath, wasPlaying)
-            return
-        }
-
-        if (isProcessing) return
-        
-        is8DEnabled = true
-        isProcessing = true
-        viewModel?.setIsProcessing(true)
-        
-        val command = FFmpegCommandBuilder.build8D(sourcePath, outputFile.absolutePath, speed8D)
-
-        FFmpegKit.executeAsync(command, { session ->
-            if (ReturnCode.isSuccess(session.returnCode)) {
-                handler.post {
-                    if (uri == currentSourceUri) {
-                        on8DProcessingSuccess(outputFile.absolutePath, wasPlaying)
-                        finishProcessing(true)
-                    } else finishProcessing(false)
-                }
-            } else handler.post { finishProcessing(false) }
-        }, {}, { stats ->
-            stats?.let { s ->
-                handler.post {
-                    val dur = player.duration
-                    if (dur > 0) {
-                        val progress = min(99.0, (s.time * 100.0) / dur.toDouble()).toInt()
-                        viewModel?.setProcessingProgress(progress)
-                    }
-                }
-            }
-        })
-    }
-
-    private fun on8DProcessingSuccess(path: String, autoPlay: Boolean = false) {
-        hasProcessed8D = true
-        
-        if (currentlyLoadedPath != path) {
-            val pbSpeed = viewModel?.playbackSpeed?.value ?: 1.0f
-            loadProcessedAudio(path, pbSpeed, autoPlay)
-        }
-    }
-
-    private fun loadProcessedAudio(path: String, speed: Float, autoPlay: Boolean) {
-        val currentPos = player.currentPosition
-        currentlyLoadedPath = path
-        player.setMediaItem(buildMediaItem(Uri.fromFile(File(path))))
-        player.seekTo(currentPos)
-        player.prepare()
-        setPlaybackSpeed(speed, viewModel?.isPitchMatched?.value ?: true)
-        if (autoPlay) play()
-    }
-
-    private fun loadOriginalAudio() {
-        val uri = currentSourceUri ?: return
-        val currentPos = player.currentPosition
-        val scheme = uri.scheme
-        currentlyLoadedPath = if (scheme == "http" || scheme == "https" || scheme == "innertube") null
-            else AudioFileManager.getRealPathFromURI(this, uri)
-        player.setMediaItem(buildMediaItem(uri))
-        player.seekTo(currentPos)
-        player.prepare()
-        play()
-    }
 
     private fun loadAudioInternal(uri: Uri, keepPlayingUntilReady: Boolean = false) {
         if (!keepPlayingUntilReady) {
@@ -1145,14 +868,6 @@ class AudioPlaybackService : MediaSessionService() {
             player.clearMediaItems()
         }
 
-        // Guard FFmpeg cancel — only if 8D is actually running
-        if (is8DEnabled && FFmpegKit.listSessions().isNotEmpty()) {
-            FFmpegKit.cancel()
-        }
-
-        // Move cache cleanup OFF the critical path
-        serviceScope.launch(Dispatchers.IO) { cleanCache() }
-        
         if (isCrossfading) {
             nextPlayer?.stop()
             nextPlayer?.release()
@@ -1166,17 +881,12 @@ class AudioPlaybackService : MediaSessionService() {
         }
 
         currentSourceUri = uri
-        hasProcessed8D = false
         isNextSongPreCached = false
         
         try {
             val scheme = uri.scheme
             if (scheme == "http" || scheme == "https" || scheme == "innertube") {
-                currentlyLoadedPath = null
                 Log.d(TAG, "Loading remote stream: ${uri.toString().take(80)}...")
-            } else {
-                val path = AudioFileManager.getRealPathFromURI(this, uri)
-                currentlyLoadedPath = path
             }
             
             val currentSong = viewModel?.currentSong?.value
@@ -1192,7 +902,6 @@ class AudioPlaybackService : MediaSessionService() {
                 pendingSeekPos = -1
             }
             
-            updateBaseVolume()
             player.prepare()
             
             if (shouldAutoPlay) {
@@ -1212,98 +921,20 @@ class AudioPlaybackService : MediaSessionService() {
         }
     }
 
-    private fun initializeAudioEffectsSafe() {
-        val sessionId = player.audioSessionId
-        if (sessionId == C.AUDIO_SESSION_ID_UNSET) return
-        
-        effectsExecutor.execute {
-            try {
-                if (sessionId == lastEffectsSessionId && equalizerEffect != null) {
-                    handler.post { viewModel?.triggerEffectsRefresh() }
-                    return@execute
-                }
-                releaseAudioEffects()
-                
-                equalizerEffect = Equalizer(0, sessionId)
-                bassBoostEffect = BassBoost(0, sessionId)
-                loudnessEnhancer = LoudnessEnhancer(sessionId)
-                reverbEffect = EnvironmentalReverb(0, sessionId)
-                lastEffectsSessionId = sessionId
-                
-                handler.post { 
-                    applyEffectsFromViewModelAsync()
-                    viewModel?.let { vm ->
-                        if (vm.hapticManager == null) {
-                            vm.hapticManager = com.codetrio.spatialflow.util.PlayerHapticManager(applicationContext)
-                        }
-                    }
-                }
-            } catch (ex: Exception) {
-                Log.e(TAG, "Failed to init audio effects: ${ex.message}")
+    private fun ensureHapticManager() {
+        viewModel?.let { vm ->
+            if (vm.hapticManager == null) {
+                vm.hapticManager = com.codetrio.spatialflow.util.PlayerHapticManager(applicationContext)
             }
         }
     }
 
-    fun applyEffectsFromViewModelAsync() {
-        val vm = viewModel ?: return
-        effectsExecutor.execute {
-            if (vm.isEqualizerEnabled.value) {
-                equalizerEffect?.enabled = true
-                setEqBandGain(0, vm.eqBand1.value )
-                setEqBandGain(1, vm.eqBand2.value )
-                setEqBandGain(2, vm.eqBand3.value )
-                setEqBandGain(3, vm.eqBand4.value )
-                setEqBandGain(4, vm.eqBand5.value )
+    private fun releaseHapticManager() {
+        viewModel?.let { vm ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                vm.hapticManager?.release()
             }
-
-            if (vm.isBassEnabled.value) {
-                bassBoostEffect?.enabled = true
-                setBassBoost(vm.bassBoost.value)
-            }
-
-            if (vm.isReverbEnabled.value) {
-                reverbEffect?.enabled = true
-                handler.post {
-                    reverbEffect?.let { player.setAuxEffectInfo(androidx.media3.common.AuxEffectInfo(it.id, 1.0f)) }
-                }
-                setReverbPreset(vm.reverbPreset.value)
-            } else {
-                reverbEffect?.enabled = false
-                handler.post {
-                    player.setAuxEffectInfo(androidx.media3.common.AuxEffectInfo(0, 0.0f))
-                }
-            }
-
-            if (vm.isLoudnessEnabled.value) {
-                loudnessEnhancer?.enabled = true
-                setLoudnessGain(vm.loudnessGain.value)
-            } else if (vm.isEqualizerEnabled.value) {
-                // Compensate for system Equalizer global volume attenuation
-                loudnessEnhancer?.enabled = true
-                try { loudnessEnhancer?.setTargetGain(600) } catch (_: Exception) {}
-            } else {
-                loudnessEnhancer?.enabled = false
-            }
-
-            handler.postDelayed({
-                setBalance(vm.balance.value)
-                setPlaybackSpeed(vm.playbackSpeed.value, vm.isPitchMatched.value)
-            }, 50)
-        }
-    }
-
-    private fun releaseAudioEffects() {
-        equalizerEffect?.release(); equalizerEffect = null
-        bassBoostEffect?.release(); bassBoostEffect = null
-        loudnessEnhancer?.release(); loudnessEnhancer = null
-        reverbEffect?.release(); reverbEffect = null
-        handler.post {
-            viewModel?.let { vm ->
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    vm.hapticManager?.release()
-                }
-                vm.hapticManager = null
-            }
+            vm.hapticManager = null
         }
     }
 
@@ -1374,13 +1005,6 @@ class AudioPlaybackService : MediaSessionService() {
             }
             SpatialFlowWidgetProvider.updateAllWidgets(this, song, isPlaying, pos, dur, lyricText)
         }
-    }
-
-    private fun finishProcessing(success: Boolean) {
-        isProcessing = false
-        viewModel?.postIsProcessing(false)
-        viewModel?.setProcessingProgress(if (success) 100 else 0)
-        updateWidgetState(player.isPlaying)
     }
 
     private fun setupMediaSession() {
@@ -1635,7 +1259,6 @@ class AudioPlaybackService : MediaSessionService() {
         player = newPlayer
         mainProcessor = nextProcessor!!
         
-        updateBaseVolume()
 
         // Stop old player and release it
         oldPlayer.stop()
@@ -1643,7 +1266,7 @@ class AudioPlaybackService : MediaSessionService() {
         oldPlayer.release()
 
         // Re-initialize a fresh nextPlayer for the future
-        nextProcessor = StereoBalanceProcessor()
+        nextProcessor = HapticsAudioProcessor()
         nextPlayer = buildExoPlayer(nextProcessor!!)
 
         // Apply listeners to the new primary player
@@ -1651,7 +1274,7 @@ class AudioPlaybackService : MediaSessionService() {
         mediaSession?.player = player
 
         // Re-attach hardware audio effects to the new audio session ID!
-        initializeAudioEffectsSafe()
+        ensureHapticManager()
 
         isCrossfading = false
         crossfadeNextSongStarted = false
@@ -1687,12 +1310,6 @@ class AudioPlaybackService : MediaSessionService() {
         }
     }
 
-    private fun cleanCache() {
-        val dayInMs = 24 * 60 * 60 * 1000L
-        val now = System.currentTimeMillis()
-        cacheDir.listFiles()?.filter { it.name.startsWith("8d") && it.lastModified() < now - dayInMs }?.forEach { it.delete() }
-    }
-
     private fun loadAudioPreferences() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         crossfadeDurationMs = (prefs.getFloat(KEY_CROSSFADE_DURATION, 0f) * 1000).toInt()
@@ -1704,8 +1321,7 @@ class AudioPlaybackService : MediaSessionService() {
             if (KEY_CROSSFADE_DURATION == key || KEY_AUDIO_FOCUS == key) loadAudioPreferences()
             if (com.codetrio.spatialflow.ui.SettingsViewModel.KEY_VOLUME_NORMALIZATION_ENABLED == key || 
                 com.codetrio.spatialflow.ui.SettingsViewModel.KEY_TARGET_LUFS == key) {
-                updateBaseVolume()
-            }
+                }
         }
     }
 
@@ -1715,18 +1331,12 @@ class AudioPlaybackService : MediaSessionService() {
         fun getService(): AudioPlaybackService = this@AudioPlaybackService
     }
 
-    inner class StereoBalanceProcessor : androidx.media3.common.audio.BaseAudioProcessor() {
-        private var currentBalance = 0f
-        private var targetBalance = 0f
+    inner class HapticsAudioProcessor : androidx.media3.common.audio.BaseAudioProcessor() {
 
         // Filter states for pure PCM-based premium real-time haptics crossover
         private var subBassFilterState = 0f
         private var bassFilterState = 0f
         private var midFilterState = 0f
-
-        fun setBalance(bal: Float) {
-            targetBalance = bal.coerceIn(-1f, 1f)
-        }
 
         override fun onConfigure(inputAudioFormat: androidx.media3.common.audio.AudioProcessor.AudioFormat): androidx.media3.common.audio.AudioProcessor.AudioFormat {
             if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT && inputAudioFormat.encoding != C.ENCODING_PCM_FLOAT) {
@@ -1740,61 +1350,27 @@ class AudioPlaybackService : MediaSessionService() {
             val isStereo = inputAudioFormat.channelCount == 2
             val is16Bit = inputAudioFormat.encoding == C.ENCODING_PCM_16BIT
             val bytesPerSample = if (is16Bit) 2 else 4
-            val inputFrameSize = bytesPerSample * inputAudioFormat.channelCount
-            val frameCount = inputBuffer.remaining() / inputFrameSize
+            val frameSize = bytesPerSample * inputAudioFormat.channelCount
+            val frameCount = inputBuffer.remaining() / frameSize
             val outBuffer = replaceOutputBuffer(frameCount * bytesPerSample * 2)
-
-            // Direct PCM Crossover Analysis for premium permissionless, zero-log haptic feedback
+            // Preserve the decoded samples; sampling is used only for optional music haptics.
             analyzePcmForHaptics(inputBuffer, is16Bit, isStereo, frameCount)
-
-            if (currentBalance == targetBalance) {
-                val leftVol = if (currentBalance > 0) 1f - currentBalance else 1f
-                val rightVol = if (currentBalance < 0) 1f + currentBalance else 1f
-                processBuffer(inputBuffer, outBuffer, leftVol, rightVol, isStereo)
-            } else {
-                val balanceStep = (targetBalance - currentBalance) / frameCount.toFloat()
-                if (inputAudioFormat.encoding == C.ENCODING_PCM_16BIT) {
-                    while (inputBuffer.hasRemaining()) {
-                        currentBalance += balanceStep
-                        val leftVol = if (currentBalance > 0) 1f - currentBalance else 1f
-                        val rightVol = if (currentBalance < 0) 1f + currentBalance else 1f
-                        val left = inputBuffer.short
-                        val right = if (isStereo) inputBuffer.short else left
-                        outBuffer.putShort((left * leftVol).toInt().toShort())
-                        outBuffer.putShort((right * rightVol).toInt().toShort())
-                    }
-                } else {
-                    while (inputBuffer.hasRemaining()) {
-                        currentBalance += balanceStep
-                        val leftVol = if (currentBalance > 0) 1f - currentBalance else 1f
-                        val rightVol = if (currentBalance < 0) 1f + currentBalance else 1f
-                        val left = inputBuffer.float
-                        val right = if (isStereo) inputBuffer.float else left
-                        outBuffer.putFloat(left * leftVol)
-                        outBuffer.putFloat(right * rightVol)
-                    }
+            if (isStereo) {
+                outBuffer.put(inputBuffer)
+            } else if (is16Bit) {
+                while (inputBuffer.remaining() >= bytesPerSample) {
+                    val sample = inputBuffer.short
+                    outBuffer.putShort(sample)
+                    outBuffer.putShort(sample)
                 }
-                currentBalance = targetBalance
+            } else {
+                while (inputBuffer.remaining() >= bytesPerSample) {
+                    val sample = inputBuffer.float
+                    outBuffer.putFloat(sample)
+                    outBuffer.putFloat(sample)
+                }
             }
             outBuffer.flip()
-        }
-
-        private fun processBuffer(input: ByteBuffer, output: ByteBuffer, leftVol: Float, rightVol: Float, isStereo: Boolean) {
-            if (inputAudioFormat.encoding == C.ENCODING_PCM_16BIT) {
-                while (input.hasRemaining()) {
-                    val left = input.short
-                    val right = if (isStereo) input.short else left
-                    output.putShort((left * leftVol).toInt().toShort())
-                    output.putShort((right * rightVol).toInt().toShort())
-                }
-            } else {
-                while (input.hasRemaining()) {
-                    val left = input.float
-                    val right = if (isStereo) input.float else left
-                    output.putFloat(left * leftVol)
-                    output.putFloat(right * rightVol)
-                }
-            }
         }
 
         @OptIn(UnstableApi::class)
@@ -1881,7 +1457,7 @@ class AudioPlaybackService : MediaSessionService() {
             // Explicitly set channel and properties to match Java example exactly
             notificationBuilder.setSmallIcon(R.drawable.ic_music_note)
             notificationBuilder.setContentTitle(currentSongName)
-            notificationBuilder.setContentText(if (is8DEnabled) "🎧 8D Audio" else "Normal Playback")
+            notificationBuilder.setContentText("Now Playing")
             notificationBuilder.setSubText("SpatialFlow")
             notificationBuilder.setChannelId("audio_playback_channel")
             notificationBuilder.setOngoing(isPlaying)
@@ -1932,92 +1508,4 @@ class AudioPlaybackService : MediaSessionService() {
         }
     }
 
-    private fun updateBaseVolume() {
-        val prefs = getSharedPreferences(com.codetrio.spatialflow.ui.SettingsViewModel.PREFS_NAME,
-            MODE_PRIVATE
-        )
-        val enabled = prefs.getBoolean(com.codetrio.spatialflow.ui.SettingsViewModel.KEY_VOLUME_NORMALIZATION_ENABLED, false)
-        
-        Log.d(TAG, "updateBaseVolume: normalizationEnabled=$enabled")
-        
-        if (!enabled) {
-            currentBaseVolume = 1.0f
-            applyCurrentBaseVolume()
-            return
-        }
-
-        val targetLufs = prefs.getFloat(com.codetrio.spatialflow.ui.SettingsViewModel.KEY_TARGET_LUFS, -14f)
-        val song = viewModel?.currentSong?.value
-        
-        Log.d(TAG, "updateBaseVolume: targetLufs=$targetLufs, song=${song?.title}, videoId=${song?.videoId}")
-        
-        if (song == null) return
-        
-        if (song.lufs != null) {
-            Log.d(TAG, "updateBaseVolume: Using pre-cached LUFS (${song.lufs})")
-            applyLufsGain(song.lufs!!, targetLufs)
-        } else if (song.videoId.isNullOrEmpty() && !song.path.isNullOrEmpty() && song.path?.startsWith("http") == false) {
-            // Local file with missing LUFS metadata
-            Log.d(TAG, "updateBaseVolume: Analyzing local file LUFS for ${song.path}")
-            serviceScope.launch(Dispatchers.IO) {
-                val measured = com.codetrio.spatialflow.player.LoudnessAnalyzer.analyzeLufsFast(song.path)
-                if (measured != null) {
-                    // Update in-memory so we don't re-analyze
-                    song.lufs = measured
-                    // Save to playlist db if applicable
-                    val db = com.codetrio.spatialflow.data.db.MusicDatabase.getDatabase(applicationContext)
-                    db.playlistDao().updateSongLufs(song.id.toString(), measured)
-                    
-                    withContext(Dispatchers.Main) {
-                        applyLufsGain(measured, targetLufs)
-                    }
-                }
-            }
-        } else if (!song.videoId.isNullOrEmpty()) {
-            // Online stream: fetch true loudness offset from YouTube Music API
-            Log.d(TAG, "updateBaseVolume: Fetching online loudnessDb for videoId=${song.videoId}")
-            serviceScope.launch(Dispatchers.IO) {
-                val loudnessDb = com.codetrio.spatialflow.data.innertube.YouTubeMusic.getLoudnessDb(song.videoId!!).getOrNull()
-                val estimatedLufs = if (loudnessDb != null) {
-                    // YouTube target is roughly -14 LUFS. The loudnessDb is the relative offset.
-                    -14.0f + loudnessDb
-                } else {
-                    // Fallback if API doesn't provide the loudness
-                    Log.d(TAG, "updateBaseVolume: Falling back to -10 LUFS")
-                    -10f 
-                }
-                
-                withContext(Dispatchers.Main) {
-                    applyLufsGain(estimatedLufs, targetLufs)
-                }
-            }
-        } else {
-            // Unrecognized streams get a fallback normalization of -10 LUFS
-            Log.d(TAG, "updateBaseVolume: Unrecognized stream, using fallback -10 LUFS")
-            applyLufsGain(-10f, targetLufs)
-        }
-    }
-
-    private fun applyLufsGain(lufs: Float, targetLufs: Float) {
-        val gain = com.codetrio.spatialflow.player.VolumeNormalizer.calculateGain(lufs, targetLufs)
-        val linearVolume = com.codetrio.spatialflow.player.VolumeNormalizer.dbToLinear(gain)
-        
-        // ExoPlayer's volume property is a multiplier from 0.0 to 1.0. It cannot amplify > 100%.
-        // If linearVolume > 1.0, it means the target LUFS is louder than the song's intrinsic loudness.
-        currentBaseVolume = linearVolume.coerceIn(0.0f, 1.0f)
-        
-        if (linearVolume > 1.0f) {
-            Log.w(TAG, "Volume Normalization: Requested gain ($gain dB) requires volume > 100% ($linearVolume). Clamped to 1.0. Target LUFS ($targetLufs) may be set too high.")
-        } else {
-            Log.d(TAG, "Applied Volume Normalization: lufs=$lufs, target=$targetLufs, gain=$gain, baseVol=$currentBaseVolume")
-        }
-        
-        applyCurrentBaseVolume()
-    }
-
-    private fun applyCurrentBaseVolume() {
-        if (!isCrossfading && player.volume != 0f) {
-            player.volume = currentBaseVolume
-        }
-    }
 }
