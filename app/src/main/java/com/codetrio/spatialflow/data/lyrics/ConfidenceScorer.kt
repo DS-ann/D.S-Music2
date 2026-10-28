@@ -136,15 +136,19 @@ class ConfidenceScorer {
 
     private fun countSyncedLines(lyrics: String): Int {
         if (lyrics.isEmpty()) return 0
+        if (AdvancedLyricsParser.recognizes(lyrics)) {
+            // JSON-backed LyricsPlus needs parsing rather than LRC/TTML regex detection.
+            return AdvancedLyricsParser.parse(lyrics).orEmpty()
+                .count { !it.isInterlude && it.content.isNotBlank() }
+        }
         val lrcLines = Regex("""(?m)^\s*\[\d{1,2}:\d{2}(?:[.:]\d{1,3})?]""")
             .findAll(lyrics).count()
         val karaokeLines = Regex("""(?m)^\s*\[\d+,\d+]""")
-            .findAll(lyrics.substringAfter('\\n', "")).count()
+            .findAll(lyrics.substringAfter('\n', "")).count()
         val ttmlLines = Regex("""(?i)<p\b[^>]*\bbegin\s*=""")
             .findAll(lyrics).count()
         return maxOf(lrcLines, karaokeLines, ttmlLines)
     }
-
     enum class Action {
         ACCEPT,            // Show immediately, stop searching
         SHOW_AND_CONTINUE, // Show but keep searching for better match
