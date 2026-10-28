@@ -124,6 +124,7 @@ class AudioPlaybackService : MediaSessionService() {
     // Track the unique song ID that the current resolution is targeting
     private var resolveTargetSongId: String? = null
     private var lastPlaybackRecoveryVideoId: String? = null
+    private var failedStreamVideoId: String? = null
     private var isRecoveringPlaybackError = false
     private var isFetchingRelatedProactively = false
 
@@ -554,6 +555,7 @@ class AudioPlaybackService : MediaSessionService() {
                 }
                 
                 if (!streamUrl.isNullOrEmpty()) {
+                    failedStreamVideoId = null
                     loadAudioInternal(streamUrl.toUri(), keepPlayingUntilReady = true)
                     
                     // Asynchronously fetch and apply resume position with a 2-second timeout
@@ -578,6 +580,7 @@ class AudioPlaybackService : MediaSessionService() {
                     }
                 } else {
                     Log.e(TAG, "Failed resolving stream after retry for: $videoId")
+                    failedStreamVideoId = videoId
                     shouldAutoPlay = false
                     viewModel?.setIsPlaying(false)
                     com.codetrio.spatialflow.ui.SnackbarController.showMessage(
@@ -759,6 +762,21 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     fun play() {
+        val activeSong = viewModel?.currentSong?.value
+        val failedVideoId = failedStreamVideoId
+        if (!failedVideoId.isNullOrBlank() && activeSong?.videoId == failedVideoId) {
+            loadAndPlay("innertube://$failedVideoId".toUri(), player.currentPosition.coerceAtLeast(0L))
+            return
+        }
+
+        if (player.playerError != null) {
+            val retryUri = viewModel?.songUri?.value ?: originalSourceUri ?: currentSourceUri
+            if (retryUri != null) {
+                loadAndPlay(retryUri, player.currentPosition.coerceAtLeast(0L))
+                return
+            }
+        }
+
         if (player.currentMediaItem == null) {
             val uri = viewModel?.songUri?.value
             if (uri != null) {
