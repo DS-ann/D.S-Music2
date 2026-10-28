@@ -20,8 +20,8 @@ android {
         // Android 6.0 Marshmallow is API 23; keep APIs newer than 23 guarded at runtime.
         minSdk 23
         targetSdk 37
-        versionCode 17
-        versionName "1.8.9"
+        versionCode 18
+        versionName "1.8.10"
     }
 
     // Produce only the ARM64-v8a APK; do not emit universal or other-ABI APKs.

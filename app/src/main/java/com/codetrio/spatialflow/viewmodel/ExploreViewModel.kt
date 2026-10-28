@@ -233,15 +233,13 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     }
                     _uiState.update { it.copy(searchResults = uniqueItems) }
                     searchContinuation = searchResult.continuation
-                    prefetchThumbnails(uniqueItems.take(12))
-                    
-                    // Pre-resolve stream URLs for top 3 song results for instant playback
+                    // Only warm visible artwork and the first likely playback target. Larger prefetch
+                    // bursts compete with scrolling and playback on low-RAM/older Android devices.
+                    prefetchThumbnails(uniqueItems.take(6))
                     uniqueItems
                         .filterIsInstance<SearchItem.Song>()
-                        .take(3)
-                        .forEach { songItem ->
-                            YouTubeMusic.prefetchStream(songItem.song.videoId)
-                        }
+                        .firstOrNull()
+                        ?.let { YouTubeMusic.prefetchStream(it.song.videoId) }
                 }
                 result.onFailure { e ->
                     Log.e(TAG, "Search failed", e)
@@ -337,7 +335,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private suspend fun getPersonalizedSections(): List<HomeSection> {
         val historyString = prefs.getString("recent_artists_list", "") ?: ""
         if (historyString.isBlank()) return emptyList()
-        val artists = historyString.split("|").map { it.trim() }.filter { it.isNotBlank() }
+        val artists = historyString.split("|// A small recent-artist sample keeps optional personalization from flooding slower devices with requests.
+        val artists = historyString.split("|").map { it.trim() }.filter { it.isNotBlank() }.take(3)
         
         val sections = mutableListOf<HomeSection>()
         val allMixedSongs = mutableListOf<SearchItem>()
@@ -429,8 +428,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         
         val exploreTask = async { YouTubeMusic.explore().getOrNull() }
 
-        // 1. While network is running, start compiling local personalized stats (Instant CPU task)
-        val localStats = getPersonalizedSections()
+        // Fetch the online feed first so local personalization cannot delay first content.
 
         // 2. Await Network streams
         val homePage = homeTask?.await()
@@ -451,14 +449,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         // Priority A: Personalized Home Content from YT
         homePage?.sections?.let { sections.addAll(it) }
 
-        // Priority B: In-App Local playback analytics (Don't duplicate labels)
-        localStats.forEach { sec ->
-            if (sections.none { it.title.equals(sec.title, ignoreCase = true) }) {
-                sections.add(sec)
-            }
-        }
-
-        // Priority C: Generic trending explore feeds
+        // Priority B: Generic trending explore feeds
         explorePage?.sections?.forEach { sec ->
             if (sections.none { it.title.equals(sec.title, ignoreCase = true) }) {
                 sections.add(sec)
@@ -504,19 +495,47 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     fun loadHomeFeed() {
         if (homeLoaded || _uiState.value.isLoadingHome) return
 
-        syncCookieFromDisk() // Critical defensive hydration step
+        syncCookieFromDisk()
         _uiState.update { it.copy(isLoadingHome = true) }
         viewModelScope.launch {
             try {
                 val mergedSections = fetchMergedHomeFeed()
-                _uiState.update { it.copy(homeSections = mergedSections) }
+                // Publish the main feed immediately; personalization is optional and loaded afterwards.
+                _uiState.update { it.copy(homeSections = mergedSections, isLoadingHome = false) }
                 homeLoaded = true
-                prefetchThumbnails(mergedSections.take(4).flatMap { it.items.take(4) })
+                prefetchThumbnails(mergedSections.take(3).flatMap { it.items.take(3) })
+
+                if (_uiState.value.currentMood == null) {
+                    viewModelScope.launch {
+                        try {
+                            val localStats = getPersonalizedSections()
+                            if (localStats.isNotEmpty()) {
+                                _uiState.update { state ->
+                                    if (state.currentMood != null) {
+                                        state
+                                    } else {
+                                        val updatedSections = state.homeSections.toMutableList()
+                                        val additions = localStats.filter { section ->
+                                            updatedSections.none {
+                                                it.title.equals(section.title, ignoreCase = true)
+                                            }
+                                        }
+                                        updatedSections.addAll(minOf(3, updatedSections.size), additions)
+                                        state.copy(homeSections = updatedSections)
+                                    }
+                                }
+                                prefetchThumbnails(localStats.take(2).flatMap { it.items.take(3) })
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Personalized sections failed to load", e)
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Home feed error", e)
                 _uiState.update { it.copy(error = e.message) }
             } finally {
-                _uiState.update { it.copy(isLoadingHome = false) }
+                _uiState.update { if (it.isLoadingHome) it.copy(isLoadingHome = false) else it }
             }
         }
     }

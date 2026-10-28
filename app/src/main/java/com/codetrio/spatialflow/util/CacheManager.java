@@ -4,7 +4,6 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.util.Log;
 
-import com.bumptech.glide.Glide;
 
 import java.io.File;
 import java.util.concurrent.ExecutorService;
@@ -13,7 +12,7 @@ import java.util.concurrent.Executors;
 /**
  * Utility class to manage app cache and clean up temp files.
  * Clears old temporary files (FFmpeg output, temp audio copies) on startup
- * to prevent app size bloat.
+ * while preserving persistent artwork caches to avoid repeated image downloads.
  */
 public class CacheManager {
 
@@ -69,16 +68,7 @@ public class CacheManager {
                         }
                     }
                 }
-
-                // Clear Glide disk cache
-                try {
-                    Glide.get(context).clearDiskCache();
-                    Log.d(TAG, "Glide disk cache cleared");
-                } catch (Exception e) {
-                    Log.w(TAG, "Failed to clear Glide cache: " + e.getMessage());
-                }
-
-                if (deletedCount > 0) {
+if (deletedCount > 0) {
                     Log.d(TAG, "Cache cleanup: deleted " + deletedCount + " files, freed " +
                             formatSize(freedBytes));
                 } else {

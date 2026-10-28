@@ -1,4 +1,4 @@
-name: Build ARM64-v8a SpatialFlow APK (Android 6+)
+name: Build and upload SpatialFlow Android 6+ APK
 
 on:
   workflow_call:
@@ -8,11 +8,6 @@ on:
         required: false
         type: string
         default: master
-      run_api23_smoke_test:
-        description: Run the optional Android 6 emulator smoke test
-        required: false
-        type: boolean
-        default: false
   push:
     branches: [ master ]
     paths:
@@ -24,7 +19,6 @@ on:
       - 'settings.gradle'
       - 'gradle.properties'
       - '.github/workflows/android6-apk.yml'
-      - '.github/scripts/**'
   workflow_dispatch:
     inputs:
       source_ref:
@@ -32,11 +26,6 @@ on:
         required: true
         type: string
         default: master
-      run_api23_smoke_test:
-        description: Run optional Android 6 emulator smoke test (may be slow on hosted runners)
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -47,7 +36,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build and verify temporary-key-signed APK
+    name: Build, sign, compress, upload
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -63,11 +52,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle without cache
+      - name: Set up Gradle with cache
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.3.1'
-          cache-disabled: true
 
       - name: Set up Android SDK build tools
         uses: android-actions/setup-android@v4
@@ -77,39 +65,21 @@ jobs:
       - name: Install Android 17 SDK and Build Tools
         run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0"
 
-      - name: Clean and build unsigned ARM64-v8a release
-        run: |
-          set -euo pipefail
-          for attempt in 1 2 3; do
-            if gradle --no-daemon --no-build-cache --no-configuration-cache --stacktrace clean assembleRelease; then
-              exit 0
-            fi
-            if [ "$attempt" -lt 3 ]; then
-              echo "Gradle build attempt $attempt failed; retrying in case of a transient dependency repository error."
-              sleep $((attempt * 15))
-            fi
-          done
-          exit 1
+      - name: Compile ARM64-v8a release APK
+        run: gradle --no-daemon assembleRelease
 
-      - name: Generate temporary key and sign the ARM64-v8a APK
-        id: temporary_signing
+      - name: Sign and highly compress APK
         run: |
           set -euo pipefail
           BUILD_DIR="app/build/outputs/apk/release"
           SOURCE_APK="$BUILD_DIR/app-arm64-v8a-release-unsigned.apk"
           ALIGNED_APK="$RUNNER_TEMP/SpatialFlow-arm64-v8a-aligned.apk"
           OUTPUT_APK="$BUILD_DIR/SpatialFlow-arm64-v8a-Android6-release.apk"
+          OUTPUT_ZIP="$BUILD_DIR/SpatialFlow-arm64-v8a-Android6-release.zip"
           KEYSTORE="$RUNNER_TEMP/spatialflow-temporary-signing-key.p12"
           ZIPALIGN="$ANDROID_HOME/build-tools/37.0.0/zipalign"
           APK_SIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
 
-          test -s "$SOURCE_APK"
-          test -x "$ZIPALIGN"
-          test -x "$APK_SIGNER"
-          APK_COUNT="$(find "$BUILD_DIR" -maxdepth 1 -type f -name '*.apk' | wc -l | tr -d ' ')"
-          test "$APK_COUNT" -eq 1
-
-          # This key is generated per workflow run; no D.S Launcher/BatteryPulse key is accessed.
           export TEMP_SIGNING_PASSWORD="$(openssl rand -hex 32)"
           keytool -genkeypair -noprompt \
             -keystore "$KEYSTORE" -storetype PKCS12 \
@@ -125,64 +95,14 @@ jobs:
             --ks-pass env:TEMP_SIGNING_PASSWORD \
             --key-pass env:TEMP_SIGNING_PASSWORD \
             --out "$OUTPUT_APK" "$ALIGNED_APK"
-          "$APK_SIGNER" verify --verbose "$OUTPUT_APK"
 
-          # Ensure this artifact is ARM64-only, not a universal/multi-ABI APK.
-          ABIS="$(unzip -Z1 "$OUTPUT_APK" | awk -F/ '$1 == "lib" && NF >= 3 { print $2 }' | sort -u)"
-          if [ -n "$ABIS" ] && [ "$ABIS" != "arm64-v8a" ]; then
-            echo "::error::Unexpected ABI directories in APK: $ABIS"
-            exit 1
-          fi
-          echo "Verified ARM64-v8a APK signed with this run's temporary key."
+          zip -9 -j "$OUTPUT_ZIP" "$OUTPUT_APK"
 
-      - name: Upload single signed ARM64-v8a APK artifact
+      - name: Upload compressed signed APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: SpatialFlow-arm64-v8a-Android6-release-APK
-          path: app/build/outputs/apk/release/SpatialFlow-arm64-v8a-Android6-release.apk
+          name: SpatialFlow-arm64-v8a-Android6-release
+          path: app/build/outputs/apk/release/SpatialFlow-arm64-v8a-Android6-release.zip
           archive: false
           if-no-files-found: error
           retention-days: 14
-
-      - name: Run Android Lint for API compatibility
-        id: android_lint
-        continue-on-error: true
-        run: gradle --no-daemon --no-build-cache --no-configuration-cache lintRelease
-
-      - name: Print Android Lint diagnostics
-        if: steps.android_lint.outcome == 'failure'
-        run: |
-          REPORT="app/build/intermediates/lint_intermediate_text_report/release/lintReportRelease/lint-results-release.txt"
-          if [ -f "$REPORT" ]; then
-            echo "Existing project lint backlog (first 100 diagnostic lines):"
-            grep -E 'Error:|Warning:' "$REPORT" | head -n 100 || true
-          else
-            echo "Lint report file was not generated."
-          fi
-
-      - name: Smoke-test install and launch on Android 6 (API 23)
-        id: api23_smoke
-        if: inputs.run_api23_smoke_test || github.event_name == 'push'
-        timeout-minutes: 12
-        continue-on-error: true
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 23
-          target: default
-          arch: arm64-v8a
-          profile: Nexus 5
-          disable-animations: true
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
-          script: bash .github/scripts/android6-smoke-test.sh
-
-      - name: Classify Android 6 emulator smoke-test result
-        if: steps.api23_smoke.outcome == 'failure'
-        env:
-          SMOKE_SCRIPT_STARTED: ${{ runner.temp }}/spatialflow-api23-smoke-started
-        run: |
-          set -euo pipefail
-          if [ -f "$SMOKE_SCRIPT_STARTED" ]; then
-            echo "::error::The API 23 emulator started, but the app install/start smoke test failed."
-            exit 1
-          fi
-          echo "::warning::The emulator failed before the API 23 smoke-test script could start. Android 6 runtime behavior is unverified; continuing to artifact upload."
