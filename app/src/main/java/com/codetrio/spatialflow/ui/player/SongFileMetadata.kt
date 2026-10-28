@@ -11,6 +11,40 @@ import java.io.File
  * File facts read from the local media source. Bitrate from embedded metadata is kept
  * separate from an estimate calculated from file bytes and duration.
  */
+internal data class OnlineStreamMetadata(
+    val title: String? = null,
+    val artist: String? = null,
+    val durationMs: Long? = null,
+    val mimeType: String? = null,
+    val bitrateBps: Int? = null,
+    val contentLengthBytes: Long? = null,
+    val audioQuality: String? = null
+)
+
+internal object OnlineStreamMetadataReader {
+    suspend fun read(videoId: String): OnlineStreamMetadata? {
+        if (videoId.isBlank()) return null
+        return try {
+            val player = com.codetrio.spatialflow.data.innertube.YouTubeMusic.player(videoId).getOrNull()
+                ?: return null
+            val audio = player.streams
+                .filter { it.mimeType.startsWith("audio/", ignoreCase = true) }
+                .maxByOrNull { it.bitrate }
+            OnlineStreamMetadata(
+                title = player.title.takeIf { it.isNotBlank() && !it.equals("Unknown", ignoreCase = true) },
+                artist = player.artist.takeIf { it.isNotBlank() && !it.equals("Unknown Artist", ignoreCase = true) },
+                durationMs = player.durationMs.takeIf { it > 0L },
+                mimeType = audio?.mimeType?.takeIf { it.isNotBlank() },
+                bitrateBps = audio?.bitrate?.takeIf { it > 0 },
+                contentLengthBytes = audio?.contentLength?.takeIf { it > 0L },
+                audioQuality = audio?.audioQuality?.takeIf { it.isNotBlank() }
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+}
+
 internal data class SongFileMetadata(
     val isRemote: Boolean,
     val sizeBytes: Long? = null,

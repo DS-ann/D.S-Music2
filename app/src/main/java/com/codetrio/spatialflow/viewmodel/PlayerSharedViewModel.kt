@@ -1384,7 +1384,8 @@ class PlayerSharedViewModel @Inject constructor(
                 artist = artist,
                 streamUrl = item.localConfiguration?.uri?.toString(),
                 durationMs = service.player.duration,
-                thumbnailUrl = artworkUri
+                thumbnailUrl = artworkUri,
+                albumName = item.mediaMetadata.albumTitle?.toString()
             )
         }
         return null

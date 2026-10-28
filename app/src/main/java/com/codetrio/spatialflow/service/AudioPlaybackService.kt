@@ -1176,6 +1176,8 @@ class AudioPlaybackService : MediaSessionService() {
         val metadataBuilder = androidx.media3.common.MediaMetadata.Builder()
             .setTitle(title)
             .setArtist(artist)
+        val activeSong = viewModel?.currentSong?.value?.takeIf { it.id.toString() == songId }
+        activeSong?.albumName?.takeIf { it.isNotBlank() }?.let { metadataBuilder.setAlbumTitle(it) }
         
         // We only compress current cover for the active track to conserve heap space
         if (title == currentSongName) {

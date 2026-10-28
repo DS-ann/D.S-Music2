@@ -78,6 +78,7 @@ import com.codetrio.spatialflow.data.lyrics.LyricLine
 import com.codetrio.spatialflow.data.lyrics.LyricsResult
 import com.codetrio.spatialflow.model.SongItem
 import com.codetrio.spatialflow.viewmodel.PlayerSharedViewModel
+import com.codetrio.spatialflow.data.innertube.YouTubeMusic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
@@ -844,10 +845,22 @@ fun FullPlayer(
                         delay(250L)
                     }
                 }
+                val onlineStreamMetadata by produceState<OnlineStreamMetadata?>(
+                    initialValue = null,
+                    key1 = song.videoId
+                ) {
+                    value = if (!song.videoId.isNullOrBlank()) {
+                        withContext(Dispatchers.IO) {
+                            OnlineStreamMetadataReader.read(song.videoId!!)
+                        }
+                    } else null
+                }
                 val streamBitrateBps = streamFormat?.bitrateBps?.takeIf { it > 0 }
+                    ?: onlineStreamMetadata?.bitrateBps
                 val durationMs = when {
                     song.duration > 0L -> song.duration
                     (streamFormat?.durationMs ?: 0L) > 0L -> streamFormat?.durationMs ?: 0L
+                    (onlineStreamMetadata?.durationMs ?: 0L) > 0L -> onlineStreamMetadata?.durationMs ?: 0L
                     (songFileMetadata.durationMs ?: 0L) > 0L -> songFileMetadata.durationMs ?: 0L
                     else -> 0L
                 }
@@ -858,6 +871,7 @@ fun FullPlayer(
                         .takeIf { it > 0.0 && it < Long.MAX_VALUE.toDouble() }
                         ?.toLong()
                 } else null
+                val reportedOnlineStreamBytes = onlineStreamMetadata?.contentLengthBytes
                 val totalSeconds = durationMs.coerceAtLeast(0L) / 1000L
                 val durationText = if (durationMs > 0L) {
                     if (totalSeconds >= 3600L) {
@@ -874,6 +888,8 @@ fun FullPlayer(
                 val sizeText = when {
                     fileSizeBytes != null ->
                         android.text.format.Formatter.formatFileSize(context, fileSizeBytes)
+                    reportedOnlineStreamBytes != null ->
+                        android.text.format.Formatter.formatFileSize(context, reportedOnlineStreamBytes) + " (reported audio stream length)"
                     estimatedStreamSizeBytes != null ->
                         "About " + android.text.format.Formatter.formatFileSize(context, estimatedStreamSizeBytes) +
                             " (estimated from stream bitrate and duration)"
@@ -893,6 +909,7 @@ fun FullPlayer(
                 }
                 val formatText = songFileMetadata.mimeType
                     ?: streamFormat?.mimeType
+                    ?: onlineStreamMetadata?.mimeType
                     ?: songFileMetadata.fileName?.substringAfterLast('.', "")
                         ?.takeIf { it.isNotBlank() }
                         ?.uppercase(java.util.Locale.ROOT)
@@ -904,9 +921,15 @@ fun FullPlayer(
                     songFileMetadata.isRemote -> "Remote audio stream"
                     else -> "Device audio library"
                 }
+                val displayTitle = song.title.takeIf { it.isNotBlank() && !it.equals("Unknown Title", true) }
+                    ?: onlineStreamMetadata?.title
+                    ?: "Title not supplied by source"
+                val displayArtist = song.artist.takeIf { it.isNotBlank() && !it.equals("Unknown Artist", true) }
+                    ?: onlineStreamMetadata?.artist
+                    ?: "Artist not supplied by source"
                 val details = mutableListOf(
-                    "Title" to song.title.ifBlank { "Unknown title" },
-                    "Artist" to song.artist.ifBlank { "Unknown artist" },
+                    "Title" to displayTitle,
+                    "Artist" to displayArtist,
                     "Album" to (
                         song.albumName?.takeIf { it.isNotBlank() && !it.equals("<unknown>", true) }
                             ?: streamFormat?.albumTitle
@@ -919,6 +942,7 @@ fun FullPlayer(
                     "Bitrate" to bitrateText,
                     "Format" to formatText
                 )
+                onlineStreamMetadata?.audioQuality?.let { details.add("Source audio quality" to it) }
                 streamFormat?.sampleRateHz?.takeIf { it > 0 }?.let {
                     details.add("Sample rate" to "${it} Hz")
                 }

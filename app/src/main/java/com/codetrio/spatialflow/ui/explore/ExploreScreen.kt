@@ -217,7 +217,8 @@ fun ExploreScreen(
                             "", // Empty streamUrl permits automatic resolving pipeline promotion
                             os.durationMs,
                             os.thumbnailUrl,
-                            os.artistId
+                            os.artistId,
+                            os.albumName
                         )
                     }
                     playerSharedViewModel.setSongList(songItems)
@@ -231,7 +232,8 @@ fun ExploreScreen(
                         "",
                         durationMs,
                         song.thumbnailUrl,
-                        song.artistId
+                        song.artistId,
+                        song.albumName
                     )
                     playerSharedViewModel.playSong(songItem)
                 }
