@@ -136,8 +136,11 @@ class PlayerLyricsStateController(private val logTag: String) {
     fun selectProvider(providerName: String) {
         val result = _providerResults.value[providerName]
         if (result != null && result.hasLyrics()) {
-            // Clear the previous rendered lyrics before applying the new provider's payload.
-            // Keep provider search results available so switching back remains immediate.
+            // Keep only the selected provider's large lyric payload in memory.
+            val compacted = _providerResults.value.toMutableMap()
+            clearInactiveProviderPayloads(compacted, providerName)
+            _providerResults.value = compacted
+
             _syncedLyrics.value = null
             _plainLyrics.value = null
             _selectedProvider.value = providerName
@@ -146,6 +149,29 @@ class PlayerLyricsStateController(private val logTag: String) {
             _isLoading.value = false
             _error.value = null
             _statusMessage.value = "Lyrics from ${result.providerName ?: providerName}"
+        }
+    }
+
+    /**
+     * The selector needs only provider identity/status for inactive sources. Removing their large
+     * raw lyric strings keeps one source payload resident instead of retaining every catalogue's
+     * full result. The UI can refetch if the user wants to switch back to a cleared source.
+     */
+    private fun clearInactiveProviderPayloads(
+        results: MutableMap<String, LyricsResult>,
+        activeProviderName: String
+    ) {
+        results.toMap().forEach { (name, item) ->
+            if (name != activeProviderName && item.hasLyrics()) {
+                results[name] = item.copy(
+                    syncedLyrics = null,
+                    plainLyrics = null,
+                    isSynced = false,
+                    isWordByWord = false,
+                    isInstrumental = false,
+                    payloadClearedForMemory = true
+                )
+            }
         }
     }
 
@@ -244,18 +270,30 @@ class PlayerLyricsStateController(private val logTag: String) {
             override fun onProviderResult(providerName: String, result: LyricsResult?) {
                 if (!isActiveLyricsRequest(requestSongId)) return
 
+                val selectedBeforeCallback = _selectedProvider.value
                 val currentMap = _providerResults.value.toMutableMap()
-                if (result != null) {
-                    currentMap[providerName] = result
-                } else {
-                    currentMap[providerName] = LyricsResult(providerName = providerName, confidence = -1f)
+                currentMap[providerName] = when {
+                    result == null -> LyricsResult(providerName = providerName, confidence = -1f)
+                    selectedBeforeCallback != null && selectedBeforeCallback != providerName && result.hasLyrics() ->
+                        result.copy(
+                            syncedLyrics = null,
+                            plainLyrics = null,
+                            isSynced = false,
+                            isWordByWord = false,
+                            isInstrumental = false,
+                            payloadClearedForMemory = true
+                        )
+                    else -> result
                 }
                 _providerResults.value = currentMap
 
                 val selected = _selectedProvider.value
                 if (selected != null) {
-                    // Re-apply only updates from the active source; ignore unrelated providers.
+                    // Re-apply only updates from the active source; discard raw payloads from other sources.
                     if (selected == providerName && result != null && result.hasLyrics()) {
+                        currentMap[providerName] = result
+                        clearInactiveProviderPayloads(currentMap, selected)
+                        _providerResults.value = currentMap
                         _syncedLyrics.value = null
                         _plainLyrics.value = null
                         applyLyricsResult(result)
@@ -268,6 +306,8 @@ class PlayerLyricsStateController(private val logTag: String) {
                     if (best != null && best.hasLyrics()) {
                         if (best.providerName.equals(DEFAULT_PROVIDER, ignoreCase = true)) {
                             _selectedProvider.value = DEFAULT_PROVIDER
+                            clearInactiveProviderPayloads(currentMap, DEFAULT_PROVIDER)
+                            _providerResults.value = currentMap
                         }
                         _syncedLyrics.value = null
                         _plainLyrics.value = null

@@ -16,7 +16,9 @@ data class LyricsResult(
     var matchedArtist: String? = null,
     var matchedAlbum: String? = null,
     var matchedDuration: Float = 0f,
-    var fetchTimestamp: Long = System.currentTimeMillis()
+    var fetchTimestamp: Long = System.currentTimeMillis(),
+    /** True when the lyric payload was dropped to save memory; refetch before using again. */
+    var payloadClearedForMemory: Boolean = false
 ) {
     /**
      * Returns true if this result has any usable lyrics content.

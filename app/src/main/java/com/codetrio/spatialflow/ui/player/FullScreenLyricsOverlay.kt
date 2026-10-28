@@ -556,10 +556,11 @@ private fun ProvidersSelector(
 
                 val supportingText = when {
                     result == null -> "Searching..."
+                    result.payloadClearedForMemory -> "Lyrics cleared to save memory · tap to refetch"
                     !result.hasLyrics() -> "No lyrics found"
-                    result.isWordByWord -> "Karaoke (Word-by-word)"
-                    result.isSynced -> "Synced (LRC)"
-                    else -> "Plain Text"
+                    result.isWordByWord -> "Karaoke (word-by-word)"
+                    result.isSynced -> "Synced lyrics"
+                    else -> "Plain text"
                 }
 
                 val shape = getSegmentedShape(index = index, count = visibleProviders.size)
@@ -575,6 +576,8 @@ private fun ProvidersSelector(
                     onClick = {
                         if (hasData) {
                             onProviderSelected(provider)
+                        } else if (result?.payloadClearedForMemory == true) {
+                            onRefindClick()
                         }
                     },
                     supportingContent = {
