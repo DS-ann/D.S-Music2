@@ -6,6 +6,8 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import com.codetrio.spatialflow.model.SongItem
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 
 /**
  * File facts read from the local media source. Bitrate from embedded metadata is kept
@@ -36,11 +38,44 @@ internal object OnlineStreamMetadataReader {
                 durationMs = player.durationMs.takeIf { it > 0L },
                 mimeType = audio?.mimeType?.takeIf { it.isNotBlank() },
                 bitrateBps = audio?.bitrate?.takeIf { it > 0 },
-                contentLengthBytes = audio?.contentLength?.takeIf { it > 0L },
+                contentLengthBytes = audio?.contentLength?.takeIf { it > 0L }
+                    ?: queryContentLength(audio?.url),
                 audioQuality = audio?.audioQuality?.takeIf { it.isNotBlank() }
             )
         } catch (_: Exception) {
             null
+        }
+    }
+
+    /**
+     * Probe the selected stream with a one-byte range request to read the true total size.
+     * No audio body is downloaded; servers that ignore ranges may still supply Content-Length.
+     */
+    private fun queryContentLength(streamUrl: String?): Long? {
+        if (streamUrl.isNullOrBlank()) return null
+        var connection: HttpURLConnection? = null
+        return try {
+            connection = (URL(streamUrl).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 4_500
+                readTimeout = 4_500
+                instanceFollowRedirects = true
+                setRequestProperty("Range", "bytes=0-0")
+            }
+            connection.connect()
+            val status = connection.responseCode
+            val rangeTotal = connection.getHeaderField("Content-Range")
+                ?.substringAfterLast('/')
+                ?.takeIf { it != "*" }
+                ?.toLongOrNull()
+                ?.takeIf { it > 0L }
+            rangeTotal ?: if (status == HttpURLConnection.HTTP_OK) {
+                connection.getHeaderField("Content-Length")?.toLongOrNull()?.takeIf { it > 0L }
+            } else null
+        } catch (_: Exception) {
+            null
+        } finally {
+            connection?.disconnect()
         }
     }
 }

@@ -30,6 +30,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Top-level orchestrator for the lyrics fetch pipeline.
@@ -47,11 +48,16 @@ class LyricsFetchManager private constructor(context: Context) {
     private val telemetry: LyricsTelemetry = LyricsTelemetry()
     private val router: ProviderRouter
     private val backgroundExecutor: ExecutorService
+    private val providerFetchExecutor: ExecutorService
     private val mainHandler: Handler = Handler(Looper.getMainLooper())
 
     // Track current search to allow cancellation
     @Volatile
     private var currentFetch: Future<*>? = null
+
+    @Volatile
+    private var selectedProviderFetch: Future<*>? = null
+    private val selectedProviderGeneration = AtomicLong(0L)
 
     @Volatile
     private var currentTrackKey: String? = null
@@ -86,6 +92,11 @@ class LyricsFetchManager private constructor(context: Context) {
         this.decisionEngine = LyricsDecisionEngine(scorer)
         this.backgroundExecutor = Executors.newSingleThreadExecutor { r ->
             val t = Thread(r, "LyricsFetchManager")
+            t.isDaemon = true
+            t
+        }
+        this.providerFetchExecutor = Executors.newCachedThreadPool { r ->
+            val t = Thread(r, "LyricsSelectedProvider")
             t.isDaemon = true
             t
         }
@@ -218,10 +229,8 @@ class LyricsFetchManager private constructor(context: Context) {
                         telemetry.logResult(result, "SHOW_AND_CONTINUE")
                         mainHandler.post { callback.onLyricsFound(result) }
 
-                        // Continue searching for better result in background
-                        if (!result.isSynced) {
-                            launchBackgroundUpgrade(track, result, callback)
-                        }
+                        // The initial full sweep already collected every provider result.
+                        // Do not repeat the sweep; selecting a source fetches only that source.
                     }
 
                     LyricsDecisionEngine.Decision.MARK_INSTRUMENTAL -> {
@@ -267,6 +276,60 @@ class LyricsFetchManager private constructor(context: Context) {
     }
 
     /**
+     * Fetch lyrics from only the provider selected in the lyrics source selector.
+     */
+    fun fetchProviderLyrics(
+        title: String,
+        artist: String,
+        album: String?,
+        durationMs: Long,
+        filePath: String?,
+        providerName: String,
+        callback: LyricsCallback,
+        videoId: String? = null
+    ) {
+        val sourceName = providerName.trim()
+        if (sourceName.isEmpty()) {
+            mainHandler.post { callback.onLyricsNotFound("No lyrics source was selected") }
+            return
+        }
+
+        val track = metadataRepair.repair(title, artist, album, durationMs, filePath, videoId)
+        val requestToken = selectedProviderGeneration.incrementAndGet()
+        selectedProviderFetch?.cancel(true)
+        selectedProviderFetch = providerFetchExecutor.submit {
+            if (requestToken != selectedProviderGeneration.get()) return@submit
+            mainHandler.post {
+                if (requestToken == selectedProviderGeneration.get()) {
+                    callback.onSearchStatus("Fetching lyrics from $sourceName…")
+                }
+            }
+
+            val result = router.searchProvider(track, sourceName, track.detectedLanguage)
+            if (Thread.currentThread().isInterrupted ||
+                requestToken != selectedProviderGeneration.get()
+            ) return@submit
+
+            mainHandler.post {
+                if (requestToken != selectedProviderGeneration.get()) return@post
+                callback.onProviderResult(result?.providerName ?: sourceName, result)
+                if (result != null && result.hasLyrics()) {
+                    callback.onLyricsFound(result)
+                } else {
+                    callback.onLyricsNotFound("No lyrics found from $sourceName")
+                }
+            }
+        }
+    }
+
+    /** Cancel a selected-source fetch without starting a full provider sweep. */
+    fun cancelProviderFetch() {
+        selectedProviderGeneration.incrementAndGet()
+        selectedProviderFetch?.cancel(true)
+        selectedProviderFetch = null
+    }
+
+    /**
      * Retry lyrics search — clears negative cache and forces full refetch.
      */
     fun retryLyrics(
@@ -292,6 +355,7 @@ class LyricsFetchManager private constructor(context: Context) {
      */
     fun cancelCurrent() {
         cancelled.set(true)
+        cancelProviderFetch()
         currentFetch?.let {
             if (!it.isDone) {
                 it.cancel(true)

@@ -1,5 +1,6 @@
 package com.codetrio.spatialflow.data.innertube
 
+import kotlin.math.abs
 import android.util.Log
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
@@ -343,7 +344,8 @@ object InnerTubeParser {
             streamingData.getAsJsonArray("formats")?.let { allFormats.addAll(it) }
 
             var bestStream: StreamData? = null
-            var highestBitrate = -1
+            var bestStreamDistance = Int.MAX_VALUE
+            val targetBitrateBps = NewPipeStreamExtractor.getTargetBitrateBps()
 
             allFormats.forEach { format ->
                 val obj = format.asJsonObject
@@ -385,9 +387,10 @@ object InnerTubeParser {
                     }
                 }
 
-                // Winner takes all architecture: Keep only the highest fidelity stream
-                if (url != null && bitrate > highestBitrate) {
-                    highestBitrate = bitrate
+                // InnerTube provides bitrate in bits/second. Keep the candidate nearest the target.
+                val distance = if (bitrate > 0) abs(bitrate - targetBitrateBps) else Int.MAX_VALUE
+                if (url != null && (bestStream == null || distance < bestStreamDistance)) {
+                    bestStreamDistance = distance
                     bestStream = StreamData(
                         url = url,
                         mimeType = mimeType,

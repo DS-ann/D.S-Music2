@@ -139,6 +139,39 @@ class LyricsRepository private constructor(context: Context) {
     }
 
     /**
+     * Fetch one provider only, for explicit selection in the lyrics selector.
+     */
+    fun fetchProviderLyrics(
+        title: String,
+        artist: String,
+        album: String?,
+        durationMs: Long,
+        filePath: String?,
+        providerName: String,
+        callback: ExtendedLyricsCallback,
+        videoId: String? = null
+    ) {
+        fetchManager.fetchProviderLyrics(
+            title, artist, album, durationMs, filePath, providerName,
+            object : LyricsFetchManager.LyricsCallback {
+                override fun onLyricsFound(result: LyricsResult) = callback.onLyricsFound(result)
+                override fun onLyricsUpgraded(betterResult: LyricsResult) = callback.onLyricsUpgraded(betterResult)
+                override fun onLyricsNotFound(reason: String) = callback.onLyricsNotFound(reason)
+                override fun onInstrumental() = callback.onInstrumental()
+                override fun onSearchStatus(message: String) = callback.onSearchStatus(message)
+                override fun onProviderResult(providerName: String, result: LyricsResult?) {
+                    callback.onProviderResult(providerName, result)
+                }
+            },
+            videoId
+        )
+    }
+
+    fun cancelProviderFetch() {
+        fetchManager.cancelProviderFetch()
+    }
+
+    /**
      * Retry lyrics — clears negative cache and forces full refetch.
      */
     fun retryLyrics(

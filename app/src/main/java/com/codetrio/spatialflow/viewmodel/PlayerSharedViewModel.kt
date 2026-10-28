@@ -1249,7 +1249,7 @@ class PlayerSharedViewModel @Inject constructor(
     }
 
     fun selectLyricsProvider(providerName: String) {
-        lyricsController.selectProvider(providerName)
+        lyricsController.selectProvider(appContext, _currentSong.value, providerName)
     }
 
 

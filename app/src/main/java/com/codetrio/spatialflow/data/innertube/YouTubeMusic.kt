@@ -14,6 +14,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -27,7 +28,12 @@ object YouTubeMusic {
 
     // Intelligent Streaming Performance Caches
     private val streamUrlCache = ConcurrentHashMap<String, Pair<String, Long>>()
-    private val activeStreamRequests = ConcurrentHashMap<String, Deferred<Result<String>>>()
+    private data class ActiveStreamRequest(
+        val generation: Long,
+        val deferred: Deferred<Result<String>>
+    )
+    private val activeStreamRequests = ConcurrentHashMap<String, ActiveStreamRequest>()
+    private val streamSelectionGeneration = AtomicLong(0L)
     private const val CACHE_TTL = 6 * 60 * 60 * 1000L // Standard 6 Hour TTL
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -193,10 +199,13 @@ object YouTubeMusic {
         if (videoId.isNullOrEmpty()) return@coroutineScope Result.failure(IllegalArgumentException("Video ID null"))
 
         cleanExpiredCache()
-        
-        // Check Level 1 Cache: Instant memory map retrieval
+        val requestGeneration = streamSelectionGeneration.get()
+
+        // A cached URL is valid only for the current quality-preference generation.
         val cached = streamUrlCache[videoId]
-        if (cached != null && cached.second > System.currentTimeMillis()) {
+        if (cached != null && cached.second > System.currentTimeMillis() &&
+            streamSelectionGeneration.get() == requestGeneration
+        ) {
             return@coroutineScope Result.success(cached.first)
         }
 
@@ -204,7 +213,11 @@ object YouTubeMusic {
         // Atomically compute or retrieve an active coroutine future for this exact stream.
         val id = videoId
         val activeTask = synchronized(activeStreamRequests) {
-            activeStreamRequests[videoId] ?: appScope.async(start = kotlinx.coroutines.CoroutineStart.LAZY) {
+            val currentRequest = activeStreamRequests[videoId]
+            if (currentRequest != null && currentRequest.generation == requestGeneration) {
+                currentRequest.deferred
+            } else {
+                val newDeferred = appScope.async(start = kotlinx.coroutines.CoroutineStart.LAZY) {
                 try {
                     // Directly invoke the high-reliability local extraction engine as requested
                     // Bypasses the volatile direct-player trial cascade which accumulates latency
@@ -244,7 +257,9 @@ object YouTubeMusic {
 
                     if (!bestUrl.isNullOrEmpty()) {
                         // Commit successfully resolved URL to memory cache
-                        streamUrlCache[id] = bestUrl to (System.currentTimeMillis() + CACHE_TTL)
+                        if (streamSelectionGeneration.get() == requestGeneration) {
+                            streamUrlCache[id] = bestUrl to (System.currentTimeMillis() + CACHE_TTL)
+                        }
                         Result.success(bestUrl)
                     } else {
                         Result.failure(IllegalStateException("Stream extraction total exhaustion"))
@@ -252,12 +267,19 @@ object YouTubeMusic {
                 } catch (e: Exception) {
                     Result.failure(e)
                 } finally {
-                    // Release request lock immediately upon resolution boundary
-                    activeStreamRequests.remove(id)
+                    // Remove only this request generation; retain newer work for the same song.
+                    synchronized(activeStreamRequests) {
+                        val active = activeStreamRequests[id]
+                        if (active != null && active.generation == requestGeneration) {
+                            activeStreamRequests.remove(id, active)
+                        }
+                    }
                 }
-            }.also {
-                activeStreamRequests[videoId] = it
-                it.start()
+                }
+                val request = ActiveStreamRequest(requestGeneration, newDeferred)
+                activeStreamRequests[videoId] = request
+                newDeferred.start()
+                newDeferred
             }
         }
 
@@ -327,6 +349,18 @@ object YouTubeMusic {
         if (videoId.isNullOrBlank()) return
         streamUrlCache.remove(videoId)
         NewPipeStreamExtractor.clearVideoCache(videoId)
+    }
+
+    /**
+     * Invalidate all quality-dependent URLs and extracted formats after a bitrate preference change.
+     */
+    fun invalidateAllStreamUrls() {
+        streamSelectionGeneration.incrementAndGet()
+        streamUrlCache.clear()
+        synchronized(activeStreamRequests) {
+            activeStreamRequests.clear()
+        }
+        NewPipeStreamExtractor.clearCache()
     }
 
     /**

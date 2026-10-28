@@ -70,7 +70,7 @@ data class SearchResult(
     val continuation: String? = null
 )
 
-/** Stream URL data extracted from player response */
+/** Stream URL data extracted from player response. bitrate is always in bits per second. */
 data class StreamData(
     val url: String,
     val mimeType: String,

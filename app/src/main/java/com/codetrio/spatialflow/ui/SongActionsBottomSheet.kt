@@ -113,6 +113,8 @@ import com.codetrio.spatialflow.R
 import com.codetrio.spatialflow.model.SongItem
 import com.codetrio.spatialflow.service.AudioPlaybackService
 import com.codetrio.spatialflow.service.CurrentAudioFormatDetails
+import com.codetrio.spatialflow.ui.player.OnlineStreamMetadata
+import com.codetrio.spatialflow.ui.player.OnlineStreamMetadataReader
 import com.codetrio.spatialflow.ui.theme.GoogleSansFlex
 import com.codetrio.spatialflow.ui.theme.SpatialFlowTheme
 import com.codetrio.spatialflow.viewmodel.PlayerSharedViewModel
@@ -1063,7 +1065,10 @@ fun InfoContent(song: SongItem?) {
             mainActivity?.audioService?.getCurrentAudioFormatDetails(it.id.toString())
         }
         value = withContext(Dispatchers.IO) {
-            readSongInfoDetails(context, song, liveFormat)
+            val onlineMetadata = song?.videoId?.takeIf { it.isNotBlank() }?.let {
+                OnlineStreamMetadataReader.read(it)
+            }
+            readSongInfoDetails(context, song, liveFormat, onlineMetadata)
         }
     }
 
@@ -1094,7 +1099,8 @@ private fun findMainActivity(context: Context): MainActivity? {
 private fun readSongInfoDetails(
     context: Context,
     song: SongItem?,
-    liveFormat: CurrentAudioFormatDetails?
+    liveFormat: CurrentAudioFormatDetails?,
+    onlineStreamMetadata: OnlineStreamMetadata? = null
 ): SongInfoDetails {
     if (song == null) {
         return SongInfoDetails(
@@ -1194,6 +1200,12 @@ private fun readSongInfoDetails(
         }
     }
 
+    if (durationMs <= 0L) {
+        durationMs = onlineStreamMetadata?.durationMs?.takeIf { it > 0L }
+            ?: liveFormat?.durationMs?.takeIf { it > 0L }
+            ?: durationMs
+    }
+
     var cachedStreamBytes = 0L
     if (remote) {
         try {
@@ -1207,8 +1219,11 @@ private fun readSongInfoDetails(
         }
     }
 
-    val effectiveBitrate = bitrateBps ?: liveFormat?.bitrateBps?.toLong()?.takeIf { it > 0L }
+    val effectiveBitrate = bitrateBps
+        ?: liveFormat?.bitrateBps?.toLong()?.takeIf { it > 0L }
+        ?: onlineStreamMetadata?.bitrateBps?.toLong()?.takeIf { it > 0L }
     val effectiveSampleRate = sampleRateHz ?: liveFormat?.sampleRateHz?.toLong()?.takeIf { it > 0L }
+    val reportedOnlineStreamBytes = onlineStreamMetadata?.contentLengthBytes?.takeIf { it > 0L }
     val durationText = if (durationMs > 0L) {
         val seconds = durationMs / 1000L
         String.format(java.util.Locale.US, "%02d:%02d", seconds / 60L, seconds % 60L)
@@ -1231,6 +1246,8 @@ private fun readSongInfoDetails(
     } else null
     val sizeText = when {
         sizeBytes > 0L -> Formatter.formatFileSize(context, sizeBytes)
+        remote && reportedOnlineStreamBytes != null ->
+            Formatter.formatFileSize(context, reportedOnlineStreamBytes) + " (reported audio stream length)"
         remote && cachedStreamBytes > 0L && estimatedRemoteBytes != null ->
             Formatter.formatFileSize(context, cachedStreamBytes) + " cached of about " +
                 Formatter.formatFileSize(context, estimatedRemoteBytes) + " estimated stream size"
@@ -1244,7 +1261,11 @@ private fun readSongInfoDetails(
     val bitrateText = when {
         effectiveBitrate != null ->
             String.format(java.util.Locale.US, "%.0f kbps", effectiveBitrate / 1000.0) +
-                if (remote && liveFormat?.bitrateBps != null) " (current stream)" else ""
+                when {
+                    !remote -> ""
+                    liveFormat?.bitrateBps != null -> " (current stream)"
+                    else -> " (selected source stream)"
+                }
         sizeBytes > 0L && durationMs > 0L ->
             String.format(java.util.Locale.US, "%.0f kbps estimated from file size", sizeBytes * 8.0 / durationMs)
         remote -> "Selected dynamically by the stream"
@@ -1252,6 +1273,8 @@ private fun readSongInfoDetails(
     }
     val format = file?.extension?.takeIf { it.isNotBlank() }?.uppercase(java.util.Locale.US)
         ?: mimeType?.substringAfter('/', "")?.takeIf { it.isNotBlank() }?.uppercase(java.util.Locale.US)
+        ?: onlineStreamMetadata?.mimeType?.substringAfter('/', "")?.takeIf { it.isNotBlank() }
+            ?.uppercase(java.util.Locale.US)
         ?: if (remote) "Online audio stream" else "Audio format not tagged"
     val sampleRateText = effectiveSampleRate?.let {
         if (it % 1000L == 0L) (it / 1000L).toString() + " kHz"

@@ -133,10 +133,11 @@ class PlayerLyricsStateController(private val logTag: String) {
         )
     }
 
-    fun selectProvider(providerName: String) {
+    fun selectProvider(context: Context, song: SongItem?, providerName: String) {
         val result = _providerResults.value[providerName]
+
         if (result != null && result.hasLyrics()) {
-            // Keep only the selected provider's large lyric payload in memory.
+            LyricsRepository.getInstance(context).cancelProviderFetch()
             val compacted = _providerResults.value.toMutableMap()
             clearInactiveProviderPayloads(compacted, providerName)
             _providerResults.value = compacted
@@ -149,7 +150,36 @@ class PlayerLyricsStateController(private val logTag: String) {
             _isLoading.value = false
             _error.value = null
             _statusMessage.value = "Lyrics from ${result.providerName ?: providerName}"
+            return
         }
+
+        // A null entry means the initial sweep is still working on this provider.
+        if (result == null || song == null) return
+        if (_selectedProvider.value == providerName && _isLoading.value) return
+
+        _selectedProvider.value = providerName
+        _syncedLyrics.value = null
+        _plainLyrics.value = null
+        _error.value = null
+        _isLoading.value = true
+        setLyricsState(LyricsState.FETCHING)
+        _statusMessage.value = "Fetching lyrics from $providerName…"
+
+        LyricsRepository.getInstance(context).fetchProviderLyrics(
+            song.title,
+            song.artist,
+            null,
+            song.duration,
+            song.path,
+            providerName,
+            createCallback(
+                requestSongId = song.id,
+                keepExistingLyricsOnNotFound = false,
+                instrumentalMessage = "Instrumental track",
+                logUpgrades = false
+            ),
+            song.videoId
+        )
     }
 
     /**

@@ -211,6 +211,38 @@ class ProviderRouter(
         return best
     }
 
+    /**
+     * Fetch one provider explicitly selected by the user. This never restarts searchAll().
+     */
+    fun searchProvider(track: TrackMetadata?, providerName: String, language: String): LyricsResult? {
+        if (track == null || providerName.isBlank()) return null
+        val provider = providers.firstOrNull {
+            it.getName().equals(providerName, ignoreCase = true)
+        } ?: return null
+
+        val startedAt = System.currentTimeMillis()
+        return try {
+            val result = provider.search(track)
+            val elapsed = System.currentTimeMillis() - startedAt
+            if (result == null || !result.hasLyrics()) {
+                stats.recordFailure(provider.getName(), language)
+                Log.d(TAG, "${provider.getName()} returned no lyrics in ${elapsed}ms")
+                null
+            } else {
+                result.providerName = provider.getName()
+                val confidence = scorer.score(result, track)
+                result.confidence = confidence
+                stats.recordSuccess(provider.getName(), language, confidence)
+                Log.d(TAG, "${provider.getName()} returned selected-source lyrics (confidence=${confidence}) in ${elapsed}ms")
+                result
+            }
+        } catch (error: Exception) {
+            stats.recordFailure(provider.getName(), language)
+            Log.w(TAG, "Selected lyrics provider ${provider.getName()} failed: ${error.message}")
+            null
+        }
+    }
+
     private fun isBetterResult(newResult: LyricsResult, newConfidence: Float, current: LyricsResult): Boolean {
         val currentConfidence = current.confidence
         

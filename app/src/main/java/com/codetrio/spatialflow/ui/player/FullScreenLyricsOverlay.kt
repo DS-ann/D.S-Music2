@@ -390,7 +390,6 @@ internal fun FullScreenLyricsOverlay(
                                 providerResults = providerResults,
                                 selectedProvider = selectedProvider,
                                 onProviderSelected = onProviderSelected,
-                                onRefindClick = onRetryLyrics,
                                 accentColor = dynamicAccentColor,
                                 contentColor = contentColor,
                                 modifier = Modifier
@@ -479,7 +478,6 @@ private fun ProvidersSelector(
     providerResults: Map<String, LyricsResult>,
     selectedProvider: String?,
     onProviderSelected: (String) -> Unit,
-    onRefindClick: () -> Unit,
     accentColor: Color,
     contentColor: Color,
     modifier: Modifier = Modifier
@@ -556,8 +554,8 @@ private fun ProvidersSelector(
 
                 val supportingText = when {
                     result == null -> "Searching..."
-                    result.payloadClearedForMemory -> "Lyrics cleared to save memory · tap to refetch"
-                    !result.hasLyrics() -> "No lyrics found"
+                    result.payloadClearedForMemory -> "Lyrics payload released · tap to fetch this source"
+                    !result.hasLyrics() -> "No lyrics found · tap to search this source"
                     result.isWordByWord -> "Karaoke (word-by-word)"
                     result.isSynced -> "Synced lyrics"
                     else -> "Plain text"
@@ -574,10 +572,12 @@ private fun ProvidersSelector(
                 ListItem(
                     selected = isSelected,
                     onClick = {
-                        if (hasData) {
+                        // Null means the initial all-provider sweep is still searching this row.
+                        // Once a result/status exists, tapping targets only this provider.
+                        if (hasData || result?.payloadClearedForMemory == true ||
+                            (result != null && !result.hasLyrics())
+                        ) {
                             onProviderSelected(provider)
-                        } else if (result?.payloadClearedForMemory == true) {
-                            onRefindClick()
                         }
                     },
                     supportingContent = {

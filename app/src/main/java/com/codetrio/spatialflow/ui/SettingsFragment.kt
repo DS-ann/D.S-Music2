@@ -38,6 +38,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -336,13 +337,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     // ── Audio Quality ────────────────────────────────────────────────────────
-    private val _audioQuality = MutableStateFlow(prefs.getString(KEY_AUDIO_QUALITY, "High") ?: "High")
+    private val _audioQuality = MutableStateFlow(
+        com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor.normalizeAudioQuality(
+            prefs.getString(KEY_AUDIO_QUALITY, "256 kbps")
+        )
+    )
     val audioQuality: StateFlow<String> = _audioQuality.asStateFlow()
 
     fun setAudioQuality(quality: String) {
-        _audioQuality.value = quality
-        prefs.edit {putString(KEY_AUDIO_QUALITY, quality)}
-        com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor.clearCache()
+        val normalized = com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor
+            .normalizeAudioQuality(quality)
+        _audioQuality.value = normalized
+        prefs.edit { putString(KEY_AUDIO_QUALITY, normalized) }
+        com.codetrio.spatialflow.data.innertube.YouTubeMusic.invalidateAllStreamUrls()
     }
 
     // ── Pause Listening History ────────────────────────────────────────────────
@@ -555,7 +562,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     _crossfadeDuration.value = prefs.getFloat(KEY_CROSSFADE_DURATION, 3f)
                     _audioFocus.value = prefs.getBoolean(KEY_AUDIO_FOCUS, true)
                     _dataSaver.value = prefs.getBoolean(KEY_DATA_SAVER, false)
-                    _audioQuality.value = prefs.getString(KEY_AUDIO_QUALITY, "High") ?: "High"
+                    _audioQuality.value =
+                        com.codetrio.spatialflow.data.innertube.NewPipeStreamExtractor
+                            .normalizeAudioQuality(prefs.getString(KEY_AUDIO_QUALITY, "256 kbps"))
                     _pauseHistory.value = prefs.getBoolean("pause_history", false)
                     _downloadFolder.value = prefs.getString("download_folder", null)
                     _songCacheMaxSize.value = prefs.getInt("song_cache_max_size", 1024)
@@ -1908,7 +1917,7 @@ private fun AudioQualityRow(
     currentQuality: String,
     onQualityChange: (String) -> Unit
 ) {
-    val options = listOf("High", "Normal", "Data Saver")
+    val options = listOf("48 kbps", "64 kbps", "96 kbps", "128 kbps", "160 kbps", "192 kbps", "256 kbps", "320 kbps")
     
     ListItem(
         headlineContent = {
@@ -1918,7 +1927,7 @@ private fun AudioQualityRow(
                     style = MaterialTheme.typography.bodyLarge
                 )
                 Text(
-                    text = "High uses more data, Data Saver uses lowest bitrate",
+                    text = "Target bitrate; the closest audio stream available from the source is selected.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1926,7 +1935,9 @@ private fun AudioQualityRow(
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     options.forEach { option ->

@@ -9,6 +9,7 @@ import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
 
 /**
  * Optimized Local YouTube stream extraction using NewPipe Extractor.
@@ -46,6 +47,46 @@ object NewPipeStreamExtractor {
     private var cachedPrefs: PreferenceSnapshot? = null
     private const val PREF_CACHE_TTL_MS = 60000L // 1 minute
 
+    private val supportedBitratesKbps = listOf(48, 64, 96, 128, 160, 192, 256, 320)
+
+    fun normalizeAudioQuality(quality: String?): String {
+        val raw = quality?.trim().orEmpty()
+        val parsed = when (raw) {
+            "High" -> 256
+            "Normal" -> 128
+            "Data Saver" -> 64
+            else -> raw.removeSuffix("kbps").trim().toIntOrNull()
+                ?: raw.removeSuffix(" kbps").trim().toIntOrNull()
+        }
+        return "${parsed?.takeIf { it in supportedBitratesKbps } ?: 256} kbps"
+    }
+
+    fun getTargetBitrateKbps(quality: String? = null): Int =
+        normalizeAudioQuality(quality ?: getPreferencesSnapshot().first)
+            .substringBefore(' ')
+            .toIntOrNull()
+            ?: 256
+
+    fun getTargetBitrateBps(): Int = getTargetBitrateKbps() * 1000
+
+    private fun streamBitrateKbps(stream: AudioStream): Int {
+        // NewPipe average bitrate is in kbps; precise itag bitrate is bits/sec.
+        val averageKbps = stream.averageBitrate
+        if (averageKbps > 0) return averageKbps
+        val rawBitrate = stream.bitrate
+        return when {
+            rawBitrate > 1000 -> (rawBitrate + 500) / 1000
+            rawBitrate > 0 -> rawBitrate
+            else -> 0
+        }
+    }
+
+    private fun qualityLabelForKbps(bitrateKbps: Int): String = when {
+        bitrateKbps >= 192 -> "AUDIO_QUALITY_HIGH"
+        bitrateKbps >= 96 -> "AUDIO_QUALITY_MEDIUM"
+        else -> "AUDIO_QUALITY_LOW"
+    }
+
     @Synchronized
     fun init(context: Context) {
         if (isInitialized) return
@@ -71,7 +112,7 @@ object NewPipeStreamExtractor {
             appContext?.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
         } catch (e: Exception) { null }
         
-        val quality = prefs?.getString("audio_quality", "High") ?: "High"
+        val quality = normalizeAudioQuality(prefs?.getString("audio_quality", "256 kbps"))
         val dataSaver = prefs?.getBoolean("data_saver", false) ?: false
         
         cachedPrefs = PreferenceSnapshot(quality, dataSaver, now)
@@ -123,17 +164,13 @@ object NewPipeStreamExtractor {
 
     private fun selectBestStream(audioStreams: List<AudioStream>): AudioStream? {
         val selectStart = System.currentTimeMillis()
-        val (audioQuality, dataSaver) = getPreferencesSnapshot()
-        
+        val audioQuality = getPreferencesSnapshot().first
         if (audioStreams.isEmpty()) return null
 
-        val best = when {
-            audioQuality == "Data Saver" || dataSaver -> audioStreams.minByOrNull { maxOf(it.bitrate, it.averageBitrate) }
-            audioQuality == "Normal" -> {
-                val sorted = audioStreams.sortedBy { maxOf(it.bitrate, it.averageBitrate) }
-                sorted.elementAtOrNull(sorted.size / 2)
-            }
-            else -> audioStreams.maxByOrNull { maxOf(it.bitrate, it.averageBitrate) }
+        val targetKbps = getTargetBitrateKbps(audioQuality)
+        val best = audioStreams.minByOrNull { stream ->
+            val candidateKbps = streamBitrateKbps(stream)
+            if (candidateKbps > 0) abs(candidateKbps - targetKbps) else Int.MAX_VALUE
         }
         Log.d(TAG, "selectBestStream took ${System.currentTimeMillis() - selectStart}ms")
         return best
@@ -206,8 +243,8 @@ object NewPipeStreamExtractor {
                 stream.codec?.contains("mp4a", ignoreCase = true) == true ||
                 stream.itag == 140
         }
-        val selected = aacStreams.maxByOrNull { maxOf(it.bitrate, it.averageBitrate) }
-            ?: audioStreams.minByOrNull { maxOf(it.bitrate, it.averageBitrate) }
+        val selected = aacStreams.maxByOrNull { streamBitrateKbps(it) }
+            ?: audioStreams.minByOrNull { streamBitrateKbps(it) }
 
         val url = selected?.content?.takeIf { it.startsWith("https://", ignoreCase = true) }
         Log.i(
@@ -235,7 +272,7 @@ object NewPipeStreamExtractor {
                 stream.codec?.contains("mp4a", ignoreCase = true) == true ||
                 stream.itag == 140
         }
-        val selected = mp4Audio.maxByOrNull { maxOf(it.bitrate, it.averageBitrate) }
+        val selected = mp4Audio.maxByOrNull { streamBitrateKbps(it) }
             ?: selectBestStream(audioStreams)
             ?: return@coroutineScope null
         val reportedMime = selected.format?.mimeType?.substringBefore(';')?.trim().orEmpty()
@@ -246,17 +283,13 @@ object NewPipeStreamExtractor {
             selected.codec?.contains("vorbis", ignoreCase = true) == true -> "audio/ogg"
             else -> "application/octet-stream"
         }
-        val bitrate = maxOf(selected.averageBitrate, selected.bitrate).takeIf { it > 0 } ?: 0
+        val bitrateKbps = streamBitrateKbps(selected)
         StreamData(
             url = selected.content,
             mimeType = mime,
-            bitrate = bitrate,
-            contentLength = null,
-            audioQuality = when {
-                bitrate >= 256 -> "AUDIO_QUALITY_HIGH"
-                bitrate >= 128 -> "AUDIO_QUALITY_MEDIUM"
-                else -> "AUDIO_QUALITY_LOW"
-            }
+            bitrate = bitrateKbps * 1000,
+            contentLength = selected.itagItem?.contentLength?.takeIf { it > 0L },
+            audioQuality = qualityLabelForKbps(bitrateKbps)
         )
     }
 
@@ -282,19 +315,16 @@ object NewPipeStreamExtractor {
                     if (audioStreams.isEmpty()) return@async null
 
                     val bestStream = selectBestStream(audioStreams) ?: return@async null
-                    
+
                     val creationStart = System.currentTimeMillis()
+                    val bitrateKbps = streamBitrateKbps(bestStream)
                     val streams = listOf(
                         StreamData(
                             url = bestStream.content,
                             mimeType = bestStream.format?.mimeType ?: "audio/mp4",
-                            bitrate = bestStream.averageBitrate,
-                            contentLength = null,
-                            audioQuality = when {
-                                bestStream.averageBitrate >= 256 -> "AUDIO_QUALITY_HIGH"
-                                bestStream.averageBitrate >= 128 -> "AUDIO_QUALITY_MEDIUM"
-                                else -> "AUDIO_QUALITY_LOW"
-                            }
+                            bitrate = bitrateKbps * 1000,
+                            contentLength = bestStream.itagItem?.contentLength?.takeIf { it > 0L },
+                            audioQuality = qualityLabelForKbps(bitrateKbps)
                         )
                     )
 
