@@ -192,8 +192,9 @@ object YouTubeMusic {
 
         // Level 2: Check for in-flight request duplication prevention
         // Atomically compute or retrieve an active coroutine future for this exact stream.
-        val activeTask = activeStreamRequests.computeIfAbsent(videoId) { id ->
-            appScope.async {
+        val id = videoId
+        val activeTask = synchronized(activeStreamRequests) {
+            activeStreamRequests[videoId] ?: appScope.async(start = kotlinx.coroutines.CoroutineStart.LAZY) {
                 try {
                     // Directly invoke the high-reliability local extraction engine as requested
                     // Bypasses the volatile direct-player trial cascade which accumulates latency
@@ -237,6 +238,9 @@ object YouTubeMusic {
                     // Release request lock immediately upon resolution boundary
                     activeStreamRequests.remove(id)
                 }
+            }.also {
+                activeStreamRequests[videoId] = it
+                it.start()
             }
         }
 
