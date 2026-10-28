@@ -10,9 +10,7 @@
     <string name="settings_header_about">About</string> <!-- General settings -->
     <string name="setting_dark_mode">Dark Mode</string>
     <string name="setting_audio_focus">Handle Audio Focus</string>
-    <string name="settings_haptics_title">Vibrations</string>
-    <string name="settings_haptics_not_supported">Haptics not supported on this device</string>
-    <string name="setting_vibration_strength">Vibration Strength</string> <!-- Playback settings -->
+    <!-- Playback settings -->
     <string name="settings_header_playback">Playback</string>
     <string name="setting_crossfade">Crossfade</string>
     <string name="setting_sleep_timer">Sleep Timer</string>

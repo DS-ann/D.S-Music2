@@ -18,8 +18,6 @@ import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -77,7 +75,6 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.SettingsBackupRestore
 import androidx.compose.material.icons.rounded.Update
-import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -202,28 +199,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         } else {
             prefs.edit {remove("yt_cookies")}
             com.codetrio.spatialflow.data.innertube.InnerTubeClient.cookie = null
-        }
-    }
-
-    // ── Haptics ──────────────────────────────────────────────────────────────
-    private val _vibrationStrength =
-        MutableStateFlow(prefs.getFloat(KEY_VIBRATION_STRENGTH, 80f))
-    val vibrationStrength: StateFlow<Float> = _vibrationStrength.asStateFlow()
-
-    private val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-    val hasHaptics: Boolean = vibrator?.hasVibrator() == true
-
-    fun setVibrationStrength(strength: Float) {
-        _vibrationStrength.value = strength
-        prefs.edit {putFloat(KEY_VIBRATION_STRENGTH, strength)}
-        if (strength > 0 && hasHaptics && vibrator != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val amplitude = (strength / 100f * 255).toInt().coerceIn(1, 255)
-                vibrator.vibrate(VibrationEffect.createOneShot(50, amplitude))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(50)
-            }
         }
     }
 
@@ -403,33 +378,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit {putBoolean("pause_history", pause)}
     }
 
-    // ── Haptics Granular ─────────────────────────────────────────────────────
-    private val _hapticPlayPause = MutableStateFlow(prefs.getBoolean(KEY_HAPTIC_PLAY_PAUSE, true))
-    val hapticPlayPause: StateFlow<Boolean> = _hapticPlayPause.asStateFlow()
-
-    private val _hapticQueue = MutableStateFlow(prefs.getBoolean(KEY_HAPTIC_QUEUE, true))
-    val hapticQueue: StateFlow<Boolean> = _hapticQueue.asStateFlow()
-
-    private val _hapticFavorite = MutableStateFlow(prefs.getBoolean(KEY_HAPTIC_FAVORITE, true))
-    val hapticFavorite: StateFlow<Boolean> = _hapticFavorite.asStateFlow()
-
-    fun setHapticPlayPause(enabled: Boolean) {
-        _hapticPlayPause.value = enabled
-        prefs.edit {putBoolean(KEY_HAPTIC_PLAY_PAUSE, enabled)}
-    }
-
-    fun setHapticQueue(enabled: Boolean) {
-        _hapticQueue.value = enabled
-        prefs.edit {putBoolean(KEY_HAPTIC_QUEUE, enabled)}
-    }
-
-    fun setHapticFavorite(enabled: Boolean) {
-        _hapticFavorite.value = enabled
-        prefs.edit {putBoolean(KEY_HAPTIC_FAVORITE, enabled)}
-    }
-
-
-
     // ── Library Paths ────────────────────────────────────────────────────────
     private val _libraryPaths = MutableStateFlow(
         (prefs.getString(KEY_LIBRARY_PATHS, "") ?: "").split("||").filter { it.isNotEmpty() }
@@ -581,7 +529,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                                 else if (prim.isNumber) {
                                     val num = prim.asNumber
                                     when (key) {
-                                        KEY_VIBRATION_STRENGTH, KEY_CROSSFADE_DURATION, KEY_TARGET_LUFS -> putFloat(key, num.toFloat())
+                                        KEY_CROSSFADE_DURATION, KEY_TARGET_LUFS -> putFloat(key, num.toFloat())
                                         else -> {
                                             try {
                                                 putInt(key, num.toInt())
@@ -599,7 +547,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     _darkMode.value = prefs.getBoolean(KEY_DARK_MODE, true)
                     _amoledBlack.value = prefs.getBoolean(KEY_AMOLED_BLACK, false)
                     _dynamicAlbumTheme.value = prefs.getBoolean(KEY_DYNAMIC_ALBUM_THEME, false)
-                    _vibrationStrength.value = prefs.getFloat(KEY_VIBRATION_STRENGTH, 80f)
                     _crossfadeEnabled.value = prefs.getBoolean(KEY_CROSSFADE_ENABLED, false)
                     _crossfadeDuration.value = prefs.getFloat(KEY_CROSSFADE_DURATION, 3f)
                     _audioFocus.value = prefs.getBoolean(KEY_AUDIO_FOCUS, true)
@@ -620,9 +567,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     _downloadFolder.value = prefs.getString("download_folder", null)
                     _songCacheMaxSize.value = prefs.getInt("song_cache_max_size", 1024)
                     _imageCacheMaxSize.value = prefs.getInt("image_cache_max_size", 512)
-                    _hapticPlayPause.value = prefs.getBoolean(KEY_HAPTIC_PLAY_PAUSE, true)
-                    _hapticQueue.value = prefs.getBoolean(KEY_HAPTIC_QUEUE, true)
-                    _hapticFavorite.value = prefs.getBoolean(KEY_HAPTIC_FAVORITE, true)
                 }
 
                 if (backupObject.has("favorites")) {
@@ -745,7 +689,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     companion object {
         const val PREFS_NAME = "AppSettings"
         const val KEY_DARK_MODE = "dark_mode"
-        const val KEY_VIBRATION_STRENGTH = "vibration_strength"
         const val KEY_CROSSFADE_ENABLED = "crossfade_enabled"
         const val KEY_CROSSFADE_DURATION = "crossfade_duration"
         const val KEY_AUDIO_FOCUS = "audio_focus"
@@ -762,9 +705,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         const val KEY_DOWNLOAD_FORMAT = "download_audio_format"
         const val KEY_DOWNLOAD_BITRATE = "download_bitrate"
         const val KEY_SYNC_FREQUENCY = "sync_frequency"
-        const val KEY_HAPTIC_PLAY_PAUSE = "haptic_play_pause"
-        const val KEY_HAPTIC_QUEUE = "haptic_queue"
-        const val KEY_HAPTIC_FAVORITE = "haptic_favorite"
         const val KEY_DYNAMIC_ALBUM_THEME = "dynamic_album_theme"
         const val KEY_VOLUME_NORMALIZATION_ENABLED = "volume_normalization_enabled"
         const val KEY_TARGET_LUFS = "target_lufs"
@@ -816,7 +756,6 @@ fun SettingsScreenContent(
     val dynamicAlbumTheme by viewModel.dynamicAlbumTheme.collectAsStateWithLifecycle()
     val hideNavLabels by viewModel.hideNavLabels.collectAsStateWithLifecycle()
     val dynamicNavStyle by viewModel.dynamicNavStyle.collectAsStateWithLifecycle()
-    val vibrationStrength by viewModel.vibrationStrength.collectAsStateWithLifecycle()
     val crossfadeEnabled by viewModel.crossfadeEnabled.collectAsStateWithLifecycle()
     val crossfadeDuration by viewModel.crossfadeDuration.collectAsStateWithLifecycle()
     val audioFocus by viewModel.audioFocus.collectAsStateWithLifecycle()
@@ -842,9 +781,6 @@ fun SettingsScreenContent(
     val mediaCacheEnabled by viewModel.mediaCacheEnabled.collectAsStateWithLifecycle()
     val mediaCacheLimitGb by viewModel.mediaCacheLimitGb.collectAsStateWithLifecycle()
 
-    val hapticPlayPause by viewModel.hapticPlayPause.collectAsStateWithLifecycle()
-    val hapticQueue by viewModel.hapticQueue.collectAsStateWithLifecycle()
-    val hapticFavorite by viewModel.hapticFavorite.collectAsStateWithLifecycle()
 
     val ytCookies by viewModel.ytCookies.collectAsStateWithLifecycle()
 
@@ -1025,20 +961,6 @@ fun SettingsScreenContent(
                 onDownloadBitrateChange = { viewModel.setDownloadBitrate(it) },
             )
         }
-        composable(SettingsRoute.Haptics.route) {
-            HapticsScreen(
-                navController = navController,
-                hasHaptics = viewModel.hasHaptics,
-                vibrationStrength = vibrationStrength,
-                onVibrationStrengthChange = { viewModel.setVibrationStrength(it) },
-                hapticPlayPause = hapticPlayPause,
-                onHapticPlayPauseChange = { viewModel.setHapticPlayPause(it) },
-                hapticQueue = hapticQueue,
-                onHapticQueueChange = { viewModel.setHapticQueue(it) },
-                hapticFavorite = hapticFavorite,
-                onHapticFavoriteChange = { viewModel.setHapticFavorite(it) }
-            )
-        }
         composable(SettingsRoute.About.route) {
             AboutScreen(
                 navController = navController,
@@ -1097,7 +1019,6 @@ sealed class SettingsRoute(val route: String) {
     object Account : SettingsRoute("account")
     object Appearance : SettingsRoute("appearance")
     object Playback : SettingsRoute("playback")
-    object Haptics : SettingsRoute("haptics")
     object About : SettingsRoute("about")
     object Feedback : SettingsRoute("feedback")
     object WhatsNew : SettingsRoute("whats_new")
@@ -1179,14 +1100,6 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
                         subtitle = "Themes, layout, visual styles",
                         icon = Icons.Rounded.Palette,
                         onClick = { navController.navigate(SettingsRoute.Appearance.route) }
-                    )
-                },
-                {
-                    SettingsCategoryItem(
-                        title = "Haptics",
-                        subtitle = "Vibration strength, haptic feedback",
-                        icon = Icons.Rounded.Vibration,
-                        onClick = { navController.navigate(SettingsRoute.Haptics.route) }
                     )
                 },
                 {
@@ -2098,88 +2011,6 @@ private fun AudioFormatRow(
     )
 }
 
-@Composable
-private fun HapticsScreen(
-    navController: androidx.navigation.NavController,
-    hasHaptics: Boolean,
-    vibrationStrength: Float,
-    onVibrationStrengthChange: (Float) -> Unit,
-    hapticPlayPause: Boolean,
-    onHapticPlayPauseChange: (Boolean) -> Unit,
-    hapticQueue: Boolean,
-    onHapticQueueChange: (Boolean) -> Unit,
-    hapticFavorite: Boolean,
-    onHapticFavoriteChange: (Boolean) -> Unit
-) {
-    Scaffold(
-        topBar = { SettingsDetailTopBar("Haptics") { navController.popBackStack() } }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 120.dp)
-        ) {
-            SettingsHeader(stringResource(R.string.settings_haptics_title))
-            SettingsGroupCard(buildList {
-                if (!hasHaptics) {
-                    add { HapticsNotSupported() }
-                }
-                add { VibrationStrengthRow(vibrationStrength, onVibrationStrengthChange, hasHaptics) }
-            })
-
-            SettingsHeader("Granular Interactions")
-            SettingsGroupCard(buildList {
-                add { HapticToggleRow("Haptics on Play/Pause", "Vibrate when playing or pausing audio", hapticPlayPause, onHapticPlayPauseChange, hasHaptics) }
-                add { HapticToggleRow("Haptics on Queue Reordering", "Vibrate when dragging items in the queue", hapticQueue, onHapticQueueChange, hasHaptics) }
-                add { HapticToggleRow("Haptics on Heart/Favorite", "Vibrate when liking a song", hapticFavorite, onHapticFavoriteChange, hasHaptics) }
-            })
-        }
-    }
-}
-
-@Composable
-private fun HapticToggleRow(
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    onToggle: (Boolean) -> Unit,
-    enabled: Boolean
-) {
-    val alpha by animateFloatAsState(
-        targetValue = if (enabled) 1f else 0.38f,
-        animationSpec = SmoothSpring,
-        label = "haptic_row_alpha"
-    )
-
-    ListItem(
-        onClick = { if (enabled) onToggle(!checked) },
-        content = {
-            Column(modifier = Modifier.graphicsLayer { this.alpha = alpha }) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        trailingContent = {
-            Switch(
-                checked = checked,
-                onCheckedChange = onToggle,
-                enabled = enabled
-            )
-        },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-    )
-}
-
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 // ── Whats New ───────────────────────────────────────────────────────────────
 
@@ -2486,65 +2317,6 @@ private fun ThemeSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?)
 }
 
 
-
-// ── Haptics ─────────────────────────────────────────────────────────────────
-
-@Composable
-private fun HapticsNotSupported() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = Icons.Default.Warning,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.error,
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = stringResource(R.string.settings_haptics_not_supported),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.error
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun VibrationStrengthRow(
-    value: Float, onValueChange: (Float) -> Unit, enabled: Boolean
-) {
-    val alpha by animateFloatAsState(
-        targetValue = if (enabled) 1f else 0.38f,
-        animationSpec = SmoothSpring,
-        label = "haptic_alpha"
-    )
-
-    ListItem(
-        onClick = { /* Slider handles interaction */ },
-        content = {
-            Text(
-                text = stringResource(R.string.setting_vibration_strength),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
-            )
-        },
-        supportingContent = {
-            Slider(
-                value = value.coerceIn(0f, 100f),
-                onValueChange = onValueChange,
-                enabled = enabled,
-                valueRange = 0f..100f,
-                steps = 3,
-                modifier = Modifier.fillMaxWidth()
-            )
-        },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-    )
-}
 
 // ── Wavy Divider ────────────────────────────────────────────────────────────
 
