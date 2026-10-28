@@ -35,7 +35,7 @@ data class LyricsResult(
     fun setSyncedLyrics(syncedLyrics: String?): LyricsResult {
         this.syncedLyrics = syncedLyrics
         this.isSynced = !syncedLyrics.isNullOrEmpty() && (
-            syncedLyrics.matches("(?s).*\\\\[\\\\d{2}:\\\\d{2}\\\\.\\\\d{2,3}].*".toRegex()) ||
+            syncedLyrics.matches("(?s).*\\[\\d{2}:\\d{2}\\.\\d{2,3}].*".toRegex()) ||
                 syncedLyrics.contains("<tt", ignoreCase = true) ||
                 syncedLyrics.contains("<?xml", ignoreCase = true) ||
                 syncedLyrics.contains("<p begin=", ignoreCase = true) ||
@@ -43,7 +43,6 @@ data class LyricsResult(
         )
         return this
     }
-
     fun setPlainLyrics(plainLyrics: String?): LyricsResult {
         this.plainLyrics = plainLyrics
         return this
