@@ -1400,7 +1400,7 @@ fun OnlineSongBottomSheet(
             // Optimized 2-Pane Actions for Landscape Width
             val menuItems = listOf(
                 Triple("Start mix", Icons.Default.Radio) {
-                    exploreViewModel.playOnlineSongWithQueue(song, listOf(song), 0)
+                    exploreViewModel.startRadio(song)
                     com.codetrio.spatialflow.ui.SnackbarController.showMessage("Starting mix based on ${song.title}")
                     onDismissRequest()
                 },

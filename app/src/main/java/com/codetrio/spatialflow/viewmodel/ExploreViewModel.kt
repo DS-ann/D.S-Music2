@@ -793,18 +793,56 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     // ========== Start Radio ==========
 
     fun startRadio(videoId: String) {
-        _uiState.update { it.copy(isLoadingStream = true) }
+        startRadioInternal(videoId, seedSong = null)
+    }
+
+    /** Start a mix from a specific song and keep that song at the front of the queue. */
+    fun startRadio(seedSong: OnlineSong) {
+        startRadioInternal(seedSong.videoId, seedSong)
+    }
+
+    private fun startRadioInternal(videoId: String, seedSong: OnlineSong?) {
+        _uiState.update { it.copy(isLoadingStream = true, error = null, streamError = null) }
         viewModelScope.launch {
             try {
-                val result = YouTubeMusic.startRadio(videoId)
-                result.onSuccess { radioSongs ->
-                    if (radioSongs.isNotEmpty()) {
-                        playOnlineSongWithQueue(radioSongs.first(), radioSongs, 0)
+                val radioResult = YouTubeMusic.startRadio(videoId)
+                val radioSongs = radioResult.getOrElse { radioError ->
+                    Log.w(TAG, "Radio request failed; falling back to related songs", radioError)
+                    emptyList()
+                }
+
+                // A radio response may be empty or contain only the seed song. Fall back
+                // to related songs so Start mix can still populate a multi-song queue.
+                val needsRelatedFallback = radioSongs.isEmpty() ||
+                    (seedSong != null && radioSongs.none { it.videoId != seedSong.videoId })
+                val candidates = if (!needsRelatedFallback) {
+                    radioSongs
+                } else {
+                    YouTubeMusic.relatedSongs(videoId).getOrElse { relatedError ->
+                        Log.w(TAG, "Related-song fallback failed for $videoId", relatedError)
+                        emptyList()
                     }
                 }
-                result.onFailure { 
-                    _uiState.update { it.copy(error = "Failed to start radio") }
+
+                val mixQueue = if (seedSong != null) {
+                    listOf(seedSong) + candidates.filterNot { it.videoId == seedSong.videoId }
+                } else {
+                    candidates
                 }
+
+                if (mixQueue.isNotEmpty()) {
+                    playOnlineSongWithQueue(mixQueue.first(), mixQueue, 0)
+                    if (seedSong != null && mixQueue.size == 1) {
+                        _uiState.update {
+                            it.copy(error = "Could not load related songs; playing the selected song only")
+                        }
+                    }
+                } else {
+                    _uiState.update { it.copy(error = "Failed to start radio: no songs were returned") }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start radio for $videoId", e)
+                _uiState.update { it.copy(error = "Failed to start radio") }
             } finally {
                 _uiState.update { it.copy(isLoadingStream = false) }
             }
