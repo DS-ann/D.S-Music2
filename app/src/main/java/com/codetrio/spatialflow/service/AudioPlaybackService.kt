@@ -295,6 +295,7 @@ class AudioPlaybackService : MediaSessionService() {
     private var isNextSongPreCached = false
     private var currentSongName = "SpatialFlow"
     private var currentAlbumArt: Bitmap? = null
+    private var lastWidgetProgressUpdateAtMs: Long = 0L
     private var shouldAutoPlay = false
     private var pendingSeekPos: Long = -1
     
@@ -1398,7 +1399,15 @@ class AudioPlaybackService : MediaSessionService() {
                         com.codetrio.spatialflow.util.PlaybackStateManager.savePosition(applicationContext, pos)
                     }
 
-                    if (player.isPlaying && pos % 200 < 100) {
+                    val lyricsModeActive = viewModel?.isLyricsModeEnabled?.value == true
+                    val nowMs = System.currentTimeMillis()
+                    val shouldUpdateWidget = if (lyricsModeActive) {
+                        nowMs - lastWidgetProgressUpdateAtMs >= 1_000L
+                    } else {
+                        pos % 200L < 100L
+                    }
+                    if (player.isPlaying && shouldUpdateWidget) {
+                        lastWidgetProgressUpdateAtMs = nowMs
                         updateWidgetProgress(pos, dur)
                     }
 
@@ -1419,7 +1428,7 @@ class AudioPlaybackService : MediaSessionService() {
                         }
                     }
                 }
-                val progressIntervalMs = if (viewModel?.isLyricsModeEnabled?.value == true) 80L else 250L
+                val progressIntervalMs = if (viewModel?.isLyricsModeEnabled?.value == true && player.isPlaying) 80L else 250L
                 handler.postDelayed(this, progressIntervalMs)
             }
         }
