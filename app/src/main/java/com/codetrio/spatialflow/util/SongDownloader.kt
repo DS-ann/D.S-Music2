@@ -144,22 +144,21 @@ object SongDownloader {
 
         _downloadProgress.value += (videoId to 0)
         job.invokeOnCompletion {
+            if (task.cancelled) task.outputFile?.delete()
             activeDownloads.remove(videoId, task)
             _downloadProgress.value -= videoId
-            if (task.cancelled) task.outputFile?.delete()
         }
         job.start()
     }
 
     fun cancelDownload(context: Context, song: SongItem) {
         val videoId = song.videoId ?: return
-        val task = activeDownloads.remove(videoId) ?: return
+        val task = activeDownloads[videoId] ?: return
+        if (task.cancelled) return
         task.cancelled = true
         task.connection?.disconnect()
         task.job?.cancel(CancellationException("Download cancelled by user"))
-        _downloadProgress.value -= videoId
         cancelNotification(context.applicationContext, song.id.toInt().coerceAtLeast(1))
-        task.outputFile?.delete()
         com.codetrio.spatialflow.ui.SnackbarController.showMessage("Download cancelled: ${cleanTitle(song.title)}")
     }
 
