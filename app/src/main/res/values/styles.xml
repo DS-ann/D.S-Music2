@@ -2,7 +2,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Portrait Toolbar Title -->
-    <style name="Base.Theme.SpatialFlow" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Base.Theme.SpatialFlow" parent="Theme.Material3.DayNight.NoActionBar" tools:targetApi="28">
         <item name="colorPrimary">@color/md_theme_primary</item>
         <item name="colorPrimaryContainer">@color/md_theme_light_primaryContainer</item>
         <item name="colorOnPrimaryContainer">@color/md_theme_light_onPrimaryContainer</item>
@@ -73,7 +73,7 @@
     <!-- ============================================ -->
 
     <!-- Display Styles - For large, impactful text -->
-    <style name="TextAppearance.SpatialFlow.DisplayLarge" parent="TextAppearance.Material3.DisplayLarge">
+    <style name="TextAppearance.SpatialFlow.DisplayLarge" parent="TextAppearance.Material3.DisplayLarge" tools:targetApi="28">
 
         <item name="android:textSize">57sp</item>
         <item name="android:letterSpacing">0</item>
@@ -100,7 +100,7 @@
         <item name="android:letterSpacing">0</item>
     </style>
 
-    <style name="TextAppearance.SpatialFlow.HeadlineMedium" parent="TextAppearance.Material3.HeadlineMedium">
+    <style name="TextAppearance.SpatialFlow.HeadlineMedium" parent="TextAppearance.Material3.HeadlineMedium" tools:targetApi="28">
 
         <item name="android:textSize">28sp</item>
         <item name="android:letterSpacing">0.018</item>
@@ -115,7 +115,7 @@
     </style>
 
     <!-- Lyrics Style - For active song lyrics -->
-    <style name="TextAppearance.SpatialFlow.Lyrics" parent="TextAppearance.Material3.HeadlineMedium">
+    <style name="TextAppearance.SpatialFlow.Lyrics" parent="TextAppearance.Material3.HeadlineMedium" tools:targetApi="28">
         <item name="android:textSize">34sp</item>
         <item name="android:textStyle">bold</item>
         <item name="android:fontFamily">@font/google_flex</item>
@@ -125,7 +125,7 @@
     </style>
 
     <!-- Title Styles - For component headers -->
-    <style name="TextAppearance.SpatialFlow.TitleLarge" parent="TextAppearance.Material3.TitleLarge">
+    <style name="TextAppearance.SpatialFlow.TitleLarge" parent="TextAppearance.Material3.TitleLarge" tools:targetApi="28">
 
         <item name="android:textSize">22sp</item>
         <item name="android:letterSpacing">0.023</item>
@@ -146,7 +146,7 @@
     </style>
 
     <!-- Body Styles - For main content text -->
-    <style name="TextAppearance.SpatialFlow.BodyLarge" parent="TextAppearance.Material3.BodyLarge">
+    <style name="TextAppearance.SpatialFlow.BodyLarge" parent="TextAppearance.Material3.BodyLarge" tools:targetApi="28">
 
         <item name="android:textSize">16sp</item>
         <item name="android:letterSpacing">0.05</item>
@@ -154,7 +154,7 @@
         <item name="android:fontVariationSettings">"'wght' 400, 'ROND' 100"</item>
     </style>
 
-    <style name="TextAppearance.SpatialFlow.BodyMedium" parent="TextAppearance.Material3.BodyMedium">
+    <style name="TextAppearance.SpatialFlow.BodyMedium" parent="TextAppearance.Material3.BodyMedium" tools:targetApi="28">
 
         <item name="android:textSize">14sp</item>
         <item name="android:letterSpacing">0.036</item>
@@ -169,7 +169,7 @@
     </style>
 
     <!-- Label Styles - For buttons, chips, and small labels -->
-    <style name="TextAppearance.SpatialFlow.LabelLarge" parent="TextAppearance.Material3.LabelLarge">
+    <style name="TextAppearance.SpatialFlow.LabelLarge" parent="TextAppearance.Material3.LabelLarge" tools:targetApi="28">
 
         <item name="android:textSize">14sp</item>
         <item name="android:letterSpacing">0.007</item>
@@ -183,7 +183,7 @@
         <item name="android:letterSpacing">0.04</item>
     </style>
 
-    <style name="TextAppearance.SpatialFlow.LabelSmall" parent="TextAppearance.Material3.LabelSmall">
+    <style name="TextAppearance.SpatialFlow.LabelSmall" parent="TextAppearance.Material3.LabelSmall" tools:targetApi="28">
 
         <item name="android:textSize">11sp</item>
         <item name="android:letterSpacing">0.045</item>
