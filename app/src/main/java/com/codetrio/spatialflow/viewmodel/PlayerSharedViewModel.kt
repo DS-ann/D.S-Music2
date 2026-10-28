@@ -283,10 +283,13 @@ class PlayerSharedViewModel @Inject constructor(
         set(value) {
             field = value
             _audioServiceState.value = value
-            value?.setViewModel(this)
-            
-            if (value != null) {
-                val activeMediaItem = value.player.currentMediaItem
+            val service = value ?: return
+            service.setViewModel(this)
+
+            // Service binding can complete before its asynchronous cache/player initialization.
+            // Never dereference service.player until the service announces readiness.
+            service.runWhenPlayerReady {
+                val activeMediaItem = service.player.currentMediaItem
                 if (activeMediaItem != null) {
                     val activeSongId = activeMediaItem.mediaId.toLongOrNull()
                     if (activeSongId != null) {
@@ -301,14 +304,14 @@ class PlayerSharedViewModel @Inject constructor(
                     }
                 } else {
                     // Cold-start warm preloading: when the service connects, immediately
-                    // load the restored playback song so pressing Play works instantly
+                    // load the restored playback song so pressing Play works instantly.
                     val restoredSong = _currentSong.value
                     val restoredUri = _songUri.value
                     val restoredPos = _currentPosition.value.toLong()
                     if (restoredSong != null && restoredUri != null) {
-                        if (value.getCurrentSourceUri() != restoredUri) {
+                        if (service.getCurrentSourceUri() != restoredUri) {
                             Log.d(TAG, "Cold-start pre-loading restored song: ${restoredSong.title} at pos $restoredPos")
-                            value.loadAudio(restoredUri, restoredPos)
+                            service.loadAudio(restoredUri, restoredPos)
                         } else {
                             Log.d(TAG, "Skipping cold-start pre-loading: song is already active in service")
                         }
