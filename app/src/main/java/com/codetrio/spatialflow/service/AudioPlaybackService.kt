@@ -830,6 +830,11 @@ class AudioPlaybackService : MediaSessionService() {
      * Pre-cache the first 512KB of the audio stream into SimpleCache for instant playback start.
      */
     private fun preCacheFirstChunk(streamUrl: String) {
+        if (!getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_MEDIA_CACHE_ENABLED, true)) {
+            Log.d(TAG, "Skipping first-chunk pre-cache because audio caching is disabled")
+            return
+        }
         serviceScope.launch(Dispatchers.IO) {
             try {
                 val httpDataSourceFactory = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(streamHttpClient)

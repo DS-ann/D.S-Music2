@@ -652,7 +652,9 @@ fun FullPlayer(
                             ) {
                                 if (uiState.isLoading) {
                                     androidx.compose.material3.CircularProgressIndicator(
-                                        modifier = Modifier.size(32.dp), color = Color.White, strokeWidth = 3.dp
+                                        modifier = Modifier.size(32.dp),
+                                        color = if (isDark) Color(0xFF1C1B1F) else Color.White,
+                                        strokeWidth = 3.dp
                                     )
                                 } else {
                                     Icon(
