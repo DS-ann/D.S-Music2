@@ -170,9 +170,6 @@ object NewPipeStreamExtractor {
             }.also {
                 inFlightRequests[videoId] = it
                 it.start()
-            }.also {
-                inFlightPlayerResults[videoId] = it
-                it.start()
             }
         }
 
@@ -250,6 +247,9 @@ object NewPipeStreamExtractor {
                 } finally {
                     inFlightPlayerResults.remove(videoId)
                 }
+            }.also {
+                inFlightPlayerResults[videoId] = it
+                it.start()
             }
         }
 
