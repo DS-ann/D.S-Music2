@@ -245,6 +245,24 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit {putFloat(KEY_CROSSFADE_DURATION, duration)}
     }
 
+    // ── Stream Audio Cache ───────────────────────────────────────────────────
+    private val _mediaCacheEnabled = MutableStateFlow(prefs.getBoolean(KEY_MEDIA_CACHE_ENABLED, true))
+    val mediaCacheEnabled: StateFlow<Boolean> = _mediaCacheEnabled.asStateFlow()
+    private val _mediaCacheLimitGb = MutableStateFlow(prefs.getInt(KEY_MEDIA_CACHE_LIMIT_GB, 1).coerceIn(1, 10))
+    val mediaCacheLimitGb: StateFlow<Int> = _mediaCacheLimitGb.asStateFlow()
+
+    fun setMediaCacheEnabled(enabled: Boolean) {
+        _mediaCacheEnabled.value = enabled
+        prefs.edit { putBoolean(KEY_MEDIA_CACHE_ENABLED, enabled) }
+        com.codetrio.spatialflow.service.AudioPlaybackService.updateMediaCacheSettings(context)
+    }
+    fun setMediaCacheLimitGb(limitGb: Int) {
+        val safeLimit = limitGb.coerceIn(1, 10)
+        _mediaCacheLimitGb.value = safeLimit
+        prefs.edit { putInt(KEY_MEDIA_CACHE_LIMIT_GB, safeLimit) }
+        com.codetrio.spatialflow.service.AudioPlaybackService.updateMediaCacheSettings(context)
+    }
+
     // ── Audio Focus ──────────────────────────────────────────────────────────
     private val _audioFocus = MutableStateFlow(prefs.getBoolean(KEY_AUDIO_FOCUS, true))
     val audioFocus: StateFlow<Boolean> = _audioFocus.asStateFlow()
@@ -671,6 +689,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         const val KEY_CROSSFADE_ENABLED = "crossfade_enabled"
         const val KEY_CROSSFADE_DURATION = "crossfade_duration"
         const val KEY_AUDIO_FOCUS = "audio_focus"
+        const val KEY_MEDIA_CACHE_ENABLED = "media_cache_enabled"
+        const val KEY_MEDIA_CACHE_LIMIT_GB = "media_cache_limit_gb"
         const val KEY_LIBRARY_PATHS = "library_paths"
         const val KEY_HIDDEN_FOLDERS = "hidden_folders"
         const val KEY_AMOLED_BLACK = "amoled_black"
@@ -753,6 +773,8 @@ fun SettingsScreenContent(
     val downloadFolder by viewModel.downloadFolder.collectAsStateWithLifecycle()
     val songCacheMaxSize by viewModel.songCacheMaxSize.collectAsStateWithLifecycle()
     val imageCacheMaxSize by viewModel.imageCacheMaxSize.collectAsStateWithLifecycle()
+    val mediaCacheEnabled by viewModel.mediaCacheEnabled.collectAsStateWithLifecycle()
+    val mediaCacheLimitGb by viewModel.mediaCacheLimitGb.collectAsStateWithLifecycle()
 
     val hapticPlayPause by viewModel.hapticPlayPause.collectAsStateWithLifecycle()
     val hapticQueue by viewModel.hapticQueue.collectAsStateWithLifecycle()
@@ -862,6 +884,10 @@ fun SettingsScreenContent(
                 onSongCacheMaxSizeChange = { viewModel.setSongCacheMaxSize(it) },
                 imageCacheMaxSize = imageCacheMaxSize,
                 onImageCacheMaxSizeChange = { viewModel.setImageCacheMaxSize(it) },
+                mediaCacheEnabled = mediaCacheEnabled,
+                onMediaCacheToggle = { viewModel.setMediaCacheEnabled(it) },
+                mediaCacheLimitGb = mediaCacheLimitGb,
+                onMediaCacheLimitChange = { viewModel.setMediaCacheLimitGb(it) },
                 downloadFolder = downloadFolder,
                 onDownloadFolderClick = { downloadFolderPickerLauncher.launch(null) },
                 ignoreShortAudio = ignoreShortAudio,
@@ -1175,6 +1201,10 @@ private fun MusicManagementScreen(
     onSongCacheMaxSizeChange: (Int) -> Unit,
     imageCacheMaxSize: Int,
     onImageCacheMaxSizeChange: (Int) -> Unit,
+    mediaCacheEnabled: Boolean,
+    onMediaCacheToggle: (Boolean) -> Unit,
+    mediaCacheLimitGb: Int,
+    onMediaCacheLimitChange: (Int) -> Unit,
     downloadFolder: String?,
     onDownloadFolderClick: () -> Unit,
     hiddenFolders: List<String>,
@@ -1243,6 +1273,36 @@ private fun MusicManagementScreen(
             SettingsGroupCard(buildList {
                 add { SongCacheSizeRow(songCacheSize, songCacheMaxSize, onSongCacheMaxSizeChange, onClearSongCache) }
                 add { ImageCacheSizeRow(imageCacheSize, imageCacheMaxSize, onImageCacheMaxSizeChange, onClearImageCache) }
+                add {
+                    ListItem(
+                        onClick = { onMediaCacheToggle(!mediaCacheEnabled) },
+                        headlineContent = { Text("Online audio cache", fontWeight = FontWeight.SemiBold) },
+                        supportingContent = {
+                            Text(if (mediaCacheEnabled) "Cache streamed audio for faster repeat playback."
+                                else "Disabled. New stream data is not retained.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        },
+                        trailingContent = { Switch(checked = mediaCacheEnabled, onCheckedChange = onMediaCacheToggle) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                }
+                if (mediaCacheEnabled) {
+                    add {
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Text("Stream cache limit", style = MaterialTheme.typography.bodyLarge)
+                                Text(mediaCacheLimitGb.toString() + " GB", style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Slider(value = mediaCacheLimitGb.toFloat(),
+                                onValueChange = { onMediaCacheLimitChange(it.toInt().coerceIn(1, 10)) },
+                                valueRange = 1f..10f, steps = 8)
+                            Text("Limit is applied immediately. Oldest cached audio is evicted first when exceeded.",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
             })
         }
     }

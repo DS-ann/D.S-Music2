@@ -7,6 +7,7 @@ import com.codetrio.spatialflow.model.SongItem
 data class PlayerUiState(
     val currentSong: SongItem? = null,
     val isPlaying: Boolean = false,
+    val isLoading: Boolean = false,
     val duration: Int = 0,
     val currentSongIndex: Int = -1,
     val isHapticsEnabled: Boolean = false,

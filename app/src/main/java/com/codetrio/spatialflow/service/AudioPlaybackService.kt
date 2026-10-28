@@ -31,8 +31,9 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSpec
-import androidx.media3.datasource.cache.CacheWriter
-import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
+import androidx.media3.datasource.cache.Cache
+import androidx.media3.datasource.cache.CacheEvictor
+import androidx.media3.datasource.cache.CacheSpanWriter
 import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.CommandButton
@@ -58,6 +59,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.TreeSet
 import java.nio.ByteBuffer
 import kotlin.math.max
 import kotlin.math.min
@@ -89,17 +91,59 @@ class AudioPlaybackService : MediaSessionService() {
         val CMD_CYCLE_PLAYBACK_MODE = SessionCommand(ACTION_CYCLE_PLAYBACK_MODE, Bundle.EMPTY)
         val CMD_TOGGLE_FAV = SessionCommand(ACTION_TOGGLE_FAV, Bundle.EMPTY)
 
+        private const val KEY_MEDIA_CACHE_ENABLED = "media_cache_enabled"
+        private const val KEY_MEDIA_CACHE_LIMIT_GB = "media_cache_limit_gb"
+        private const val DEFAULT_MEDIA_CACHE_LIMIT_GB = 1
+        private const val BYTES_PER_GB = 1024L * 1024L * 1024L
+
         private var cache: SimpleCache? = null
+        private var cacheEvictor: AdjustableCacheEvictor? = null
 
         @Synchronized
         fun getCache(context: Context): SimpleCache {
             if (cache == null) {
-                val cacheDir = File(context.cacheDir, "media_cache")
-                val evictor = LeastRecentlyUsedCacheEvictor(200 * 1024 * 1024) // 200MB
-                val databaseProvider = StandaloneDatabaseProvider(context)
-                cache = SimpleCache(cacheDir, evictor, databaseProvider)
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                val enabled = prefs.getBoolean(KEY_MEDIA_CACHE_ENABLED, true)
+                val limitBytes = prefs.getInt(KEY_MEDIA_CACHE_LIMIT_GB, DEFAULT_MEDIA_CACHE_LIMIT_GB)
+                    .coerceIn(1, 10).toLong() * BYTES_PER_GB
+                val evictor = AdjustableCacheEvictor(enabled, limitBytes)
+                cacheEvictor = evictor
+                cache = SimpleCache(File(context.cacheDir, "media_cache"), evictor, StandaloneDatabaseProvider(context))
+                evictor.configure(cache!!, enabled, limitBytes)
             }
             return cache!!
+        }
+
+        @Synchronized
+        fun updateMediaCacheSettings(context: Context) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val enabled = prefs.getBoolean(KEY_MEDIA_CACHE_ENABLED, true)
+            val limitBytes = prefs.getInt(KEY_MEDIA_CACHE_LIMIT_GB, DEFAULT_MEDIA_CACHE_LIMIT_GB)
+                .coerceIn(1, 10).toLong() * BYTES_PER_GB
+            cache?.let { cacheEvictor?.configure(it, enabled, limitBytes) }
+        }
+
+        @Synchronized
+        fun getMediaCacheSnapshot(context: Context): Pair<Long, List<Pair<String, Long>>> {
+            val currentCache = getCache(context)
+            val entries = currentCache.keys.map { key ->
+                key to currentCache.getCachedSpans(key).map { it.length }.sum()
+            }.filter { it.second > 0L }.sortedByDescending { it.second }
+            return currentCache.cacheSpace to entries
+        }
+
+        @Synchronized
+        fun clearMediaCache(context: Context) {
+            val currentCache = cache
+            if (currentCache == null) {
+                File(context.cacheDir, "media_cache").deleteRecursively()
+                return
+            }
+            currentCache.keys.toList().forEach { key ->
+                try { currentCache.removeResource(key) }
+                catch (error: Exception) { Log.w(TAG, "Could not clear one cached resource", error) }
+            }
+            cacheEvictor?.refresh(currentCache)
         }
     }
 
@@ -187,7 +231,9 @@ class AudioPlaybackService : MediaSessionService() {
             val isPlayingState = player.playWhenReady && state == Player.STATE_READY
             viewModel?.postIsPlaying(isPlayingState)
 
+            if (state == Player.STATE_BUFFERING) viewModel?.setLoading(true)
             if (state == Player.STATE_READY) {
+                viewModel?.setLoading(false)
                 viewModel?.setPlaybackReady(true)
                 if (pendingSeekPos >= 0) {
                     player.seekTo(pendingSeekPos)
@@ -213,6 +259,7 @@ class AudioPlaybackService : MediaSessionService() {
 
             val song = viewModel?.currentSong?.value
             val videoId = song?.videoId?.takeIf { it.isNotBlank() }
+            viewModel?.setLoading(videoId != null && playbackRecoveryStage < 2)
             if (videoId != null && playbackRecoveryStage < 2) {
                 if (lastPlaybackRecoveryVideoId != videoId) {
                     lastPlaybackRecoveryVideoId = videoId
@@ -245,6 +292,7 @@ class AudioPlaybackService : MediaSessionService() {
                 return
             }
 
+            viewModel?.setLoading(false)
             val message = if (videoId != null) {
                 "Playback failed after retry. Check your connection and try again."
             } else {
@@ -543,9 +591,14 @@ class AudioPlaybackService : MediaSessionService() {
      * prior to injecting raw HTTP/File resource pointers into ExoPlayer.
      */
     private fun resolveAndLoad(uri: Uri) {
+        viewModel?.setLoading(true)
         originalSourceUri = uri
         if (uri.scheme == "innertube") {
-            val videoId = uri.host ?: return
+            val videoId = uri.host
+            if (videoId.isNullOrBlank()) {
+                viewModel?.setLoading(false)
+                return
+            }
             val useWebRemixRetry = forceWebRemixOnNextResolveVideoId == videoId
             val useCompatibleFallbackRetry = forceCompatibleFallbackOnNextResolveVideoId == videoId
             if (useWebRemixRetry) forceWebRemixOnNextResolveVideoId = null
@@ -630,6 +683,7 @@ class AudioPlaybackService : MediaSessionService() {
                     failedStreamVideoId = videoId
                     shouldAutoPlay = false
                     viewModel?.setIsPlaying(false)
+                    viewModel?.setLoading(false)
                     com.codetrio.spatialflow.ui.SnackbarController.showMessage(
                         "Couldn't load this song. Check your connection and tap Play to retry."
                     )
@@ -1022,6 +1076,7 @@ class AudioPlaybackService : MediaSessionService() {
                 preloadNextSongIntoQueue()
             }, 200)
         } catch (e: Exception) {
+            viewModel?.setLoading(false)
             Log.e(TAG, "Failed to load audio: ${e.message}")
         }
     }
@@ -1605,4 +1660,67 @@ class AudioPlaybackService : MediaSessionService() {
         }
     }
 
+}
+
+
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+private class AdjustableCacheEvictor(initialEnabled: Boolean, initialMaxBytes: Long) : CacheEvictor {
+    private val lock = Any()
+    private val spans = TreeSet<CacheSpan>(Comparator { a, b ->
+        val touched = a.lastTouchTimestamp.compareTo(b.lastTouchTimestamp)
+        if (touched != 0) touched else {
+            val keyOrder = a.key.compareTo(b.key)
+            if (keyOrder != 0) keyOrder else a.position.compareTo(b.position)
+        }
+    })
+    @Volatile private var enabled = initialEnabled
+    @Volatile private var maxBytes = initialMaxBytes
+    @Volatile private var initialized = false
+    @Volatile private var activeCache: Cache? = null
+
+    override fun requiresCacheSpanTouches(): Boolean = true
+    override fun onCacheInitialized() {
+        initialized = true
+        activeCache?.let { evictIfNeeded(it) }
+    }
+    override fun onStartFile(cache: Cache, key: String, position: Long, length: Long) {
+        activeCache = cache
+        if (initialized) evictIfNeeded(cache, length.coerceAtLeast(0L))
+    }
+    override fun onSpanAdded(cache: Cache, span: CacheSpan) {
+        activeCache = cache
+        synchronized(lock) { spans.add(span) }
+        if (initialized) evictIfNeeded(cache)
+    }
+    override fun onSpanRemoved(cache: Cache, span: CacheSpan) {
+        activeCache = cache
+        synchronized(lock) { spans.remove(span) }
+    }
+    override fun onSpanTouched(cache: Cache, oldSpan: CacheSpan, newSpan: CacheSpan) {
+        activeCache = cache
+        synchronized(lock) { spans.remove(oldSpan); spans.add(newSpan) }
+        if (initialized) evictIfNeeded(cache)
+    }
+    fun configure(cache: Cache, enabled: Boolean, maxBytes: Long) {
+        this.enabled = enabled
+        this.maxBytes = maxBytes.coerceAtLeast(1L)
+        refresh(cache)
+    }
+    fun refresh(cache: Cache) {
+        activeCache = cache
+        synchronized(lock) {
+            spans.clear()
+            cache.keys.forEach { key -> spans.addAll(cache.getCachedSpans(key)) }
+        }
+        if (initialized) evictIfNeeded(cache)
+    }
+    private fun evictIfNeeded(cache: Cache, incomingBytes: Long = 0L) {
+        while (true) {
+            val removeOne = synchronized(lock) { !enabled || cache.cacheSpace + incomingBytes > maxBytes }
+            if (!removeOne) return
+            val oldest = synchronized(lock) { if (spans.isEmpty()) null else spans.pollFirst() } ?: return
+            try { cache.removeSpan(oldest) }
+            catch (error: Exception) { android.util.Log.w("SpatialFlowCache", "Unable to evict cached audio", error) }
+        }
+    }
 }

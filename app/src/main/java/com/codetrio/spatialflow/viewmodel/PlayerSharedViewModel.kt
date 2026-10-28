@@ -325,6 +325,7 @@ class PlayerSharedViewModel @Inject constructor(
         _currentSong.value = oldVm._currentSong.value
         _songUri.value = oldVm._songUri.value
         _isPlaying.value = oldVm._isPlaying.value
+        _isLoading.value = oldVm._isLoading.value
         _currentPosition.value = oldVm._currentPosition.value
         _duration.value = oldVm._duration.value
         _isShuffleEnabled.value = oldVm._isShuffleEnabled.value
@@ -349,6 +350,10 @@ class PlayerSharedViewModel @Inject constructor(
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    fun setLoading(loading: Boolean) { _isLoading.value = loading }
 
     private val _currentPosition = MutableStateFlow(0)
     val currentPosition: StateFlow<Int> = _currentPosition.asStateFlow()
@@ -1308,6 +1313,7 @@ class PlayerSharedViewModel @Inject constructor(
         _currentSong.value = song
         _songUri.value = song.contentUri
         _isPlaybackReady.value = false
+        _isLoading.value = true
 
         _isCurrentSongFavorite.value = favoritesManager?.isFavorite(song.id) ?: false
         baseLikesCountInt = 0

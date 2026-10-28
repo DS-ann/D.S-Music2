@@ -707,6 +707,7 @@ fun PlayerBottomSheetCompose(
         // Playback state observers combined into stable UI model
         val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
         val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
+        val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
         val duration by viewModel.duration.collectAsStateWithLifecycle()
         val currentSongIndex by viewModel.currentSongIndex.collectAsStateWithLifecycle()
         val isHapticsEnabled by viewModel.isHapticsEnabled.collectAsStateWithLifecycle()
@@ -779,13 +780,14 @@ fun PlayerBottomSheetCompose(
         )
  
         val uiState = remember(
-            currentSong, isPlaying, duration, currentSongIndex,
+            currentSong, isPlaying, isLoading, duration, currentSongIndex,
             isHapticsEnabled, miniPlayerBlendColor, isCurrentSongFavorite, isCurrentSongDisliked, repeatMode, isShuffleEnabled,
             playerBackgroundColor, likesCount, isCurrentSongDownloaded, currentSongDownloadProgress
         ) {
             PlayerUiState(
                 currentSong = currentSong,
                 isPlaying = isPlaying,
+                isLoading = isLoading,
                 duration = duration,
                 currentSongIndex = currentSongIndex,
                 isHapticsEnabled = isHapticsEnabled,
@@ -1369,18 +1371,24 @@ private fun MiniPlayerContentInternal(
 
             IconButton(
                 onClick = {
-                    if (isPlaying) viewModel.pauseAudio() else viewModel.playAudio()
+                    if (!isLoading) {
+                        if (isPlaying) viewModel.pauseAudio() else viewModel.playAudio()
+                    }
                 },
-                modifier = Modifier
-                    .size(42.dp)
-                    .background(playBgColor, CircleShape)
+                modifier = Modifier.size(42.dp).background(playBgColor, CircleShape)
             ) {
-                Icon(
-                    painter = painterResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play),
-                    contentDescription = "Play/Pause",
-                    tint = contentColor,
-                    modifier = Modifier.size(20.dp)
-                )
+                if (isLoading) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp), color = contentColor, strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play),
+                        contentDescription = "Play/Pause",
+                        tint = contentColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
 
             IconButton(onClick = { viewModel.playNextSong() }) {

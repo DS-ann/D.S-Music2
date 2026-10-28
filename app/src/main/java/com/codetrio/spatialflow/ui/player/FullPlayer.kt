@@ -16,6 +16,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -27,6 +29,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -34,6 +37,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -265,6 +269,7 @@ fun FullPlayer(
     val haptic = LocalHapticFeedback.current
     val hasLyrics = !syncedLyrics.isNullOrEmpty() || !plainLyrics.isNullOrBlank()
     val currentSongId = uiState.currentSong?.id
+    var showSongInfoDialog by remember { mutableStateOf(false) }
     var lastLyricsFetchSongId by remember { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
     
@@ -421,6 +426,17 @@ fun FullPlayer(
                             }
                     )
                 }
+                IconButton(
+                    onClick = { showSongInfoDialog = true },
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Song information",
+                        tint = contentSecondary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -446,16 +462,7 @@ fun FullPlayer(
             ) {
                 Spacer(modifier = Modifier.width(12.dp))
 
-                SplitLikeDislikeChip(
-                    isLiked = uiState.isCurrentSongFavorite,
-                    isDisliked = uiState.isCurrentSongDisliked,
-                    likesCount = uiState.likesCount,
-                    onLikeClick = onFavoriteClick,
-                    onDislikeClick = onDislikeClick,
-                    contentColor = contentColor,
-                    accentColor = dynamicAccentColor,
-                    isDark = isDark
-                )
+                // Like/dislike controls are removed from the player.
 
                 // Interactive Music Haptics Chip inside the same row
                 PillChip(
@@ -624,7 +631,7 @@ fun FullPlayer(
                             label = "PlayCorner"
                         )
                         androidx.compose.material3.Button(
-                            onClick = onPlayPauseClick,
+                            onClick = { if (!uiState.isLoading) onPlayPauseClick() },
                             modifier = with(scope) {
                                 Modifier
                                     .animateWidth(interactionSource)
@@ -643,11 +650,17 @@ fun FullPlayer(
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    painter = painterResource(id = if (uiState.isPlaying) R.drawable.ic_pause else R.drawable.ic_play),
-                                    contentDescription = if (uiState.isPlaying) "Pause" else "Play",
-                                    modifier = Modifier.size(42.dp)
-                                )
+                                if (uiState.isLoading) {
+                                    androidx.compose.material3.CircularProgressIndicator(
+                                        modifier = Modifier.size(32.dp), color = Color.White, strokeWidth = 3.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        painter = painterResource(id = if (uiState.isPlaying) R.drawable.ic_pause else R.drawable.ic_play),
+                                        contentDescription = if (uiState.isPlaying) "Pause" else "Play",
+                                        modifier = Modifier.size(42.dp)
+                                    )
+                                }
                             }
                         }
                     },
@@ -793,6 +806,65 @@ fun FullPlayer(
                     else viewModel.cancelSleepTimer()
                 }
             )
+        }
+
+        if (showSongInfoDialog) {
+            val song = uiState.currentSong
+            if (song != null) {
+                val totalSeconds = song.duration.coerceAtLeast(0L) / 1000L
+                val durationText = if (totalSeconds >= 3600L) {
+                    java.lang.String.format(java.util.Locale.getDefault(), "%d:%02d:%02d",
+                        totalSeconds / 3600L, (totalSeconds % 3600L) / 60L, totalSeconds % 60L)
+                } else {
+                    java.lang.String.format(java.util.Locale.getDefault(), "%d:%02d",
+                        totalSeconds / 60L, totalSeconds % 60L)
+                }
+                val addedText = if (song.dateAdded > 0L) {
+                    java.text.DateFormat.getDateTimeInstance().format(java.util.Date(song.dateAdded * 1000L))
+                } else "Unavailable"
+                val details = listOf(
+                    "Title" to song.title,
+                    "Artist" to song.artist,
+                    "Duration" to durationText,
+                    "Source" to if (!song.videoId.isNullOrBlank()) "YouTube Music / online" else "Device audio",
+                    "Song ID" to song.id.toString(),
+                    "Album ID" to if (song.albumId > 0L) song.albumId.toString() else "Unavailable",
+                    "Date added" to addedText,
+                    "Video ID" to (song.videoId ?: "Unavailable"),
+                    "Artist ID" to (song.artistId ?: "Unavailable"),
+                    "LUFS" to (song.lufs?.toString() ?: "Not analyzed"),
+                    "File path" to (song.path ?: "Unavailable"),
+                    "Data reference" to (song.data ?: "Unavailable"),
+                    "Content URI" to song.contentUri.toString(),
+                    "Thumbnail URL" to (song.thumbnailUrl ?: "Unavailable")
+                )
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showSongInfoDialog = false },
+                    title = { Text("Song information", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
+                    text = {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)
+                                .verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)
+                        ) {
+                            details.forEach { (label, value) ->
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                                    Text(label, modifier = Modifier.width(100.dp),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(value, modifier = Modifier.weight(1f),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface)
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(onClick = { showSongInfoDialog = false }) { Text("Close") }
+                    }
+                )
+            }
         }
     }
 }

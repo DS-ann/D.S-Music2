@@ -135,6 +135,7 @@ import com.codetrio.spatialflow.data.innertube.OnlineArtist
 import com.codetrio.spatialflow.data.innertube.OnlinePlaylist
 import com.codetrio.spatialflow.data.innertube.OnlineSong
 import com.codetrio.spatialflow.model.SongItem
+import com.codetrio.spatialflow.service.AudioPlaybackService
 import com.codetrio.spatialflow.model.toSongItem
 import com.codetrio.spatialflow.ui.CreateLocalPlaylistDialog
 import com.codetrio.spatialflow.ui.LocalPlaylistPickerDialog
@@ -147,6 +148,7 @@ import com.codetrio.spatialflow.viewmodel.ExploreViewModel
 import com.codetrio.spatialflow.viewmodel.PlayerSharedViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 enum class SortOrder {
@@ -349,7 +351,8 @@ fun LibraryScreen(
                 "Songs",
                 "Albums",
                 "Artists",
-                "Device Files"
+                "Device Files",
+                "Cache"
             )
 
             Row(
@@ -392,6 +395,7 @@ fun LibraryScreen(
                     "Albums" -> AlbumsTabContent(nestedScrollConnection)
                     "Artists" -> ArtistsTabContent(nestedScrollConnection)
                     "Recap" -> RecapTabContent(nestedScrollConnection, viewModel, onNavigateToExplore)
+                    "Cache" -> StreamCacheTabContent(context)
                     "Device Files" -> {
                         // Scan Local Files helper
                         val onRefreshAction = {
@@ -2668,4 +2672,123 @@ private fun getActivityFromContext(context: Context): Activity? {
 
 private fun navigateToExplore(activity: Activity?) {
     (activity as? MainActivity)?.showArtistPage(null, null)
+}
+
+
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@Composable
+private fun StreamCacheTabContent(context: Context) {
+    val scope = rememberCoroutineScope()
+    var cacheBytes by remember { mutableStateOf(0L) }
+    var cacheEntries by remember { mutableStateOf(emptyList<Pair<String, Long>>()) }
+    var cacheEnabled by remember { mutableStateOf(true) }
+    var cacheLimitGb by remember { mutableStateOf(1) }
+    var isClearing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(context) {
+        while (true) {
+            val snapshot = withContext(Dispatchers.IO) {
+                val prefs = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+                val summary = try { AudioPlaybackService.getMediaCacheSnapshot(context) }
+                    catch (_: Exception) { 0L to emptyList<Pair<String, Long>>() }
+                Triple(summary, prefs.getBoolean("media_cache_enabled", true),
+                    prefs.getInt("media_cache_limit_gb", 1).coerceIn(1, 10))
+            }
+            cacheBytes = snapshot.first.first
+            cacheEntries = snapshot.first.second
+            cacheEnabled = snapshot.second
+            cacheLimitGb = snapshot.third
+            delay(1800L)
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+            ) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Audio cache", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(android.text.format.Formatter.formatFileSize(context, cacheBytes) +
+                        " used • " + cacheEntries.size + " cached sources",
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (cacheEnabled) "Caching is on. Limit: " + cacheLimitGb + " GB"
+                        else "Caching is off. New stream data is not retained.")
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                isClearing = true
+                                withContext(Dispatchers.IO) { AudioPlaybackService.clearMediaCache(context) }
+                                val afterClear = withContext(Dispatchers.IO) { AudioPlaybackService.getMediaCacheSnapshot(context) }
+                                cacheBytes = afterClear.first
+                                cacheEntries = afterClear.second
+                                isClearing = false
+                            }
+                        },
+                        enabled = !isClearing
+                    ) {
+                        if (isClearing) androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp), strokeWidth = 2.dp
+                        ) else Icon(Icons.Default.Delete, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (isClearing) "Clearing…" else "Clear cache")
+                    }
+                    Text("This cache stores streamed audio chunks. Change its limit in Settings → Music Management → Storage.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        if (cacheEntries.isEmpty()) {
+            item {
+                Box(Modifier.fillMaxWidth().padding(vertical = 36.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.MusicNote, contentDescription = null, modifier = Modifier.size(42.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text("No cached audio sources", style = MaterialTheme.typography.titleMedium)
+                        Text("Play an online song to populate the cache.", style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        } else {
+            itemsIndexed(cacheEntries, key = { _, item -> item.first }) { index, item ->
+                ListItem(
+                    headlineContent = { Text(cacheSourceLabel(item.first, index), fontWeight = FontWeight.SemiBold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent = { Text(cacheSourceDetail(item.first), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                    trailingContent = { Text(android.text.format.Formatter.formatFileSize(context, item.second),
+                        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                )
+            }
+        }
+    }
+}
+
+private fun cacheSourceLabel(key: String, index: Int): String {
+    val uri = android.net.Uri.parse(key)
+    val host = uri.host
+    return when {
+        host?.contains("googlevideo.com", ignoreCase = true) == true -> "YouTube audio stream " + (index + 1)
+        uri.scheme == "content" || uri.scheme == "file" -> "Device audio stream " + (index + 1)
+        !host.isNullOrBlank() -> host
+        else -> "Cached media source " + (index + 1)
+    }
+}
+
+private fun cacheSourceDetail(key: String): String {
+    val uri = android.net.Uri.parse(key)
+    return if (!uri.host.isNullOrBlank()) {
+        // Do not expose signed URL query parameters or stream tokens in the UI.
+        uri.host + (uri.path?.takeIf { it.isNotBlank() } ?: "")
+    } else {
+        key.substringBefore('?').take(160)
+    }
 }
