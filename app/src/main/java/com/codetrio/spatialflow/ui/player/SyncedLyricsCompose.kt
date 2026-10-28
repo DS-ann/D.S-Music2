@@ -67,6 +67,7 @@ import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.codetrio.spatialflow.R
@@ -313,7 +314,7 @@ private fun LyricLineItem(
         label = "LyricAlpha"
     )
 
-    val rawPos = if (isKaraoke && isActive) currentPositionProvider() else lineStartMs.toInt()
+    val rawPos = if ((isKaraoke || line.backgroundWords.isNotEmpty()) && isActive) currentPositionProvider() else lineStartMs.toInt()
     val smoothedPos by animateFloatAsState(
         targetValue = rawPos.toFloat(),
         animationSpec = tween(
@@ -387,6 +388,7 @@ private fun LyricLineItem(
         fontSize = 38.sp,
         fontWeight = FontWeight.Bold,
         lineHeight = 50.sp,
+        textAlign = if (line.isRightAligned) TextAlign.End else TextAlign.Start,
         platformStyle = PlatformTextStyle(includeFontPadding = true)
     )
 
@@ -395,6 +397,7 @@ private fun LyricLineItem(
         fontSize = 20.sp,
         fontWeight = FontWeight.Medium,
         lineHeight = 28.sp,
+        textAlign = if (line.isRightAligned) TextAlign.End else TextAlign.Start,
         platformStyle = PlatformTextStyle(includeFontPadding = true)
     )
 
@@ -477,6 +480,60 @@ private fun LyricLineItem(
                                     }
                                 }
                             }
+                    )
+                }
+            }
+        }
+        if (!line.backgroundContent.isNullOrBlank()) {
+            val backgroundText = line.backgroundContent + " "
+            val backgroundLayoutResult = remember(line.startTimeMs, line.backgroundContent) {
+                androidx.compose.runtime.mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null)
+            }
+            val backgroundStyle = bracketTextStyle.copy(
+                fontSize = 18.sp,
+                lineHeight = 26.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp)
+            ) {
+                Text(
+                    text = backgroundText,
+                    style = backgroundStyle,
+                    color = if (isActive) contentColor.copy(alpha = 0.82f) else dimColor,
+                    modifier = Modifier.fillMaxWidth(),
+                    onTextLayout = { backgroundLayoutResult.value = it },
+                    maxLines = 2
+                )
+
+                if (line.backgroundWords.isNotEmpty() && isActive) {
+                    Text(
+                        text = backgroundText,
+                        style = backgroundStyle.copy(
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = accentColor.copy(alpha = 0.35f),
+                                offset = androidx.compose.ui.geometry.Offset(0f, 0f),
+                                blurRadius = 12f
+                            )
+                        ),
+                        color = litColor,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                            }
+                            .drawWithCache {
+                                onDrawWithContent {
+                                    val layout = backgroundLayoutResult.value
+                                    if (layout != null) {
+                                        drawContent()
+                                        eraseFutureText(layout, line.backgroundWords, smoothedPos.toLong(), 0, this)
+                                    }
+                                }
+                            },
+                        maxLines = 2
                     )
                 }
             }

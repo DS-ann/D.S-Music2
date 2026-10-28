@@ -7,5 +7,6 @@ data class LyricWord(
     val text: String,
     val absoluteStartTimeMs: Long,
     val durationMs: Long,
-    val charRange: IntRange = 0..0
+    val charRange: IntRange = 0..0,
+    val isBackground: Boolean = false
 )

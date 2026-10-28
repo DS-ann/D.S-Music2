@@ -20,10 +20,19 @@ object LrcParser {
             return emptyList()
         }
 
-        // Use Gramophone's robust parser options: trim=true, multiLine=true
+        val trimmed = lrcContent.trim()
+        val rawTtml = extractTtmlContent(trimmed)
+        if (rawTtml != null) {
+            val ttmlLines = TtmlParser.parse(rawTtml)
+            if (ttmlLines.isNotEmpty()) return ttmlLines
+            // TTML/XML failed to produce timed lines.
+            // NEVER pass XML content to LrcUtils because it will treat XML tags as unsynced lyrics!
+            Log.w(TAG, "Content was identified as TTML/XML but yielded no lines; suppressing raw XML display")
+            return emptyList()
+        }
         val parserOptions = LrcUtils.LrcParserOptions(trim = true, multiLine = true, errorText = null)
         val semanticLyrics = try {
-            LrcUtils.parseLyrics(lrcContent, null, parserOptions, null)
+            LrcUtils.parseLyrics(lrcContent, null, parserOptions, LrcUtils.LyricFormat.LRC)
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing lyrics via Gramophone parser", e)
             null
@@ -49,26 +58,40 @@ object LrcParser {
                     )
                 } ?: emptyList()
 
+                val isRightAligned = line.text.startsWith("[Singer 2", ignoreCase = true) ||
+                        line.text.startsWith("[Artist 2", ignoreCase = true) ||
+                        line.text.startsWith("(Singer 2", ignoreCase = true) ||
+                        line.text.startsWith("(Artist 2", ignoreCase = true) ||
+                        line.text.startsWith("[Duet 2", ignoreCase = true)
+
                 parsedLines.add(
                     LyricLine(
                         startTimeMs = line.start.toLong(),
                         content = line.text,
                         isInterlude = false,
                         isWordByWord = words.isNotEmpty(),
-                        words = words
+                        words = words,
+                        isRightAligned = isRightAligned
                     )
                 )
             }
         } else if (semanticLyrics is SemanticLyrics.UnsyncedLyrics) {
             // Unsynced lyrics (plain lyrics)
             for (line in semanticLyrics.unsyncedText) {
+                val isRightAligned = line.first.startsWith("[Singer 2", ignoreCase = true) ||
+                        line.first.startsWith("[Artist 2", ignoreCase = true) ||
+                        line.first.startsWith("(Singer 2", ignoreCase = true) ||
+                        line.first.startsWith("(Artist 2", ignoreCase = true) ||
+                        line.first.startsWith("[Duet 2", ignoreCase = true)
+
                 parsedLines.add(
                     LyricLine(
                         startTimeMs = 0L,
                         content = line.first,
                         isInterlude = false,
                         isWordByWord = false,
-                        words = emptyList()
+                        words = emptyList(),
+                        isRightAligned = isRightAligned
                     )
                 )
             }
@@ -76,8 +99,52 @@ object LrcParser {
 
         parsedLines.sort()
 
+        val normalizedLines = parsedLines.map { normalizeLineSpacing(it) }
+
         // Insert interlude markers for instrumental gaps
-        return insertInterludes(parsedLines)
+        return insertInterludes(normalizedLines)
+    }
+
+    private fun normalizeLineSpacing(line: LyricLine): LyricLine {
+        if (!line.content.contains(Regex("[ \\t]{2,}")) && !line.words.any { it.text.contains(Regex("[ \\t]{2,}")) }) {
+            return line
+        }
+        if (line.words.isEmpty()) {
+            return line.copy(content = line.content.replace(Regex("[ \\t]+"), " ").trim())
+        }
+        val sb = StringBuilder()
+        var lastIdx = 0
+        val sortedWords = line.words.sortedBy { it.charRange.first }
+        val newWords = mutableListOf<LyricWord>()
+        for (w in sortedWords) {
+            val wStart = w.charRange.first.coerceIn(0, line.content.length)
+            val wEnd = (w.charRange.last + 1).coerceIn(0, line.content.length)
+            if (wStart > lastIdx) {
+                val gap = line.content.substring(lastIdx, wStart)
+                val cleanGap = if (gap.all { it.isWhitespace() }) " " else gap.replace(Regex("[ \\t]+"), " ")
+                sb.append(cleanGap)
+            }
+            val newWordStart = sb.length
+            val wordText = if (wEnd > wStart) {
+                line.content.substring(wStart, wEnd).replace(Regex("[ \\t]+"), " ")
+            } else {
+                w.text.replace(Regex("[ \\t]+"), " ")
+            }
+            sb.append(wordText)
+            val newWordEnd = (sb.length - 1).coerceAtLeast(newWordStart)
+            newWords.add(
+                w.copy(
+                    text = wordText,
+                    charRange = newWordStart..newWordEnd
+                )
+            )
+            lastIdx = wEnd
+        }
+        if (lastIdx < line.content.length) {
+            val trailing = line.content.substring(lastIdx).replace(Regex("[ \\t]+"), " ")
+            sb.append(trailing)
+        }
+        return line.copy(content = sb.toString().trimEnd(), words = newWords)
     }
 
     private fun insertInterludes(sorted: List<LyricLine>): List<LyricLine> {
@@ -113,5 +180,58 @@ object LrcParser {
         }
 
         return result
+    }
+
+    private fun extractTtmlContent(text: String): String? {
+        if (text.isBlank()) return null
+
+        val trimmed = text.trim()
+
+        // 1. Check if the string is wrapped in a JSON response
+        if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+            val jsonExtracted = extractTtmlFromJson(trimmed)
+            if (jsonExtracted != null) return jsonExtracted
+        }
+
+        // 2. Direct XML/TTML format checks
+        if (trimmed.contains("<tt", ignoreCase = true) ||
+            trimmed.contains("<p begin=", ignoreCase = true) ||
+            trimmed.contains("ttm:begin", ignoreCase = true) ||
+            (trimmed.contains("<?xml", ignoreCase = true) && !trimmed.contains("<Qrc", ignoreCase = true) && !trimmed.contains("LyricContent", ignoreCase = true))
+        ) {
+            return trimmed
+        }
+
+        return null
+    }
+
+    private fun extractTtmlFromJson(jsonStr: String): String? {
+        return try {
+            val parsed = com.google.gson.JsonParser.parseString(jsonStr)
+            if (!parsed.isJsonObject) return null
+            val obj = parsed.asJsonObject
+            val candidateKeys = listOf("lyrics", "ttml", "content", "ttmlContent", "data", "syncedLyrics", "lrc", "body", "response")
+            for (key in candidateKeys) {
+                if (obj.has(key)) {
+                    val elem = obj.get(key)
+                    if (elem.isJsonPrimitive && elem.asJsonPrimitive.isString) {
+                        val strVal = elem.asString.trim()
+                        if (strVal.startsWith("{") && strVal.endsWith("}")) {
+                            val nested = extractTtmlFromJson(strVal)
+                            if (nested != null) return nested
+                        }
+                        if (strVal.contains("<tt", ignoreCase = true) || strVal.contains("<p begin=", ignoreCase = true) || strVal.contains("<?xml", ignoreCase = true)) {
+                            return strVal
+                        }
+                    } else if (elem.isJsonObject) {
+                        val nested = extractTtmlFromJson(elem.toString())
+                        if (nested != null) return nested
+                    }
+                }
+            }
+            null
+        } catch (_: Exception) {
+            null
+        }
     }
 }

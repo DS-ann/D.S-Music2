@@ -14,6 +14,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -45,9 +46,11 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,6 +76,7 @@ import com.codetrio.spatialflow.data.lyrics.LyricsResult
 import com.codetrio.spatialflow.model.SongItem
 import kotlin.math.hypot
 import kotlin.math.max
+import kotlinx.coroutines.delay
 
 /**
  * Optimized circular reveal modifier utilizing a remembered path and in-place reset/rebuild.
@@ -150,6 +154,31 @@ internal fun FullScreenLyricsOverlay(
 ) {
     val consumeClicks = remember { MutableInteractionSource() }
     var showProvidersSheet by remember { mutableStateOf(false) }
+    var syncOffsetMs by remember(currentSong?.id) { mutableStateOf(0L) }
+    var showSyncControls by remember { mutableStateOf(false) }
+    var syncControlActivity by remember { mutableStateOf(0) }
+
+    // Hide the adjustment strip after three seconds without a sync-control action.
+    LaunchedEffect(showSyncControls, syncControlActivity, currentSong?.id) {
+        if (showSyncControls) {
+            delay(3000L)
+            showSyncControls = false
+        }
+    }
+
+    val effectivePositionProvider = remember(currentPositionProvider, syncOffsetMs) {
+        {
+            (currentPositionProvider().toLong() + syncOffsetMs)
+                .coerceIn(0L, Int.MAX_VALUE.toLong())
+                .toInt()
+        }
+    }
+
+    fun adjustSyncOffset(deltaMs: Long) {
+        syncOffsetMs = (syncOffsetMs + deltaMs).coerceIn(-10_000L, 10_000L)
+        showSyncControls = true
+        syncControlActivity += 1
+    }
 
     val view = LocalView.current
     DisposableEffect(view) {
@@ -284,7 +313,7 @@ internal fun FullScreenLyricsOverlay(
                         SyncedLyricsCompose(
                             onSeekTo = onSeekTo,
                             lyrics = syncedLyrics,
-                            currentPositionProvider = currentPositionProvider,
+                            currentPositionProvider = effectivePositionProvider,
                             contentColor = contentColor,
                             dynamicAccentColor = dynamicAccentColor,
                             currentSong = currentSong,
@@ -375,6 +404,74 @@ internal fun FullScreenLyricsOverlay(
                             )
                         }
                     }
+                }
+            }
+        }
+
+        if (contentReady && !syncedLyrics.isNullOrEmpty()) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                AnimatedVisibility(visible = showSyncControls) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(28.dp))
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.94f))
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(0.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val adjustments = listOf(
+                            -500L to "−0.5s",
+                            -50L to "−50ms",
+                            0L to "Reset",
+                            50L to "+50ms",
+                            500L to "+0.5s"
+                        )
+                        adjustments.forEach { (deltaMs, label) ->
+                            TextButton(
+                                onClick = {
+                                    if (deltaMs == 0L) {
+                                        syncOffsetMs = 0L
+                                        showSyncControls = true
+                                        syncControlActivity += 1
+                                    } else {
+                                        adjustSyncOffset(deltaMs)
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    text = label,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+
+                TextButton(
+                    onClick = {
+                        showSyncControls = !showSyncControls
+                        syncControlActivity += 1
+                    },
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.88f))
+                ) {
+                    val offsetLabel = String.format(java.util.Locale.US, "%+.1fs", syncOffsetMs / 1000f)
+                    Text(
+                        text = if (syncOffsetMs == 0L) "LYRICS SYNC" else "SYNC $offsetLabel",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }

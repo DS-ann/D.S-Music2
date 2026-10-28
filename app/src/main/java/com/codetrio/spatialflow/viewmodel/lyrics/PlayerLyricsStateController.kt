@@ -191,12 +191,16 @@ class PlayerLyricsStateController(private val logTag: String) {
 
                 if (_selectedProvider.value == null && !betterResult.syncedLyrics.isNullOrEmpty()) {
                     val lines = LrcParser.parse(betterResult.syncedLyrics)
-                    _syncedLyrics.value = lines
-                    _plainLyrics.value = null
-                    _lyricsState.value = LyricsState.SUCCESS
-                    if (logUpgrades) {
-                        _statusMessage.value = "Upgraded to synced lyrics from ${betterResult.providerName}"
-                        Log.d(logTag, "Lyrics upgraded to synced from ${betterResult.providerName}")
+                    if (lines.isNotEmpty()) {
+                        _syncedLyrics.value = lines
+                        _plainLyrics.value = null
+                        _lyricsState.value = LyricsState.SUCCESS
+                        if (logUpgrades) {
+                            _statusMessage.value = "Upgraded to synced lyrics from ${betterResult.providerName}"
+                            Log.d(logTag, "Lyrics upgraded to synced from ${betterResult.providerName}")
+                        }
+                    } else {
+                        Log.w(logTag, "Ignoring unparseable synced lyrics from ${betterResult.providerName}")
                     }
                 }
             }
@@ -264,14 +268,81 @@ class PlayerLyricsStateController(private val logTag: String) {
     }
 
     private fun applyLyricsResult(result: LyricsResult) {
-        if (!result.syncedLyrics.isNullOrEmpty()) {
-            val lines = LrcParser.parse(result.syncedLyrics)
-            _syncedLyrics.value = lines
-            _plainLyrics.value = null
-        } else if (!result.plainLyrics.isNullOrEmpty()) {
-            _syncedLyrics.value = null
-            _plainLyrics.value = result.plainLyrics
+        val synced = result.syncedLyrics
+        if (!synced.isNullOrEmpty()) {
+            val lines = LrcParser.parse(synced)
+            if (lines.isNotEmpty()) {
+                _syncedLyrics.value = lines
+                _plainLyrics.value = null
+                return
+            }
+            Log.w(logTag, "Synced lyrics could not be parsed; trying plain lyrics fallback")
         }
+
+        val plain = result.plainLyrics
+        if (!plain.isNullOrBlank()) {
+            val normalized = sanitizePlainLyrics(plain)
+            if (normalized.contains("<tt", ignoreCase = true) ||
+                normalized.contains("<?xml", ignoreCase = true) ||
+                normalized.contains("<p begin=", ignoreCase = true)) {
+                val ttmlLines = LrcParser.parse(normalized)
+                if (ttmlLines.isNotEmpty()) {
+                    _syncedLyrics.value = ttmlLines
+                    _plainLyrics.value = null
+                    return
+                }
+            }
+            _syncedLyrics.value = null
+            _plainLyrics.value = normalized.takeIf { it.isNotBlank() }
+        } else {
+            _syncedLyrics.value = null
+            _plainLyrics.value = null
+        }
+    }
+
+    /**
+     * Strip provider wrappers and XML tags so malformed provider payloads never appear
+     * as raw markup in the lyrics view.
+     */
+    private fun sanitizePlainLyrics(plain: String): String {
+        var text = plain.trim()
+        if (text.startsWith("{") && text.endsWith("}")) {
+            try {
+                val json = com.google.gson.JsonParser.parseString(text).asJsonObject
+                for (key in listOf("lyrics", "plainLyrics", "content", "data", "text", "ttml", "syncedLyrics")) {
+                    val value = json.get(key)
+                    if (value != null && value.isJsonPrimitive && value.asJsonPrimitive.isString) {
+                        text = value.asString.trim()
+                        break
+                    }
+                }
+            } catch (_: Exception) {
+                // Leave non-JSON text untouched for the sanitizer below.
+            }
+        }
+        if (text.contains("<tt", ignoreCase = true) ||
+            text.contains("<?xml", ignoreCase = true) ||
+            text.contains("<p", ignoreCase = true)) {
+            val paragraphText = Regex(
+                """<p\b[^>]*>(.*?)</p>""",
+                setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
+            ).findAll(text)
+                .map { it.groupValues[1].replace(Regex("<[^>]+>"), "").trim() }
+                .filter { it.isNotEmpty() }
+                .joinToString("\\n")
+            if (paragraphText.isNotBlank()) text = paragraphText
+            else text = text.replace(Regex("<[^>]+>"), " ").trim()
+        } else {
+            text = text.replace(Regex("<[^>]+>"), " ").trim()
+        }
+        return text
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&apos;", "'")
+            .replace(Regex("[ \\t]+"), " ")
+            .trim()
     }
 
     private fun hasLyricsData(): Boolean {
