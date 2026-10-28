@@ -53,7 +53,11 @@ public class AudioFileManager {
     }
 
     public static File createOutputFile(Context context, String fileName) {
-        if (!fileName.toLowerCase().endsWith(".m4a") && !fileName.toLowerCase().endsWith(".mp3")) {
+        String lowerName = fileName.toLowerCase(java.util.Locale.ROOT);
+        if (!(lowerName.endsWith(".m4a") || lowerName.endsWith(".mp3") ||
+                lowerName.endsWith(".webm") || lowerName.endsWith(".ogg") ||
+                lowerName.endsWith(".opus") || lowerName.endsWith(".aac") ||
+                lowerName.endsWith(".flac") || lowerName.endsWith(".wav"))) {
             fileName = fileName + ".m4a";
         }
 
@@ -80,9 +84,13 @@ public class AudioFileManager {
     }
 
     public static void scanFile(Context context, File file) {
+        scanFile(context, file, null, null, null);
+    }
+
+    public static void scanFile(Context context, File file, String title, String artist, String album) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Copy to MediaStore Audio for Android 10+
-            copyToMediaStore(context, file);
+            // Copy to MediaStore Audio while preserving source metadata in the library row.
+            copyToMediaStore(context, file, title, artist, album);
         } else {
             // Trigger media scanner for older versions
             try {
@@ -96,7 +104,7 @@ public class AudioFileManager {
         }
     }
 
-    private static void copyToMediaStore(Context context, File sourceFile) {
+    private static void copyToMediaStore(Context context, File sourceFile, String suppliedTitle, String suppliedArtist, String suppliedAlbum) {
         if (!sourceFile.exists()) {
             Log.e(TAG, "Source file doesn't exist: " + sourceFile.getAbsolutePath());
             return;
@@ -110,24 +118,34 @@ public class AudioFileManager {
             nameWithoutExtension = nameWithoutExtension.substring(0, nameWithoutExtension.length() - 4);
         }
 
-        // Split by " - " to get Title and Artist
-        String title = nameWithoutExtension;
-        String artist = "Unknown Artist";
-        if (nameWithoutExtension.contains(" - ")) {
+        // Filename parsing is only a fallback. Prefer metadata supplied by the downloader.
+        String title = suppliedTitle != null && !suppliedTitle.trim().isEmpty() ? suppliedTitle.trim() : nameWithoutExtension;
+        String artist = suppliedArtist != null && !suppliedArtist.trim().isEmpty() ? suppliedArtist.trim() : "Unknown Artist";
+        if ((suppliedTitle == null || suppliedTitle.trim().isEmpty() ||
+                suppliedArtist == null || suppliedArtist.trim().isEmpty()) && nameWithoutExtension.contains(" - ")) {
             String[] parts = nameWithoutExtension.split(" - ", 2);
-            title = parts[0].trim();
-            artist = parts[1].trim();
+            if (suppliedTitle == null || suppliedTitle.trim().isEmpty()) title = parts[0].trim();
+            if (suppliedArtist == null || suppliedArtist.trim().isEmpty()) artist = parts[1].trim();
         }
 
         ContentValues values = new ContentValues();
         values.put(MediaStore.Audio.Media.DISPLAY_NAME, sourceFile.getName());
         values.put(MediaStore.Audio.Media.TITLE, title);
         values.put(MediaStore.Audio.Media.ARTIST, artist);
-        
-        String mimeType = "audio/mp4";
-        if (sourceFile.getName().toLowerCase().endsWith(".mp3")) {
-            mimeType = "audio/mpeg";
+        values.put(MediaStore.Audio.Media.ALBUM_ARTIST, artist);
+        if (suppliedAlbum != null && !suppliedAlbum.trim().isEmpty()) {
+            values.put(MediaStore.Audio.Media.ALBUM, suppliedAlbum.trim());
         }
+
+        String lowerFileName = sourceFile.getName().toLowerCase(java.util.Locale.ROOT);
+        String mimeType;
+        if (lowerFileName.endsWith(".mp3")) mimeType = "audio/mpeg";
+        else if (lowerFileName.endsWith(".m4a") || lowerFileName.endsWith(".aac")) mimeType = "audio/mp4";
+        else if (lowerFileName.endsWith(".webm")) mimeType = "audio/webm";
+        else if (lowerFileName.endsWith(".ogg") || lowerFileName.endsWith(".opus")) mimeType = "audio/ogg";
+        else if (lowerFileName.endsWith(".flac")) mimeType = "audio/flac";
+        else if (lowerFileName.endsWith(".wav")) mimeType = "audio/wav";
+        else mimeType = "application/octet-stream";
         values.put(MediaStore.Audio.Media.MIME_TYPE, mimeType);
 
         // Save under Music/SpatialFlow folder

@@ -251,7 +251,8 @@ fun LibraryScreen(
                             "", // Empty streamUrl permits automatic resolving pipeline promotion
                             os.durationMs,
                             os.thumbnailUrl,
-                            os.artistId
+                            os.artistId,
+                            os.albumName
                         )
                     }
                     viewModel.setSongList(songItems)
@@ -259,7 +260,7 @@ fun LibraryScreen(
                     viewModel.playSongAtIndex(currentIdx)
                 } else {
                     val songItem = SongItem.createOnlineSong(
-                        videoId, song.title, song.artist, "", durationMs, song.thumbnailUrl, song.artistId
+                        videoId, song.title, song.artist, "", durationMs, song.thumbnailUrl, song.artistId, song.albumName
                     )
                     viewModel.playSong(songItem)
                 }

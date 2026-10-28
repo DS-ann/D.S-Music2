@@ -17,6 +17,7 @@ data class SongItem(
 ) : Serializable {
 
     @JvmField var thumbnailUrl: String? = null
+    @JvmField var albumName: String? = null
     @JvmField var videoId: String? = null
     @JvmField var artistId: String? = null
     @JvmField var lufs: Float? = null
@@ -151,13 +152,14 @@ data class SongItem(
 
         @JvmStatic
         @JvmOverloads
-        fun createOnlineSong(videoId: String?, title: String?, artist: String?, streamUrl: String?, durationMs: Long, thumbnailUrl: String?, artistId: String? = null): SongItem {
+        fun createOnlineSong(videoId: String?, title: String?, artist: String?, streamUrl: String?, durationMs: Long, thumbnailUrl: String?, artistId: String? = null, albumName: String? = null): SongItem {
             val id = videoId?.hashCode()?.toLong() ?: (streamUrl?.hashCode()?.toLong() ?: System.currentTimeMillis())
             val song = SongItem(id, title ?: "Unknown Title", artist ?: "Unknown Artist", -1, streamUrl, durationMs, System.currentTimeMillis())
             song.contentUri = (streamUrl ?: "").toUri()
             song.thumbnailUrl = thumbnailUrl?.let { enhanceThumbnailUrl(it) }
             song.videoId = videoId
             song.artistId = artistId
+            song.albumName = albumName?.takeIf { it.isNotBlank() }
             return song
         }
 

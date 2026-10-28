@@ -98,8 +98,9 @@ object SongDownloader {
                 // Initialize/Update download notification
                 updateNotification(context, cleanTitleStr, 0, notificationId)
 
-                val streamUrl = NewPipeStreamExtractor.getStreamUrl(videoId)
-                if (streamUrl == null) {
+                val downloadStream = NewPipeStreamExtractor.getDownloadStreamData(videoId)
+                val streamUrl = downloadStream?.url
+                if (streamUrl.isNullOrBlank()) {
                     cancelNotification(context, notificationId)
                     withContext(Dispatchers.Main) {
                         com.codetrio.spatialflow.ui.SnackbarController.showMessage("Failed to extract download URL for $cleanTitleStr")
@@ -108,7 +109,17 @@ object SongDownloader {
                 }
 
                 // Create output file
-                val fileName = "$cleanTitleStr - $cleanArtistStr.mp3"
+                val extension = when {
+                    downloadStream?.mimeType?.startsWith("audio/mp4", ignoreCase = true) == true -> "m4a"
+                    downloadStream?.mimeType?.startsWith("audio/mpeg", ignoreCase = true) == true -> "mp3"
+                    downloadStream?.mimeType?.contains("webm", ignoreCase = true) == true -> "webm"
+                    downloadStream?.mimeType?.contains("ogg", ignoreCase = true) == true -> "ogg"
+                    downloadStream?.mimeType?.contains("flac", ignoreCase = true) == true -> "flac"
+                    downloadStream?.mimeType?.contains("aac", ignoreCase = true) == true -> "aac"
+                    downloadStream?.mimeType?.contains("wav", ignoreCase = true) == true -> "wav"
+                    else -> "audio"
+                }
+                val fileName = "$cleanTitleStr - $cleanArtistStr.$extension"
                 val outputFile = AudioFileManager.createOutputFile(context, fileName)
 
                 val url = URL(streamUrl)
@@ -175,16 +186,23 @@ object SongDownloader {
                     }
                 }
 
-                // Write metadata (Title, Artist, and Album Art) to .mp3 file
+                // Embed actual source metadata in the downloaded audio. Do not invent an album
+                // by copying the track title; write album tags only when the source supplied one.
+                var metadataEmbedded = false
                 try {
                     val audioFile = org.jaudiotagger.audio.AudioFileIO.read(outputFile)
                     val tag = audioFile.tagOrCreateAndSetDefault
-                    
-                    val cleanAlbumStr = cleanAlbum(song.title)
                     tag.setField(org.jaudiotagger.tag.FieldKey.TITLE, cleanTitleStr)
                     tag.setField(org.jaudiotagger.tag.FieldKey.ARTIST, cleanArtistStr)
-                    tag.setField(org.jaudiotagger.tag.FieldKey.ALBUM, cleanAlbumStr)
-                    
+                    tag.setField(org.jaudiotagger.tag.FieldKey.ALBUM_ARTIST, cleanArtistStr)
+                    song.albumName?.takeIf { it.isNotBlank() }?.let {
+                        tag.setField(org.jaudiotagger.tag.FieldKey.ALBUM, it.trim())
+                    }
+                    tag.setField(
+                        org.jaudiotagger.tag.FieldKey.COMMENT,
+                        "Downloaded from YouTube Music (video ID: $videoId)"
+                    )
+
                     if (artworkBytes != null) {
                         val artwork = org.jaudiotagger.tag.images.StandardArtwork()
                         artwork.binaryData = artworkBytes
@@ -192,14 +210,17 @@ object SongDownloader {
                         tag.deleteArtworkField()
                         tag.setField(artwork)
                     }
-                    
+
                     audioFile.commit()
+                    metadataEmbedded = true
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to write tags to file", e)
+                    // Some containers, especially WebM, are not taggable through jaudiotagger.
+                    // Keep the original audio download, but never claim embedded tags were written.
+                    Log.w(TAG, "Embedded metadata is not supported for ${outputFile.extension}", e)
                 }
 
-                // Copy file to MediaStore and request a media scan
-                AudioFileManager.scanFile(context, outputFile)
+                // Populate the OS library row with the same source metadata as the embedded tags.
+                AudioFileManager.scanFile(context, outputFile, cleanTitleStr, cleanArtistStr, song.albumName)
 
                 // Show completion status
                 showFinishedNotification(context, cleanTitleStr, cleanArtistStr, notificationId)
@@ -207,7 +228,11 @@ object SongDownloader {
                 _downloadProgress.value -= videoId
                 withContext(Dispatchers.Main) {
                     com.codetrio.spatialflow.ui.SnackbarController.showMessage(
-                        "Downloaded: $cleanTitleStr",
+                        if (metadataEmbedded) {
+                            "Downloaded with embedded metadata: $cleanTitleStr"
+                        } else {
+                            "Downloaded: $cleanTitleStr (this audio format could not store embedded tags)"
+                        },
                         iconResId = R.drawable.ic_downloaded
                     )
                 }

@@ -219,6 +219,48 @@ object NewPipeStreamExtractor {
     }
 
     /**
+     * Select a download stream with embedded tagging in mind. Prefer AAC/MP4,
+     * which can be stored as M4A and tagged with jaudiotagger on Android 6+.
+     * If unavailable, keep the selected source stream's reported container.
+     */
+    suspend fun getDownloadStreamData(videoId: String?): StreamData? = coroutineScope {
+        if (videoId.isNullOrBlank()) return@coroutineScope null
+        val info = fetchStreamInfo(videoId) ?: return@coroutineScope null
+        val audioStreams = info.audioStreams
+        if (audioStreams.isEmpty()) return@coroutineScope null
+
+        val mp4Audio = audioStreams.filter { stream ->
+            val mime = stream.format?.mimeType.orEmpty()
+            mime.startsWith("audio/mp4", ignoreCase = true) ||
+                stream.codec?.contains("mp4a", ignoreCase = true) == true ||
+                stream.itag == 140
+        }
+        val selected = mp4Audio.maxByOrNull { maxOf(it.bitrate, it.averageBitrate) }
+            ?: selectBestStream(audioStreams)
+            ?: return@coroutineScope null
+        val reportedMime = selected.format?.mimeType?.substringBefore(';')?.trim().orEmpty()
+        val mime = when {
+            reportedMime.isNotBlank() -> reportedMime
+            selected.codec?.contains("mp4a", ignoreCase = true) == true -> "audio/mp4"
+            selected.codec?.contains("opus", ignoreCase = true) == true -> "audio/webm"
+            selected.codec?.contains("vorbis", ignoreCase = true) == true -> "audio/ogg"
+            else -> "application/octet-stream"
+        }
+        val bitrate = maxOf(selected.averageBitrate, selected.bitrate).takeIf { it > 0 } ?: 0
+        StreamData(
+            url = selected.content,
+            mimeType = mime,
+            bitrate = bitrate,
+            contentLength = null,
+            audioQuality = when {
+                bitrate >= 256 -> "AUDIO_QUALITY_HIGH"
+                bitrate >= 128 -> "AUDIO_QUALITY_MEDIUM"
+                else -> "AUDIO_QUALITY_LOW"
+            }
+        )
+    }
+
+    /**
      * Extract full stream info including metadata lazily.
      */
     suspend fun getPlayerResult(videoId: String?): PlayerResult? = coroutineScope {

@@ -848,9 +848,12 @@ fun FullPlayer(
                             totalSeconds / 60L, totalSeconds % 60L)
                     }
                 } else "Not provided by source"
+                val fileSizeBytes = songFileMetadata.sizeBytes
+                val fileBitrateBps = songFileMetadata.bitrateBps
+                val estimatedFileBitrateBps = songFileMetadata.estimatedBitrateBps
                 val sizeText = when {
-                    songFileMetadata.sizeBytes != null ->
-                        android.text.format.Formatter.formatFileSize(context, songFileMetadata.sizeBytes)
+                    fileSizeBytes != null ->
+                        android.text.format.Formatter.formatFileSize(context, fileSizeBytes)
                     estimatedStreamSizeBytes != null ->
                         "About " + android.text.format.Formatter.formatFileSize(context, estimatedStreamSizeBytes) +
                             " (estimated from stream bitrate and duration)"
@@ -859,12 +862,12 @@ fun FullPlayer(
                     else -> "Not exposed by this file provider"
                 }
                 val bitrateText = when {
-                    songFileMetadata.bitrateBps != null ->
-                        "${(songFileMetadata.bitrateBps + 500L) / 1000L} kb/s (file metadata)"
+                    fileBitrateBps != null ->
+                        "${(fileBitrateBps + 500L) / 1000L} kb/s (file metadata)"
                     streamBitrateBps != null ->
                         "${(streamBitrateBps + 500) / 1000} kb/s (active stream format)"
-                    songFileMetadata.estimatedBitrateBps != null ->
-                        "${(songFileMetadata.estimatedBitrateBps + 500L) / 1000L} kb/s (estimated from file size and duration)"
+                    estimatedFileBitrateBps != null ->
+                        "${(estimatedFileBitrateBps + 500L) / 1000L} kb/s (estimated from file size and duration)"
                     songFileMetadata.isRemote -> "Not reported by the active stream"
                     else -> "Not embedded in file metadata"
                 }
