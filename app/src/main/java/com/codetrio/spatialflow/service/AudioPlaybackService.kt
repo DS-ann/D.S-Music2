@@ -214,6 +214,20 @@ class AudioPlaybackService : MediaSessionService() {
     private val binder: IBinder = LocalBinder()
     private val serviceScope = MainScope()
     internal lateinit var player: ExoPlayer
+
+    // Service callbacks must return quickly on older devices. Disk-cache initialization is
+    // performed on IO before ExoPlayer is built; local UI binding remains available meanwhile.
+    private var isPlayerInitialized = false
+    private var pendingViewModel: PlayerSharedViewModel? = null
+    private val pendingServiceActions = mutableListOf<String>()
+    private var pendingPlaybackRequest: PendingPlaybackRequest? = null
+    private var pendingSeekToPosition: Long? = null
+
+    private data class PendingPlaybackRequest(
+        val uri: Uri,
+        val startPosition: Long,
+        val autoPlay: Boolean
+    )
     private var mediaSession: MediaSession? = null
     private var viewModel: PlayerSharedViewModel? = null
     private lateinit var handler: Handler
@@ -477,35 +491,76 @@ class AudioPlaybackService : MediaSessionService() {
             clientProvider = { com.codetrio.spatialflow.data.innertube.InnerTubeClient }
         )
         
-        initializePlayer()
-        setupMediaSession()
-        loadAudioPreferences()
-        setupPreferenceListener()
-        setupProgressTracking()
+        // SimpleCache construction scans disk and can block for seconds on Android 6 storage.
+        // Do not do that work inside Service.onCreate(), whose startup timeout is strict.
+        serviceScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    getCache(applicationContext)
+                }
+
+                initializePlayer()
+                setupMediaSession()
+                loadAudioPreferences()
+                setupPreferenceListener()
+                setupProgressTracking()
+                isPlayerInitialized = true
+
+                pendingViewModel?.let { vm ->
+                    pendingViewModel = null
+                    setViewModel(vm)
+                }
+
+                pendingPlaybackRequest?.let { request ->
+                    pendingPlaybackRequest = null
+                    if (request.autoPlay) {
+                        loadAndPlay(request.uri, request.startPosition)
+                    } else {
+                        loadAudio(request.uri, request.startPosition)
+                    }
+                }
+                pendingSeekToPosition?.let { position ->
+                    pendingSeekToPosition = null
+                    player.seekTo(position)
+                }
+
+                val actions = pendingServiceActions.toList()
+                pendingServiceActions.clear()
+                actions.forEach(::handleServiceAction)
+                Log.i(TAG, "Playback service initialized asynchronously")
+            } catch (error: Exception) {
+                Log.e(TAG, "Asynchronous playback service initialization failed", error)
+            }
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         intent?.action?.let { action ->
-            when (action) {
-                ACTION_PLAY -> play()
-                ACTION_PAUSE -> pause()
-                ACTION_PREVIOUS -> playPrevious()
-                ACTION_NEXT -> playNext()
-                ACTION_TOGGLE_LOOP -> {
-                    viewModel?.toggleLoopMode()
-                    updateWidgetState(player.isPlaying)
-                }
-                ACTION_CYCLE_PLAYBACK_MODE -> {
-                    cycleNotificationPlaybackMode()
-                }
-                ACTION_TOGGLE_FAV -> {
-                    viewModel?.toggleFavorite()
-                }
+            if (isPlayerInitialized) {
+                handleServiceAction(action)
+            } else {
+                // Android can deliver media-button/notification actions while disk setup is running.
+                pendingServiceActions.add(action)
             }
         }
         return super.onStartCommand(intent, flags, startId)
+    }
+
+    private fun handleServiceAction(action: String) {
+        when (action) {
+            ACTION_PLAY -> play()
+            ACTION_PAUSE -> pause()
+            ACTION_PREVIOUS -> playPrevious()
+            ACTION_NEXT -> playNext()
+            ACTION_TOGGLE_LOOP -> {
+                viewModel?.toggleLoopMode()
+                if (isPlayerInitialized) updateWidgetState(player.isPlaying)
+            }
+            ACTION_CYCLE_PLAYBACK_MODE -> cycleNotificationPlaybackMode()
+            ACTION_TOGGLE_FAV -> viewModel?.toggleFavorite()
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -535,16 +590,20 @@ class AudioPlaybackService : MediaSessionService() {
         prefListener?.let {
             getSharedPreferences(PREFS_NAME, MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(it)
         }
-        handler.removeCallbacks(progressUpdateRunnable)
+        if (::progressUpdateRunnable.isInitialized) {
+            handler.removeCallbacks(progressUpdateRunnable)
+        }
         releaseHapticManager()
         abandonAudioFocus()
-        
-        viewModel?.cleanupBgScope()
-        player.removeListener(mainPlayerListener)
-        serviceScope.cancel()
-        player.release()
-        nextPlayer?.release()
+
+        if (isPlayerInitialized) {
+            viewModel?.cleanupBgScope()
+            player.removeListener(mainPlayerListener)
+            player.release()
+            nextPlayer?.release()
+        }
         mediaSession?.release()
+        serviceScope.cancel()
     }
 
     private fun configurePlayerAudio(target: ExoPlayer) {
@@ -595,6 +654,10 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     fun setViewModel(vm: PlayerSharedViewModel) {
+        if (!isPlayerInitialized) {
+            pendingViewModel = vm
+            return
+        }
         val oldVm = this.viewModel
         if (oldVm != null && oldVm !== vm) {
             // Memory Leak Extermination: 
@@ -630,6 +693,10 @@ class AudioPlaybackService : MediaSessionService() {
 
     @JvmOverloads
     fun loadAudio(uri: Uri, startPosition: Long = -1) {
+        if (!isPlayerInitialized) {
+            pendingPlaybackRequest = PendingPlaybackRequest(uri, startPosition, autoPlay = false)
+            return
+        }
         shouldAutoPlay = false
         pendingSeekPos = startPosition
         resolveAndLoad(uri)
@@ -637,6 +704,11 @@ class AudioPlaybackService : MediaSessionService() {
 
     @JvmOverloads
     fun loadAndPlay(uri: Uri, startPosition: Long = -1) {
+        if (!isPlayerInitialized) {
+            pendingPlaybackRequest = PendingPlaybackRequest(uri, startPosition, autoPlay = true)
+            viewModel?.setLoading(true)
+            return
+        }
         // A user-initiated track load permits one new recovery attempt. The automatic
         // recovery itself must not reset its guard, or a broken URL can retry forever.
         if (!isRecoveringPlaybackError) {
@@ -930,6 +1002,10 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     fun play() {
+        if (!isPlayerInitialized) {
+            pendingServiceActions.add(ACTION_PLAY)
+            return
+        }
         val activeSong = viewModel?.currentSong?.value
         val failedVideoId = failedStreamVideoId
         if (!failedVideoId.isNullOrBlank() && activeSong?.videoId == failedVideoId) {
@@ -964,6 +1040,10 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     fun pause() {
+        if (!isPlayerInitialized) {
+            pendingServiceActions.add(ACTION_PAUSE)
+            return
+        }
         if (player.isPlaying) {
             player.pause()
             if (isCrossfading) {
@@ -975,12 +1055,18 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     fun setShuffleModeEnabled(enabled: Boolean) {
+        if (!isPlayerInitialized) return
         if (player.shuffleModeEnabled != enabled) {
             player.shuffleModeEnabled = enabled
         }
     }
 
     fun stop() {
+        if (!isPlayerInitialized) {
+            pendingPlaybackRequest = null
+            pendingServiceActions.clear()
+            return
+        }
         player.stop()
         if (isCrossfading) {
             nextPlayer?.stop()
@@ -991,6 +1077,10 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     fun seekTo(position: Int) {
+        if (!isPlayerInitialized) {
+            pendingSeekToPosition = position.toLong()
+            return
+        }
         player.seekTo(position.toLong())
     }
 
