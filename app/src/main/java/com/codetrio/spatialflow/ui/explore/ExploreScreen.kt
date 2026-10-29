@@ -246,7 +246,13 @@ fun ExploreScreen(
         playerSharedViewModel.currentSongIndex.collect { idx ->
             if (idx >= 0) {
                 val queue = viewModel.onlineQueue.value
-                if (idx < queue.size) {
+                val activeVideoId = playerSharedViewModel.currentSong.value?.videoId
+                // The shared player index also changes for Library/Cache queues. Do not use
+                // that unrelated index to restore a stale Explore selection/highlight.
+                if (idx < queue.size &&
+                    !activeVideoId.isNullOrBlank() &&
+                    queue[idx].videoId == activeVideoId
+                ) {
                     viewModel.updateActiveSongAndIndex(idx, queue[idx])
                 }
             }
