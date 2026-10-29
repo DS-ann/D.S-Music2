@@ -303,6 +303,12 @@ internal fun FullScreenLyricsOverlay(
                 contentAlignment = Alignment.Center
             ) {
                 when {
+                    // Keep the loading state visible while an explicitly selected provider fetches.
+                    // The user can still reopen/switch sources without getting a blank lyrics panel.
+                    isLoading -> {
+                        CircularProgressIndicator(color = dynamicAccentColor)
+                    }
+
                     !contentReady -> Unit
 
                     !syncedLyrics.isNullOrEmpty() -> {
@@ -341,10 +347,6 @@ internal fun FullScreenLyricsOverlay(
                         }
                     }
 
-                    isLoading -> {
-                        CircularProgressIndicator(color = dynamicAccentColor)
-                    }
-
                     lyricsError != null -> {
                         LyricsErrorState(
                             message = lyricsError.message ?: "Lyrics not found",
@@ -361,7 +363,9 @@ internal fun FullScreenLyricsOverlay(
                 }
             }
 
-            if (showProvidersSheet && contentReady) {
+            // Do not tie the source selector to contentReady: provider switching temporarily
+            // clears the visible lyrics while a new source is loading.
+            if (showProvidersSheet) {
                 val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                 ModalBottomSheet(
                     onDismissRequest = { showProvidersSheet = false },
