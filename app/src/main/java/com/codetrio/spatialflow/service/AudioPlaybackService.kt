@@ -953,10 +953,13 @@ class AudioPlaybackService : MediaSessionService() {
                     if (downloadedUri != null) {
                         ensureActive()
                         if (resolveTargetSongId != videoId) return@launch
-                        activeSong.contentUri = downloadedUri
-                        activeSong.isDownloadedOffline = true
-                        activeSong.isCachedTrack = false
-                        viewModel?.refreshCurrentSongSource(activeSong)
+                        viewModel?.refreshCurrentSongSource(
+                            activeSong.withPlaybackSource(
+                                downloadedUri,
+                                cached = false,
+                                downloaded = true
+                            )
+                        )
                         Log.i(TAG, "Using downloaded offline audio for $videoId: $downloadedUri")
                         originalSourceUri = downloadedUri
                         loadAudioInternal(downloadedUri, keepPlayingUntilReady = true)
@@ -976,11 +979,15 @@ class AudioPlaybackService : MediaSessionService() {
                     if (cachedUri != null) {
                         ensureActive()
                         if (resolveTargetSongId != videoId) return@launch
-                        activeSong?.apply {
-                            contentUri = cachedUri
-                            isCachedTrack = true
-                            isDownloadedOffline = false
-                        }?.let { viewModel?.refreshCurrentSongSource(it) }
+                        activeSong?.let { song ->
+                            viewModel?.refreshCurrentSongSource(
+                                song.withPlaybackSource(
+                                    cachedUri,
+                                    cached = true,
+                                    downloaded = false
+                                )
+                            )
+                        }
                         Log.i(TAG, "Using cached stream for $videoId regardless of selected format/bitrate")
                         originalSourceUri = cachedUri
                         loadAudioInternal(cachedUri, keepPlayingUntilReady = true)
@@ -1056,10 +1063,15 @@ class AudioPlaybackService : MediaSessionService() {
                         val sourceChanged = song.isCachedTrack ||
                             song.isDownloadedOffline ||
                             song.contentUri != resolverUri
-                        song.isCachedTrack = false
-                        song.isDownloadedOffline = false
-                        song.contentUri = resolverUri
-                        if (sourceChanged) viewModel?.refreshCurrentSongSource(song)
+                        if (sourceChanged) {
+                            viewModel?.refreshCurrentSongSource(
+                                song.withPlaybackSource(
+                                    resolverUri,
+                                    cached = false,
+                                    downloaded = false
+                                )
+                            )
+                        }
                     }
                     loadAudioInternal(streamUrl.toUri(), keepPlayingUntilReady = true)
                     
