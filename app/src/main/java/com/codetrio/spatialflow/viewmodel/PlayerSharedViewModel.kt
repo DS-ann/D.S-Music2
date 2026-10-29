@@ -1295,10 +1295,7 @@ class PlayerSharedViewModel @Inject constructor(
         _currentSong.value = song
     }
 
-    /**
-     * Publish a new current-song emission when the media source/format switches for the same
-     * track ID. SongItem equality is ID-based, so a direct assignment would be suppressed.
-     */
+    /** Publish a same-ID replacement when its actual playback source changes. */
     fun refreshCurrentSongSource(song: SongItem) {
         if (_currentSong.value?.id != song.id) return
         _currentSong.value = song
@@ -1323,18 +1320,9 @@ class PlayerSharedViewModel @Inject constructor(
         _currentSongIndex.value = index
         lyricsController.clearForSongChange(song)
 
-        // SongItem equality intentionally keys queue items by ID. If the same track is
-        // switched from an online resolver to its cached/downloaded URI, StateFlow would
-        // otherwise suppress the replacement and keep the old player/playing-icon state.
-        val previousSong = _currentSong.value
-        val sourceChangedForSameTrack = previousSong != null &&
-            previousSong.id == song.id &&
-            (previousSong.contentUri != song.contentUri ||
-                previousSong.videoId != song.videoId ||
-                previousSong.isCachedTrack != song.isCachedTrack ||
-                previousSong.isDownloadedOffline != song.isDownloadedOffline)
-        // SongItem equality includes its playback source, so assigning a same-ID item with a
-        // different URI now emits directly without a null-frame flicker.
+        // SongItem equality includes its playback source, so selecting a cached/downloaded
+        // representation of the same track ID emits a real current-song update without a
+        // null-frame flicker or a stale playing icon.
         _currentSong.value = song
         _songUri.value = song.contentUri
         _isPlaybackReady.value = false
