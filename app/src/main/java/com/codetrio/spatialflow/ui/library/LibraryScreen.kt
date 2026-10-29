@@ -334,9 +334,9 @@ fun LibraryScreen(
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Header Row (Hides in Device Files)
+                // Library header remains visible in every Library destination.
                 AnimatedVisibility(
-                    visible = activeTab != "Device Files",
+                    visible = true,
                     enter = expandVertically() + fadeIn(),
                     exit = shrinkVertically() + fadeOut()
                 ) {
@@ -423,8 +423,7 @@ fun LibraryScreen(
                     "History" to "History",
                     "Downloads" to "Downloaded songs",
                     "Podcasts" to "Podcasts",
-                    "Recap" to "Recap",
-                    "Local music" to "Device Files"
+                    "Recap" to "Recap"
                 )
 
                 Row(
@@ -467,7 +466,7 @@ fun LibraryScreen(
                     "Albums" -> AlbumsTabContent(nestedScrollConnection, albumsAsList)
                     "Artists" -> ArtistsTabContent(nestedScrollConnection, artistsAsList)
                     "Recap" -> RecapTabContent(nestedScrollConnection, viewModel, onNavigateToExplore)
-                    "Device Files", "Downloaded songs" -> {
+                    "Downloaded songs" -> {
                         // Scan Local Files helper
                         val onRefreshAction = {
                             scope.launch {
@@ -545,11 +544,7 @@ fun LibraryScreen(
 
                                 // Keep this folder scoped to files saved by SpatialFlow's downloader.
                                 val sourceSongs = remember(localSongs, activeTab) {
-                                    if (activeTab == "Downloaded songs") {
-                                        localSongs.filter(::isSpatialFlowDownloadedSong)
-                                    } else {
-                                        localSongs
-                                    }
+                                    localSongs.filter(::isSpatialFlowDownloadedSong)
                                 }
 
                                 // Filter, Sort, and Group local songs
@@ -1418,7 +1413,7 @@ private fun PlaylistsTabContent(
                 )
             }
             Box(modifier = Modifier.weight(1f)) {
-                StreamCacheTabContent(context, viewModel)
+                StreamCacheTabContent(context, viewModel, exploreViewModel)
             }
         }
     } else {
@@ -3223,7 +3218,11 @@ private suspend fun readCacheTabSnapshot(
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
-private fun StreamCacheTabContent(context: Context, viewModel: PlayerSharedViewModel) {
+private fun StreamCacheTabContent(
+    context: Context,
+    viewModel: PlayerSharedViewModel,
+    exploreViewModel: ExploreViewModel?
+) {
     var cacheEntries by remember { mutableStateOf(emptyList<CachedSongEntry>()) }
     val lyricsCache = remember(context) { LyricsCacheManager(context.applicationContext) }
 
