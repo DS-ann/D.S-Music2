@@ -2,7 +2,6 @@ package com.codetrio.spatialflow.data.innertube
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,24 +56,30 @@ object AudioFormatSelectionCoordinator {
         requestedFormat: String,
         targetBitrateKbps: Int,
         options: List<AvailableAudioFormat>
-    ): AvailableAudioFormat = requestMutex.withLock {
+    ): AvailableAudioFormat {
         val uniqueOptions = options.distinctBy { it.id }
         if (uniqueOptions.isEmpty()) throw RequestedAudioFormatUnavailableException(requestedFormat)
 
-        val request = AudioFormatChoiceRequest(
-            id = requestIds.incrementAndGet(),
-            songTitle = songTitle.ifBlank { "this song" },
-            purpose = purpose,
-            requestedFormat = requestedFormat,
-            targetBitrateKbps = targetBitrateKbps,
-            options = uniqueOptions,
-            response = CompletableDeferred()
-        )
-        _pending.value = request
+        requestMutex.lock()
+        var request: AudioFormatChoiceRequest? = null
         try {
-            request.response.await() ?: throw AudioFormatSelectionCancelledException()
+            val created = AudioFormatChoiceRequest(
+                id = requestIds.incrementAndGet(),
+                songTitle = songTitle.ifBlank { "this song" },
+                purpose = purpose,
+                requestedFormat = requestedFormat,
+                targetBitrateKbps = targetBitrateKbps,
+                options = uniqueOptions,
+                response = CompletableDeferred()
+            )
+            request = created
+            _pending.value = created
+            return created.response.await() ?: throw AudioFormatSelectionCancelledException()
         } finally {
-            if (_pending.value?.id == request.id) _pending.value = null
+            request?.let { active ->
+                if (_pending.value?.id == active.id) _pending.value = null
+            }
+            requestMutex.unlock()
         }
     }
 
