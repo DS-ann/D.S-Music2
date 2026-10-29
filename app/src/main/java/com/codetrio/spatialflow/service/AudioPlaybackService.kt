@@ -930,12 +930,12 @@ class AudioPlaybackService : MediaSessionService() {
             
             resolveJob = serviceScope.launch {
                 Log.d(TAG, "Pre-resolving stream ahead of injector injection: $videoId")
+                val activeSong = viewModel?.currentSong?.value?.takeIf { it.videoId == videoId }
 
                 // A fully cached stream wins over format/bitrate preferences. Play it through
                 // its exact cache key, otherwise an explicit setting can force a network fetch
                 // even though another quality/container is already available offline.
                 if (!useWebRemixRetry && !useCompatibleFallbackRetry) {
-                    val activeSong = viewModel?.currentSong?.value?.takeIf { it.videoId == videoId }
 
                     // A real downloaded audio file is the highest-priority offline source.
                     // Resolve it by video ID first so even non-default format/bitrate downloads
