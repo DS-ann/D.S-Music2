@@ -658,6 +658,20 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     // ========== Online Playback ==========
 
+    /** Clear stale Explore "now playing" highlights when playback is handed to Cache/Library. */
+    fun clearOnlinePlaybackSelection() {
+        _uiState.update { state ->
+            state.copy(
+                currentOnlineSong = null,
+                onlineQueue = emptyList(),
+                currentOnlineIndex = -1,
+                streamUrl = null,
+                isLoadingStream = false,
+                streamError = null
+            )
+        }
+    }
+
     fun playOnlineSong(song: OnlineSong) {
         _uiState.update { 
             it.copy(
