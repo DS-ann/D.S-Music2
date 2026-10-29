@@ -207,9 +207,12 @@ class AudioPlaybackService : MediaSessionService() {
                 if (uri.scheme != "http" && uri.scheme != "https") return@mapNotNull null
                 val cachedBytes = currentCache.getCachedSpans(key).sumOf { it.length }
                 if (cachedBytes <= 0L) return@mapNotNull null
-                key to cachedBytes
+                Triple(key, cachedBytes, fullyCached)
             }
-            return candidates.maxByOrNull { it.second }?.first?.let { Uri.parse(it) }
+            // Prefer a completely cached version over a larger partial copy at another quality.
+            val completeCandidates = candidates.filter { it.third }
+            val preferredCandidates = completeCandidates.ifEmpty { candidates }
+            return preferredCandidates.maxByOrNull { it.second }?.first?.let { Uri.parse(it) }
         }
 
         /** Returns cached byte count and detected format for the current track. */
