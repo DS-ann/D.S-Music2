@@ -274,6 +274,7 @@ object SongDownloader {
                     downloadStream?.mimeType?.startsWith("audio/mp4", ignoreCase = true) == true -> "m4a"
                     downloadStream?.mimeType?.startsWith("audio/mpeg", ignoreCase = true) == true -> "mp3"
                     downloadStream?.mimeType?.contains("webm", ignoreCase = true) == true -> "webm"
+                    downloadStream?.mimeType?.contains("opus", ignoreCase = true) == true -> "opus"
                     downloadStream?.mimeType?.contains("ogg", ignoreCase = true) == true -> "ogg"
                     downloadStream?.mimeType?.contains("flac", ignoreCase = true) == true -> "flac"
                     downloadStream?.mimeType?.contains("aac", ignoreCase = true) == true -> "aac"
@@ -815,6 +816,11 @@ object SongDownloader {
             val contentMetadata = cache.getContentMetadata(cacheKey)
             val contentLength = ContentMetadata.getContentLength(contentMetadata)
             val cachedBytes = spans.sumOf { it.length }
+            // Media3 does not preserve MIME in cache metadata. Use the MIME recorded after
+            // playback, then the URL's mime parameter or a container signature for old entries.
+            val mimeType = metadata.mimeType.takeIf { it.isNotBlank() }
+                ?: inferCachedMimeType(cacheKey, spans)
+            if (mimeType.isNullOrBlank()) return@mapNotNull null
 
             var coveredUntil = 0L
             var hasGap = false
@@ -831,12 +837,45 @@ object SongDownloader {
                 cacheKey = cacheKey,
                 spans = spans,
                 contentLength = contentLength,
-                mimeType = null, // Media3 cache metadata does not persist a MIME type.
+                mimeType = mimeType,
                 cachedBytes = cachedBytes,
                 isComplete = complete
             )
         }
         return candidates.firstOrNull { it.isComplete } ?: candidates.maxByOrNull { it.cachedBytes }
+    }
+
+    private fun inferCachedMimeType(cacheKey: String, spans: List<CacheSpan>): String? {
+        val urlMime = runCatching {
+            android.net.Uri.parse(cacheKey).getQueryParameter("mime")
+        }.getOrNull()?.substringBefore(';')?.trim()
+        if (!urlMime.isNullOrBlank()) return urlMime
+
+        val firstSpan = spans.firstOrNull { it.position == 0L } ?: return null
+        val spanFile = firstSpan.file ?: return null
+        val header = ByteArray(16)
+        val read = runCatching {
+            FileInputStream(spanFile).use { input -> input.read(header) }
+        }.getOrDefault(-1)
+        if (read < 4) return null
+
+        fun ascii(start: Int, length: Int): String =
+            String(header, start, length, Charsets.US_ASCII)
+
+        return when {
+            (header[0].toInt() and 0xFF) == 0x1A &&
+                (header[1].toInt() and 0xFF) == 0x45 &&
+                (header[2].toInt() and 0xFF) == 0xDF &&
+                (header[3].toInt() and 0xFF) == 0xA3 -> "audio/webm"
+            read >= 8 && ascii(4, 4) == "ftyp" -> "audio/mp4"
+            ascii(0, 4) == "OggS" -> "audio/ogg"
+            ascii(0, 4) == "fLaC" -> "audio/flac"
+            ascii(0, 4) == "RIFF" -> "audio/wav"
+            ascii(0, 3) == "ID3" ||
+                ((header[0].toInt() and 0xFF) == 0xFF &&
+                    ((header[1].toInt() and 0xE0) == 0xE0)) -> "audio/mpeg"
+            else -> null
+        }
     }
 
     private fun copyCachedStream(
@@ -876,13 +915,14 @@ object SongDownloader {
     }
 
     private fun extensionForMimeType(mimeType: String?): String = when {
-        mimeType?.contains("audio/mp4", ignoreCase = true) == true -> "m4a"
-        mimeType?.contains("audio/mpeg", ignoreCase = true) == true -> "mp3"
-        mimeType?.contains("audio/webm", ignoreCase = true) == true -> "webm"
-        mimeType?.contains("audio/ogg", ignoreCase = true) == true -> "ogg"
-        mimeType?.contains("audio/flac", ignoreCase = true) == true -> "flac"
-        mimeType?.contains("audio/aac", ignoreCase = true) == true -> "aac"
-        mimeType?.contains("audio/wav", ignoreCase = true) == true -> "wav"
+        mimeType?.contains("mp4", ignoreCase = true) == true -> "m4a"
+        mimeType?.contains("mpeg", ignoreCase = true) == true -> "mp3"
+        mimeType?.contains("webm", ignoreCase = true) == true -> "webm"
+        mimeType?.contains("opus", ignoreCase = true) == true -> "opus"
+        mimeType?.contains("ogg", ignoreCase = true) == true -> "ogg"
+        mimeType?.contains("flac", ignoreCase = true) == true -> "flac"
+        mimeType?.contains("aac", ignoreCase = true) == true -> "aac"
+        mimeType?.contains("wav", ignoreCase = true) == true -> "wav"
         else -> "m4a"
     }
 
