@@ -1301,7 +1301,6 @@ class PlayerSharedViewModel @Inject constructor(
      */
     fun refreshCurrentSongSource(song: SongItem) {
         if (_currentSong.value?.id != song.id) return
-        _currentSong.value = null
         _currentSong.value = song
         _songUri.value = song.contentUri
     }
@@ -1334,7 +1333,8 @@ class PlayerSharedViewModel @Inject constructor(
                 previousSong.videoId != song.videoId ||
                 previousSong.isCachedTrack != song.isCachedTrack ||
                 previousSong.isDownloadedOffline != song.isDownloadedOffline)
-        if (sourceChangedForSameTrack) _currentSong.value = null
+        // SongItem equality includes its playback source, so assigning a same-ID item with a
+        // different URI now emits directly without a null-frame flicker.
         _currentSong.value = song
         _songUri.value = song.contentUri
         _isPlaybackReady.value = false
