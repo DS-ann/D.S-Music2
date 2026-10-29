@@ -166,11 +166,6 @@ public class SpatialFlowWidgetProvider extends AppWidgetProvider {
                 // Setup Intents with the correct Context for isPlaying
                 setupPendingIntents(context, views, isPlaying, layoutId, providerClass);
 
-                // Load Art and Aura
-                loadAlbumArt(context, views, song.getAlbumArtUri(), id);
-                if (layoutId == R.layout.widget_small || layoutId == R.layout.widget_medium) {
-                    loadBlurredAura(context, views, song.getAlbumArtUri(), id);
-                }
             } else {
                 if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
                     views.setTextViewText(R.id.widget_song_title, "SpatialFlow");
@@ -182,9 +177,47 @@ public class SpatialFlowWidgetProvider extends AppWidgetProvider {
                 setupPendingIntents(context, views, false, layoutId, providerClass);
             }
 
+            // Apply the complete, usable widget layout before starting asynchronous artwork
+            // work. If a thumbnail URI or transformation fails, the controls and text still render.
             manager.updateAppWidget(id, views);
+
+            if (song != null) {
+                Uri artworkUri = null;
+                try {
+                    artworkUri = song.getAlbumArtUri();
+                } catch (Exception artworkError) {
+                    Log.w(TAG, "Could not resolve widget artwork for " + song.title, artworkError);
+                }
+                if (artworkUri != null) {
+                    try {
+                        loadAlbumArt(context, views, artworkUri, id);
+                    } catch (Exception artworkError) {
+                        Log.w(TAG, "Could not load widget album art for " + song.title, artworkError);
+                    }
+                    if (layoutId == R.layout.widget_small || layoutId == R.layout.widget_medium) {
+                        try {
+                            loadBlurredAura(context, views, artworkUri, id);
+                        } catch (Exception artworkError) {
+                            Log.w(TAG, "Could not load widget aura for " + song.title, artworkError);
+                        }
+                    }
+                }
+            }
         } catch (Exception e) {
-            Log.e(TAG, "Failed to update widget " + id + ": " + e.getMessage());
+            Log.e(TAG, "Failed to update widget " + id, e);
+            // Last-resort fallback: a new RemoteViews without artwork still avoids an empty
+            // widget when a non-artwork update operation is rejected by the launcher.
+            try {
+                RemoteViews fallback = new RemoteViews(context.getPackageName(), layoutId);
+                if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
+                    fallback.setTextViewText(R.id.widget_song_title, song != null ? song.title : "SpatialFlow");
+                    fallback.setTextViewText(R.id.widget_artist_name, song != null ? song.artist : "Select a song");
+                }
+                setupPendingIntents(context, fallback, isPlaying, layoutId, providerClass);
+                manager.updateAppWidget(id, fallback);
+            } catch (Exception fallbackError) {
+                Log.e(TAG, "Widget fallback rendering failed for " + id, fallbackError);
+            }
         }
     }
 
@@ -516,11 +549,20 @@ public class SpatialFlowWidgetProvider extends AppWidgetProvider {
                 boolean currentMode = prefs.getBoolean(PREF_LYRICS_MODE + id, false);
                 prefs.edit().putBoolean(PREF_LYRICS_MODE + id, !currentMode).apply();
                 
-                // Trigger a full update to reflect the state change immediately
-                // We'll use the last known data or just refresh the skeleton
-                RemoteViews views = hideSkeleton(context, R.layout.widget_medium);
+                // Toggle the saved page without replacing the current RemoteViews layout.
+                RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_medium);
                 views.setDisplayedChild(R.id.widget_flipper, !currentMode ? 1 : 0);
                 manager.partiallyUpdateAppWidget(id, views);
+            }
+
+            // The old implementation only switched the ViewFlipper page. It never fetched
+            // lyrics, so a newly opened lyrics page could remain "..." forever.
+            try {
+                Intent lyricsIntent = new Intent(context, com.codetrio.spatialflow.service.AudioPlaybackService.class);
+                lyricsIntent.setAction("com.codetrio.spatialflow.ACTION_WIDGET_FETCH_LYRICS");
+                context.startService(lyricsIntent);
+            } catch (Exception e) {
+                Log.w(TAG, "Could not request lyrics for widget", e);
             }
         }
     }
