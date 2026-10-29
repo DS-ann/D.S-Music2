@@ -52,12 +52,20 @@ fun SlidingQueueDrawer(
     modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val screenHeight = configuration.screenHeightDp.dp
-    
+    val screenWidth = configuration.screenWidthDp.dp
+    val landscapePanelWidthFraction = 0.42f
+
     val slidingOffset by animateDpAsState(
         targetValue = if (isQueueExpanded) 0.dp else screenHeight + 100.dp,
         animationSpec = spring(dampingRatio = 0.85f, stiffness = 300f),
         label = "QueueSlidingOffset"
+    )
+    val landscapeSlidingOffset by animateDpAsState(
+        targetValue = if (isQueueExpanded) 0.dp else -(screenWidth * landscapePanelWidthFraction + 100.dp),
+        animationSpec = spring(dampingRatio = 0.85f, stiffness = 300f),
+        label = "QueueSlidingOffsetX"
     )
 
     val queueCornerRadius by animateDpAsState(
@@ -127,11 +135,24 @@ fun SlidingQueueDrawer(
     }
 
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .fillMaxHeight()
-            .offset { androidx.compose.ui.unit.IntOffset(0, slidingOffset.roundToPx()) },
-        shape = RoundedCornerShape(topStart = safeCornerRadius, topEnd = safeCornerRadius),
+        modifier = modifier.then(
+            if (isLandscape) {
+                Modifier
+                    .fillMaxWidth(landscapePanelWidthFraction)
+                    .fillMaxHeight()
+                    .offset { androidx.compose.ui.unit.IntOffset(landscapeSlidingOffset.roundToPx(), 0) }
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .offset { androidx.compose.ui.unit.IntOffset(0, slidingOffset.roundToPx()) }
+            }
+        ),
+        shape = if (isLandscape) {
+            RoundedCornerShape(topEnd = safeCornerRadius, bottomEnd = safeCornerRadius)
+        } else {
+            RoundedCornerShape(topStart = safeCornerRadius, topEnd = safeCornerRadius)
+        },
         color = queueBgColor
     ) {
         Box(modifier = Modifier.fillMaxSize()) {

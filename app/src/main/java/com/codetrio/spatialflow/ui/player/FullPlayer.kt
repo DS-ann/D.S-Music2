@@ -718,6 +718,7 @@ fun FullPlayer(
                 syncedLyrics = syncedLyrics,
                 plainLyrics = plainLyrics,
                 isLoading = isLyricsLoading,
+                isPlaying = uiState.isPlaying,
                 lyricsError = lyricsError,
                 currentPositionProvider = currentPositionProvider,
                 contentReady = lyricsContentReady,
