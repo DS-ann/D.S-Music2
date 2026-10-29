@@ -515,6 +515,9 @@ object SongDownloader {
         artworkBytes: ByteArray?
     ): Boolean {
         val extension = outputFile.extension
+        if (extension.equals("webm", ignoreCase = true)) {
+            return embedWebmMetadataSafely(outputFile, title, artist, album, videoId, fromCache)
+        }
         val taggedFile = File(outputFile.parentFile, "${outputFile.nameWithoutExtension}.tagging.$extension")
         var backupFile: File? = null
         try {
@@ -631,6 +634,170 @@ object SongDownloader {
         }
     }
 
+    /**
+     * WebM/Opus is not handled by the usual audio-tag writer. Write standard Matroska
+     * SimpleTag elements into a WebM Segment so that tags are embedded in the media file,
+     * rather than relying only on MediaStore's display fields.
+     */
+    private fun embedWebmMetadataSafely(
+        outputFile: File,
+        title: String,
+        artist: String,
+        album: String?,
+        videoId: String,
+        fromCache: Boolean
+    ): Boolean {
+        val stagedFile = File(outputFile.parentFile, "${outputFile.nameWithoutExtension}.tagging.webm")
+        var backupFile: File? = null
+        try {
+            if (stagedFile.exists() && !stagedFile.delete()) {
+                throw IOException("Could not clear the WebM metadata staging file")
+            }
+            outputFile.copyTo(stagedFile, overwrite = true)
+            val sourceComment = if (fromCache) {
+                "Exported from SpatialFlow cached audio (video ID: $videoId)"
+            } else {
+                "Downloaded from YouTube Music (video ID: $videoId)"
+            }
+            val tags = buildWebmMetadataTags(title, artist, album, sourceComment)
+            appendWebmMetadataTags(stagedFile, tags)
+
+            backupFile = File(outputFile.parentFile, "${outputFile.name}.raw-backup")
+            if (backupFile.exists() && !backupFile.delete()) {
+                throw IOException("Could not clear the WebM audio backup file")
+            }
+            if (!outputFile.renameTo(backupFile)) {
+                throw IOException("Could not preserve original WebM audio before metadata writing")
+            }
+            if (!stagedFile.renameTo(outputFile)) {
+                backupFile.renameTo(outputFile)
+                throw IOException("Could not install the tagged WebM audio file")
+            }
+            backupFile.delete()
+            return true
+        } catch (error: Exception) {
+            Log.w(TAG, "WebM metadata embedding failed safely for ${outputFile.name}", error)
+            stagedFile.delete()
+            if (backupFile?.exists() == true && !outputFile.exists()) {
+                backupFile.renameTo(outputFile)
+            }
+            return false
+        }
+    }
+
+    private fun buildWebmMetadataTags(
+        title: String,
+        artist: String,
+        album: String?,
+        comment: String
+    ): ByteArray {
+        val entries = ArrayList<ByteArray>()
+
+        fun addTag(name: String, value: String?) {
+            if (value.isNullOrBlank()) return
+            val nameElement = webmElement(byteArrayOf(0x45, 0xA3.toByte()), name.toByteArray(Charsets.UTF_8))
+            val valueElement = webmElement(byteArrayOf(0x44, 0x87.toByte()), value.toByteArray(Charsets.UTF_8))
+            val simpleTag = webmElement(byteArrayOf(0x67, 0xC8.toByte()), nameElement + valueElement)
+            // TargetTypeValue 50 is the default track-level tag target; omitting a TrackUID
+            // makes the descriptive tags apply to the audio track.
+            val targets = webmElement(
+                byteArrayOf(0x63, 0xC0.toByte()),
+                webmElement(byteArrayOf(0x68, 0xCA.toByte()), byteArrayOf(50))
+            )
+            entries.add(webmElement(byteArrayOf(0x73, 0x73.toByte()), targets + simpleTag))
+        }
+
+        addTag("TITLE", title)
+        addTag("ARTIST", artist)
+        addTag("ALBUM", album)
+        addTag("COMMENT", comment)
+        return webmElement(
+            byteArrayOf(0x12, 0x54, 0xC3.toByte(), 0x67),
+            entries.fold(ByteArray(0)) { output, entry -> output + entry }
+        )
+    }
+
+    private fun webmElement(id: ByteArray, payload: ByteArray): ByteArray =
+        id + encodeWebmSize(payload.size.toLong()) + payload
+
+    private fun encodeWebmSize(value: Long, fixedWidth: Int? = null): ByteArray {
+        if (value < 0L) throw IOException("Invalid EBML element size")
+        val width = fixedWidth ?: (1..8).firstOrNull { candidate ->
+            value <= (1L shl (7 * candidate)) - 2L
+        } ?: throw IOException("EBML element is too large")
+        if (width !in 1..8 || value > (1L shl (7 * width)) - 2L) {
+            throw IOException("EBML size does not fit its existing field")
+        }
+        val encoded = ByteArray(width)
+        var remaining = value
+        for (index in width - 1 downTo 0) {
+            encoded[index] = (remaining and 0xFFL).toByte()
+            remaining = remaining ushr 8
+        }
+        encoded[0] = (encoded[0].toInt() or (1 shl (8 - width))).toByte()
+        return encoded
+    }
+
+    private fun appendWebmMetadataTags(file: File, tags: ByteArray) {
+        java.io.RandomAccessFile(file, "rw").use { randomFile ->
+            val fileLength = randomFile.length()
+            if (fileLength < 8L) throw IOException("Downloaded WebM file is too small to tag")
+
+            // The Segment header occurs near the beginning of a WebM file. Do not scan the
+            // audio clusters indefinitely or risk matching arbitrary payload bytes later on.
+            val scanLimit = minOf(fileLength - 4L, 1024L * 1024L)
+            var segmentOffset = -1L
+            var offset = 0L
+            while (offset <= scanLimit) {
+                randomFile.seek(offset)
+                if (randomFile.readUnsignedByte() == 0x18 &&
+                    randomFile.readUnsignedByte() == 0x53 &&
+                    randomFile.readUnsignedByte() == 0x80 &&
+                    randomFile.readUnsignedByte() == 0x67
+                ) {
+                    segmentOffset = offset
+                    break
+                }
+                offset++
+            }
+            if (segmentOffset < 0L) throw IOException("WebM Segment header was not found")
+
+            val sizeOffset = segmentOffset + 4L
+            randomFile.seek(sizeOffset)
+            val first = randomFile.readUnsignedByte()
+            var width = 1
+            var marker = 0x80
+            while (width <= 8 && (first and marker) == 0) {
+                width++
+                marker = marker ushr 1
+            }
+            if (width > 8) throw IOException("Invalid WebM Segment size")
+
+            var segmentSize = (first and (marker - 1)).toLong()
+            repeat(width - 1) {
+                segmentSize = (segmentSize shl 8) or randomFile.readUnsignedByte().toLong()
+            }
+            val unknownSize = segmentSize == (1L shl (7 * width)) - 1L
+            if (unknownSize) {
+                // Unknown-size Segments extend to EOF, so adding another Segment child is safe.
+                randomFile.seek(fileLength)
+                randomFile.write(tags)
+                return
+            }
+
+            val payloadStart = sizeOffset + width
+            val expectedEnd = payloadStart + segmentSize
+            if (expectedEnd != fileLength) {
+                throw IOException("Unexpected trailing bytes after the WebM Segment")
+            }
+            val newSize = encodeWebmSize(segmentSize + tags.size.toLong(), width)
+            randomFile.seek(sizeOffset)
+            randomFile.write(newSize)
+            randomFile.seek(fileLength)
+            randomFile.write(tags)
+        }
+    }
+
     private fun findCachedStream(context: Context, songId: String): CachedStreamCandidate? {
         val cache = try {
             AudioPlaybackService.getCache(context.applicationContext)
@@ -664,7 +831,7 @@ object SongDownloader {
                 cacheKey = cacheKey,
                 spans = spans,
                 contentLength = contentLength,
-                mimeType = null, // CachedMediaMetadata stores display metadata, not MIME type.
+                mimeType = runCatching { ContentMetadata.getContentType(contentMetadata) }.getOrNull(),
                 cachedBytes = cachedBytes,
                 isComplete = complete
             )
