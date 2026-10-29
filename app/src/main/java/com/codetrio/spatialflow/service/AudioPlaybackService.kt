@@ -227,13 +227,12 @@ class AudioPlaybackService : MediaSessionService() {
             val currentCache = getCache(context.applicationContext)
             val candidates = currentCache.keys.mapNotNull { key ->
                 val metadata = getCachedMediaMetadata(context, key)
+                val isExactUri = !streamUri.isNullOrBlank() && key == streamUri
                 val matchesMetadata = metadata != null && (
                     (songId.isNotBlank() && metadata.songId == songId) ||
                     (!videoId.isNullOrBlank() && metadata.videoId == videoId)
                 )
-                if (!matchesMetadata && (streamUri.isNullOrBlank() || key != streamUri)) {
-                    return@mapNotNull null
-                }
+                if (!matchesMetadata && !isExactUri) return@mapNotNull null
 
                 val spans = currentCache.getCachedSpans(key)
                 val cachedBytes = spans.sumOf { it.length }
@@ -248,9 +247,17 @@ class AudioPlaybackService : MediaSessionService() {
                     totalBytes = contentLength,
                     mimeType = metadata?.mimeType?.takeIf { it.isNotBlank() },
                     isComplete = complete
-                )
+                ) to isExactUri
             }
-            return candidates.maxByOrNull { if (it.isComplete) it.totalBytes ?: it.cachedBytes else it.cachedBytes }
+            // The currently playing cache key is authoritative. Otherwise prefer complete
+            // variants, then the largest cached byte range as a best-effort fallback.
+            val exactCandidates = candidates.filter { it.second }
+            if (exactCandidates.isNotEmpty()) {
+                return exactCandidates.maxByOrNull { it.first.cachedBytes }?.first
+            }
+            val completeCandidates = candidates.filter { it.first.isComplete }
+            return completeCandidates.ifEmpty { candidates }
+                .maxByOrNull { it.first.totalBytes ?: it.first.cachedBytes }?.first
         }
 
         /**
