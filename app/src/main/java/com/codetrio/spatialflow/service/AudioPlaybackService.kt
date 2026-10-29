@@ -1044,11 +1044,16 @@ class AudioPlaybackService : MediaSessionService() {
                 
                 if (!streamUrl.isNullOrEmpty()) {
                     failedStreamVideoId = null
-                    activeSong?.apply {
-                        isCachedTrack = false
-                        isDownloadedOffline = false
-                        contentUri = "innertube://$videoId".toUri()
-                    }?.let { viewModel?.refreshCurrentSongSource(it) }
+                    activeSong?.let { song ->
+                        val resolverUri = "innertube://$videoId".toUri()
+                        val sourceChanged = song.isCachedTrack ||
+                            song.isDownloadedOffline ||
+                            song.contentUri != resolverUri
+                        song.isCachedTrack = false
+                        song.isDownloadedOffline = false
+                        song.contentUri = resolverUri
+                        if (sourceChanged) viewModel?.refreshCurrentSongSource(song)
+                    }
                     loadAudioInternal(streamUrl.toUri(), keepPlayingUntilReady = true)
                     
                     // Asynchronously fetch and apply resume position with a 2-second timeout
