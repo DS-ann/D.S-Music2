@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
@@ -1240,7 +1241,8 @@ fun OnlineSongBottomSheet(
     exploreViewModel: ExploreViewModel,
     onPlaylistAddClick: (SongItem) -> Unit,
     onViewCreditsClick: (OnlineSong) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onRemoveFromCache: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val downloadProgress by SongDownloader.downloadProgress.collectAsState()
@@ -1416,7 +1418,7 @@ fun OnlineSongBottomSheet(
             Spacer(modifier = Modifier.height(2.dp))
 
             // Optimized 2-Pane Actions for Landscape Width
-            val menuItems = listOf(
+            val baseMenuItems = listOf(
                 Triple("Start mix", Icons.Default.Radio) {
                     exploreViewModel.startRadio(song)
                     com.codetrio.spatialflow.ui.SnackbarController.showMessage("Starting mix based on ${song.title}")
@@ -1494,6 +1496,14 @@ fun OnlineSongBottomSheet(
                     onDismissRequest()
                 }
             )
+            val menuItems = if (onRemoveFromCache != null) {
+                baseMenuItems + Triple("Remove from cache", Icons.Default.DeleteOutline) {
+                    onRemoveFromCache()
+                    onDismissRequest()
+                }
+            } else {
+                baseMenuItems
+            }
 
             val menuColumns = if (isLandscape) 2 else 1
             val menuChunks = menuItems.chunked(menuColumns)
