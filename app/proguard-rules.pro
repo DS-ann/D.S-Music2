@@ -1,6 +1,6 @@
 # Keep the manifest Application class and its Hilt-injected startup entry point stable on older ART runtimes.
--keep class com.codetrio.spatialflow.SpatialFlowApplication { *; }
--keep class com.codetrio.spatialflow.Hilt_SpatialFlowApplication { *; }
+-keep class com.dsann.music.SpatialFlowApplication { *; }
+-keep class com.dsann.music.Hilt_SpatialFlowApplication { *; }
 
 # Add project specific ProGuard rules here.
 # You can control the set of applied configuration files using the
@@ -31,7 +31,7 @@
 -keep class android.provider.MediaStore$Audio$Media { *; }
 
 # ============ Custom Views ============
--keep class com.codetrio.spatialflow.ui.custom.** { *; }
+-keep class com.dsann.music.ui.custom.** { *; }
 
 # ============ Palette ============
 -keep class androidx.palette.graphics.** { *; }
@@ -45,7 +45,7 @@
 
 # ============ Lyrics & JSON Models ============
 # Keep lyrics data classes (Gson needs field names to match JSON)
--keep class com.codetrio.spatialflow.data.lyrics.** { *; }
+-keep class com.dsann.music.data.lyrics.** { *; }
 -keepattributes *Annotation*
 -keepattributes Signature
 
@@ -66,8 +66,8 @@
 -dontwarn org.jaudiotagger.**
 
 # ============ InnerTube & Models ============
--keep class com.codetrio.spatialflow.data.innertube.** { *; }
--keep class com.codetrio.spatialflow.model.** { *; }
+-keep class com.dsann.music.data.innertube.** { *; }
+-keep class com.dsann.music.model.** { *; }
 
 # ============ NewPipe Extractor & Jsoup ============
 -keep class org.schabi.newpipe.extractor.** { *; }

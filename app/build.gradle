@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace 'com.codetrio.spatialflow'
+    namespace 'com.dsann.music'
     compileSdk 37
 
     // Fix for "App not installed" errors when sharing debug APKs
