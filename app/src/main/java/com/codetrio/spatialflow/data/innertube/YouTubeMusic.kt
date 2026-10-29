@@ -276,7 +276,7 @@ object YouTubeMusic {
                 }
                 }
                 val request = ActiveStreamRequest(requestGeneration, newDeferred)
-                activeStreamRequests[videoId] = request
+                activeStreamRequests[requestKey] = request
                 newDeferred.start()
                 newDeferred
             }

@@ -352,7 +352,7 @@ object NewPipeStreamExtractor {
                     inFlightRequests.remove(requestKey)
                 }
             }.also {
-                inFlightRequests[videoId] = it
+                inFlightRequests[requestKey] = it
                 it.start()
             }
         }
