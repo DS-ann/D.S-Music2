@@ -301,7 +301,10 @@ internal fun FullScreenLyricsOverlay(
                     )
                 }
 
-                IconButton(onClick = { showProvidersSheet = true }) {
+                IconButton(
+                    onClick = { showProvidersSheet = true },
+                    interactionSource = remember { MutableInteractionSource() }
+                ) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
                         contentDescription = "Change Lyrics Provider",

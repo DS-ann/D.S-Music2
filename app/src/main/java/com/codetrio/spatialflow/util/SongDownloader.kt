@@ -544,18 +544,18 @@ object SongDownloader {
             if (tag is org.jaudiotagger.tag.mp4.Mp4Tag) {
                 // Use native MP4 atoms for M4A/AAC. This is more reliable across Android
                 // media scanners than relying only on generic cross-format field mappings.
-                tag.setField(tag.createTagField(org.jaudiotagger.tag.mp4.Mp4FieldKey.TITLE, title))
-                tag.setField(tag.createTagField(org.jaudiotagger.tag.mp4.Mp4FieldKey.ARTIST, artist))
+                tag.setField(tag.createField(org.jaudiotagger.tag.mp4.Mp4FieldKey.TITLE, title))
+                tag.setField(tag.createField(org.jaudiotagger.tag.mp4.Mp4FieldKey.ARTIST, artist))
                 runCatching {
-                    tag.setField(tag.createTagField(org.jaudiotagger.tag.mp4.Mp4FieldKey.ALBUM_ARTIST, artist))
+                    tag.setField(tag.createField(org.jaudiotagger.tag.mp4.Mp4FieldKey.ALBUM_ARTIST, artist))
                 }.onFailure { Log.d(TAG, "MP4 album artist tag not supported: ${it.message}") }
                 album?.takeIf { it.isNotBlank() }?.let { albumTitle ->
                     runCatching {
-                        tag.setField(tag.createTagField(org.jaudiotagger.tag.mp4.Mp4FieldKey.ALBUM, albumTitle.trim()))
+                        tag.setField(tag.createField(org.jaudiotagger.tag.mp4.Mp4FieldKey.ALBUM, albumTitle.trim()))
                     }.onFailure { Log.d(TAG, "MP4 album tag not supported: ${it.message}") }
                 }
                 runCatching {
-                    tag.setField(tag.createTagField(org.jaudiotagger.tag.mp4.Mp4FieldKey.COMMENT, sourceComment))
+                    tag.setField(tag.createField(org.jaudiotagger.tag.mp4.Mp4FieldKey.COMMENT, sourceComment))
                 }.onFailure { Log.d(TAG, "MP4 comment tag not supported: ${it.message}") }
             } else {
                 // TITLE and ARTIST are required. Optional fields are isolated because some formats

@@ -1196,8 +1196,13 @@ fun PlayerBottomSheetCompose(
                                         currentSheetContentState = PlayerSheetState.EXPANDED
                                     }
                                     else -> {
-                                        // Only the visible album-cover target opens lyrics.
-                                        viewModel.setLyricsModeEnabled(true)
+                                        // Lyrics open only from a deliberate tap on the visible artwork.
+                                        // Other upper player surfaces must remain player controls.
+                                        if (playerContentExpansionFraction.value >= 0.98f &&
+                                            !isQueueExpanded
+                                        ) {
+                                            viewModel.setLyricsModeEnabled(true)
+                                        }
                                     }
                                 }
                             }
