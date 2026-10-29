@@ -54,6 +54,17 @@ public class SpatialFlowWidgetProvider extends AppWidgetProvider {
         for (int appWidgetId : appWidgetIds) {
             updateWidget(context, appWidgetManager, appWidgetId, null, false, 0, 0, null, layoutId, providerClass);
         }
+
+        // onUpdate has no access to the current playback item itself. Ask the running playback
+        // service to replace these initial placeholders with the real track/position immediately;
+        // otherwise widgets added while a song is already playing can remain apparently blank.
+        try {
+            Intent refreshIntent = new Intent(context, com.codetrio.spatialflow.service.AudioPlaybackService.class);
+            refreshIntent.setAction("com.codetrio.spatialflow.ACTION_WIDGET_REFRESH_STATE");
+            context.startService(refreshIntent);
+        } catch (Exception e) {
+            Log.w(TAG, "Could not refresh widget state after adding a widget", e);
+        }
     }
 
     public static void updateAllWidgets(Context context, SongItem currentSong, boolean isPlaying, int position,
