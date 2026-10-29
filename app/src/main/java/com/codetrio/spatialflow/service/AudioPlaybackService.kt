@@ -926,6 +926,33 @@ class AudioPlaybackService : MediaSessionService() {
                 // even though another quality/container is already available offline.
                 if (!useWebRemixRetry && !useCompatibleFallbackRetry) {
                     val activeSong = viewModel?.currentSong?.value?.takeIf { it.videoId == videoId }
+
+                    // A real downloaded audio file is the highest-priority offline source.
+                    // Resolve it by video ID first so even non-default format/bitrate downloads
+                    // are used rather than extracting a fresh URL for another online stream.
+                    val downloadedUri = activeSong?.let { song ->
+                        withContext(Dispatchers.IO) {
+                            com.codetrio.spatialflow.util.SongDownloader.findDownloadedUri(
+                                applicationContext,
+                                videoId,
+                                song.title,
+                                song.artist
+                            )
+                        }
+                    }
+                    if (downloadedUri != null) {
+                        ensureActive()
+                        if (resolveTargetSongId != videoId) return@launch
+                        activeSong.contentUri = downloadedUri
+                        activeSong.isDownloadedOffline = true
+                        activeSong.isCachedTrack = false
+                        viewModel?.refreshCurrentSongSource(activeSong)
+                        Log.i(TAG, "Using downloaded offline audio for $videoId: $downloadedUri")
+                        originalSourceUri = downloadedUri
+                        loadAudioInternal(downloadedUri, keepPlayingUntilReady = true)
+                        return@launch
+                    }
+
                     val cacheSongId = activeSong?.id?.toString()
                         ?: videoId.hashCode().toLong().toString()
                     val cachedUri = withContext(Dispatchers.IO) {
@@ -939,7 +966,12 @@ class AudioPlaybackService : MediaSessionService() {
                     if (cachedUri != null) {
                         ensureActive()
                         if (resolveTargetSongId != videoId) return@launch
-                        Log.i(TAG, "Using fully cached stream for $videoId regardless of selected format/bitrate")
+                        activeSong?.apply {
+                            contentUri = cachedUri
+                            isCachedTrack = true
+                            isDownloadedOffline = false
+                        }?.let { viewModel?.refreshCurrentSongSource(it) }
+                        Log.i(TAG, "Using cached stream for $videoId regardless of selected format/bitrate")
                         originalSourceUri = cachedUri
                         loadAudioInternal(cachedUri, keepPlayingUntilReady = true)
                         return@launch
@@ -1009,6 +1041,11 @@ class AudioPlaybackService : MediaSessionService() {
                 
                 if (!streamUrl.isNullOrEmpty()) {
                     failedStreamVideoId = null
+                    activeSong?.apply {
+                        isCachedTrack = false
+                        isDownloadedOffline = false
+                        contentUri = "innertube://$videoId".toUri()
+                    }?.let { viewModel?.refreshCurrentSongSource(it) }
                     loadAudioInternal(streamUrl.toUri(), keepPlayingUntilReady = true)
                     
                     // Asynchronously fetch and apply resume position with a 2-second timeout
