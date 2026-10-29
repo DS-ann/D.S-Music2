@@ -179,7 +179,8 @@ class AudioPlaybackService : MediaSessionService() {
         fun getCachedPlaybackUri(
             context: Context,
             songId: String,
-            videoId: String? = null
+            videoId: String? = null,
+            requireComplete: Boolean = true
         ): Uri? {
             val currentCache = getCache(context.applicationContext)
             val candidates = currentCache.keys.mapNotNull { key ->
@@ -191,13 +192,15 @@ class AudioPlaybackService : MediaSessionService() {
                 val contentMetadata = currentCache.getContentMetadata(key)
                 val contentLength = androidx.media3.datasource.cache.ContentMetadata
                     .getContentLength(contentMetadata)
-                if (contentLength <= 0L || !currentCache.isCached(key, 0L, contentLength)) {
-                    return@mapNotNull null
-                }
+                val fullyCached = contentLength > 0L &&
+                    currentCache.isCached(key, 0L, contentLength)
+                if (requireComplete && !fullyCached) return@mapNotNull null
 
                 val uri = Uri.parse(key)
                 if (uri.scheme != "http" && uri.scheme != "https") return@mapNotNull null
-                key to currentCache.getCachedSpans(key).sumOf { it.length }
+                val cachedBytes = currentCache.getCachedSpans(key).sumOf { it.length }
+                if (cachedBytes <= 0L) return@mapNotNull null
+                key to cachedBytes
             }
             return candidates.maxByOrNull { it.second }?.first?.let { Uri.parse(it) }
         }
@@ -881,7 +884,12 @@ class AudioPlaybackService : MediaSessionService() {
                     val cacheSongId = activeSong?.id?.toString()
                         ?: videoId.hashCode().toLong().toString()
                     val cachedUri = withContext(Dispatchers.IO) {
-                        getCachedPlaybackUri(applicationContext, cacheSongId, videoId)
+                        getCachedPlaybackUri(
+                            applicationContext,
+                            cacheSongId,
+                            videoId,
+                            requireComplete = false
+                        )
                     }
                     if (cachedUri != null) {
                         ensureActive()
