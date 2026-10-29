@@ -355,6 +355,51 @@ class AudioPlaybackService : MediaSessionService() {
             return CACHE_METADATA_ENTRY_PREFIX + out.toString()
         }
 
+        /**
+         * Removes all cached stream variants belonging to one song without affecting other songs.
+         * The exact cache URI is also matched so entries with missing metadata can still be removed.
+         */
+        @JvmStatic
+        @Synchronized
+        fun removeMediaCacheForSong(
+            context: Context,
+            songId: String,
+            videoId: String = "",
+            cacheUri: String = ""
+        ): Int {
+            val appContext = context.applicationContext
+            val currentCache = getCache(appContext)
+            val metadataPrefs = appContext.getSharedPreferences(
+                PREF_MEDIA_CACHE_METADATA,
+                Context.MODE_PRIVATE
+            )
+            val metadataEditor = metadataPrefs.edit()
+            var removedResources = 0
+
+            currentCache.keys.toList().forEach { key ->
+                val metadata = getCachedMediaMetadata(appContext, key)
+                val matchesSong = songId.isNotBlank() && metadata?.songId == songId
+                val matchesVideo = videoId.isNotBlank() && metadata?.videoId == videoId
+                val matchesExactUri = cacheUri.isNotBlank() && key == cacheUri
+                if (!matchesSong && !matchesVideo && !matchesExactUri) return@forEach
+
+                try {
+                    currentCache.removeResource(key)
+                    metadataEditor.remove(cacheMetadataEntryKey(key))
+                    removedResources++
+                } catch (error: Exception) {
+                    Log.w(TAG, "Could not remove cached resource for song $songId", error)
+                }
+            }
+
+            metadataEditor.apply()
+            if (songId.isNotBlank()) {
+                getCachedMediaArtworkFile(appContext, songId).delete()
+            }
+            cacheEvictor?.refresh(currentCache)
+            return removedResources
+        }
+
         @Synchronized
         fun clearMediaCache(context: Context) {
             context.getSharedPreferences(PREF_MEDIA_CACHE_METADATA, Context.MODE_PRIVATE).edit().clear().apply()
