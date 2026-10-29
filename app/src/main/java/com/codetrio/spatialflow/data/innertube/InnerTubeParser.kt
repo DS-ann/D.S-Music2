@@ -343,9 +343,7 @@ object InnerTubeParser {
             streamingData.getAsJsonArray("adaptiveFormats")?.let { allFormats.addAll(it) }
             streamingData.getAsJsonArray("formats")?.let { allFormats.addAll(it) }
 
-            var bestStream: StreamData? = null
-            var bestStreamFormatPenalty = Int.MAX_VALUE
-            var bestStreamDistance = Int.MAX_VALUE
+            val availableAudioStreams = mutableListOf<StreamData>()
             val targetBitrateBps = NewPipeStreamExtractor.getTargetBitrateBps()
             val preferredAudioFormat = NewPipeStreamExtractor.getPlaybackAudioFormat()
 
@@ -389,39 +387,47 @@ object InnerTubeParser {
                     }
                 }
 
-                // Prefer the requested native format first, then the stream closest to the
-                // requested bitrate. If the source has no matching format, any playable format
-                // remains eligible as a fallback.
-                val formatPenalty = if (
-                    NewPipeStreamExtractor.matchesAudioFormat(
-                        mimeType,
-                        preferredFormat = preferredAudioFormat
-                    )
-                ) 0 else 1
-                val distance = if (bitrate > 0) abs(bitrate - targetBitrateBps) else Int.MAX_VALUE
-                if (
-                    url != null &&
-                    (bestStream == null ||
-                        formatPenalty < bestStreamFormatPenalty ||
-                        (formatPenalty == bestStreamFormatPenalty && distance < bestStreamDistance))
-                ) {
-                    bestStreamFormatPenalty = formatPenalty
-                    bestStreamDistance = distance
-                    bestStream = StreamData(
-                        url = url,
-                        mimeType = mimeType,
-                        bitrate = bitrate,
-                        contentLength = obj.get("contentLength")?.asLong,
-                        audioQuality = obj.get("audioQuality")?.asString
+                if (!url.isNullOrBlank()) {
+                    availableAudioStreams.add(
+                        StreamData(
+                            url = url,
+                            mimeType = mimeType,
+                            bitrate = bitrate,
+                            contentLength = obj.get("contentLength")?.asLong,
+                            audioQuality = obj.get("audioQuality")?.asString
+                        )
                     )
                 }
             }
 
-            // Final load: Only output the absolute champion candidate 
-            val streams = mutableListOf<StreamData>()
-            bestStream?.let { streams.add(it) }
+            // Return matching formats only when one exists. If the requested format is absent,
+            // retain the actual available formats so the caller can ask the listener to choose
+            // rather than silently changing the requested container/codec.
+            val matchingStreams = availableAudioStreams.filter {
+                NewPipeStreamExtractor.matchesAudioFormat(
+                    it.mimeType,
+                    preferredFormat = preferredAudioFormat
+                )
+            }
+            val formatCandidates = when {
+                preferredAudioFormat == "auto" -> {
+                    availableAudioStreams.filter { it.mimeType.contains("audio/mp4", ignoreCase = true) }
+                        .ifEmpty { availableAudioStreams }
+                }
+                matchingStreams.isNotEmpty() -> matchingStreams
+                else -> availableAudioStreams
+            }
+            val streams = formatCandidates.sortedWith(
+                compareBy<StreamData> {
+                    if (it.bitrate > 0) abs(it.bitrate - targetBitrateBps) else Int.MAX_VALUE
+                }
+            )
 
-            Log.d(TAG, "Parsed player: $videoId — ${streams.size} audio streams from ${allFormats.size} total formats")
+            Log.d(
+                TAG,
+                "Parsed player: $videoId — ${streams.size} candidate audio streams from ${allFormats.size} total formats; " +
+                    "requested=$preferredAudioFormat, matches=${matchingStreams.size}"
+            )
 
             val tracking = json.getAsJsonObject("playbackTracking")
             val playbackUrl = tracking?.getAsJsonObject("videostatsPlaybackUrl")?.get("baseUrl")?.asString

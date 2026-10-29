@@ -195,7 +195,10 @@ object YouTubeMusic {
      * Atomically acquires the best audio stream URL for a given video ID.
      * Implements absolute deduped parallelism prevention and automatic caching.
      */
-    suspend fun getStreamUrl(videoId: String?): Result<String> = coroutineScope {
+    suspend fun getStreamUrl(
+        videoId: String?,
+        promptForFormatChoice: Boolean = false
+    ): Result<String> = coroutineScope {
         if (videoId.isNullOrEmpty()) return@coroutineScope Result.failure(IllegalArgumentException("Video ID null"))
 
         cleanExpiredCache()
@@ -209,23 +212,23 @@ object YouTubeMusic {
             return@coroutineScope Result.success(cached.first)
         }
 
-        // Level 2: Check for in-flight request duplication prevention
-        // Atomically compute or retrieve an active coroutine future for this exact stream.
+        // Separate interactive and background requests so prefetch cannot consume a foreground
+        // format-choice request before its dialog has a chance to appear.
         val id = videoId
+        val requestKey = "$id#format-choice=$promptForFormatChoice"
         val activeTask = synchronized(activeStreamRequests) {
-            val currentRequest = activeStreamRequests[videoId]
+            val currentRequest = activeStreamRequests[requestKey]
             if (currentRequest != null && currentRequest.generation == requestGeneration) {
                 currentRequest.deferred
             } else {
                 val newDeferred = appScope.async(start = kotlinx.coroutines.CoroutineStart.LAZY) {
                 try {
-                    // Directly invoke the high-reliability local extraction engine as requested
-                    // Bypasses the volatile direct-player trial cascade which accumulates latency
-                    // The extractor can fail on a YouTube format/API change. Do not let
-                    // that exception skip the independent InnerTube player fallback.
                     var bestUrl: String? = try {
-                        NewPipeStreamExtractor.getStreamUrl(id)
+                        NewPipeStreamExtractor.getStreamUrl(id, allowFormatChoice = promptForFormatChoice)
                     } catch (extractorEx: Exception) {
+                        if (extractorEx is AudioFormatSelectionCancelledException ||
+                            extractorEx is RequestedAudioFormatUnavailableException
+                        ) throw extractorEx
                         Log.e(TAG, "NewPipe extraction failed for $id; trying InnerTube fallback", extractorEx)
                         null
                     }
@@ -235,16 +238,18 @@ object YouTubeMusic {
                         try {
                             val playerJson = InnerTubeClient.player(id)
                             val parsed = InnerTubeParser.parsePlayerResponse(playerJson)
-                            // InnerTubeParser has already applied the configured playback format and
-                            // bitrate when it chose its stream. Do not replace it with a max/min
-                            // bitrate choice here.
-                            bestUrl = parsed?.streams
-                                ?.firstOrNull { it.mimeType.contains("audio", ignoreCase = true) }
-                                ?.url
+                            bestUrl = chooseInnerTubeStream(
+                                parsed = parsed,
+                                videoId = id,
+                                promptForFormatChoice = promptForFormatChoice
+                            )
                             if (!bestUrl.isNullOrEmpty()) {
                                 Log.d(TAG, "Successfully resolved fallback stream via InnerTube player for $id")
                             }
                         } catch (fallbackEx: Exception) {
+                            if (fallbackEx is AudioFormatSelectionCancelledException ||
+                                fallbackEx is RequestedAudioFormatUnavailableException
+                            ) throw fallbackEx
                             Log.e(TAG, "InnerTube player fallback failed for $id: ${fallbackEx.message}")
                         }
                     }
@@ -263,9 +268,9 @@ object YouTubeMusic {
                 } finally {
                     // Remove only this request generation; retain newer work for the same song.
                     synchronized(activeStreamRequests) {
-                        val active = activeStreamRequests[id]
+                        val active = activeStreamRequests[requestKey]
                         if (active != null && active.generation == requestGeneration) {
-                            activeStreamRequests.remove(id, active)
+                            activeStreamRequests.remove(requestKey, active)
                         }
                     }
                 }
@@ -278,6 +283,64 @@ object YouTubeMusic {
         }
 
         return@coroutineScope activeTask.await()
+    }
+
+
+    private suspend fun chooseInnerTubeStream(
+        parsed: PlayerResult?,
+        videoId: String,
+        promptForFormatChoice: Boolean
+    ): String? {
+        val audio = parsed?.streams.orEmpty()
+            .filter { it.mimeType.contains("audio", ignoreCase = true) && it.url.isNotBlank() }
+        if (audio.isEmpty()) return null
+
+        val requestedFormat = NewPipeStreamExtractor.getPlaybackAudioFormat()
+        val targetKbps = NewPipeStreamExtractor.getTargetBitrateKbps()
+        val matching = audio.filter {
+            NewPipeStreamExtractor.matchesAudioFormat(
+                it.mimeType,
+                preferredFormat = requestedFormat
+            )
+        }
+        val candidates = when {
+            requestedFormat == "auto" -> audio.filter {
+                it.mimeType.contains("audio/mp4", ignoreCase = true)
+            }.ifEmpty { audio }
+            matching.isNotEmpty() -> matching
+            else -> emptyList()
+        }
+
+        if (candidates.isNotEmpty()) {
+            return candidates.minByOrNull { stream ->
+                val kbps = if (stream.bitrate > 1000) stream.bitrate / 1000 else stream.bitrate
+                if (kbps > 0) kotlin.math.abs(kbps - targetKbps) else Int.MAX_VALUE
+            }?.url
+        }
+
+        if (requestedFormat == "auto") return null
+        if (!promptForFormatChoice) throw RequestedAudioFormatUnavailableException(requestedFormat)
+
+        val options = audio.mapIndexed { index, stream ->
+            val bitrateKbps = if (stream.bitrate > 1000) (stream.bitrate + 500) / 1000 else stream.bitrate
+            AvailableAudioFormat(
+                id = "innertube:$videoId:$index",
+                url = stream.url,
+                mimeType = stream.mimeType.substringBefore(';').trim(),
+                codec = null,
+                bitrateKbps = bitrateKbps,
+                contentLength = stream.contentLength,
+                formatLabel = audioFormatDisplayLabel(stream.mimeType)
+            )
+        }.sortedWith(compareByDescending<AvailableAudioFormat> { it.bitrateKbps }.thenBy { it.formatLabel })
+
+        return AudioFormatSelectionCoordinator.choose(
+            songTitle = parsed?.title ?: videoId,
+            purpose = AudioFormatPurpose.PLAYBACK,
+            requestedFormat = requestedFormat,
+            targetBitrateKbps = targetKbps,
+            options = options
+        ).url
     }
 
     /**
