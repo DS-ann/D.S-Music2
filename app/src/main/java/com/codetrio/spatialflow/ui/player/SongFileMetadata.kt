@@ -27,7 +27,11 @@ internal object OnlineStreamMetadataReader {
     suspend fun read(videoId: String): OnlineStreamMetadata? {
         if (videoId.isBlank()) return null
         return try {
-            val player = com.codetrio.spatialflow.data.innertube.YouTubeMusic.player(videoId).getOrNull()
+            // Metadata lookup must not fail simply because the user's selected playback codec is
+            // unavailable for this track. This mode may inspect a usable source stream for details,
+            // but it never seeds a playback URL cache.
+            val player = com.codetrio.spatialflow.data.innertube.YouTubeMusic
+                .player(videoId, metadataOnly = true).getOrNull()
                 ?: return null
             val audio = player.streams
                 .filter { it.mimeType.startsWith("audio/", ignoreCase = true) }

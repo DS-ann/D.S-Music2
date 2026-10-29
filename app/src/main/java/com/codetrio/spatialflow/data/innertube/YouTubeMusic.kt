@@ -133,7 +133,10 @@ object YouTubeMusic {
 
     // ========== Player & Streaming ==========
 
-    suspend fun player(videoId: String?): Result<PlayerResult> = withContext(Dispatchers.IO) {
+    suspend fun player(
+        videoId: String?,
+        metadataOnly: Boolean = false
+    ): Result<PlayerResult> = withContext(Dispatchers.IO) {
         runCatching {
             if (videoId.isNullOrEmpty()) throw IllegalArgumentException("Invalid videoId")
 
@@ -142,7 +145,7 @@ object YouTubeMusic {
             coroutineScope {
                 val newPipeDeferred = async(Dispatchers.IO) {
                     try {
-                        NewPipeStreamExtractor.getPlayerResult(videoId)
+                        NewPipeStreamExtractor.getPlayerResult(videoId, metadataOnly = metadataOnly)
                     } catch (e: Exception) {
                         Log.e("YouTubeTelemetry", "NewPipe stream extraction failed for $videoId: ${e.message}", e)
                         null

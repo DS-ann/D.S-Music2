@@ -535,26 +535,42 @@ object SongDownloader {
                 audioFile.tagOrCreateAndSetDefault
             }
 
-            // TITLE and ARTIST are required. Optional fields are isolated because some formats
-            // don't support every generic jaudiotagger key.
-            tag.setField(org.jaudiotagger.tag.FieldKey.TITLE, title)
-            tag.setField(org.jaudiotagger.tag.FieldKey.ARTIST, artist)
-            runCatching { tag.setField(org.jaudiotagger.tag.FieldKey.ALBUM_ARTIST, artist) }
-                .onFailure { Log.d(TAG, "Album artist tag not supported by ${extension}: ${it.message}") }
-            album?.takeIf { it.isNotBlank() }?.let { albumTitle ->
-                runCatching { tag.setField(org.jaudiotagger.tag.FieldKey.ALBUM, albumTitle.trim()) }
-                    .onFailure { Log.d(TAG, "Album tag not supported by ${extension}: ${it.message}") }
+            val sourceComment = if (fromCache) {
+                "Exported from SpatialFlow cached audio (video ID: $videoId)"
+            } else {
+                "Downloaded from YouTube Music (video ID: $videoId)"
             }
-            runCatching {
-                tag.setField(
-                    org.jaudiotagger.tag.FieldKey.COMMENT,
-                    if (fromCache) {
-                        "Exported from SpatialFlow cached audio (video ID: $videoId)"
-                    } else {
-                        "Downloaded from YouTube Music (video ID: $videoId)"
-                    }
-                )
-            }.onFailure { Log.d(TAG, "Comment tag not supported by ${extension}: ${it.message}") }
+
+            if (tag is org.jaudiotagger.tag.mp4.Mp4Tag) {
+                // Use native MP4 atoms for M4A/AAC. This is more reliable across Android
+                // media scanners than relying only on generic cross-format field mappings.
+                tag.setField(tag.createTagField(org.jaudiotagger.tag.mp4.Mp4FieldKey.TITLE, title))
+                tag.setField(tag.createTagField(org.jaudiotagger.tag.mp4.Mp4FieldKey.ARTIST, artist))
+                runCatching {
+                    tag.setField(tag.createTagField(org.jaudiotagger.tag.mp4.Mp4FieldKey.ALBUM_ARTIST, artist))
+                }.onFailure { Log.d(TAG, "MP4 album artist tag not supported: ${it.message}") }
+                album?.takeIf { it.isNotBlank() }?.let { albumTitle ->
+                    runCatching {
+                        tag.setField(tag.createTagField(org.jaudiotagger.tag.mp4.Mp4FieldKey.ALBUM, albumTitle.trim()))
+                    }.onFailure { Log.d(TAG, "MP4 album tag not supported: ${it.message}") }
+                }
+                runCatching {
+                    tag.setField(tag.createTagField(org.jaudiotagger.tag.mp4.Mp4FieldKey.COMMENT, sourceComment))
+                }.onFailure { Log.d(TAG, "MP4 comment tag not supported: ${it.message}") }
+            } else {
+                // TITLE and ARTIST are required. Optional fields are isolated because some formats
+                // don't support every generic jaudiotagger key.
+                tag.setField(org.jaudiotagger.tag.FieldKey.TITLE, title)
+                tag.setField(org.jaudiotagger.tag.FieldKey.ARTIST, artist)
+                runCatching { tag.setField(org.jaudiotagger.tag.FieldKey.ALBUM_ARTIST, artist) }
+                    .onFailure { Log.d(TAG, "Album artist tag not supported by ${extension}: ${it.message}") }
+                album?.takeIf { it.isNotBlank() }?.let { albumTitle ->
+                    runCatching { tag.setField(org.jaudiotagger.tag.FieldKey.ALBUM, albumTitle.trim()) }
+                        .onFailure { Log.d(TAG, "Album tag not supported by ${extension}: ${it.message}") }
+                }
+                runCatching { tag.setField(org.jaudiotagger.tag.FieldKey.COMMENT, sourceComment) }
+                    .onFailure { Log.d(TAG, "Comment tag not supported by ${extension}: ${it.message}") }
+            }
 
             if (artworkBytes != null && artworkBytes.isNotEmpty()) {
                 runCatching {
@@ -578,9 +594,17 @@ object SongDownloader {
 
             // Verify the written tags by reading the staged audio back.
             val writtenTag = org.jaudiotagger.audio.AudioFileIO.read(taggedFile).tag
-            if (writtenTag.getFirst(org.jaudiotagger.tag.FieldKey.TITLE).isNullOrBlank() ||
-                writtenTag.getFirst(org.jaudiotagger.tag.FieldKey.ARTIST).isNullOrBlank()
-            ) {
+            val writtenTitle = if (writtenTag is org.jaudiotagger.tag.mp4.Mp4Tag) {
+                writtenTag.getFirst(org.jaudiotagger.tag.mp4.Mp4FieldKey.TITLE)
+            } else {
+                writtenTag.getFirst(org.jaudiotagger.tag.FieldKey.TITLE)
+            }
+            val writtenArtist = if (writtenTag is org.jaudiotagger.tag.mp4.Mp4Tag) {
+                writtenTag.getFirst(org.jaudiotagger.tag.mp4.Mp4FieldKey.ARTIST)
+            } else {
+                writtenTag.getFirst(org.jaudiotagger.tag.FieldKey.ARTIST)
+            }
+            if (writtenTitle.isNullOrBlank() || writtenArtist.isNullOrBlank()) {
                 throw IOException("Metadata verification failed: title or artist was not persisted")
             }
 

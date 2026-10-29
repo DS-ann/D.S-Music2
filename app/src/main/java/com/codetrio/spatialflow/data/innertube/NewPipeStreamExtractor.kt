@@ -278,6 +278,7 @@ object NewPipeStreamExtractor {
     ): AudioStream? {
         val requestedFormat = normalizeAudioFormat(preferredFormat)
         val candidates = candidatesForFormat(audioStreams, requestedFormat)
+            .filter { it.content.startsWith("https://", ignoreCase = true) }
         if (candidates.isNotEmpty()) {
             return candidates.minByOrNull { stream ->
                 val bitrate = streamBitrateKbps(stream)
@@ -285,10 +286,22 @@ object NewPipeStreamExtractor {
             }
         }
         if (requestedFormat == "auto") return null
-        if (audioStreams.isEmpty()) throw RequestedAudioFormatUnavailableException(requestedFormat)
         if (!allowFormatChoice) throw RequestedAudioFormatUnavailableException(requestedFormat)
 
-        val optionPairs = audioStreams.mapIndexed { index, stream -> stream to choiceOption(stream, index) }
+        // A missing requested format is a user-choice case, not a silent fallback.
+        // Only display formats for which extraction returned a usable stream URL.
+        val availableStreams = audioStreams.filter {
+            it.content.startsWith("https://", ignoreCase = true)
+        }
+        if (availableStreams.isEmpty()) {
+            throw RequestedAudioFormatUnavailableException(requestedFormat)
+        }
+        Log.w(
+            TAG,
+            "Requested $purpose format '$requestedFormat' unavailable for $videoId; " +
+                "asking the user to choose from ${availableStreams.size} available streams"
+        )
+        val optionPairs = availableStreams.mapIndexed { index, stream -> stream to choiceOption(stream, index) }
             .sortedWith(compareByDescending<Pair<AudioStream, AvailableAudioFormat>> { it.second.bitrateKbps }
                 .thenBy { it.second.formatLabel })
         val selected = AudioFormatSelectionCoordinator.choose(
@@ -530,44 +543,57 @@ object NewPipeStreamExtractor {
     /**
      * Extract full stream info including metadata lazily.
      */
-    suspend fun getPlayerResult(videoId: String?): PlayerResult? = coroutineScope {
+    suspend fun getPlayerResult(
+        videoId: String?,
+        metadataOnly: Boolean = false
+    ): PlayerResult? = coroutineScope {
         if (videoId.isNullOrEmpty()) return@coroutineScope null
-        
-        val cachedResult = synchronized(cacheLock) { playerResultCache.get(videoId) }
-        if (cachedResult != null) {
-            Log.d(TAG, "Cache HIT (PlayerResult) for $videoId")
-            return@coroutineScope cachedResult
+
+        // Metadata requests have a separate identity and deliberately bypass the strict playback
+        // cache, so an unavailable selected codec never suppresses the song's title/artist/duration.
+        val requestKey = "$videoId#metadata=$metadataOnly"
+        if (!metadataOnly) {
+            val cachedResult = synchronized(cacheLock) { playerResultCache.get(videoId) }
+            if (cachedResult != null) {
+                Log.d(TAG, "Cache HIT (PlayerResult) for $videoId")
+                return@coroutineScope cachedResult
+            }
         }
 
         val deferred = synchronized(inFlightPlayerResults) {
-            inFlightPlayerResults[videoId] ?: extractorScope.async(start = kotlinx.coroutines.CoroutineStart.LAZY) {
+            inFlightPlayerResults[requestKey] ?: extractorScope.async(start = kotlinx.coroutines.CoroutineStart.LAZY) {
                 try {
-                    val info = fetchStreamInfo(videoId)
-                    if (info == null) return@async null
-                    
+                    val info = fetchStreamInfo(videoId) ?: return@async null
                     val audioStreams = info.audioStreams
-                    if (audioStreams.isEmpty()) return@async null
+                    if (audioStreams.isEmpty() && !metadataOnly) return@async null
 
-                    val bestStream = selectBestStream(audioStreams) ?: return@async null
+                    val requestedMatch = selectBestStream(audioStreams)
+                    // Information screens may use a source-supported stream to report bitrate/MIME
+                    // even when the chosen playback format is unavailable. It is never added to
+                    // the playback URL cache and therefore cannot silently change playback format.
+                    val bestStream = requestedMatch ?: if (metadataOnly) {
+                        audioStreams.maxByOrNull { streamBitrateKbps(it) }
+                    } else {
+                        null
+                    }
+                    if (bestStream == null && !metadataOnly) return@async null
 
-                    val creationStart = System.currentTimeMillis()
-                    val bitrateKbps = streamBitrateKbps(bestStream)
-                    val streams = listOf(
-                        StreamData(
-                            url = bestStream.content,
-                            mimeType = bestStream.format?.mimeType ?: "audio/mp4",
-                            bitrate = bitrateKbps * 1000,
-                            contentLength = bestStream.itagItem?.contentLength?.takeIf { it > 0L },
-                            audioQuality = qualityLabelForKbps(bitrateKbps)
+                    val streams = bestStream?.let { stream ->
+                        val bitrateKbps = streamBitrateKbps(stream)
+                        listOf(
+                            StreamData(
+                                url = stream.content,
+                                mimeType = stream.format?.mimeType ?: "audio/mp4",
+                                bitrate = bitrateKbps * 1000,
+                                contentLength = stream.itagItem?.contentLength?.takeIf { it > 0L },
+                                audioQuality = qualityLabelForKbps(bitrateKbps)
+                            )
                         )
-                    )
+                    } ?: emptyList()
 
-                    val thumbStart = System.currentTimeMillis()
                     val thumbnailUrl = info.thumbnails.lastOrNull()?.url?.let {
                         InnerTubeParser.getHighResThumbnailUrl(it)
                     }
-                    Log.d(TAG, "Thumbnail extraction took ${System.currentTimeMillis() - thumbStart}ms for $videoId")
-
                     val likesFormatted = try {
                         val likeCount = info.likeCount
                         if (likeCount > 0) formatLikesCount(likeCount) else null
@@ -584,19 +610,19 @@ object NewPipeStreamExtractor {
                         streams = streams,
                         likesCount = likesFormatted
                     )
-                    Log.d(TAG, "PlayerResult creation took ${System.currentTimeMillis() - creationStart}ms for $videoId")
-                    synchronized(cacheLock) {
-                        playerResultCache.put(videoId, result)
-                        // Also seed the URL cache while we're at it!
-                        streamUrlCache.put(videoId, bestStream.content)
+                    if (!metadataOnly) {
+                        synchronized(cacheLock) {
+                            playerResultCache.put(videoId, result)
+                            // Only this strict, preference-matching path can seed playback URLs.
+                            bestStream?.let { streamUrlCache.put(videoId, it.content) }
+                        }
                     }
-                    
                     result
                 } finally {
-                    inFlightPlayerResults.remove(videoId)
+                    inFlightPlayerResults.remove(requestKey)
                 }
             }.also {
-                inFlightPlayerResults[videoId] = it
+                inFlightPlayerResults[requestKey] = it
                 it.start()
             }
         }
