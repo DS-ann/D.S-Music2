@@ -3,6 +3,8 @@ package com.codetrio.spatialflow.util
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.ContentUris
+import android.net.Uri
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Environment
@@ -115,6 +117,125 @@ object SongDownloader {
 
     fun isDownloading(videoId: String?): Boolean =
         !videoId.isNullOrBlank() && activeDownloads.containsKey(videoId)
+
+    private const val PREF_DOWNLOADED_TRACK_URIS = "spatialflow_downloaded_track_uris"
+
+    /**
+     * Resolve an app-downloaded audio file before trying Media3's online stream resolver.
+     * Video-ID mappings are preferred; title/artist filenames and the SpatialFlow folder
+     * provide a migration path for downloads created before mappings were recorded.
+     */
+    fun findDownloadedUri(
+        context: Context,
+        videoId: String?,
+        title: String,
+        artist: String
+    ): Uri? {
+        if (videoId.isNullOrBlank()) return null
+        val prefs = context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
+        val mappingKey = "uri_$videoId"
+        val mapped = prefs.getString(mappingKey, null)?.let { raw ->
+            runCatching { Uri.parse(raw) }.getOrNull()
+        }
+        if (mapped != null && isUriReadable(context, mapped)) return mapped
+        if (mapped != null) prefs.edit().remove(mappingKey).apply()
+
+        val baseName = "${cleanTitle(title)} - ${cleanArtist(artist)}"
+            .replace(Regex("[^a-zA-Z0-9._\\s()\\[\\]-]"), "_")
+        val extensions = listOf("m4a", "mp3", "webm", "opus", "ogg", "flac", "aac", "wav")
+        for (extension in extensions) {
+            val filename = "$baseName.$extension"
+            val found = findSpatialFlowMediaStoreUri(context, filename)
+                ?: findLegacyDownloadedFile(filename)
+            if (found != null && isUriReadable(context, found)) {
+                prefs.edit().putString(mappingKey, found.toString()).apply()
+                return found
+            }
+        }
+        return null
+    }
+
+    /** Record the permanent MediaStore URI immediately after the file is published. */
+    private fun rememberDownloadedSong(context: Context, videoId: String, outputFile: File) {
+        if (videoId.isBlank()) return
+        val uri = findSpatialFlowMediaStoreUri(context, outputFile.name)
+            ?: if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && outputFile.isFile) {
+                Uri.fromFile(outputFile)
+            } else null
+        if (uri != null) {
+            context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
+                .edit()
+                .putString("uri_$videoId", uri.toString())
+                .putString("name_$videoId", outputFile.name)
+                .apply()
+        } else {
+            Log.w(TAG, "Download completed but permanent MediaStore URI was not found for $videoId")
+        }
+    }
+
+    private fun findSpatialFlowMediaStoreUri(context: Context, filename: String): Uri? {
+        val projection = mutableListOf(MediaStore.Audio.Media._ID).apply {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                add(MediaStore.Audio.Media.DATA)
+            } else {
+                add(MediaStore.Audio.Media.RELATIVE_PATH)
+            }
+        }.toTypedArray()
+
+        return try {
+            context.contentResolver.query(
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                "${MediaStore.Audio.Media.DISPLAY_NAME} = ?",
+                arrayOf(filename),
+                "${MediaStore.Audio.Media.DATE_ADDED} DESC"
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                val locationColumn = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+                } else {
+                    cursor.getColumnIndex(MediaStore.Audio.Media.RELATIVE_PATH)
+                }
+                while (cursor.moveToNext()) {
+                    val location = if (locationColumn >= 0) cursor.getString(locationColumn).orEmpty() else ""
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        if (!location.replace('\\', '/').lowercase().contains("spatialflow/")) continue
+                    } else {
+                        if (!location.replace('\\', '/').lowercase().contains("/spatialflow/")) continue
+                    }
+                    return@use ContentUris.withAppendedId(
+                        MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                        cursor.getLong(idColumn)
+                    )
+                }
+                null
+            }
+        } catch (error: Exception) {
+            Log.w(TAG, "Could not resolve published download $filename", error)
+            null
+        }
+    }
+
+    private fun findLegacyDownloadedFile(filename: String): Uri? {
+        val directory = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            "SpatialFlow"
+        )
+        val file = File(directory, filename)
+        return if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && file.isFile) Uri.fromFile(file) else null
+    }
+
+    private fun isUriReadable(context: Context, uri: Uri): Boolean = try {
+        when (uri.scheme) {
+            "file" -> uri.path?.let { File(it).isFile } == true
+            "content" -> context.contentResolver.openAssetFileDescriptor(uri, "r")?.use {
+                it.length != 0L
+            } == true
+            else -> false
+        }
+    } catch (_: Exception) {
+        false
+    }
 
     /**
      * Tapping Download twice for the same track toggles it off. We keep the
@@ -274,6 +395,7 @@ object SongDownloader {
                     downloadStream?.mimeType?.startsWith("audio/mp4", ignoreCase = true) == true -> "m4a"
                     downloadStream?.mimeType?.startsWith("audio/mpeg", ignoreCase = true) == true -> "mp3"
                     downloadStream?.mimeType?.contains("webm", ignoreCase = true) == true -> "webm"
+                    downloadStream?.mimeType?.contains("opus", ignoreCase = true) == true -> "opus"
                     downloadStream?.mimeType?.contains("ogg", ignoreCase = true) == true -> "ogg"
                     downloadStream?.mimeType?.contains("flac", ignoreCase = true) == true -> "flac"
                     downloadStream?.mimeType?.contains("aac", ignoreCase = true) == true -> "aac"
@@ -348,6 +470,7 @@ object SongDownloader {
             if (!AudioFileManager.scanFile(context, outputFile, cleanTitleStr, cleanArtistStr, song.albumName)) {
                 throw IOException("Could not publish the downloaded audio to the music library")
             }
+            rememberDownloadedSong(context, videoId, outputFile)
             showFinishedNotification(context, cleanTitleStr, cleanArtistStr, notificationId)
             _downloadProgress.value += (videoId to 100)
 
@@ -515,6 +638,9 @@ object SongDownloader {
         artworkBytes: ByteArray?
     ): Boolean {
         val extension = outputFile.extension
+        if (extension.equals("webm", ignoreCase = true)) {
+            return embedWebmMetadataSafely(outputFile, title, artist, album, videoId, fromCache)
+        }
         val taggedFile = File(outputFile.parentFile, "${outputFile.nameWithoutExtension}.tagging.$extension")
         var backupFile: File? = null
         try {
@@ -631,6 +757,170 @@ object SongDownloader {
         }
     }
 
+    /**
+     * WebM/Opus is not handled by the usual audio-tag writer. Write standard Matroska
+     * SimpleTag elements into a WebM Segment so that tags are embedded in the media file,
+     * rather than relying only on MediaStore's display fields.
+     */
+    private fun embedWebmMetadataSafely(
+        outputFile: File,
+        title: String,
+        artist: String,
+        album: String?,
+        videoId: String,
+        fromCache: Boolean
+    ): Boolean {
+        val stagedFile = File(outputFile.parentFile, "${outputFile.nameWithoutExtension}.tagging.webm")
+        var backupFile: File? = null
+        try {
+            if (stagedFile.exists() && !stagedFile.delete()) {
+                throw IOException("Could not clear the WebM metadata staging file")
+            }
+            outputFile.copyTo(stagedFile, overwrite = true)
+            val sourceComment = if (fromCache) {
+                "Exported from SpatialFlow cached audio (video ID: $videoId)"
+            } else {
+                "Downloaded from YouTube Music (video ID: $videoId)"
+            }
+            val tags = buildWebmMetadataTags(title, artist, album, sourceComment)
+            appendWebmMetadataTags(stagedFile, tags)
+
+            backupFile = File(outputFile.parentFile, "${outputFile.name}.raw-backup")
+            if (backupFile.exists() && !backupFile.delete()) {
+                throw IOException("Could not clear the WebM audio backup file")
+            }
+            if (!outputFile.renameTo(backupFile)) {
+                throw IOException("Could not preserve original WebM audio before metadata writing")
+            }
+            if (!stagedFile.renameTo(outputFile)) {
+                backupFile.renameTo(outputFile)
+                throw IOException("Could not install the tagged WebM audio file")
+            }
+            backupFile.delete()
+            return true
+        } catch (error: Exception) {
+            Log.w(TAG, "WebM metadata embedding failed safely for ${outputFile.name}", error)
+            stagedFile.delete()
+            if (backupFile?.exists() == true && !outputFile.exists()) {
+                backupFile.renameTo(outputFile)
+            }
+            return false
+        }
+    }
+
+    private fun buildWebmMetadataTags(
+        title: String,
+        artist: String,
+        album: String?,
+        comment: String
+    ): ByteArray {
+        val entries = ArrayList<ByteArray>()
+
+        fun addTag(name: String, value: String?) {
+            if (value.isNullOrBlank()) return
+            val nameElement = webmElement(byteArrayOf(0x45, 0xA3.toByte()), name.toByteArray(Charsets.UTF_8))
+            val valueElement = webmElement(byteArrayOf(0x44, 0x87.toByte()), value.toByteArray(Charsets.UTF_8))
+            val simpleTag = webmElement(byteArrayOf(0x67, 0xC8.toByte()), nameElement + valueElement)
+            // TargetTypeValue 50 is the default track-level tag target; omitting a TrackUID
+            // makes the descriptive tags apply to the audio track.
+            val targets = webmElement(
+                byteArrayOf(0x63, 0xC0.toByte()),
+                webmElement(byteArrayOf(0x68, 0xCA.toByte()), byteArrayOf(50))
+            )
+            entries.add(webmElement(byteArrayOf(0x73, 0x73.toByte()), targets + simpleTag))
+        }
+
+        addTag("TITLE", title)
+        addTag("ARTIST", artist)
+        addTag("ALBUM", album)
+        addTag("COMMENT", comment)
+        return webmElement(
+            byteArrayOf(0x12, 0x54, 0xC3.toByte(), 0x67),
+            entries.fold(ByteArray(0)) { output, entry -> output + entry }
+        )
+    }
+
+    private fun webmElement(id: ByteArray, payload: ByteArray): ByteArray =
+        id + encodeWebmSize(payload.size.toLong()) + payload
+
+    private fun encodeWebmSize(value: Long, fixedWidth: Int? = null): ByteArray {
+        if (value < 0L) throw IOException("Invalid EBML element size")
+        val width = fixedWidth ?: (1..8).firstOrNull { candidate ->
+            value <= (1L shl (7 * candidate)) - 2L
+        } ?: throw IOException("EBML element is too large")
+        if (width !in 1..8 || value > (1L shl (7 * width)) - 2L) {
+            throw IOException("EBML size does not fit its existing field")
+        }
+        val encoded = ByteArray(width)
+        var remaining = value
+        for (index in width - 1 downTo 0) {
+            encoded[index] = (remaining and 0xFFL).toByte()
+            remaining = remaining ushr 8
+        }
+        encoded[0] = (encoded[0].toInt() or (1 shl (8 - width))).toByte()
+        return encoded
+    }
+
+    private fun appendWebmMetadataTags(file: File, tags: ByteArray) {
+        java.io.RandomAccessFile(file, "rw").use { randomFile ->
+            val fileLength = randomFile.length()
+            if (fileLength < 8L) throw IOException("Downloaded WebM file is too small to tag")
+
+            // The Segment header occurs near the beginning of a WebM file. Do not scan the
+            // audio clusters indefinitely or risk matching arbitrary payload bytes later on.
+            val scanLimit = minOf(fileLength - 4L, 1024L * 1024L)
+            var segmentOffset = -1L
+            var offset = 0L
+            while (offset <= scanLimit) {
+                randomFile.seek(offset)
+                if (randomFile.readUnsignedByte() == 0x18 &&
+                    randomFile.readUnsignedByte() == 0x53 &&
+                    randomFile.readUnsignedByte() == 0x80 &&
+                    randomFile.readUnsignedByte() == 0x67
+                ) {
+                    segmentOffset = offset
+                    break
+                }
+                offset++
+            }
+            if (segmentOffset < 0L) throw IOException("WebM Segment header was not found")
+
+            val sizeOffset = segmentOffset + 4L
+            randomFile.seek(sizeOffset)
+            val first = randomFile.readUnsignedByte()
+            var width = 1
+            var marker = 0x80
+            while (width <= 8 && (first and marker) == 0) {
+                width++
+                marker = marker ushr 1
+            }
+            if (width > 8) throw IOException("Invalid WebM Segment size")
+
+            var segmentSize = (first and (marker - 1)).toLong()
+            repeat(width - 1) {
+                segmentSize = (segmentSize shl 8) or randomFile.readUnsignedByte().toLong()
+            }
+            val unknownSize = segmentSize == (1L shl (7 * width)) - 1L
+            if (unknownSize) {
+                // Unknown-size Segments extend to EOF, so adding another Segment child is safe.
+                randomFile.seek(fileLength)
+                randomFile.write(tags)
+                return
+            }
+
+            val payloadStart = sizeOffset + width
+            val expectedEnd = payloadStart + segmentSize
+            if (expectedEnd != fileLength) {
+                throw IOException("Unexpected trailing bytes after the WebM Segment")
+            }
+            val newSize = encodeWebmSize(segmentSize + tags.size.toLong(), width)
+            randomFile.seek(sizeOffset)
+            randomFile.write(newSize)
+            randomFile.seek(fileLength)
+            randomFile.write(tags)
+        }
+    }
+
     private fun findCachedStream(context: Context, songId: String): CachedStreamCandidate? {
         val cache = try {
             AudioPlaybackService.getCache(context.applicationContext)
@@ -648,6 +938,11 @@ object SongDownloader {
             val contentMetadata = cache.getContentMetadata(cacheKey)
             val contentLength = ContentMetadata.getContentLength(contentMetadata)
             val cachedBytes = spans.sumOf { it.length }
+            // Media3 does not preserve MIME in cache metadata. Use the MIME recorded after
+            // playback, then the URL's mime parameter or a container signature for old entries.
+            val mimeType = metadata.mimeType.takeIf { it.isNotBlank() }
+                ?: inferCachedMimeType(cacheKey, spans)
+            if (mimeType.isNullOrBlank()) return@mapNotNull null
 
             var coveredUntil = 0L
             var hasGap = false
@@ -664,12 +959,45 @@ object SongDownloader {
                 cacheKey = cacheKey,
                 spans = spans,
                 contentLength = contentLength,
-                mimeType = null, // CachedMediaMetadata stores display metadata, not MIME type.
+                mimeType = mimeType,
                 cachedBytes = cachedBytes,
                 isComplete = complete
             )
         }
         return candidates.firstOrNull { it.isComplete } ?: candidates.maxByOrNull { it.cachedBytes }
+    }
+
+    private fun inferCachedMimeType(cacheKey: String, spans: List<CacheSpan>): String? {
+        val urlMime = runCatching {
+            android.net.Uri.parse(cacheKey).getQueryParameter("mime")
+        }.getOrNull()?.substringBefore(';')?.trim()
+        if (!urlMime.isNullOrBlank()) return urlMime
+
+        val firstSpan = spans.firstOrNull { it.position == 0L } ?: return null
+        val spanFile = firstSpan.file ?: return null
+        val header = ByteArray(16)
+        val read = runCatching {
+            FileInputStream(spanFile).use { input -> input.read(header) }
+        }.getOrDefault(-1)
+        if (read < 4) return null
+
+        fun ascii(start: Int, length: Int): String =
+            String(header, start, length, Charsets.US_ASCII)
+
+        return when {
+            (header[0].toInt() and 0xFF) == 0x1A &&
+                (header[1].toInt() and 0xFF) == 0x45 &&
+                (header[2].toInt() and 0xFF) == 0xDF &&
+                (header[3].toInt() and 0xFF) == 0xA3 -> "audio/webm"
+            read >= 8 && ascii(4, 4) == "ftyp" -> "audio/mp4"
+            ascii(0, 4) == "OggS" -> "audio/ogg"
+            ascii(0, 4) == "fLaC" -> "audio/flac"
+            ascii(0, 4) == "RIFF" -> "audio/wav"
+            ascii(0, 3) == "ID3" ||
+                ((header[0].toInt() and 0xFF) == 0xFF &&
+                    ((header[1].toInt() and 0xE0) == 0xE0)) -> "audio/mpeg"
+            else -> null
+        }
     }
 
     private fun copyCachedStream(
@@ -709,13 +1037,14 @@ object SongDownloader {
     }
 
     private fun extensionForMimeType(mimeType: String?): String = when {
-        mimeType?.contains("audio/mp4", ignoreCase = true) == true -> "m4a"
-        mimeType?.contains("audio/mpeg", ignoreCase = true) == true -> "mp3"
-        mimeType?.contains("audio/webm", ignoreCase = true) == true -> "webm"
-        mimeType?.contains("audio/ogg", ignoreCase = true) == true -> "ogg"
-        mimeType?.contains("audio/flac", ignoreCase = true) == true -> "flac"
-        mimeType?.contains("audio/aac", ignoreCase = true) == true -> "aac"
-        mimeType?.contains("audio/wav", ignoreCase = true) == true -> "wav"
+        mimeType?.contains("mp4", ignoreCase = true) == true -> "m4a"
+        mimeType?.contains("mpeg", ignoreCase = true) == true -> "mp3"
+        mimeType?.contains("webm", ignoreCase = true) == true -> "webm"
+        mimeType?.contains("opus", ignoreCase = true) == true -> "opus"
+        mimeType?.contains("ogg", ignoreCase = true) == true -> "ogg"
+        mimeType?.contains("flac", ignoreCase = true) == true -> "flac"
+        mimeType?.contains("aac", ignoreCase = true) == true -> "aac"
+        mimeType?.contains("wav", ignoreCase = true) == true -> "wav"
         else -> "m4a"
     }
 

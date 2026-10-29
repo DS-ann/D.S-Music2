@@ -186,7 +186,11 @@ fun LibraryScreen(
     val scope = rememberCoroutineScope()
 
     var activeTab by rememberSaveable { mutableStateOf("Playlists") }
-    var searchQuery by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(activeTab) {
+        // Migrate a previously saved selection of the removed Device Files destination.
+        if (activeTab == "Device Files") activeTab = "Playlists"
+    }
+    var searchQuery by rememberSaveable { mutableStateOf("")}
     var sortOrder by rememberSaveable { mutableStateOf(SortOrder.A_Z) }
     var playlistsAsList by rememberSaveable { mutableStateOf(false) }
     var albumsAsList by rememberSaveable { mutableStateOf(false) }
@@ -334,9 +338,9 @@ fun LibraryScreen(
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Header Row (Hides in Device Files)
+                // Library header remains visible in every Library destination.
                 AnimatedVisibility(
-                    visible = activeTab != "Device Files",
+                    visible = true,
                     enter = expandVertically() + fadeIn(),
                     exit = shrinkVertically() + fadeOut()
                 ) {
@@ -423,8 +427,7 @@ fun LibraryScreen(
                     "History" to "History",
                     "Downloads" to "Downloaded songs",
                     "Podcasts" to "Podcasts",
-                    "Recap" to "Recap",
-                    "Local music" to "Device Files"
+                    "Recap" to "Recap"
                 )
 
                 Row(
@@ -467,7 +470,7 @@ fun LibraryScreen(
                     "Albums" -> AlbumsTabContent(nestedScrollConnection, albumsAsList)
                     "Artists" -> ArtistsTabContent(nestedScrollConnection, artistsAsList)
                     "Recap" -> RecapTabContent(nestedScrollConnection, viewModel, onNavigateToExplore)
-                    "Device Files", "Downloaded songs" -> {
+                    "Downloaded songs" -> {
                         // Scan Local Files helper
                         val onRefreshAction = {
                             scope.launch {
@@ -545,11 +548,7 @@ fun LibraryScreen(
 
                                 // Keep this folder scoped to files saved by SpatialFlow's downloader.
                                 val sourceSongs = remember(localSongs, activeTab) {
-                                    if (activeTab == "Downloaded songs") {
-                                        localSongs.filter(::isSpatialFlowDownloadedSong)
-                                    } else {
-                                        localSongs
-                                    }
+                                    localSongs.filter(::isSpatialFlowDownloadedSong)
                                 }
 
                                 // Filter, Sort, and Group local songs
@@ -788,14 +787,31 @@ fun LibraryScreen(
                                                                         }
                                                                     }
                                                                     override fun onDelete(song: SongItem) {
-                                                                        try {
-                                                                            val file = java.io.File(song.path)
-                                                                            if (file.exists()) file.delete()
-                                                                            // Rescan
-                                                                            scope.launch {
-                                                                                scanLocalFiles(context, viewModel)
+                                                                        scope.launch {
+                                                                            val deleted = withContext(Dispatchers.IO) {
+                                                                                // Downloaded songs on Android 10+ live in MediaStore. Deleting only
+                                                                                // song.path leaves the indexed MediaStore item behind.
+                                                                                val rowsDeleted = runCatching {
+                                                                                    context.contentResolver.delete(song.contentUri, null, null)
+                                                                                }.getOrDefault(0)
+                                                                                if (rowsDeleted > 0) {
+                                                                                    true
+                                                                                } else {
+                                                                                    val rawPath = (song.path ?: song.data).orEmpty()
+                                                                                    if (rawPath.isBlank()) {
+                                                                                        false
+                                                                                    } else {
+                                                                                        val file = java.io.File(rawPath)
+                                                                                        !file.exists() || file.delete()
+                                                                                    }
+                                                                                }
                                                                             }
-                                                                        } catch (_: Exception) {}
+                                                                            scanLocalFiles(context, viewModel)
+                                                                            com.codetrio.spatialflow.ui.SnackbarController.showMessage(
+                                                                                if (deleted) "Deleted: ${song.title}"
+                                                                                else "Could not delete ${song.title}. The file may require storage permission."
+                                                                            )
+                                                                        }
                                                                     }
                                                                     override fun onEdit(song: SongItem) {
                                                                         onEditSong(song)
@@ -1401,7 +1417,7 @@ private fun PlaylistsTabContent(
                 )
             }
             Box(modifier = Modifier.weight(1f)) {
-                StreamCacheTabContent(context)
+                StreamCacheTabContent(context, viewModel, exploreViewModel)
             }
         }
     } else {
@@ -3138,7 +3154,9 @@ private data class CachedSongEntry(
     val songId: String,
     val title: String,
     val artist: String,
-    val bytes: Long
+    val videoId: String,
+    val durationMs: Long,
+    val cachedUri: String
 )
 
 private data class CacheTabSnapshot(
@@ -3154,15 +3172,14 @@ private suspend fun readCacheTabSnapshot(
     } catch (_: Exception) {
         0L to emptyList<Pair<String, Long>>()
     }
-    val metadataByKey = summary.second.mapNotNull { (key, _) ->
-        AudioPlaybackService.getCachedMediaMetadata(context, key)?.let { key to it }
-    }.toMap()
-    val metadataBySong = LinkedHashMap<String, Pair<com.codetrio.spatialflow.service.CachedMediaMetadata, Long>>()
+    val entriesBySong = LinkedHashMap<String, Pair<CachedSongEntry, Long>>()
     val metadataRepair = MetadataRepair()
 
     summary.second.forEach { (key, bytes) ->
-        val metadata = metadataByKey[key] ?: return@forEach
+        val metadata = AudioPlaybackService.getCachedMediaMetadata(context, key)
+            ?: return@forEach
         if (metadata.songId.isBlank() || metadata.title.isBlank()) return@forEach
+
         val artwork = AudioPlaybackService.getCachedMediaArtworkFile(context, metadata.songId)
         if (!artwork.isFile || artwork.length() <= 0L) return@forEach
 
@@ -3176,32 +3193,43 @@ private suspend fun readCacheTabSnapshot(
         )
         if (!lyricsCache.hasCachedLyrics(track)) return@forEach
 
-        val existing = metadataBySong[metadata.songId]
-        metadataBySong[metadata.songId] = if (existing == null) {
-            metadata to bytes
-        } else {
-            // Multiple stream URLs can refer to the same track; report their combined cached bytes.
-            existing.first to (existing.second + bytes)
-        }
-    }
+        // Keep the Cache playlist genuinely offline: omit partial tracks that would have
+        // to fall back to the network when tapped.
+        val cachedUri = AudioPlaybackService.getCachedPlaybackUri(
+            context,
+            metadata.songId,
+            metadata.videoId
+        )?.toString() ?: return@forEach
 
-    val entries = metadataBySong.values.map { (metadata, bytes) ->
-        CachedSongEntry(
+        val entry = CachedSongEntry(
             songId = metadata.songId,
             title = metadata.title,
             artist = metadata.artist.ifBlank { "Unknown artist" },
-            bytes = bytes
+            videoId = metadata.videoId,
+            durationMs = metadata.durationMs,
+            cachedUri = cachedUri
         )
-    }.sortedByDescending { it.bytes }
+        val existing = entriesBySong[metadata.songId]
+        if (existing == null || bytes > existing.second) {
+            entriesBySong[metadata.songId] = entry to bytes
+        }
+    }
 
-    CacheTabSnapshot(entries = entries)
+    CacheTabSnapshot(
+        entries = entriesBySong.values.map { it.first }.sortedBy { it.title.lowercase() }
+    )
 }
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
-private fun StreamCacheTabContent(context: Context) {
+private fun StreamCacheTabContent(
+    context: Context,
+    viewModel: PlayerSharedViewModel,
+    exploreViewModel: ExploreViewModel?
+) {
     var cacheEntries by remember { mutableStateOf(emptyList<CachedSongEntry>()) }
     val lyricsCache = remember(context) { LyricsCacheManager(context.applicationContext) }
+    val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
 
     LaunchedEffect(context, lyricsCache) {
         cacheEntries = readCacheTabSnapshot(context, lyricsCache).entries
@@ -3211,27 +3239,127 @@ private fun StreamCacheTabContent(context: Context) {
         }
     }
 
+    // Playlist entries use their exact Media3 cache URL; they never become a new online
+    // innertube request, and the selected format/bitrate cannot override the cached stream.
+    val cacheQueue = remember(cacheEntries, context) {
+        cacheEntries.map { item ->
+            SongItem(
+                item.songId.toLongOrNull() ?: item.videoId.hashCode().toLong(),
+                item.title,
+                item.artist,
+                -1L,
+                item.cachedUri,
+                item.durationMs,
+                System.currentTimeMillis()
+            ).apply {
+                videoId = null
+                isCachedTrack = true
+                isDownloadedOffline = false
+                contentUri = android.net.Uri.parse(item.cachedUri)
+                thumbnailUrl = android.net.Uri.fromFile(
+                    AudioPlaybackService.getCachedMediaArtworkFile(context, item.songId)
+                ).toString()
+            }
+        }
+    }
+
+    fun startPlaylist(shuffle: Boolean) {
+        if (cacheQueue.isEmpty()) return
+        exploreViewModel?.clearOnlinePlaybackSelection()
+        viewModel.setShuffleEnabled(shuffle)
+        viewModel.setSongList(if (shuffle) cacheQueue.shuffled() else cacheQueue)
+        viewModel.playSongAtIndex(0)
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        item {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text("Cached songs", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(
-                    "Only tracks with cached audio, cover art, and lyrics are listed.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        // YouTube-style playlist header: cover art, playlist identity, song count, and
+        // dedicated Play all / Shuffle actions before the track list.
+        if (cacheEntries.isNotEmpty()) {
+            item(key = "cache-playlist-header") {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AsyncImage(
+                            model = AudioPlaybackService.getCachedMediaArtworkFile(context, cacheEntries.first().songId),
+                            contentDescription = "Cache playlist artwork",
+                            modifier = Modifier.size(136.dp).clip(RoundedCornerShape(14.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                "Cache",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            Text(
+                                "SpatialFlow · ${cacheEntries.size} songs",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                "Available offline",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = { startPlaylist(false) },
+                            enabled = cacheQueue.isNotEmpty(),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Play all")
+                        }
+                        OutlinedButton(
+                            onClick = { startPlaylist(true) },
+                            enabled = cacheQueue.isNotEmpty(),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.Shuffle, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Shuffle")
+                        }
+                    }
+                    androidx.compose.material3.HorizontalDivider()
+                }
+            }
+        } else {
+            item(key = "cache-playlist-empty-header") {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text("Cache", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Your offline playlist",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
         if (cacheEntries.isEmpty()) {
-            item {
+            item(key = "cache-playlist-empty") {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -3245,15 +3373,20 @@ private fun StreamCacheTabContent(context: Context) {
                     )
                     Text("No cached songs yet", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "A track appears after its audio data, cover art, and lyrics have all been cached on this device.",
+                        "A song appears here after its full audio, cover art, and lyrics are cached on this device.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         } else {
-            itemsIndexed(cacheEntries, key = { _, item -> item.songId }) { _, item ->
+            itemsIndexed(cacheEntries, key = { _, item -> item.songId }) { index, item ->
                 val artwork = AudioPlaybackService.getCachedMediaArtworkFile(context, item.songId)
+                val queueSong = cacheQueue.getOrNull(index)
+                val isCurrentSong = currentSong?.isCachedTrack == true &&
+                    currentSong?.id == queueSong?.id &&
+                    currentSong?.contentUri?.toString() == item.cachedUri
+
                 ListItem(
                     leadingContent = {
                         AsyncImage(
@@ -3268,20 +3401,36 @@ private fun StreamCacheTabContent(context: Context) {
                             item.title,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            color = if (isCurrentSong) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurface
                         )
                     },
                     supportingContent = {
-                        Text(item.artist, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    },
-                    trailingContent = {
                         Text(
-                            android.text.format.Formatter.formatFileSize(context, item.bytes) + " cached",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            if (isCurrentSong) "${item.artist} · Now playing" else item.artist,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     },
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                    trailingContent = {
+                        Icon(
+                            if (isCurrentSong) Icons.Filled.PlayArrow else Icons.AutoMirrored.Filled.PlaylistPlay,
+                            contentDescription = if (isCurrentSong) "Now playing" else "Play cached song",
+                            tint = if (isCurrentSong) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable {
+                            if (index in cacheQueue.indices) {
+                                exploreViewModel?.clearOnlinePlaybackSelection()
+                                viewModel.setSongList(cacheQueue)
+                                viewModel.playSongAtIndex(index)
+                            }
+                        }
                 )
             }
         }

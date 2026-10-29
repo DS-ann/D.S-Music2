@@ -74,7 +74,16 @@ data class CachedMediaMetadata(
     val title: String,
     val artist: String,
     val songId: String,
-    val durationMs: Long = 0L
+    val durationMs: Long = 0L,
+    val videoId: String = "",
+    val mimeType: String = ""
+)
+
+data class CachedAudioFacts(
+    val cachedBytes: Long,
+    val totalBytes: Long?,
+    val mimeType: String?,
+    val isComplete: Boolean
 )
 
 data class CurrentAudioFormatDetails(
@@ -167,6 +176,91 @@ class AudioPlaybackService : MediaSessionService() {
         }
 
         /**
+         * Finds a fully cached stream for a track without consulting the user's selected
+         * format/bitrate. Returning the exact original URL preserves Media3's cache key, and
+         * requiring the full content length prevents an offline tap from silently reaching
+         * the network for missing byte ranges.
+         */
+        @JvmStatic
+        @Synchronized
+        fun getCachedPlaybackUri(
+            context: Context,
+            songId: String,
+            videoId: String? = null,
+            requireComplete: Boolean = true
+        ): Uri? {
+            val currentCache = getCache(context.applicationContext)
+            val candidates = currentCache.keys.mapNotNull { key ->
+                val metadata = getCachedMediaMetadata(context, key) ?: return@mapNotNull null
+                val matchesSong = songId.isNotBlank() && metadata.songId == songId
+                val matchesVideo = !videoId.isNullOrBlank() && metadata.videoId == videoId
+                if (!matchesSong && !matchesVideo) return@mapNotNull null
+
+                val contentMetadata = currentCache.getContentMetadata(key)
+                val contentLength = androidx.media3.datasource.cache.ContentMetadata
+                    .getContentLength(contentMetadata)
+                val fullyCached = contentLength > 0L &&
+                    currentCache.isCached(key, 0L, contentLength)
+                if (requireComplete && !fullyCached) return@mapNotNull null
+
+                val uri = Uri.parse(key)
+                if (uri.scheme != "http" && uri.scheme != "https") return@mapNotNull null
+                val cachedBytes = currentCache.getCachedSpans(key).sumOf { it.length }
+                if (cachedBytes <= 0L) return@mapNotNull null
+                Triple(key, cachedBytes, fullyCached)
+            }
+            // Prefer a completely cached version over a larger partial copy at another quality.
+            val completeCandidates = candidates.filter { it.third }
+            val preferredCandidates = completeCandidates.ifEmpty { candidates }
+            return preferredCandidates.maxByOrNull { it.second }?.first?.let { Uri.parse(it) }
+        }
+
+        /** Returns cached byte count and detected format for the current track. */
+        @JvmStatic
+        @Synchronized
+        fun getCachedAudioFacts(
+            context: Context,
+            songId: String,
+            videoId: String? = null,
+            streamUri: String? = null
+        ): CachedAudioFacts? {
+            val currentCache = getCache(context.applicationContext)
+            val candidates = currentCache.keys.mapNotNull { key ->
+                val metadata = getCachedMediaMetadata(context, key)
+                val isExactUri = !streamUri.isNullOrBlank() && key == streamUri
+                val matchesMetadata = metadata != null && (
+                    (songId.isNotBlank() && metadata.songId == songId) ||
+                    (!videoId.isNullOrBlank() && metadata.videoId == videoId)
+                )
+                if (!matchesMetadata && !isExactUri) return@mapNotNull null
+
+                val spans = currentCache.getCachedSpans(key)
+                val cachedBytes = spans.sumOf { it.length }
+                if (cachedBytes <= 0L) return@mapNotNull null
+                val contentLength = androidx.media3.datasource.cache.ContentMetadata
+                    .getContentLength(currentCache.getContentMetadata(key))
+                    .takeIf { it > 0L }
+                val complete = contentLength != null &&
+                    currentCache.isCached(key, 0L, contentLength)
+                CachedAudioFacts(
+                    cachedBytes = cachedBytes,
+                    totalBytes = contentLength,
+                    mimeType = metadata?.mimeType?.takeIf { it.isNotBlank() },
+                    isComplete = complete
+                ) to isExactUri
+            }
+            // The currently playing cache key is authoritative. Otherwise prefer complete
+            // variants, then the largest cached byte range as a best-effort fallback.
+            val exactCandidates = candidates.filter { it.second }
+            if (exactCandidates.isNotEmpty()) {
+                return exactCandidates.maxByOrNull { it.first.cachedBytes }?.first
+            }
+            val completeCandidates = candidates.filter { it.first.isComplete }
+            return completeCandidates.ifEmpty { candidates }
+                .maxByOrNull { it.first.totalBytes ?: it.first.cachedBytes }?.first
+        }
+
+        /**
          * Associates the opaque Media3 cache key (typically a signed stream URL) with safe display
          * metadata. Only a SHA-256 digest is used as the preference key; signed URLs are not stored
          * in the metadata preference file.
@@ -178,15 +272,22 @@ class AudioPlaybackService : MediaSessionService() {
             title: String,
             artist: String,
             songId: String = "",
-            durationMs: Long = 0L
+            durationMs: Long = 0L,
+            videoId: String = "",
+            mimeType: String = ""
         ) {
             if (cacheKey.isBlank() || title.isBlank()) return
             val digestKey = cacheMetadataEntryKey(cacheKey)
+            // Keep the video ID when a cache playlist later reopens a track using its direct
+            // cached URL (that offline queue intentionally has no online resolver ID).
+            val previousMetadata = getCachedMediaMetadata(context, cacheKey)
             val payload = org.json.JSONObject()
                 .put("title", title)
                 .put("artist", artist)
                 .put("songId", songId)
                 .put("durationMs", durationMs)
+                .put("videoId", videoId.ifBlank { previousMetadata?.videoId.orEmpty() })
+                .put("mimeType", mimeType.ifBlank { previousMetadata?.mimeType.orEmpty() })
                 .toString()
             context.getSharedPreferences(PREF_MEDIA_CACHE_METADATA, Context.MODE_PRIVATE)
                 .edit().putString(digestKey, payload).apply()
@@ -204,7 +305,9 @@ class AudioPlaybackService : MediaSessionService() {
                     title = title,
                     artist = json.optString("artist", "").trim(),
                     songId = json.optString("songId", ""),
-                    durationMs = json.optLong("durationMs", 0L)
+                    durationMs = json.optLong("durationMs", 0L),
+                    videoId = json.optString("videoId", ""),
+                    mimeType = json.optString("mimeType", "")
                 )
             } catch (_: Exception) {
                 null
@@ -369,6 +472,7 @@ class AudioPlaybackService : MediaSessionService() {
             if (state == Player.STATE_READY) {
                 viewModel?.setLoading(false)
                 viewModel?.setPlaybackReady(true)
+                persistCurrentCacheMimeType()
                 if (pendingSeekPos >= 0) {
                     player.seekTo(pendingSeekPos)
                     pendingSeekPos = -1
@@ -826,7 +930,64 @@ class AudioPlaybackService : MediaSessionService() {
             
             resolveJob = serviceScope.launch {
                 Log.d(TAG, "Pre-resolving stream ahead of injector injection: $videoId")
-                
+
+                // A fully cached stream wins over format/bitrate preferences. Play it through
+                // its exact cache key, otherwise an explicit setting can force a network fetch
+                // even though another quality/container is already available offline.
+                if (!useWebRemixRetry && !useCompatibleFallbackRetry) {
+                    val activeSong = viewModel?.currentSong?.value?.takeIf { it.videoId == videoId }
+
+                    // A real downloaded audio file is the highest-priority offline source.
+                    // Resolve it by video ID first so even non-default format/bitrate downloads
+                    // are used rather than extracting a fresh URL for another online stream.
+                    val downloadedUri = activeSong?.let { song ->
+                        withContext(Dispatchers.IO) {
+                            com.codetrio.spatialflow.util.SongDownloader.findDownloadedUri(
+                                applicationContext,
+                                videoId,
+                                song.title,
+                                song.artist
+                            )
+                        }
+                    }
+                    if (downloadedUri != null) {
+                        ensureActive()
+                        if (resolveTargetSongId != videoId) return@launch
+                        activeSong.contentUri = downloadedUri
+                        activeSong.isDownloadedOffline = true
+                        activeSong.isCachedTrack = false
+                        viewModel?.refreshCurrentSongSource(activeSong)
+                        Log.i(TAG, "Using downloaded offline audio for $videoId: $downloadedUri")
+                        originalSourceUri = downloadedUri
+                        loadAudioInternal(downloadedUri, keepPlayingUntilReady = true)
+                        return@launch
+                    }
+
+                    val cacheSongId = activeSong?.id?.toString()
+                        ?: videoId.hashCode().toLong().toString()
+                    val cachedUri = withContext(Dispatchers.IO) {
+                        getCachedPlaybackUri(
+                            applicationContext,
+                            cacheSongId,
+                            videoId,
+                            requireComplete = false
+                        )
+                    }
+                    if (cachedUri != null) {
+                        ensureActive()
+                        if (resolveTargetSongId != videoId) return@launch
+                        activeSong?.apply {
+                            contentUri = cachedUri
+                            isCachedTrack = true
+                            isDownloadedOffline = false
+                        }?.let { viewModel?.refreshCurrentSongSource(it) }
+                        Log.i(TAG, "Using cached stream for $videoId regardless of selected format/bitrate")
+                        originalSourceUri = cachedUri
+                        loadAudioInternal(cachedUri, keepPlayingUntilReady = true)
+                        return@launch
+                    }
+                }
+
                 // Fetch stream URL only, don't wait for position yet. Cancelling a format-choice
                 // dialog is a user decision, not an extraction error: don't auto-switch formats
                 // or immediately show the same request again.
@@ -890,6 +1051,16 @@ class AudioPlaybackService : MediaSessionService() {
                 
                 if (!streamUrl.isNullOrEmpty()) {
                     failedStreamVideoId = null
+                    activeSong?.let { song ->
+                        val resolverUri = "innertube://$videoId".toUri()
+                        val sourceChanged = song.isCachedTrack ||
+                            song.isDownloadedOffline ||
+                            song.contentUri != resolverUri
+                        song.isCachedTrack = false
+                        song.isDownloadedOffline = false
+                        song.contentUri = resolverUri
+                        if (sourceChanged) viewModel?.refreshCurrentSongSource(song)
+                    }
                     loadAudioInternal(streamUrl.toUri(), keepPlayingUntilReady = true)
                     
                     // Asynchronously fetch and apply resume position with a 2-second timeout
@@ -1214,7 +1385,8 @@ class AudioPlaybackService : MediaSessionService() {
                 title,
                 artist,
                 songId,
-                cachedSong?.duration ?: 0L
+                cachedSong?.duration ?: 0L,
+                cachedSong?.videoId.orEmpty()
             )
         }
 
@@ -1223,6 +1395,38 @@ class AudioPlaybackService : MediaSessionService() {
             .setMediaId(songId) // Stable ID for shuffle-mode resync
             .setMediaMetadata(metadataBuilder.build())
             .build()
+    }
+
+    /** Save the real container MIME after ExoPlayer has identified the active audio track. */
+    private fun persistCurrentCacheMimeType() {
+        if (!isPlayerInitialized) return
+        val item = player.currentMediaItem ?: return
+        val uri = item.localConfiguration?.uri ?: return
+        if (uri.scheme != "http" && uri.scheme != "https") return
+
+        val audioFormat = player.currentTracks.groups
+            .flatMap { group -> (0 until group.length).map { group.getTrackFormat(it) } }
+            .firstOrNull { it.sampleMimeType?.startsWith("audio/") == true }
+        val mimeType = listOf(audioFormat?.containerMimeType, audioFormat?.sampleMimeType)
+            .firstOrNull { candidate ->
+                !candidate.isNullOrBlank() && listOf("webm", "mp4", "mpeg", "ogg", "flac", "wav")
+                    .any { candidate.contains(it, ignoreCase = true) }
+            } ?: audioFormat?.sampleMimeType ?: return
+
+        val activeSong = viewModel?.currentSong?.value
+        val durationMs = player.duration.takeIf {
+            it > 0L && it != androidx.media3.common.C.TIME_UNSET
+        } ?: activeSong?.duration ?: 0L
+        rememberMediaCacheMetadata(
+            applicationContext,
+            uri.toString(),
+            item.mediaMetadata.title?.toString() ?: activeSong?.title.orEmpty(),
+            item.mediaMetadata.artist?.toString() ?: activeSong?.artist.orEmpty(),
+            item.mediaId.ifBlank { activeSong?.id?.toString().orEmpty() },
+            durationMs,
+            activeSong?.videoId.orEmpty(),
+            mimeType
+        )
     }
 
     private fun persistCurrentSongArtwork(bitmap: Bitmap?) {

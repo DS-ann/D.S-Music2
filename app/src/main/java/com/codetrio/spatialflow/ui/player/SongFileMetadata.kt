@@ -5,6 +5,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.codetrio.spatialflow.model.SongItem
+import com.codetrio.spatialflow.service.AudioPlaybackService
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -99,16 +100,52 @@ internal data class SongFileMetadata(
 internal object SongFileMetadataReader {
 
     fun isRemoteSong(song: SongItem): Boolean {
+        if (song.isCachedTrack || song.isDownloadedOffline) return false
         val path = song.path.orEmpty()
         val uri = runCatching { song.contentUri }.getOrNull()
-        return !song.videoId.isNullOrBlank() ||
-            path.startsWith("http://", ignoreCase = true) ||
+        return path.startsWith("http://", ignoreCase = true) ||
             path.startsWith("https://", ignoreCase = true) ||
             uri?.scheme.equals("http", ignoreCase = true) ||
-            uri?.scheme.equals("https", ignoreCase = true)
+            uri?.scheme.equals("https", ignoreCase = true) ||
+            uri?.scheme.equals("innertube", ignoreCase = true)
     }
 
     fun read(context: Context, song: SongItem): SongFileMetadata {
+        if (song.isCachedTrack) {
+            val facts = runCatching {
+                AudioPlaybackService.getCachedAudioFacts(
+                    context.applicationContext,
+                    song.id.toString(),
+                    song.videoId,
+                    song.contentUri.toString()
+                )
+            }.getOrNull()
+            if (facts != null) {
+                val duration = song.duration.takeIf { it > 0L }
+                val bytes = facts.totalBytes ?: facts.cachedBytes
+                val estimatedBitrate = if (duration != null && duration > 0L && bytes > 0L) {
+                    (bytes.toDouble() * 8000.0 / duration.toDouble())
+                        .takeIf { it.isFinite() && it > 0.0 && it < Long.MAX_VALUE.toDouble() }
+                        ?.toLong()
+                } else null
+                return SongFileMetadata(
+                    isRemote = false,
+                    sizeBytes = bytes,
+                    durationMs = duration,
+                    estimatedBitrateBps = estimatedBitrate,
+                    mimeType = facts.mimeType,
+                    fileName = runCatching { song.contentUri.lastPathSegment }.getOrNull()
+                        ?.takeIf { it.isNotBlank() }
+                )
+            }
+            // A cache item remains identified as cached even when Media3 temporarily exposes
+            // no length/MIME values; do not initiate a fresh online metadata probe.
+            return SongFileMetadata(
+                isRemote = false,
+                durationMs = song.duration.takeIf { it > 0L },
+                mimeType = null
+            )
+        }
         if (isRemoteSong(song)) return SongFileMetadata(isRemote = true)
 
         val localFile = sequenceOf(song.path, song.data)

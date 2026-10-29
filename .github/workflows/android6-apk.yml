@@ -9,7 +9,7 @@ on:
         type: string
         default: master
   push:
-    branches: [ master ]
+    branches: [ master, 'fix/download-metadata-cache-playback' ]
     paths:
       - 'app/**'
       - 'gradle/**'
@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: DS-ann/SpatialFlow
-          ref: ${{ inputs.source_ref || 'master' }}
+          ref: ${{ inputs.source_ref || github.ref_name }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v6
