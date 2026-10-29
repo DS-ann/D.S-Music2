@@ -75,7 +75,8 @@ data class CachedMediaMetadata(
     val artist: String,
     val songId: String,
     val durationMs: Long = 0L,
-    val videoId: String = ""
+    val videoId: String = "",
+    val mimeType: String = ""
 )
 
 data class CurrentAudioFormatDetails(
@@ -214,19 +215,21 @@ class AudioPlaybackService : MediaSessionService() {
             artist: String,
             songId: String = "",
             durationMs: Long = 0L,
-            videoId: String = ""
+            videoId: String = "",
+            mimeType: String = ""
         ) {
             if (cacheKey.isBlank() || title.isBlank()) return
             val digestKey = cacheMetadataEntryKey(cacheKey)
             // Keep the video ID when a cache playlist later reopens a track using its direct
             // cached URL (that offline queue intentionally has no online resolver ID).
-            val previousVideoId = getCachedMediaMetadata(context, cacheKey)?.videoId.orEmpty()
+            val previousMetadata = getCachedMediaMetadata(context, cacheKey)
             val payload = org.json.JSONObject()
                 .put("title", title)
                 .put("artist", artist)
                 .put("songId", songId)
                 .put("durationMs", durationMs)
-                .put("videoId", videoId.ifBlank { previousVideoId })
+                .put("videoId", videoId.ifBlank { previousMetadata?.videoId.orEmpty() })
+                .put("mimeType", mimeType.ifBlank { previousMetadata?.mimeType.orEmpty() })
                 .toString()
             context.getSharedPreferences(PREF_MEDIA_CACHE_METADATA, Context.MODE_PRIVATE)
                 .edit().putString(digestKey, payload).apply()
@@ -245,7 +248,8 @@ class AudioPlaybackService : MediaSessionService() {
                     artist = json.optString("artist", "").trim(),
                     songId = json.optString("songId", ""),
                     durationMs = json.optLong("durationMs", 0L),
-                    videoId = json.optString("videoId", "")
+                    videoId = json.optString("videoId", ""),
+                    mimeType = json.optString("mimeType", "")
                 )
             } catch (_: Exception) {
                 null
@@ -410,6 +414,7 @@ class AudioPlaybackService : MediaSessionService() {
             if (state == Player.STATE_READY) {
                 viewModel?.setLoading(false)
                 viewModel?.setPlaybackReady(true)
+                persistCurrentCacheMimeType()
                 if (pendingSeekPos >= 0) {
                     player.seekTo(pendingSeekPos)
                     pendingSeekPos = -1
@@ -1285,6 +1290,38 @@ class AudioPlaybackService : MediaSessionService() {
             .setMediaId(songId) // Stable ID for shuffle-mode resync
             .setMediaMetadata(metadataBuilder.build())
             .build()
+    }
+
+    /** Save the real container MIME after ExoPlayer has identified the active audio track. */
+    private fun persistCurrentCacheMimeType() {
+        if (!isPlayerInitialized) return
+        val item = player.currentMediaItem ?: return
+        val uri = item.localConfiguration?.uri ?: return
+        if (uri.scheme != "http" && uri.scheme != "https") return
+
+        val audioFormat = player.currentTracks.groups
+            .flatMap { group -> (0 until group.length).map { group.getTrackFormat(it) } }
+            .firstOrNull { it.sampleMimeType?.startsWith("audio/") == true }
+        val mimeType = listOf(audioFormat?.containerMimeType, audioFormat?.sampleMimeType)
+            .firstOrNull { candidate ->
+                !candidate.isNullOrBlank() && listOf("webm", "mp4", "mpeg", "ogg", "flac", "wav")
+                    .any { candidate.contains(it, ignoreCase = true) }
+            } ?: audioFormat?.sampleMimeType ?: return
+
+        val activeSong = viewModel?.currentSong?.value
+        val durationMs = player.duration.takeIf {
+            it > 0L && it != androidx.media3.common.C.TIME_UNSET
+        } ?: activeSong?.duration ?: 0L
+        rememberMediaCacheMetadata(
+            applicationContext,
+            uri.toString(),
+            item.mediaMetadata.title?.toString() ?: activeSong?.title.orEmpty(),
+            item.mediaMetadata.artist?.toString() ?: activeSong?.artist.orEmpty(),
+            item.mediaId.ifBlank { activeSong?.id?.toString().orEmpty() },
+            durationMs,
+            activeSong?.videoId.orEmpty(),
+            mimeType
+        )
     }
 
     private fun persistCurrentSongArtwork(bitmap: Bitmap?) {
