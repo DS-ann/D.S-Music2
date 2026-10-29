@@ -90,8 +90,8 @@ jobs:
           BUILD_DIR="app/build/outputs/apk/release"
           SOURCE_APK="$BUILD_DIR/app-arm64-v8a-release-unsigned.apk"
           ALIGNED_APK="$RUNNER_TEMP/SpatialFlow-arm64-v8a-aligned.apk"
-          OUTPUT_APK="$BUILD_DIR/SpatialFlow-arm64-v8a-Android6-release.apk"
-          OUTPUT_ZIP="$BUILD_DIR/SpatialFlow-arm64-v8a-Android6-release.zip"
+          OUTPUT_APK="$BUILD_DIR/dsmusic.apk"
+          OUTPUT_ZIP="$BUILD_DIR/dsmusic.zip"
           ZIPALIGN="$ANDROID_HOME/build-tools/37.0.0/zipalign"
           APK_SIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
 
@@ -111,7 +111,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: music
-          path: app/build/outputs/apk/release/SpatialFlow-arm64-v8a-Android6-release.zip
+          path: app/build/outputs/apk/release/dsmusic.zip
           archive: false
           if-no-files-found: error
           retention-days: 14
