@@ -186,7 +186,11 @@ fun LibraryScreen(
     val scope = rememberCoroutineScope()
 
     var activeTab by rememberSaveable { mutableStateOf("Playlists") }
-    var searchQuery by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(activeTab) {
+        // Migrate a previously saved selection of the removed Device Files destination.
+        if (activeTab == "Device Files") activeTab = "Playlists"
+    }
+    var searchQuery by rememberSaveable { mutableStateOf("")}
     var sortOrder by rememberSaveable { mutableStateOf(SortOrder.A_Z) }
     var playlistsAsList by rememberSaveable { mutableStateOf(false) }
     var albumsAsList by rememberSaveable { mutableStateOf(false) }
