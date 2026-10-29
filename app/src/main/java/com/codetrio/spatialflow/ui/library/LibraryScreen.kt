@@ -3225,6 +3225,7 @@ private fun StreamCacheTabContent(
 ) {
     var cacheEntries by remember { mutableStateOf(emptyList<CachedSongEntry>()) }
     val lyricsCache = remember(context) { LyricsCacheManager(context.applicationContext) }
+    val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
 
     LaunchedEffect(context, lyricsCache) {
         cacheEntries = readCacheTabSnapshot(context, lyricsCache).entries
@@ -3234,8 +3235,8 @@ private fun StreamCacheTabContent(
         }
     }
 
-    // These queue items point directly at fully cached URL keys. Keep videoId null so the
-    // ordinary online resolver cannot replace the cached URI or prefetch a different quality.
+    // Playlist entries use their exact Media3 cache URL; they never become a new online
+    // innertube request, and the selected format/bitrate cannot override the cached stream.
     val cacheQueue = remember(cacheEntries, context) {
         cacheEntries.map { item ->
             SongItem(
@@ -3248,6 +3249,8 @@ private fun StreamCacheTabContent(
                 System.currentTimeMillis()
             ).apply {
                 videoId = null
+                isCachedTrack = true
+                isDownloadedOffline = false
                 contentUri = android.net.Uri.parse(item.cachedUri)
                 thumbnailUrl = android.net.Uri.fromFile(
                     AudioPlaybackService.getCachedMediaArtworkFile(context, item.songId)
@@ -3256,27 +3259,103 @@ private fun StreamCacheTabContent(
         }
     }
 
+    fun startPlaylist(shuffle: Boolean) {
+        if (cacheQueue.isEmpty()) return
+        exploreViewModel?.clearOnlinePlaybackSelection()
+        viewModel.setShuffleEnabled(shuffle)
+        viewModel.setSongList(if (shuffle) cacheQueue.shuffled() else cacheQueue)
+        viewModel.playSongAtIndex(0)
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        item {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text("Cached songs", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(
-                    "Fully cached tracks with cover art and lyrics. Tap a song to play it offline.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        // YouTube-style playlist header: cover art, playlist identity, song count, and
+        // dedicated Play all / Shuffle actions before the track list.
+        if (cacheEntries.isNotEmpty()) {
+            item(key = "cache-playlist-header") {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AsyncImage(
+                            model = AudioPlaybackService.getCachedMediaArtworkFile(context, cacheEntries.first().songId),
+                            contentDescription = "Cache playlist artwork",
+                            modifier = Modifier.size(136.dp).clip(RoundedCornerShape(14.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                "Cache",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            Text(
+                                "SpatialFlow · ${cacheEntries.size} songs",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                "Available offline",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = { startPlaylist(false) },
+                            enabled = cacheQueue.isNotEmpty(),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Play all")
+                        }
+                        OutlinedButton(
+                            onClick = { startPlaylist(true) },
+                            enabled = cacheQueue.isNotEmpty(),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.Shuffle, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Shuffle")
+                        }
+                    }
+                    androidx.compose.material3.HorizontalDivider()
+                }
+            }
+        } else {
+            item(key = "cache-playlist-empty-header") {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text("Cache", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Your offline playlist",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
         if (cacheEntries.isEmpty()) {
-            item {
+            item(key = "cache-playlist-empty") {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -3299,6 +3378,11 @@ private fun StreamCacheTabContent(
         } else {
             itemsIndexed(cacheEntries, key = { _, item -> item.songId }) { index, item ->
                 val artwork = AudioPlaybackService.getCachedMediaArtworkFile(context, item.songId)
+                val queueSong = cacheQueue.getOrNull(index)
+                val isCurrentSong = currentSong?.isCachedTrack == true &&
+                    currentSong?.id == queueSong?.id &&
+                    currentSong?.contentUri?.toString() == item.cachedUri
+
                 ListItem(
                     leadingContent = {
                         AsyncImage(
@@ -3313,17 +3397,24 @@ private fun StreamCacheTabContent(
                             item.title,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            color = if (isCurrentSong) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurface
                         )
                     },
                     supportingContent = {
-                        Text(item.artist, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            if (isCurrentSong) "${item.artist} · Now playing" else item.artist,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     },
                     trailingContent = {
                         Icon(
-                            Icons.Filled.PlayArrow,
-                            contentDescription = "Play cached song",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            if (isCurrentSong) Icons.Filled.PlayArrow else Icons.AutoMirrored.Filled.PlaylistPlay,
+                            contentDescription = if (isCurrentSong) "Now playing" else "Play cached song",
+                            tint = if (isCurrentSong) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     },
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -3331,6 +3422,7 @@ private fun StreamCacheTabContent(
                         .clip(RoundedCornerShape(12.dp))
                         .clickable {
                             if (index in cacheQueue.indices) {
+                                exploreViewModel?.clearOnlinePlaybackSelection()
                                 viewModel.setSongList(cacheQueue)
                                 viewModel.playSongAtIndex(index)
                             }
