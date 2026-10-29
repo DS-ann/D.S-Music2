@@ -219,7 +219,7 @@ internal object YouTubeRangeDownloadClient {
         /** Reads a song as one response while the following range is fetched in parallel. */
         private inner class ChunkedBody(
             first: Response,
-            start: Long,
+            private val start: Long,
             private val end: Long,
             private val base: Request
         ) : ResponseBody() {

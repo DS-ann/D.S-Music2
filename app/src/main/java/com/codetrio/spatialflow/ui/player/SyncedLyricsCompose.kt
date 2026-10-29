@@ -570,7 +570,6 @@ private fun LyricLineItem(
                                             geometry = geometry,
                                             words = line.backgroundWords,
                                             pos = currentPositionProvider().toLong(),
-                                            wordOffset = 0,
                                             drawScope = this
                                         )
                                     }
