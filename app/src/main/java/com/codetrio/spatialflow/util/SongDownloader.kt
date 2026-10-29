@@ -831,7 +831,7 @@ object SongDownloader {
                 cacheKey = cacheKey,
                 spans = spans,
                 contentLength = contentLength,
-                mimeType = runCatching { ContentMetadata.getContentType(contentMetadata) }.getOrNull(),
+                mimeType = null, // Media3 cache metadata does not persist a MIME type.
                 cachedBytes = cachedBytes,
                 isComplete = complete
             )
