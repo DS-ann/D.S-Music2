@@ -8,7 +8,7 @@ coreKtx = "1.17.0"
 coreSplashscreen = "1.2.0"
 espressoCoreVersion = "3.7.0"
 glide = "5.0.5"
-jaudiotagger = "3.0.1"
+jaudiotagger = "2.3.14"
 junit = "4.13.2"
 kotlinStdlib = "2.2.10"
 lifecycleLivedataKtx = "2.10.0"
@@ -46,7 +46,7 @@ core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "coreSplashscreen" }
 espresso-core-v361 = { module = "androidx.test.espresso:espresso-core", version.ref = "espressoCoreVersion" }
 glide = { module = "com.github.bumptech.glide:glide", version.ref = "glide" }
-jaudiotagger = { module = "net.jthink:jaudiotagger", version.ref = "jaudiotagger" }
+jaudiotagger = { module = "com.github.Adonai:jaudiotagger", version.ref = "jaudiotagger" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 junit-v121 = { module = "androidx.test.ext:junit", version.ref = "androidxJunit" }
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlinStdlib" }
