@@ -373,6 +373,12 @@ data class SheetVerticalDragFrame(
     val expansionFraction: Float
 )
 
+private data class SheetAnimationRequest(
+    val targetExpanded: Boolean,
+    val animationSpec: AnimationSpec<Float>?,
+    val initialVelocity: Float
+)
+
 fun computeSheetVerticalDragFrame(
     accumulatedDragY: Float,
     expandedY: Float,
@@ -498,11 +504,13 @@ class SheetVerticalDragGestureHandler(
 
         scope.launch {
             if (targetState == PlayerSheetState.EXPANDED) {
-                launch { onAnimateSheet(true, null, 0f) }
+                // Request the transition before changing the state. The composable owns the
+                // single animation job so the gesture and state observer cannot race each other.
+                onAnimateSheet(true, null, 0f)
                 onExpandSheetState()
             } else {
                 val dynamicDamping = collapseSpringDampingForFraction(currentFraction)
-                
+
                 // Gelatinous Squash & Stretch Bounce Trigger
                 launch {
                     val initialSquash = collapseInitialSquashForFraction(currentFraction)
@@ -515,14 +523,12 @@ class SheetVerticalDragGestureHandler(
                         )
                     )
                 }
-                
-                launch {
-                    onAnimateSheet(
-                        false,
-                        spring(dampingRatio = dynamicDamping, stiffness = Spring.StiffnessLow),
-                        verticalVelocity
-                    )
-                }
+
+                onAnimateSheet(
+                    false,
+                    spring(dampingRatio = dynamicDamping, stiffness = Spring.StiffnessLow),
+                    verticalVelocity
+                )
                 onCollapseSheetState()
             }
         }
@@ -835,7 +841,13 @@ fun PlayerBottomSheetCompose(
         val isPlaybackReady by viewModel.isPlaybackReady.collectAsStateWithLifecycle()
 
         var currentSheetContentState by remember { mutableStateOf(PlayerSheetState.COLLAPSED) }
-        
+
+        // Keep one animation owner for gesture, tap and Back transitions. The old drag handler
+        // and the state observer both animated the same Animatables, sometimes cancelling a
+        // collapse before the mini player reached its bottom position.
+        var pendingSheetAnimation by remember { mutableStateOf<SheetAnimationRequest?>(null) }
+        var sheetAnimationRequestId by remember { mutableStateOf(0) }
+
         val currentSheetTranslationY = remember { Animatable(screenHeightPx) }
         val visualOvershootScaleY = remember { Animatable(1f) }
         val offsetAnimatable = remember { Animatable(0f) }
@@ -853,9 +865,10 @@ fun PlayerBottomSheetCompose(
         // Synchronize dynamic scrolling Bottom Nav visibility changes
         LaunchedEffect(Unit) {
             snapshotFlow { sheetCollapsedTargetYState.value }.collect { targetY ->
-                if (currentSheetContentState == PlayerSheetState.COLLAPSED && 
-                    !isDragging && 
-                    !currentSheetTranslationY.isRunning && 
+                if (currentSheetContentState == PlayerSheetState.COLLAPSED &&
+                    pendingSheetAnimation == null &&
+                    !isDragging &&
+                    !currentSheetTranslationY.isRunning &&
                     currentSheetTranslationY.value != screenHeightPx
                 ) {
                     currentSheetTranslationY.snapTo(targetY)
@@ -896,7 +909,11 @@ fun PlayerBottomSheetCompose(
         }
 
         // Resolves sheet animations
-        suspend fun animatePlayerSheet(targetExpanded: Boolean, initialVelocity: Float = 0f) {
+        suspend fun animatePlayerSheet(
+            targetExpanded: Boolean,
+            animationSpec: AnimationSpec<Float>? = null,
+            initialVelocity: Float = 0f
+        ) {
             val expectedBottomNavHeight = if (dynamicBottomNavHeightState.value > 0f) {
                 dynamicBottomNavHeightState.value
             } else {
@@ -910,33 +927,50 @@ fun PlayerBottomSheetCompose(
                 screenHeightPx - miniPlayerHeightPx - expectedBottomNavHeight - expectedBottomGapPx
             }
             val destFraction = if (targetExpanded) 1f else 0f
-            
+
             val collapsedY = screenHeightPx - miniPlayerHeightPx - expectedBottomNavHeight - expectedBottomGapPx
             val totalDistance = collapsedY
             val initialFractionVelocity = if (totalDistance > 0f) {
                 -initialVelocity / totalDistance
             } else 0f
-            
+            val resolvedAnimationSpec = animationSpec
+                ?: spring(dampingRatio = 0.85f, stiffness = 400f)
+
             coroutineScope {
                 launch {
                     currentSheetTranslationY.animateTo(
                         targetValue = destY,
-                        animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
+                        animationSpec = resolvedAnimationSpec,
                         initialVelocity = initialVelocity
                     )
                 }
                 launch {
                     playerContentExpansionFraction.animateTo(
                         targetValue = destFraction,
-                        animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
+                        animationSpec = resolvedAnimationSpec,
                         initialVelocity = initialFractionVelocity
                     )
                 }
             }
         }
 
-        LaunchedEffect(currentSheetContentState) {
-            animatePlayerSheet(currentSheetContentState == PlayerSheetState.EXPANDED)
+        // This is the only place that animates the sheet. Taps and Back use the default spring;
+        // drag gestures can supply their velocity/damping without starting a competing animation.
+        LaunchedEffect(currentSheetContentState, sheetAnimationRequestId) {
+            val targetExpanded = currentSheetContentState == PlayerSheetState.EXPANDED
+            val request = pendingSheetAnimation
+                ?.takeIf { it.targetExpanded == targetExpanded }
+            pendingSheetAnimation = null
+
+            if (request != null) {
+                animatePlayerSheet(
+                    targetExpanded = request.targetExpanded,
+                    animationSpec = request.animationSpec,
+                    initialVelocity = request.initialVelocity
+                )
+            } else {
+                animatePlayerSheet(targetExpanded = targetExpanded)
+            }
         }
 
         LaunchedEffect(playerContentExpansionFraction) {
@@ -980,7 +1014,10 @@ fun PlayerBottomSheetCompose(
                 miniHeightPxProvider = { miniHeightPx },
                 currentSheetStateProvider = { currentSheetContentState },
                 visualOvershootScaleY = visualOvershootScaleY,
-                onAnimateSheet = { target, _, velocity -> animatePlayerSheet(target, velocity) },
+                onAnimateSheet = { target, animationSpec, velocity ->
+                    pendingSheetAnimation = SheetAnimationRequest(target, animationSpec, velocity)
+                    sheetAnimationRequestId += 1
+                },
                 onExpandSheetState = { currentSheetContentState = PlayerSheetState.EXPANDED },
                 onCollapseSheetState = { currentSheetContentState = PlayerSheetState.COLLAPSED },
                 onDragStateChange = { dragging -> isDragging = dragging }
