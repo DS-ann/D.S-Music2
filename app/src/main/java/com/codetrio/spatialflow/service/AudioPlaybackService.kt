@@ -1069,7 +1069,7 @@ class AudioPlaybackService : MediaSessionService() {
                             applicationContext,
                             cacheSongId,
                             videoId,
-                            requireComplete = false
+                            requireComplete = true
                         )
                     }
                     if (cachedUri != null) {
@@ -1259,7 +1259,11 @@ class AudioPlaybackService : MediaSessionService() {
                     configurePlayerAudio(nextPlayer!!)
                     }
                     val nextItem = buildMediaItem(nextUri, nextSong.title, nextSong.artist, nextSong.id.toString())
-                    nextPlayer?.setMediaItem(nextItem)
+                    if (nextSong.isCachedTrack) {
+                        nextPlayer?.setMediaSource(buildCacheOnlyMediaSource(nextItem))
+                    } else {
+                        nextPlayer?.setMediaItem(nextItem)
+                    }
                     nextPlayer?.prepare()
                     nextPlayer?.playWhenReady = false
                     nextPlayer?.volume = 0f
@@ -1267,7 +1271,11 @@ class AudioPlaybackService : MediaSessionService() {
                 } else {
                     if (player.mediaItemCount < 2) {
                         val nextItem = buildMediaItem(nextUri, nextSong.title, nextSong.artist, nextSong.id.toString())
-                        player.addMediaItem(nextItem)
+                        if (nextSong.isCachedTrack) {
+                            player.addMediaSource(buildCacheOnlyMediaSource(nextItem))
+                        } else {
+                            player.addMediaItem(nextItem)
+                        }
                         Log.d(TAG, "⚡ SUCCESSFULLY HOT-QUEUED NEXT SONG INTO NATIVE PIPELINE! READY FOR ZERO-GAP TRANSITION.")
                     }
                 }
@@ -1505,6 +1513,22 @@ class AudioPlaybackService : MediaSessionService() {
             .build()
     }
 
+    /**
+     * Create an offline-only media source for Cache playlist entries. Without an upstream data
+     * source, evicted or missing bytes cannot silently fall back to online streaming.
+     */
+    @OptIn(UnstableApi::class)
+    private fun buildCacheOnlyMediaSource(
+        mediaItem: MediaItem
+    ): androidx.media3.exoplayer.source.MediaSource {
+        val cacheOnlyFactory = CacheDataSource.Factory()
+            .setCache(getCache(applicationContext))
+            .setUpstreamDataSourceFactory(null)
+        return androidx.media3.exoplayer.source.DefaultMediaSourceFactory(this)
+            .setDataSourceFactory(cacheOnlyFactory)
+            .createMediaSource(mediaItem)
+    }
+
     /** Save the real container MIME after ExoPlayer has identified the active audio track. */
     private fun persistCurrentCacheMimeType() {
         if (!isPlayerInitialized) return
@@ -1681,7 +1705,12 @@ class AudioPlaybackService : MediaSessionService() {
                 telemetryManager.onSongChanged(currentSong.videoId!!, currentSong.duration)
             }
             
-            player.setMediaItem(buildMediaItem(uri))
+            val mediaItem = buildMediaItem(uri)
+            if (currentSong?.isCachedTrack == true) {
+                player.setMediaSource(buildCacheOnlyMediaSource(mediaItem))
+            } else {
+                player.setMediaItem(mediaItem)
+            }
             
             // Seek BEFORE prepare to avoid double-buffering pass
             if (pendingSeekPos >= 0) {
