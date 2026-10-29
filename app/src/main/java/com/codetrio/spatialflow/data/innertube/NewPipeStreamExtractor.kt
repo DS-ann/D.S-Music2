@@ -425,9 +425,9 @@ object NewPipeStreamExtractor {
         } else {
             if (requestedFormat == "auto") return null
             if (!allowFormatChoice) throw RequestedAudioFormatUnavailableException(requestedFormat)
-            val options = streams.mapIndexed { index, stream ->
+            val optionPairs = streams.mapIndexed { index, stream ->
                 val kbps = if (stream.bitrate > 1000) (stream.bitrate + 500) / 1000 else stream.bitrate
-                AvailableAudioFormat(
+                stream to AvailableAudioFormat(
                     id = "innertube-download:$videoId:$index",
                     url = stream.url,
                     mimeType = stream.mimeType.substringBefore(';').trim(),
@@ -436,26 +436,25 @@ object NewPipeStreamExtractor {
                     contentLength = stream.contentLength,
                     formatLabel = audioFormatDisplayLabel(stream.mimeType)
                 )
-            }.sortedWith(compareByDescending<AvailableAudioFormat> { it.bitrateKbps }.thenBy { it.formatLabel })
+            }.sortedWith(
+                compareByDescending<Pair<StreamData, AvailableAudioFormat>> { it.second.bitrateKbps }
+                    .thenBy { it.second.formatLabel }
+            )
             val choice = AudioFormatSelectionCoordinator.choose(
                 songTitle = title,
                 purpose = AudioFormatPurpose.DOWNLOAD,
                 requestedFormat = requestedFormat,
                 targetBitrateKbps = targetKbps,
-                options = options
+                options = optionPairs.map { it.second }
             )
-            val index = options.indexOfFirst { it.id == choice.id }
-            if (index < 0) return null
-            val original = streams.firstOrNull {
-                val candidateIndex = streams.indexOf(it)
-                candidateIndex == options.firstOrNull { opt -> opt.id == choice.id }?.id?.substringAfterLast(':')?.toIntOrNull()
-            }
-            StreamData(
+            val original = optionPairs.firstOrNull { it.second.id == choice.id }?.first ?: return null
+            val bitrateKbps = if (original.bitrate > 1000) (original.bitrate + 500) / 1000 else original.bitrate
+            original.copy(
                 url = choice.url,
                 mimeType = choice.mimeType,
-                bitrate = choice.bitrateKbps * 1000,
+                bitrate = if (bitrateKbps > 0) bitrateKbps * 1000 else choice.bitrateKbps * 1000,
                 contentLength = choice.contentLength,
-                audioQuality = original?.audioQuality ?: qualityLabelForKbps(choice.bitrateKbps)
+                audioQuality = original.audioQuality ?: qualityLabelForKbps(choice.bitrateKbps)
             )
         }
 
