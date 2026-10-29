@@ -326,10 +326,14 @@ object NewPipeStreamExtractor {
                     val audioStreams = info.audioStreams
                     if (audioStreams.isEmpty()) {
                         val preferred = getPlaybackAudioFormat()
-                        if (preferred != "auto") throw RequestedAudioFormatUnavailableException(preferred)
-                        Log.w(TAG, "No audio-only streams found for $videoId, trying muxed video/audio streams")
-                        val anyMuxed = info.videoStreams.firstOrNull()
-                        bestUrl = anyMuxed?.content
+                        if (preferred == "auto") {
+                            Log.w(TAG, "No audio-only streams found for $videoId, trying muxed video/audio streams")
+                            bestUrl = info.videoStreams.firstOrNull()?.content
+                        } else {
+                            // Leave this unresolved so YouTubeMusic can inspect the independent
+                            // InnerTube player response and offer its available audio formats.
+                            Log.w(TAG, "No audio-only NewPipe streams for $videoId; checking InnerTube formats")
+                        }
                     } else {
                         val best = selectStreamForOperation(
                             videoId = videoId,
@@ -391,6 +395,74 @@ object NewPipeStreamExtractor {
         url
     }
 
+    private suspend fun selectInnerTubeDownloadStream(
+        videoId: String,
+        title: String,
+        allowFormatChoice: Boolean
+    ): StreamData? {
+        val requestedFormat = getDownloadAudioFormat()
+        val targetKbps = getDownloadTargetBitrateKbps()
+        val parsed = runCatching {
+            InnerTubeParser.parsePlayerResponse(InnerTubeClient.player(videoId))
+        }.getOrNull() ?: return null
+        val streams = parsed.streams.filter { it.mimeType.contains("audio", ignoreCase = true) && it.url.isNotBlank() }
+        if (streams.isEmpty()) return null
+
+        val matching = streams.filter {
+            matchesAudioFormat(it.mimeType, preferredFormat = requestedFormat)
+        }
+        val candidates = when {
+            requestedFormat == "auto" -> streams.filter { it.mimeType.contains("audio/mp4", ignoreCase = true) }.ifEmpty { streams }
+            matching.isNotEmpty() -> matching
+            else -> emptyList()
+        }
+
+        val selected: StreamData = if (candidates.isNotEmpty()) {
+            candidates.minByOrNull { stream ->
+                val kbps = if (stream.bitrate > 1000) (stream.bitrate + 500) / 1000 else stream.bitrate
+                if (kbps > 0) kotlin.math.abs(kbps - targetKbps) else Int.MAX_VALUE
+            } ?: return null
+        } else {
+            if (requestedFormat == "auto") return null
+            if (!allowFormatChoice) throw RequestedAudioFormatUnavailableException(requestedFormat)
+            val options = streams.mapIndexed { index, stream ->
+                val kbps = if (stream.bitrate > 1000) (stream.bitrate + 500) / 1000 else stream.bitrate
+                AvailableAudioFormat(
+                    id = "innertube-download:$videoId:$index",
+                    url = stream.url,
+                    mimeType = stream.mimeType.substringBefore(';').trim(),
+                    codec = null,
+                    bitrateKbps = kbps,
+                    contentLength = stream.contentLength,
+                    formatLabel = audioFormatDisplayLabel(stream.mimeType)
+                )
+            }.sortedWith(compareByDescending<AvailableAudioFormat> { it.bitrateKbps }.thenBy { it.formatLabel })
+            val choice = AudioFormatSelectionCoordinator.choose(
+                songTitle = title,
+                purpose = AudioFormatPurpose.DOWNLOAD,
+                requestedFormat = requestedFormat,
+                targetBitrateKbps = targetKbps,
+                options = options
+            )
+            val index = options.indexOfFirst { it.id == choice.id }
+            if (index < 0) return null
+            val original = streams.firstOrNull {
+                val candidateIndex = streams.indexOf(it)
+                candidateIndex == options.firstOrNull { opt -> opt.id == choice.id }?.id?.substringAfterLast(':')?.toIntOrNull()
+            }
+            StreamData(
+                url = choice.url,
+                mimeType = choice.mimeType,
+                bitrate = choice.bitrateKbps * 1000,
+                contentLength = choice.contentLength,
+                audioQuality = original?.audioQuality ?: qualityLabelForKbps(choice.bitrateKbps)
+            )
+        }
+
+        val bitrateKbps = if (selected.bitrate > 1000) (selected.bitrate + 500) / 1000 else selected.bitrate
+        return selected.copy(bitrate = bitrateKbps * 1000)
+    }
+
     /**
      * Select a download stream with embedded tagging in mind. Prefer AAC/MP4,
      * which can be stored as M4A and tagged with jaudiotagger on Android 6+.
@@ -398,9 +470,15 @@ object NewPipeStreamExtractor {
      */
     suspend fun getDownloadStreamData(videoId: String?, allowFormatChoice: Boolean = true): StreamData? = coroutineScope {
         if (videoId.isNullOrBlank()) return@coroutineScope null
-        val info = fetchStreamInfo(videoId) ?: return@coroutineScope null
+        val info = fetchStreamInfo(videoId)
+        if (info == null || info.audioStreams.isEmpty()) {
+            return@coroutineScope selectInnerTubeDownloadStream(
+                videoId = videoId,
+                title = videoId,
+                allowFormatChoice = allowFormatChoice
+            )
+        }
         val audioStreams = info.audioStreams
-        if (audioStreams.isEmpty()) return@coroutineScope null
 
         val downloadFormat = getDownloadAudioFormat()
         val targetKbps = getDownloadTargetBitrateKbps()
