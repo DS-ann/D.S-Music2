@@ -807,7 +807,11 @@ fun FullPlayer(
                     initialValue = null,
                     key1 = song.videoId
                 ) {
-                    value = if (!song.videoId.isNullOrBlank()) {
+                    value = if (
+                        !song.videoId.isNullOrBlank() &&
+                        !song.isCachedTrack &&
+                        !song.isDownloadedOffline
+                    ) {
                         withContext(Dispatchers.IO) {
                             OnlineStreamMetadataReader.read(song.videoId!!)
                         }
@@ -875,9 +879,11 @@ fun FullPlayer(
                     ?: if (songFileMetadata.isRemote) "Streaming audio (codec not identified yet)"
                        else "Audio format not exposed by file provider"
                 val sourceText = when {
-                    !song.videoId.isNullOrBlank() -> "YouTube Music stream"
+                    song.isCachedTrack -> "SpatialFlow cache (cached audio stream)"
+                    song.isDownloadedOffline -> "Downloaded audio file (offline)"
+                    !song.videoId.isNullOrBlank() && songFileMetadata.isRemote -> "YouTube Music stream"
                     songFileMetadata.isRemote -> "Remote audio stream"
-                    else -> "Device audio library"
+                    else -> "Device audio file"
                 }
                 val displayTitle = song.title.takeIf { it.isNotBlank() && !it.equals("Unknown Title", true) }
                     ?: onlineStreamMetadata?.title
