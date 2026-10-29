@@ -1133,28 +1133,6 @@ fun PlayerBottomSheetCompose(
                     Box(
                         modifier = Modifier
                             .size(albumArtSizeDp)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) {
-                                when {
-                                    isLyricsModeEnabled -> {
-                                        // The cover is now in the lyrics header; tapping it returns
-                                        // to the expanded full-player controls.
-                                        viewModel.setLyricsModeEnabled(false)
-                                    }
-                                    currentSheetContentState != PlayerSheetState.EXPANDED ||
-                                        playerContentExpansionFraction.value < 0.95f -> {
-                                        // The mini-player is a separate first step. Never skip the
-                                        // full player when its cover is tapped.
-                                        currentSheetContentState = PlayerSheetState.EXPANDED
-                                    }
-                                    else -> {
-                                        // From the fully expanded player, the cover opens lyrics.
-                                        viewModel.setLyricsModeEnabled(true)
-                                    }
-                                }
-                            }
                             .graphicsLayer {
                                 val t = playerContentExpansionFraction.value
                                 val lyricsT = lyricsArtworkProgress
@@ -1198,6 +1176,30 @@ fun PlayerBottomSheetCompose(
                                 clip = true
                                 shadowElevation = androidx.compose.ui.util.lerp(normalShadow, 6.dp.toPx(), lyricsT)
                                 alpha = artworkAlpha
+                            }
+                            // Put the click target inside the transformed layer. With clickable
+                            // outside graphicsLayer, taps on the old 90%-screen layout bounds could
+                            // open lyrics even when the visible cover was elsewhere/smaller.
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                when {
+                                    isLyricsModeEnabled -> {
+                                        // Tapping the compact cover in the lyrics app bar returns
+                                        // to the full player.
+                                        viewModel.setLyricsModeEnabled(false)
+                                    }
+                                    currentSheetContentState != PlayerSheetState.EXPANDED ||
+                                        playerContentExpansionFraction.value < 0.95f -> {
+                                        // First tap from mini-player only expands the player.
+                                        currentSheetContentState = PlayerSheetState.EXPANDED
+                                    }
+                                    else -> {
+                                        // Only the visible album-cover target opens lyrics.
+                                        viewModel.setLyricsModeEnabled(true)
+                                    }
+                                }
                             }
                             .zIndex(if (isQueueExpanded) 1f else if (isLyricsModeEnabled || lyricsArtworkProgress > 0f) 6f else 3f)
                     ) {
