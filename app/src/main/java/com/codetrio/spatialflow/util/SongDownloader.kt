@@ -3,6 +3,8 @@ package com.codetrio.spatialflow.util
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.ContentUris
+import android.net.Uri
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Environment
@@ -115,6 +117,125 @@ object SongDownloader {
 
     fun isDownloading(videoId: String?): Boolean =
         !videoId.isNullOrBlank() && activeDownloads.containsKey(videoId)
+
+    private const val PREF_DOWNLOADED_TRACK_URIS = "spatialflow_downloaded_track_uris"
+
+    /**
+     * Resolve an app-downloaded audio file before trying Media3's online stream resolver.
+     * Video-ID mappings are preferred; title/artist filenames and the SpatialFlow folder
+     * provide a migration path for downloads created before mappings were recorded.
+     */
+    fun findDownloadedUri(
+        context: Context,
+        videoId: String?,
+        title: String,
+        artist: String
+    ): Uri? {
+        if (videoId.isNullOrBlank()) return null
+        val prefs = context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
+        val mappingKey = "uri_$videoId"
+        val mapped = prefs.getString(mappingKey, null)?.let { raw ->
+            runCatching { Uri.parse(raw) }.getOrNull()
+        }
+        if (mapped != null && isUriReadable(context, mapped)) return mapped
+        if (mapped != null) prefs.edit().remove(mappingKey).apply()
+
+        val baseName = "${cleanTitle(title)} - ${cleanArtist(artist)}"
+            .replace(Regex("[^a-zA-Z0-9._\\s()\\[\\]-]"), "_")
+        val extensions = listOf("m4a", "mp3", "webm", "opus", "ogg", "flac", "aac", "wav")
+        for (extension in extensions) {
+            val filename = "$baseName.$extension"
+            val found = findSpatialFlowMediaStoreUri(context, filename)
+                ?: findLegacyDownloadedFile(filename)
+            if (found != null && isUriReadable(context, found)) {
+                prefs.edit().putString(mappingKey, found.toString()).apply()
+                return found
+            }
+        }
+        return null
+    }
+
+    /** Record the permanent MediaStore URI immediately after the file is published. */
+    private fun rememberDownloadedSong(context: Context, videoId: String, outputFile: File) {
+        if (videoId.isBlank()) return
+        val uri = findSpatialFlowMediaStoreUri(context, outputFile.name)
+            ?: if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && outputFile.isFile) {
+                Uri.fromFile(outputFile)
+            } else null
+        if (uri != null) {
+            context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
+                .edit()
+                .putString("uri_$videoId", uri.toString())
+                .putString("name_$videoId", outputFile.name)
+                .apply()
+        } else {
+            Log.w(TAG, "Download completed but permanent MediaStore URI was not found for $videoId")
+        }
+    }
+
+    private fun findSpatialFlowMediaStoreUri(context: Context, filename: String): Uri? {
+        val projection = mutableListOf(MediaStore.Audio.Media._ID).apply {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                add(MediaStore.Audio.Media.DATA)
+            } else {
+                add(MediaStore.Audio.Media.RELATIVE_PATH)
+            }
+        }.toTypedArray()
+
+        return try {
+            context.contentResolver.query(
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                "${MediaStore.Audio.Media.DISPLAY_NAME} = ?",
+                arrayOf(filename),
+                "${MediaStore.Audio.Media.DATE_ADDED} DESC"
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                val locationColumn = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+                } else {
+                    cursor.getColumnIndex(MediaStore.Audio.Media.RELATIVE_PATH)
+                }
+                while (cursor.moveToNext()) {
+                    val location = if (locationColumn >= 0) cursor.getString(locationColumn).orEmpty() else ""
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        if (!location.replace('\\', '/').lowercase().contains("spatialflow/")) continue
+                    } else {
+                        if (!location.replace('\\', '/').lowercase().contains("/spatialflow/")) continue
+                    }
+                    return@use ContentUris.withAppendedId(
+                        MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                        cursor.getLong(idColumn)
+                    )
+                }
+                null
+            }
+        } catch (error: Exception) {
+            Log.w(TAG, "Could not resolve published download $filename", error)
+            null
+        }
+    }
+
+    private fun findLegacyDownloadedFile(filename: String): Uri? {
+        val directory = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            "SpatialFlow"
+        )
+        val file = File(directory, filename)
+        return if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && file.isFile) Uri.fromFile(file) else null
+    }
+
+    private fun isUriReadable(context: Context, uri: Uri): Boolean = try {
+        when (uri.scheme) {
+            "file" -> uri.path?.let { File(it).isFile } == true
+            "content" -> context.contentResolver.openAssetFileDescriptor(uri, "r")?.use {
+                it.length != 0L
+            } == true
+            else -> false
+        }
+    } catch (_: Exception) {
+        false
+    }
 
     /**
      * Tapping Download twice for the same track toggles it off. We keep the
@@ -349,6 +470,7 @@ object SongDownloader {
             if (!AudioFileManager.scanFile(context, outputFile, cleanTitleStr, cleanArtistStr, song.albumName)) {
                 throw IOException("Could not publish the downloaded audio to the music library")
             }
+            rememberDownloadedSong(context, videoId, outputFile)
             showFinishedNotification(context, cleanTitleStr, cleanArtistStr, notificationId)
             _downloadProgress.value += (videoId to 100)
 
