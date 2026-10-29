@@ -48,6 +48,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.AccountCircle
@@ -241,9 +242,9 @@ fun LibraryScreen(
         }
     }
 
-    // Migrate a previously saved blank overview page to the Playlist landing section.
+    // Migrate old saved Cache/blank destinations to Playlists; Cache now lives inside Playlists.
     LaunchedEffect(Unit) {
-        if (activeTab.isBlank()) activeTab = "Playlists"
+        if (activeTab.isBlank() || activeTab == "Cache") activeTab = "Playlists"
     }
 
     // Trigger local files scan on first composition
@@ -460,18 +461,12 @@ fun LibraryScreen(
                     .nestedScroll(nestedScrollConnection)
             ) {
                 when (activeTab) {
-                    "Playlists" -> PlaylistsTabContent(
-                        nestedScrollConnection,
-                        viewModel,
-                        playlistsAsList,
-                        onOpenCachePlaylist = { activeTab = "Cache" }
-                    )
+                    "Playlists" -> PlaylistsTabContent(nestedScrollConnection, viewModel, playlistsAsList)
                     "Podcasts" -> PodcastsTabContent(nestedScrollConnection)
                     "Songs" -> SongsTabContent(nestedScrollConnection, viewModel)
                     "Albums" -> AlbumsTabContent(nestedScrollConnection, albumsAsList)
                     "Artists" -> ArtistsTabContent(nestedScrollConnection, artistsAsList)
                     "Recap" -> RecapTabContent(nestedScrollConnection, viewModel, onNavigateToExplore)
-                    "Cache" -> StreamCacheTabContent(context)
                     "Device Files", "Downloaded songs" -> {
                         // Scan Local Files helper
                         val onRefreshAction = {
@@ -1315,8 +1310,7 @@ private fun UnifiedLibraryCard(item: UnifiedLibraryItem) {
 private fun PlaylistsTabContent(
     nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection,
     viewModel: PlayerSharedViewModel,
-    showAsList: Boolean = false,
-    onOpenCachePlaylist: () -> Unit = {}
+    showAsList: Boolean = false
 ) {
     val context = LocalContext.current
     val activity = remember { getActivityFromContext(context) as? androidx.fragment.app.FragmentActivity }
@@ -1333,6 +1327,11 @@ private fun PlaylistsTabContent(
 
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var selectedLocalPlaylist by remember { mutableStateOf<PlaylistEntity?>(null) }
+    var showCachePlaylist by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = showCachePlaylist) {
+        showCachePlaylist = false
+    }
 
     LaunchedEffect(Unit) {
         accountViewModel?.refreshAll()
@@ -1381,11 +1380,36 @@ private fun PlaylistsTabContent(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
+    if (showCachePlaylist) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { showCachePlaylist = false }) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back to playlists",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Text(
+                    "Cache",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Box(modifier = Modifier.weight(1f)) {
+                StreamCacheTabContent(context)
+            }
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
         // My Playlists Section Header
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1433,7 +1457,7 @@ private fun PlaylistsTabContent(
                         },
                         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                            .clickable(onClick = onOpenCachePlaylist)
+                            .clickable { showCachePlaylist = true }
                     )
                 }
                 if (localPlaylists.isEmpty()) {
@@ -1633,6 +1657,7 @@ private fun PlaylistsTabContent(
                     })
                 }
             }
+        }
         }
     }
 }
