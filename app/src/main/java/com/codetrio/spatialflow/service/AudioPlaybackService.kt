@@ -108,6 +108,7 @@ class AudioPlaybackService : MediaSessionService() {
         const val ACTION_CYCLE_PLAYBACK_MODE = "com.codetrio.spatialflow.ACTION_CYCLE_PLAYBACK_MODE"
         const val ACTION_TOGGLE_FAV = "com.codetrio.spatialflow.ACTION_TOGGLE_FAV"
         const val ACTION_WIDGET_FETCH_LYRICS = "com.codetrio.spatialflow.ACTION_WIDGET_FETCH_LYRICS"
+        const val ACTION_WIDGET_REFRESH_STATE = "com.codetrio.spatialflow.ACTION_WIDGET_REFRESH_STATE"
 
         private const val PREFS_NAME = "AppSettings"
         private const val KEY_CROSSFADE_DURATION = "crossfade_duration"
@@ -757,6 +758,9 @@ class AudioPlaybackService : MediaSessionService() {
                 } else {
                     Log.w(TAG, "Widget requested lyrics before a current song was available")
                 }
+            }
+            ACTION_WIDGET_REFRESH_STATE -> {
+                updateWidgetState(player.isPlaying)
             }
         }
     }
