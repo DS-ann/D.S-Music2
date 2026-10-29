@@ -221,8 +221,10 @@ fun LibraryScreen(
     val downloadProgress by SongDownloader.downloadProgress.collectAsStateWithLifecycle(emptyMap())
     val favoriteIds by viewModel.favoriteSongIds.collectAsStateWithLifecycle(emptySet())
     val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
+    val lyricsCache = remember(context) { LyricsCacheManager(context.applicationContext) }
 
     var selectedSongForMenu by remember { mutableStateOf<OnlineSong?>(null) }
+    var selectedCachedSongForMenu by remember { mutableStateOf<CachedSongEntry?>(null) }
     var songToAddPlaylist by remember { mutableStateOf<SongItem?>(null) }
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
@@ -912,7 +914,10 @@ fun LibraryScreen(
                 OnlineSongBottomSheet(
                     song = song,
                     isPinned = isPinned,
-                    onDismissRequest = { selectedSongForMenu = null },
+                    onDismissRequest = {
+                        selectedSongForMenu = null
+                        selectedCachedSongForMenu = null
+                    },
                     playerSharedViewModel = viewModel,
                     exploreViewModel = exploreViewModel,
                     onPlaylistAddClick = { onlineSongItem ->
@@ -921,6 +926,32 @@ fun LibraryScreen(
                     },
                     onViewCreditsClick = { s ->
                         showCreditsForSong = s
+                    },
+                    onRemoveFromCache = selectedCachedSongForMenu?.let { cachedItem ->
+                        {
+                            val removedResources = AudioPlaybackService.removeMediaCacheForSong(
+                                context = context.applicationContext,
+                                songId = cachedItem.songId,
+                                videoId = cachedItem.videoId,
+                                cacheUri = cachedItem.cachedUri
+                            )
+                            val track = MetadataRepair().repair(
+                                cachedItem.title,
+                                cachedItem.artist,
+                                null,
+                                cachedItem.durationMs,
+                                null,
+                                null
+                            )
+                            lyricsCache.evict(track)
+                            com.codetrio.spatialflow.ui.SnackbarController.showMessage(
+                                if (removedResources > 0) {
+                                    "Removed from cache: ${cachedItem.title}"
+                                } else {
+                                    "Cache entry not found: ${cachedItem.title}"
+                                }
+                            )
+                        }
                     }
                 )
             }
@@ -1417,7 +1448,30 @@ private fun PlaylistsTabContent(
                 )
             }
             Box(modifier = Modifier.weight(1f)) {
-                StreamCacheTabContent(context, viewModel, exploreViewModel)
+                StreamCacheTabContent(
+                    context = context,
+                    viewModel = viewModel,
+                    exploreViewModel = exploreViewModel,
+                    lyricsCache = lyricsCache,
+                    onSongLongClick = { item ->
+                        if (exploreViewModel != null) {
+                            selectedCachedSongForMenu = item
+                            selectedSongForMenu = OnlineSong(
+                                videoId = item.videoId,
+                                title = item.title,
+                                artist = item.artist,
+                                durationMs = item.durationMs,
+                                thumbnailUrl = android.net.Uri.fromFile(
+                                    AudioPlaybackService.getCachedMediaArtworkFile(context, item.songId)
+                                ).toString()
+                            )
+                        } else {
+                            com.codetrio.spatialflow.ui.SnackbarController.showMessage(
+                                "Song options are unavailable right now"
+                            )
+                        }
+                    }
+                )
             }
         }
     } else {
@@ -3225,10 +3279,11 @@ private suspend fun readCacheTabSnapshot(
 private fun StreamCacheTabContent(
     context: Context,
     viewModel: PlayerSharedViewModel,
-    exploreViewModel: ExploreViewModel?
+    exploreViewModel: ExploreViewModel?,
+    lyricsCache: LyricsCacheManager,
+    onSongLongClick: (CachedSongEntry) -> Unit
 ) {
     var cacheEntries by remember { mutableStateOf(emptyList<CachedSongEntry>()) }
-    val lyricsCache = remember(context) { LyricsCacheManager(context.applicationContext) }
     val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
 
     LaunchedEffect(context, lyricsCache) {
@@ -3388,6 +3443,14 @@ private fun StreamCacheTabContent(
                     currentSong?.contentUri?.toString() == item.cachedUri
 
                 ListItem(
+                    onClick = {
+                        if (index in cacheQueue.indices) {
+                            exploreViewModel?.clearOnlinePlaybackSelection()
+                            viewModel.setSongList(cacheQueue)
+                            viewModel.playSongAtIndex(index)
+                        }
+                    },
+                    onLongClick = { onSongLongClick(item) },
                     leadingContent = {
                         AsyncImage(
                             model = artwork,
@@ -3424,13 +3487,6 @@ private fun StreamCacheTabContent(
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                     modifier = Modifier.fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .clickable {
-                            if (index in cacheQueue.indices) {
-                                exploreViewModel?.clearOnlinePlaybackSelection()
-                                viewModel.setSongList(cacheQueue)
-                                viewModel.playSongAtIndex(index)
-                            }
-                        }
                 )
             }
         }
