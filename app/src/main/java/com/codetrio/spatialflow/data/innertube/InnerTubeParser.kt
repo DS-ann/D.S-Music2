@@ -320,7 +320,11 @@ object InnerTubeParser {
 
     // ========== Player Parsing ==========
 
-    fun parsePlayerResponse(json: JsonObject): PlayerResult? {
+    fun parsePlayerResponse(
+        json: JsonObject,
+        preferredAudioFormatOverride: String? = null,
+        targetBitrateKbpsOverride: Int? = null
+    ): PlayerResult? {
         try {
             val playabilityStatus = json.getAsJsonObject("playabilityStatus")
             val status = playabilityStatus?.get("status")?.asString
@@ -344,8 +348,13 @@ object InnerTubeParser {
             streamingData.getAsJsonArray("formats")?.let { allFormats.addAll(it) }
 
             val availableAudioStreams = mutableListOf<StreamData>()
-            val targetBitrateBps = NewPipeStreamExtractor.getTargetBitrateBps()
-            val preferredAudioFormat = NewPipeStreamExtractor.getPlaybackAudioFormat()
+            val targetBitrateBps = targetBitrateKbpsOverride
+                ?.coerceAtLeast(1)
+                ?.times(1000)
+                ?: NewPipeStreamExtractor.getTargetBitrateBps()
+            val preferredAudioFormat = preferredAudioFormatOverride
+                ?.let(NewPipeStreamExtractor::normalizeAudioFormat)
+                ?: NewPipeStreamExtractor.getPlaybackAudioFormat()
 
             allFormats.forEach { format ->
                 val obj = format.asJsonObject

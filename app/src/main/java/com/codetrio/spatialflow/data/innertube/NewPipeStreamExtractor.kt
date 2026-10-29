@@ -308,7 +308,14 @@ object NewPipeStreamExtractor {
         if (videoId.isNullOrEmpty()) return@coroutineScope null
 
         val requestKey = "$videoId#format-choice=$allowFormatChoice"
-        val cachedUrl = synchronized(cacheLock) { streamUrlCache.get(videoId) }
+        val requestedFormat = getPlaybackAudioFormat()
+        // A URL-only cache cannot prove that the URL matches an explicitly requested format.
+        // Interactive resolution must inspect the current format list instead of silently using
+        // a URL selected earlier by prefetch or another resolver.
+        val canUseCachedUrl = !allowFormatChoice || requestedFormat == "auto"
+        val cachedUrl = if (canUseCachedUrl) {
+            synchronized(cacheLock) { streamUrlCache.get(videoId) }
+        } else null
         if (cachedUrl != null) {
             Log.d(TAG, "Cache HIT (URL) for $videoId")
             return@coroutineScope cachedUrl
@@ -403,7 +410,11 @@ object NewPipeStreamExtractor {
         val requestedFormat = getDownloadAudioFormat()
         val targetKbps = getDownloadTargetBitrateKbps()
         val parsed = runCatching {
-            InnerTubeParser.parsePlayerResponse(InnerTubeClient.player(videoId))
+            InnerTubeParser.parsePlayerResponse(
+                json = InnerTubeClient.player(videoId),
+                preferredAudioFormatOverride = requestedFormat,
+                targetBitrateKbpsOverride = targetKbps
+            )
         }.getOrNull() ?: return null
         val streams = parsed.streams.filter { it.mimeType.contains("audio", ignoreCase = true) && it.url.isNotBlank() }
         if (streams.isEmpty()) return null

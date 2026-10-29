@@ -205,7 +205,9 @@ object YouTubeMusic {
         val requestGeneration = streamSelectionGeneration.get()
 
         // A cached URL is valid only for the current quality-preference generation.
-        val cached = streamUrlCache[videoId]
+        val explicitFormat = NewPipeStreamExtractor.getPlaybackAudioFormat() != "auto"
+        val canUseCachedUrl = !promptForFormatChoice || !explicitFormat
+        val cached = if (canUseCachedUrl) streamUrlCache[videoId] else null
         if (cached != null && cached.second > System.currentTimeMillis() &&
             streamSelectionGeneration.get() == requestGeneration
         ) {
