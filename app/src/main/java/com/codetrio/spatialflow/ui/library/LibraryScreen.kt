@@ -17,6 +17,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -1391,6 +1392,7 @@ private fun PlaylistsTabContent(
     onCachedSongLongClick: (CachedSongEntry) -> Unit
 ) {
     val context = LocalContext.current
+    val lyricsCache = remember(context) { LyricsCacheManager(context.applicationContext) }
     val activity = remember { getActivityFromContext(context) as? androidx.fragment.app.FragmentActivity }
 
     val accountViewModel = remember(activity) {
@@ -3288,6 +3290,7 @@ private suspend fun readCacheTabSnapshot(
     )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 private fun StreamCacheTabContent(
