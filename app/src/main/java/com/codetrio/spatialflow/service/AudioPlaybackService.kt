@@ -107,6 +107,7 @@ class AudioPlaybackService : MediaSessionService() {
         const val ACTION_TOGGLE_LOOP = "com.codetrio.spatialflow.ACTION_TOGGLE_LOOP"
         const val ACTION_CYCLE_PLAYBACK_MODE = "com.codetrio.spatialflow.ACTION_CYCLE_PLAYBACK_MODE"
         const val ACTION_TOGGLE_FAV = "com.codetrio.spatialflow.ACTION_TOGGLE_FAV"
+        const val ACTION_WIDGET_FETCH_LYRICS = "com.codetrio.spatialflow.ACTION_WIDGET_FETCH_LYRICS"
 
         private const val PREFS_NAME = "AppSettings"
         private const val KEY_CROSSFADE_DURATION = "crossfade_duration"
@@ -390,6 +391,7 @@ class AudioPlaybackService : MediaSessionService() {
     )
     private var mediaSession: MediaSession? = null
     private var viewModel: PlayerSharedViewModel? = null
+    private var widgetLyricsObserverJob: Job? = null
     private lateinit var handler: Handler
     private lateinit var progressUpdateRunnable: Runnable
 
@@ -744,6 +746,18 @@ class AudioPlaybackService : MediaSessionService() {
             }
             ACTION_CYCLE_PLAYBACK_MODE -> cycleNotificationPlaybackMode()
             ACTION_TOGGLE_FAV -> viewModel?.toggleFavorite()
+            ACTION_WIDGET_FETCH_LYRICS -> {
+                val vm = viewModel
+                val song = vm?.currentSong?.value
+                if (song != null) {
+                    if (vm.syncedLyrics.value.isNullOrEmpty() && vm.plainLyrics.value.isNullOrBlank()) {
+                        vm.fetchLyricsForCurrentSong()
+                    }
+                    updateWidgetState(player.isPlaying)
+                } else {
+                    Log.w(TAG, "Widget requested lyrics before a current song was available")
+                }
+            }
         }
     }
 
@@ -851,9 +865,48 @@ class AudioPlaybackService : MediaSessionService() {
             oldVm.cleanupBgScope()
         }
         this.viewModel = vm
-        
+
+        // Keep widget lyrics live after the activity has closed. Tapping the widget's
+        // lyrics page starts the normal provider pipeline, and each result updates RemoteViews.
+        widgetLyricsObserverJob?.cancel()
+        widgetLyricsObserverJob = serviceScope.launch {
+            vm.syncedLyrics.collect { lyrics ->
+                val position = player.currentPosition.coerceAtLeast(0L)
+                val duration = player.duration.coerceAtLeast(0L)
+                val currentText = if (!lyrics.isNullOrEmpty()) {
+                    SpatialFlowWidgetProvider.findCurrentLyricLine(lyrics, position.toInt())
+                } else {
+                    vm.plainLyrics.value?.lineSequence()
+                        ?.firstOrNull { it.isNotBlank() }
+                        ?.trim()
+                }
+                if (!currentText.isNullOrBlank()) {
+                    SpatialFlowWidgetProvider.updateAllWidgetsPartial(
+                        this@AudioPlaybackService,
+                        position.toInt(),
+                        duration.toInt(),
+                        currentText
+                    )
+                }
+            }
+        }
+        serviceScope.launch {
+            vm.plainLyrics.collect { plain ->
+                if (vm.syncedLyrics.value.isNullOrEmpty() && !plain.isNullOrBlank()) {
+                    val position = player.currentPosition.coerceAtLeast(0L)
+                    val duration = player.duration.coerceAtLeast(0L)
+                    SpatialFlowWidgetProvider.updateAllWidgetsPartial(
+                        this@AudioPlaybackService,
+                        position.toInt(),
+                        duration.toInt(),
+                        plain.lineSequence().firstOrNull { it.isNotBlank() }?.trim() ?: "..."
+                    )
+                }
+            }
+        }
+
         player.shuffleModeEnabled = vm.isShuffleEnabled.value
-        
+
         // Dynamic observations to trigger custom layout updates whenever loop/fav changes
         serviceScope.launch {
             vm.repeatMode.collect {
