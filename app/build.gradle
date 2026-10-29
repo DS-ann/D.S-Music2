@@ -16,7 +16,7 @@ android {
     project.ext.set("android.injected.testOnly", "false")
 
     defaultConfig {
-        applicationId "com.codetrio.spatialflow"
+        applicationId "com.dsann.music"
         // Android 6.0 Marshmallow is API 23; keep APIs newer than 23 guarded at runtime.
         minSdk 23
         targetSdk 37
