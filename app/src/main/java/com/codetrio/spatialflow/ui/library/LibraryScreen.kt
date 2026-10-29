@@ -309,6 +309,25 @@ fun LibraryScreen(
         }
     }
 
+    val openCachedSongMenu: (CachedSongEntry) -> Unit = { item ->
+        if (exploreViewModel != null) {
+            selectedCachedSongForMenu = item
+            selectedSongForMenu = OnlineSong(
+                videoId = item.videoId,
+                title = item.title,
+                artist = item.artist,
+                durationMs = item.durationMs,
+                thumbnailUrl = android.net.Uri.fromFile(
+                    AudioPlaybackService.getCachedMediaArtworkFile(context, item.songId)
+                ).toString()
+            )
+        } else {
+            com.codetrio.spatialflow.ui.SnackbarController.showMessage(
+                "Song options are unavailable right now"
+            )
+        }
+    }
+
     val nestedScrollConnection = remember(mainActivity) {
         object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
             override fun onPostScroll(
@@ -466,7 +485,12 @@ fun LibraryScreen(
                     .nestedScroll(nestedScrollConnection)
             ) {
                 when (activeTab) {
-                    "Playlists" -> PlaylistsTabContent(nestedScrollConnection, viewModel, playlistsAsList)
+                    "Playlists" -> PlaylistsTabContent(
+                        nestedScrollConnection,
+                        viewModel,
+                        playlistsAsList,
+                        onCachedSongLongClick = openCachedSongMenu
+                    )
                     "Podcasts" -> PodcastsTabContent(nestedScrollConnection)
                     "Songs" -> SongsTabContent(nestedScrollConnection, viewModel)
                     "Albums" -> AlbumsTabContent(nestedScrollConnection, albumsAsList)
@@ -857,7 +881,12 @@ fun LibraryScreen(
                         onSongMenuClick = { song -> selectedSongForMenu = song },
                         showTopBar = false
                     )
-                    "" -> PlaylistsTabContent(nestedScrollConnection, viewModel, playlistsAsList)
+                    "" -> PlaylistsTabContent(
+                        nestedScrollConnection,
+                        viewModel,
+                        playlistsAsList,
+                        onCachedSongLongClick = openCachedSongMenu
+                    )
                 }
             }
         }
@@ -1357,7 +1386,8 @@ private fun UnifiedLibraryCard(item: UnifiedLibraryItem) {
 private fun PlaylistsTabContent(
     nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection,
     viewModel: PlayerSharedViewModel,
-    showAsList: Boolean = false
+    showAsList: Boolean = false,
+    onCachedSongLongClick: (CachedSongEntry) -> Unit
 ) {
     val context = LocalContext.current
     val activity = remember { getActivityFromContext(context) as? androidx.fragment.app.FragmentActivity }
@@ -1453,24 +1483,7 @@ private fun PlaylistsTabContent(
                     viewModel = viewModel,
                     exploreViewModel = exploreViewModel,
                     lyricsCache = lyricsCache,
-                    onSongLongClick = { item ->
-                        if (exploreViewModel != null) {
-                            selectedCachedSongForMenu = item
-                            selectedSongForMenu = OnlineSong(
-                                videoId = item.videoId,
-                                title = item.title,
-                                artist = item.artist,
-                                durationMs = item.durationMs,
-                                thumbnailUrl = android.net.Uri.fromFile(
-                                    AudioPlaybackService.getCachedMediaArtworkFile(context, item.songId)
-                                ).toString()
-                            )
-                        } else {
-                            com.codetrio.spatialflow.ui.SnackbarController.showMessage(
-                                "Song options are unavailable right now"
-                            )
-                        }
-                    }
+                    onSongLongClick = onCachedSongLongClick
                 )
             }
         }
@@ -3459,22 +3472,23 @@ private fun StreamCacheTabContent(
                             contentScale = ContentScale.Crop
                         )
                     },
-                    headlineContent = {
-                        Text(
-                            item.title,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = if (isCurrentSong) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurface
-                        )
-                    },
-                    supportingContent = {
-                        Text(
-                            if (isCurrentSong) "${item.artist} · Now playing" else item.artist,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    content = {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                item.title,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = if (isCurrentSong) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                if (isCurrentSong) "${item.artist} · Now playing" else item.artist,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     },
                     trailingContent = {
                         Icon(
