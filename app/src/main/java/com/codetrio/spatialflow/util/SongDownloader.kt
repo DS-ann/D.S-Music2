@@ -523,31 +523,65 @@ object SongDownloader {
             }
             outputFile.copyTo(taggedFile, overwrite = true)
             val audioFile = org.jaudiotagger.audio.AudioFileIO.read(taggedFile)
-            val tag = audioFile.tagOrCreateAndSetDefault
+            val isMp4Container = extension.equals("m4a", ignoreCase = true) ||
+                extension.equals("mp4", ignoreCase = true) ||
+                extension.equals("m4p", ignoreCase = true) ||
+                extension.equals("m4b", ignoreCase = true)
+
+            val tag = if (isMp4Container) {
+                (audioFile.tag as? org.jaudiotagger.tag.mp4.Mp4Tag)
+                    ?: org.jaudiotagger.tag.mp4.Mp4Tag().also { audioFile.setTag(it) }
+            } else {
+                audioFile.tagOrCreateAndSetDefault
+            }
+
+            // TITLE and ARTIST are required. Optional fields are isolated because some formats
+            // don't support every generic jaudiotagger key.
             tag.setField(org.jaudiotagger.tag.FieldKey.TITLE, title)
             tag.setField(org.jaudiotagger.tag.FieldKey.ARTIST, artist)
-            tag.setField(org.jaudiotagger.tag.FieldKey.ALBUM_ARTIST, artist)
-            album?.takeIf { it.isNotBlank() }?.let {
-                tag.setField(org.jaudiotagger.tag.FieldKey.ALBUM, it.trim())
+            runCatching { tag.setField(org.jaudiotagger.tag.FieldKey.ALBUM_ARTIST, artist) }
+                .onFailure { Log.d(TAG, "Album artist tag not supported by ${extension}: ${it.message}") }
+            album?.takeIf { it.isNotBlank() }?.let { albumTitle ->
+                runCatching { tag.setField(org.jaudiotagger.tag.FieldKey.ALBUM, albumTitle.trim()) }
+                    .onFailure { Log.d(TAG, "Album tag not supported by ${extension}: ${it.message}") }
             }
-            tag.setField(
-                org.jaudiotagger.tag.FieldKey.COMMENT,
-                if (fromCache) {
-                    "Exported from SpatialFlow cached audio (video ID: $videoId)"
-                } else {
-                    "Downloaded from YouTube Music (video ID: $videoId)"
-                }
-            )
+            runCatching {
+                tag.setField(
+                    org.jaudiotagger.tag.FieldKey.COMMENT,
+                    if (fromCache) {
+                        "Exported from SpatialFlow cached audio (video ID: $videoId)"
+                    } else {
+                        "Downloaded from YouTube Music (video ID: $videoId)"
+                    }
+                )
+            }.onFailure { Log.d(TAG, "Comment tag not supported by ${extension}: ${it.message}") }
+
             if (artworkBytes != null && artworkBytes.isNotEmpty()) {
-                val artwork = org.jaudiotagger.tag.images.StandardArtwork()
-                artwork.binaryData = artworkBytes
-                artwork.mimeType = "image/jpeg"
-                tag.deleteArtworkField()
-                tag.setField(artwork)
+                runCatching {
+                    if (tag is org.jaudiotagger.tag.mp4.Mp4Tag) {
+                        tag.deleteArtworkField()
+                        tag.setField(tag.createArtworkField(artworkBytes))
+                    } else {
+                        val artwork = org.jaudiotagger.tag.images.StandardArtwork()
+                        artwork.binaryData = artworkBytes
+                        artwork.mimeType = "image/jpeg"
+                        tag.deleteArtworkField()
+                        tag.setField(artwork)
+                    }
+                }.onFailure { Log.w(TAG, "Could not embed cover art in ${extension}: ${it.message}") }
             }
+
             audioFile.commit()
             if (!taggedFile.isFile || taggedFile.length() <= 0L) {
                 throw IOException("Metadata write produced an empty file")
+            }
+
+            // Verify the written tags by reading the staged audio back.
+            val writtenTag = org.jaudiotagger.audio.AudioFileIO.read(taggedFile).tag
+            if (writtenTag.getFirst(org.jaudiotagger.tag.FieldKey.TITLE).isNullOrBlank() ||
+                writtenTag.getFirst(org.jaudiotagger.tag.FieldKey.ARTIST).isNullOrBlank()
+            ) {
+                throw IOException("Metadata verification failed: title or artist was not persisted")
             }
 
             backupFile = File(outputFile.parentFile, "${outputFile.name}.raw-backup")

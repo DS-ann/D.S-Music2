@@ -47,7 +47,7 @@ fun AudioFormatChoiceDialogHost() {
                         .verticalScroll(rememberScrollState())
                 ) {
                     Text(
-                        "The requested format (\${pending.requestedFormat.uppercase()}) isn't available for \${pending.songTitle}. " +
+                        "The requested format (${pending.requestedFormat.uppercase()}) isn't available for ${pending.songTitle}. " +
                             "Choose one of the formats this track actually offers. Your Settings preference won't be changed.",
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -66,7 +66,7 @@ fun AudioFormatChoiceDialogHost() {
                                     buildString {
                                         append(
                                             if (option.bitrateKbps > 0) {
-                                                "\${option.bitrateKbps} kbps"
+                                                "${option.bitrateKbps} kbps"
                                             } else {
                                                 "Bitrate unknown"
                                             }
