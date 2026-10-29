@@ -154,9 +154,6 @@ object NewPipeStreamExtractor {
             "auto" -> audioStreams.filter(::isM4aAudio).ifEmpty { audioStreams }
             else -> audioStreams.filter { stream ->
                 matchesAudioFormat(stream.format?.mimeType, stream.codec, normalizedFormat)
-            }.ifEmpty {
-                Log.w(TAG, "Requested audio format '$normalizedFormat' unavailable; falling back to source formats")
-                audioStreams
             }
         }
     }
@@ -256,12 +253,61 @@ object NewPipeStreamExtractor {
         return best
     }
 
+    private fun choiceOption(stream: AudioStream, index: Int): AvailableAudioFormat {
+        val mimeType = stream.format?.mimeType?.substringBefore(';')?.trim().orEmpty()
+        val bitrateKbps = streamBitrateKbps(stream)
+        return AvailableAudioFormat(
+            id = "newpipe:${stream.itag}:${mimeType}:${bitrateKbps}:$index",
+            url = stream.content,
+            mimeType = mimeType,
+            codec = stream.codec,
+            bitrateKbps = bitrateKbps,
+            contentLength = stream.itagItem?.contentLength?.takeIf { it > 0L },
+            formatLabel = audioFormatDisplayLabel(mimeType, stream.codec)
+        )
+    }
+
+    private suspend fun selectStreamForOperation(
+        videoId: String,
+        title: String,
+        audioStreams: List<AudioStream>,
+        preferredFormat: String,
+        targetKbps: Int,
+        purpose: AudioFormatPurpose,
+        allowFormatChoice: Boolean
+    ): AudioStream? {
+        val candidates = candidatesForFormat(audioStreams, preferredFormat)
+        if (candidates.isNotEmpty()) {
+            return candidates.minByOrNull { stream ->
+                val bitrate = streamBitrateKbps(stream)
+                if (bitrate > 0) kotlin.math.abs(bitrate - targetKbps) else Int.MAX_VALUE
+            }
+        }
+        if (preferredFormat == "auto") return null
+        if (audioStreams.isEmpty()) throw RequestedAudioFormatUnavailableException(preferredFormat)
+        if (!allowFormatChoice) throw RequestedAudioFormatUnavailableException(preferredFormat)
+
+        val optionPairs = audioStreams.mapIndexed { index, stream -> stream to choiceOption(stream, index) }
+            .sortedWith(compareByDescending<Pair<AudioStream, AvailableAudioFormat>> { it.second.bitrateKbps }
+                .thenBy { it.second.formatLabel })
+        val selected = AudioFormatSelectionCoordinator.choose(
+            songTitle = title,
+            purpose = purpose,
+            requestedFormat = preferredFormat,
+            targetBitrateKbps = targetKbps,
+            options = optionPairs.map { it.second }
+        )
+        return optionPairs.firstOrNull { it.second.id == selected.id }?.first
+    }
+
     /**
-     * Extract the best audio stream URL for a YouTube video.
+     * Extract the best audio stream URL for a YouTube video. If the requested format is missing,
+     * interactive playback can select from formats that this track actually exposes.
      */
-    suspend fun getStreamUrl(videoId: String?): String? = coroutineScope {
+    suspend fun getStreamUrl(videoId: String?, allowFormatChoice: Boolean = false): String? = coroutineScope {
         if (videoId.isNullOrEmpty()) return@coroutineScope null
-        
+
+        val requestKey = "$videoId#format-choice=$allowFormatChoice"
         val cachedUrl = synchronized(cacheLock) { streamUrlCache.get(videoId) }
         if (cachedUrl != null) {
             Log.d(TAG, "Cache HIT (URL) for $videoId")
@@ -270,7 +316,7 @@ object NewPipeStreamExtractor {
 
         // Deduplication
         val deferred = synchronized(inFlightRequests) {
-            inFlightRequests[videoId] ?: extractorScope.async(start = kotlinx.coroutines.CoroutineStart.LAZY) {
+            inFlightRequests[requestKey] ?: extractorScope.async(start = kotlinx.coroutines.CoroutineStart.LAZY) {
                 try {
                     val start = System.currentTimeMillis()
                     val info = fetchStreamInfo(videoId)
@@ -279,11 +325,21 @@ object NewPipeStreamExtractor {
                     var bestUrl: String? = null
                     val audioStreams = info.audioStreams
                     if (audioStreams.isEmpty()) {
+                        val preferred = getPlaybackAudioFormat()
+                        if (preferred != "auto") throw RequestedAudioFormatUnavailableException(preferred)
                         Log.w(TAG, "No audio-only streams found for $videoId, trying muxed video/audio streams")
                         val anyMuxed = info.videoStreams.firstOrNull()
                         bestUrl = anyMuxed?.content
                     } else {
-                        val best = selectBestStream(audioStreams)
+                        val best = selectStreamForOperation(
+                            videoId = videoId,
+                            title = info.name ?: videoId,
+                            audioStreams = audioStreams,
+                            preferredFormat = getPlaybackAudioFormat(),
+                            targetKbps = getTargetBitrateKbps(),
+                            purpose = AudioFormatPurpose.PLAYBACK,
+                            allowFormatChoice = allowFormatChoice
+                        )
                         bestUrl = best?.content
                     }
 
@@ -293,7 +349,7 @@ object NewPipeStreamExtractor {
                     Log.d(TAG, "Stream extraction took ${System.currentTimeMillis() - start}ms for $videoId")
                     bestUrl
                 } finally {
-                    inFlightRequests.remove(videoId)
+                    inFlightRequests.remove(requestKey)
                 }
             }.also {
                 inFlightRequests[videoId] = it
@@ -340,7 +396,7 @@ object NewPipeStreamExtractor {
      * which can be stored as M4A and tagged with jaudiotagger on Android 6+.
      * If unavailable, keep the selected source stream's reported container.
      */
-    suspend fun getDownloadStreamData(videoId: String?): StreamData? = coroutineScope {
+    suspend fun getDownloadStreamData(videoId: String?, allowFormatChoice: Boolean = true): StreamData? = coroutineScope {
         if (videoId.isNullOrBlank()) return@coroutineScope null
         val info = fetchStreamInfo(videoId) ?: return@coroutineScope null
         val audioStreams = info.audioStreams
@@ -348,11 +404,15 @@ object NewPipeStreamExtractor {
 
         val downloadFormat = getDownloadAudioFormat()
         val targetKbps = getDownloadTargetBitrateKbps()
-        val candidates = candidatesForFormat(audioStreams, downloadFormat)
-        val selected = candidates.minByOrNull { stream ->
-            val candidateKbps = streamBitrateKbps(stream)
-            if (candidateKbps > 0) abs(candidateKbps - targetKbps) else Int.MAX_VALUE
-        } ?: return@coroutineScope null
+        val selected = selectStreamForOperation(
+            videoId = videoId,
+            title = info.name ?: videoId,
+            audioStreams = audioStreams,
+            preferredFormat = downloadFormat,
+            targetKbps = targetKbps,
+            purpose = AudioFormatPurpose.DOWNLOAD,
+            allowFormatChoice = allowFormatChoice
+        ) ?: return@coroutineScope null
 
         val reportedMime = selected.format?.mimeType?.substringBefore(';')?.trim().orEmpty()
         val mime = when {
