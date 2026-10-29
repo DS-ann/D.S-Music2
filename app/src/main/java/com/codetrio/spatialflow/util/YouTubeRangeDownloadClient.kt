@@ -110,10 +110,13 @@ internal object YouTubeRangeDownloadClient {
         override fun intercept(chain: Interceptor.Chain): Response {
             val request = chain.request()
             val url = request.url
-            if (!isGoogleVideoStream(url)) return chain.proceed(request)
+            if (!YouTubeRangeDownloadClient.isGoogleVideoStream(url)) return chain.proceed(request)
 
             if (url.queryParameter("range") != null) {
-                return withRetry(streamRequest(request, 0L, null, false), chain::proceed)
+                return YouTubeRangeDownloadClient.withRetry(
+                    YouTubeRangeDownloadClient.streamRequest(request, 0L, null, false),
+                    chain::proceed
+                )
             }
 
             val range = request.header("Range")?.let {
@@ -126,10 +129,13 @@ internal object YouTubeRangeDownloadClient {
             } ?: contentLength?.minus(1L)
 
             if (contentLength != null && contentLength > 0L && end != null &&
-                end - start + 1L > CHUNK_SIZE
+                end - start + 1L > YouTubeRangeDownloadClient.CHUNK_SIZE
             ) {
-                val firstEnd = minOf(end, start + CHUNK_SIZE - 1L)
-                val first = withRetry(streamRequest(request, start, firstEnd, true), chain::proceed)
+                val firstEnd = minOf(end, start + YouTubeRangeDownloadClient.CHUNK_SIZE - 1L)
+                val first = YouTubeRangeDownloadClient.withRetry(
+                    YouTubeRangeDownloadClient.streamRequest(request, start, firstEnd, true),
+                    chain::proceed
+                )
                 if (!first.isSuccessful) {
                     Log.w(TAG, "Initial stream range rejected: HTTP " + first.code)
                     return first
@@ -154,8 +160,10 @@ internal object YouTubeRangeDownloadClient {
 
             val translatedRange = range != null &&
                 !(start == 0L && range.groupValues[2].isEmpty())
-            val response = withRetry(
-                streamRequest(request, start, range?.groupValues?.get(2)?.toLongOrNull(), translatedRange),
+            val response = YouTubeRangeDownloadClient.withRetry(
+                YouTubeRangeDownloadClient.streamRequest(
+                    request, start, range?.groupValues?.get(2)?.toLongOrNull(), translatedRange
+                ),
                 chain::proceed
             )
             if (translatedRange && response.code == 200) {
@@ -218,12 +226,12 @@ internal object YouTubeRangeDownloadClient {
             private val contentTypeValue = first.body.contentType()
             private var position = start
             private var current: Response? = first
-            private var currentEnd = minOf(end, start + CHUNK_SIZE - 1L)
+            private var currentEnd = minOf(end, start + YouTubeRangeDownloadClient.CHUNK_SIZE - 1L)
             private var next: Pair<Long, PendingResponse>? = null
 
             private fun fetch(from: Long): PendingResponse {
-                val to = minOf(end, from + CHUNK_SIZE - 1L)
-                val request = streamRequest(base, from, to, true)
+                val to = minOf(end, from + YouTubeRangeDownloadClient.CHUNK_SIZE - 1L)
+                val request = YouTubeRangeDownloadClient.streamRequest(base, from, to, true)
                 val call = chunkClient.newCall(request)
                 val pending = PendingResponse(call)
                 call.enqueue(object : Callback {
@@ -235,7 +243,9 @@ internal object YouTubeRangeDownloadClient {
                         if (response.code == 403) {
                             response.close()
                             try {
-                                val retry = chunkClient.newCall(streamRequest(base, from, to, true)).execute()
+                                val retry = chunkClient.newCall(
+                                    YouTubeRangeDownloadClient.streamRequest(base, from, to, true)
+                                ).execute()
                                 pending.complete(retry)
                             } catch (error: IOException) {
                                 pending.fail(error)
@@ -267,11 +277,12 @@ internal object YouTubeRangeDownloadClient {
                     throw IOException("YouTube rejected stream range at byte " + position + " (HTTP " + code + ")")
                 }
                 current = response
-                currentEnd = minOf(end, position + CHUNK_SIZE - 1L)
+                currentEnd = minOf(end, position + YouTubeRangeDownloadClient.CHUNK_SIZE - 1L)
             }
 
             private val source = object : okio.Source {
                 override fun read(sink: Buffer, byteCount: Long): Long {
+                    if (byteCount == 0L) return 0L
                     if (position > end) return -1L
                     while (true) {
                         val response = current ?: run {
