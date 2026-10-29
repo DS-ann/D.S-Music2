@@ -97,6 +97,7 @@ object SongDownloader {
     private class DownloadTask {
         @Volatile var job: Job? = null
         @Volatile var connection: HttpURLConnection? = null
+        @Volatile var call: okhttp3.Call? = null
         @Volatile var outputFile: File? = null
         @Volatile var cancelled: Boolean = false
     }
@@ -166,6 +167,7 @@ object SongDownloader {
         // Schedule both off the UI thread so Android 6 StrictMode cannot crash the app.
         scope.launch(Dispatchers.IO) {
             runCatching { task.connection?.disconnect() }
+            runCatching { task.call?.cancel() }
         }
         scope.launch(Dispatchers.IO) {
             task.job?.cancel(CancellationException("Download cancelled by user"))
@@ -374,6 +376,8 @@ object SongDownloader {
         } finally {
             task.connection?.disconnect()
             task.connection = null
+            task.call?.cancel()
+            task.call = null
             if (task.cancelled) task.outputFile?.delete()
             _downloadProgress.value -= videoId
         }
@@ -397,7 +401,8 @@ object SongDownloader {
     ) {
         var lastError: Exception? = null
         for (attempt in 1..3) {
-            var connection: HttpURLConnection? = null
+            var call: okhttp3.Call? = null
+            var response: okhttp3.Response? = null
             try {
                 coroutineContext.ensureActive()
                 if (outputFile.exists() && !outputFile.delete()) {
@@ -409,31 +414,21 @@ object SongDownloader {
                     }
                 }
 
-                connection = URL(streamUrl).openConnection() as HttpURLConnection
-                task.connection = connection
-                connection.connectTimeout = 15_000
-                connection.readTimeout = 30_000
-                connection.useCaches = false
-                connection.instanceFollowRedirects = true
-                connection.requestMethod = "GET"
-                connection.setRequestProperty(
-                    "User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0"
-                )
-                connection.setRequestProperty("Accept", "*/*")
-                connection.setRequestProperty("Accept-Encoding", "identity")
-                connection.connect()
-
-                val responseCode = connection.responseCode
-                if (responseCode != HttpURLConnection.HTTP_OK) {
-                    throw IOException("Download server returned HTTP $responseCode")
+                // Google video streams are fetched as 1 MiB range requests, pipelining the next
+                // range while the current range is read. This avoids YouTube's playback-speed
+                // throttling on a single long, open-ended GET without changing audio quality.
+                call = YouTubeRangeDownloadClient.newCall(streamUrl)
+                task.call = call
+                response = call.execute()
+                if (response.code != HttpURLConnection.HTTP_OK) {
+                    throw IOException("Download server returned HTTP ${response.code}")
                 }
 
-                val declaredLength = connection.contentLength.toLong().takeIf { it > 0L }
+                val declaredLength = response.body.contentLength().takeIf { it > 0L }
                 val progressLength = declaredLength ?: expectedBytes?.takeIf { it > 0L }
                 var downloadedBytes = 0L
                 var lastProgressUpdate = 0L
-                connection.inputStream.use { input ->
+                response.body.byteStream().use { input ->
                     BufferedOutputStream(FileOutputStream(outputFile), 64 * 1024).use { output ->
                         val buffer = ByteArray(64 * 1024)
                         while (true) {
@@ -468,6 +463,7 @@ object SongDownloader {
                         "Incomplete audio download: received $downloadedBytes of $declaredLength bytes"
                     )
                 }
+                Log.i(TAG, "Downloaded $downloadedBytes bytes using range-enabled mode on attempt $attempt")
                 return
             } catch (cancelled: CancellationException) {
                 outputFile.delete()
@@ -482,8 +478,13 @@ object SongDownloader {
                     delay(attempt * 500L)
                 }
             } finally {
-                connection?.disconnect()
-                if (task.connection === connection) task.connection = null
+                response?.close()
+                call?.cancel()
+                if (task.call === call) task.call = null
+                if (task.connection != null) {
+                    runCatching { task.connection?.disconnect() }
+                    task.connection = null
+                }
             }
         }
         throw IOException("Audio download failed after 3 attempts: ${lastError?.message ?: "unknown network error"}", lastError)
