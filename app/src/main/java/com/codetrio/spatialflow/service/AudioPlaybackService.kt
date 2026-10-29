@@ -79,6 +79,13 @@ data class CachedMediaMetadata(
     val mimeType: String = ""
 )
 
+data class CachedAudioFacts(
+    val cachedBytes: Long,
+    val totalBytes: Long?,
+    val mimeType: String?,
+    val isComplete: Boolean
+)
+
 data class CurrentAudioFormatDetails(
     val bitrateBps: Int?,
     val sampleRateHz: Int?,
@@ -203,6 +210,44 @@ class AudioPlaybackService : MediaSessionService() {
                 key to cachedBytes
             }
             return candidates.maxByOrNull { it.second }?.first?.let { Uri.parse(it) }
+        }
+
+        /** Returns cached byte count and detected format for the current track. */
+        @JvmStatic
+        @Synchronized
+        fun getCachedAudioFacts(
+            context: Context,
+            songId: String,
+            videoId: String? = null,
+            streamUri: String? = null
+        ): CachedAudioFacts? {
+            val currentCache = getCache(context.applicationContext)
+            val candidates = currentCache.keys.mapNotNull { key ->
+                val metadata = getCachedMediaMetadata(context, key)
+                val matchesMetadata = metadata != null && (
+                    (songId.isNotBlank() && metadata.songId == songId) ||
+                    (!videoId.isNullOrBlank() && metadata.videoId == videoId)
+                )
+                if (!matchesMetadata && (streamUri.isNullOrBlank() || key != streamUri)) {
+                    return@mapNotNull null
+                }
+
+                val spans = currentCache.getCachedSpans(key)
+                val cachedBytes = spans.sumOf { it.length }
+                if (cachedBytes <= 0L) return@mapNotNull null
+                val contentLength = androidx.media3.datasource.cache.ContentMetadata
+                    .getContentLength(currentCache.getContentMetadata(key))
+                    .takeIf { it > 0L }
+                val complete = contentLength != null &&
+                    currentCache.isCached(key, 0L, contentLength)
+                CachedAudioFacts(
+                    cachedBytes = cachedBytes,
+                    totalBytes = contentLength,
+                    mimeType = metadata?.mimeType?.takeIf { it.isNotBlank() },
+                    isComplete = complete
+                )
+            }
+            return candidates.maxByOrNull { if (it.isComplete) it.totalBytes ?: it.cachedBytes else it.cachedBytes }
         }
 
         /**
