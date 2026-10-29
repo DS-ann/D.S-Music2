@@ -19,6 +19,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -3456,14 +3457,6 @@ private fun StreamCacheTabContent(
                     currentSong?.contentUri?.toString() == item.cachedUri
 
                 ListItem(
-                    onClick = {
-                        if (index in cacheQueue.indices) {
-                            exploreViewModel?.clearOnlinePlaybackSelection()
-                            viewModel.setSongList(cacheQueue)
-                            viewModel.playSongAtIndex(index)
-                        }
-                    },
-                    onLongClick = { onSongLongClick(item) },
                     leadingContent = {
                         AsyncImage(
                             model = artwork,
@@ -3472,23 +3465,23 @@ private fun StreamCacheTabContent(
                             contentScale = ContentScale.Crop
                         )
                     },
-                    content = {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                item.title,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = if (isCurrentSong) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                if (isCurrentSong) "${item.artist} · Now playing" else item.artist,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    headlineContent = {
+                        Text(
+                            item.title,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = if (isCurrentSong) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurface
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            if (isCurrentSong) "${item.artist} · Now playing" else item.artist,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     },
                     trailingContent = {
                         Icon(
@@ -3501,6 +3494,16 @@ private fun StreamCacheTabContent(
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                     modifier = Modifier.fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
+                        .combinedClickable(
+                            onClick = {
+                                if (index in cacheQueue.indices) {
+                                    exploreViewModel?.clearOnlinePlaybackSelection()
+                                    viewModel.setSongList(cacheQueue)
+                                    viewModel.playSongAtIndex(index)
+                                }
+                            },
+                            onLongClick = { onSongLongClick(item) }
+                        )
                 )
             }
         }
