@@ -1196,6 +1196,20 @@ fun PlayerBottomSheetCompose(
                     Box(
                         modifier = Modifier
                             .size(albumArtSizeDp)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                if (isLyricsModeEnabled) {
+                                    // The cover has moved into the lyrics app-bar area; tapping it
+                                    // closes lyrics and returns to the player controls.
+                                    viewModel.setLyricsModeEnabled(false)
+                                } else {
+                                    // The mini-player cover opens the full player directly in lyrics.
+                                    currentSheetContentState = PlayerSheetState.EXPANDED
+                                    viewModel.setLyricsModeEnabled(true)
+                                }
+                            }
                             .graphicsLayer {
                                 val t = playerContentExpansionFraction.value
                                 val lyricsT = lyricsArtworkProgress
