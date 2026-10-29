@@ -1200,14 +1200,22 @@ fun PlayerBottomSheetCompose(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
                             ) {
-                                if (isLyricsModeEnabled) {
-                                    // The cover has moved into the lyrics app-bar area; tapping it
-                                    // closes lyrics and returns to the player controls.
-                                    viewModel.setLyricsModeEnabled(false)
-                                } else {
-                                    // The mini-player cover opens the full player directly in lyrics.
-                                    currentSheetContentState = PlayerSheetState.EXPANDED
-                                    viewModel.setLyricsModeEnabled(true)
+                                when {
+                                    isLyricsModeEnabled -> {
+                                        // The cover is now in the lyrics header; tapping it returns
+                                        // to the expanded full-player controls.
+                                        viewModel.setLyricsModeEnabled(false)
+                                    }
+                                    currentSheetContentState != PlayerSheetState.EXPANDED ||
+                                        playerContentExpansionFraction.value < 0.95f -> {
+                                        // The mini-player is a separate first step. Never skip the
+                                        // full player when its cover is tapped.
+                                        currentSheetContentState = PlayerSheetState.EXPANDED
+                                    }
+                                    else -> {
+                                        // From the fully expanded player, the cover opens lyrics.
+                                        viewModel.setLyricsModeEnabled(true)
+                                    }
                                 }
                             }
                             .graphicsLayer {

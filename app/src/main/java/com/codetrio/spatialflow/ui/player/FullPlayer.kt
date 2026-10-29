@@ -734,6 +734,7 @@ fun FullPlayer(
                 providerResults = providerResults,
                 selectedProvider = selectedProvider,
                 onProviderSelected = onProviderSelected,
+                onDismissLyrics = { onLyricsModeChanged(false) },
                 modifier = Modifier.fillMaxSize()
             )
         }

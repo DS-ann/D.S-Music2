@@ -151,6 +151,7 @@ internal fun FullScreenLyricsOverlay(
     providerResults: Map<String, LyricsResult>,
     selectedProvider: String?,
     onProviderSelected: (String) -> Unit,
+    onDismissLyrics: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val consumeClicks = remember { MutableInteractionSource() }
@@ -215,11 +216,25 @@ internal fun FullScreenLyricsOverlay(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Spacer(modifier = Modifier.size(48.dp))
+                Spacer(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onDismissLyrics
+                        )
+                )
 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onDismissLyrics
+                        )
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,

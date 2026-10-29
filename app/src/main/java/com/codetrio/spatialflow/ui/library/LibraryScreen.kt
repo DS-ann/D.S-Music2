@@ -423,8 +423,7 @@ fun LibraryScreen(
                     "Downloads" to "Downloaded songs",
                     "Podcasts" to "Podcasts",
                     "Recap" to "Recap",
-                    "Local music" to "Device Files",
-                    "Cache" to "Cache"
+                    "Local music" to "Device Files"
                 )
 
                 Row(
@@ -461,7 +460,12 @@ fun LibraryScreen(
                     .nestedScroll(nestedScrollConnection)
             ) {
                 when (activeTab) {
-                    "Playlists" -> PlaylistsTabContent(nestedScrollConnection, viewModel, playlistsAsList)
+                    "Playlists" -> PlaylistsTabContent(
+                        nestedScrollConnection,
+                        viewModel,
+                        playlistsAsList,
+                        onOpenCachePlaylist = { activeTab = "Cache" }
+                    )
                     "Podcasts" -> PodcastsTabContent(nestedScrollConnection)
                     "Songs" -> SongsTabContent(nestedScrollConnection, viewModel)
                     "Albums" -> AlbumsTabContent(nestedScrollConnection, albumsAsList)
@@ -1111,9 +1115,6 @@ private fun UnifiedLibraryContent(
                 LibraryCategoryItem("Downloaded songs", "Music saved on this device", Icons.AutoMirrored.Filled.QueueMusic) {
                     navigateToTab.value("Downloaded songs")
                 },
-                LibraryCategoryItem("Cache", "Cached audio", Icons.Default.Folder) {
-                    navigateToTab.value("Cache")
-                }
             )
         )
 
@@ -1314,7 +1315,8 @@ private fun UnifiedLibraryCard(item: UnifiedLibraryItem) {
 private fun PlaylistsTabContent(
     nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection,
     viewModel: PlayerSharedViewModel,
-    showAsList: Boolean = false
+    showAsList: Boolean = false,
+    onOpenCachePlaylist: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val activity = remember { getActivityFromContext(context) as? androidx.fragment.app.FragmentActivity }
@@ -1405,48 +1407,73 @@ private fun PlaylistsTabContent(
             }
         }
 
-        // Local Playlists horizontal list
-        if (localPlaylists.isEmpty()) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(80.dp)
-                    .clickable { showCreatePlaylistDialog = true },
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer
-            ) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        "+ Create a playlist to get started",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-        } else if (showAsList) {
+        // Cache is a virtual playlist next to user-created playlists. It opens the
+        // existing cache-backed list without being a separate category in the Library rail.
+        if (showAsList) {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                items(localPlaylists, key = { it.id }) { playlist ->
+                item(key = "spatialflow-cache-playlist") {
                     ListItem(
                         headlineContent = {
-                            Text(playlist.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                            Text("Cache", maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
                         },
-                        supportingContent = { Text("Playlist", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        supportingContent = {
+                            Text("Cached songs with artwork and lyrics", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        },
                         leadingContent = {
                             Box(
                                 modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp))
                                     .background(MaterialTheme.colorScheme.primaryContainer),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
                             }
                         },
                         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                            .clickable { selectedLocalPlaylist = playlist }
+                            .clickable(onClick = onOpenCachePlaylist)
                     )
+                }
+                if (localPlaylists.isEmpty()) {
+                    item(key = "create-playlist-prompt") {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().height(72.dp)
+                                .clickable { showCreatePlaylistDialog = true },
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainer
+                        ) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    "+ Create a playlist to get started",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    items(localPlaylists, key = { it.id }) { playlist ->
+                        ListItem(
+                            headlineContent = {
+                                Text(playlist.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                            },
+                            supportingContent = { Text("Playlist", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                            leadingContent = {
+                                Box(
+                                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.primaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                }
+                            },
+                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                .clickable { selectedLocalPlaylist = playlist }
+                        )
+                    }
                 }
             }
         } else {
@@ -1454,12 +1481,12 @@ private fun PlaylistsTabContent(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                items(localPlaylists) { playlist ->
+                item(key = "spatialflow-cache-playlist") {
                     Column(
                         modifier = Modifier
                             .width(120.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable { selectedLocalPlaylist = playlist }
+                            .clickable(onClick = onOpenCachePlaylist)
                             .padding(8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -1471,21 +1498,97 @@ private fun PlaylistsTabContent(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.AutoMirrored.Filled.PlaylistPlay,
-                                null,
+                                Icons.Default.Folder,
+                                contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(36.dp)
                             )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            playlist.title,
+                            "Cache",
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.bodySmall,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                        Text(
+                            "Cached songs",
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                if (localPlaylists.isEmpty()) {
+                    item(key = "create-playlist-prompt") {
+                        Column(
+                            modifier = Modifier
+                                .width(144.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { showCreatePlaylistDialog = true }
+                                .padding(8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(
+                                modifier = Modifier.size(96.dp).clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = "Create Playlist",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Create playlist",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                } else {
+                    items(localPlaylists) { playlist ->
+                        Column(
+                            modifier = Modifier
+                                .width(120.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { selectedLocalPlaylist = playlist }
+                                .padding(8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(96.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.PlaylistPlay,
+                                    null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                playlist.title,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             }
