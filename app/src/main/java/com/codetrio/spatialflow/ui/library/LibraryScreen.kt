@@ -1510,7 +1510,7 @@ private fun PlaylistsTabContent(
                         modifier = Modifier
                             .width(120.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable(onClick = onOpenCachePlaylist)
+                            .clickable { showCachePlaylist = true }
                             .padding(8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
