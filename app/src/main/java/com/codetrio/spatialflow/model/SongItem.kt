@@ -97,15 +97,41 @@ data class SongItem(
         }
     }
 
+    /**
+     * Song ID remains the stable identity, but playback-source differences must be observable by
+     * StateFlow. The player can switch the same track ID between an online URL, a Media3 cache
+     * URL, and a downloaded content URI; treating these as equal leaves stale source details/UI.
+     */
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other == null || javaClass != other.javaClass) return false
         val songItem = other as SongItem
-        return id == songItem.id
+        return id == songItem.id &&
+            contentUri == songItem.contentUri &&
+            videoId == songItem.videoId &&
+            isCachedTrack == songItem.isCachedTrack &&
+            isDownloadedOffline == songItem.isDownloadedOffline
     }
 
     override fun hashCode(): Int {
+        // Equal objects necessarily share the same stable song ID. Source variants may
+        // intentionally collide, but keeping the ID hash stable avoids mutable-hash hazards.
         return id.hashCode()
+    }
+
+    /** Create a replacement instead of mutating the object already published through StateFlow. */
+    fun withPlaybackSource(uri: Uri, cached: Boolean, downloaded: Boolean): SongItem {
+        return copy().apply {
+            thumbnailUrl = this@SongItem.thumbnailUrl
+            mediaStoreRelativePath = this@SongItem.mediaStoreRelativePath
+            albumName = this@SongItem.albumName
+            videoId = this@SongItem.videoId
+            artistId = this@SongItem.artistId
+            lufs = this@SongItem.lufs
+            contentUri = uri
+            isCachedTrack = cached
+            isDownloadedOffline = downloaded
+        }
     }
 
     companion object {
