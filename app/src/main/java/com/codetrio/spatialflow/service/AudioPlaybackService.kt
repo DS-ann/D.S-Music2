@@ -74,7 +74,8 @@ data class CachedMediaMetadata(
     val title: String,
     val artist: String,
     val songId: String,
-    val durationMs: Long = 0L
+    val durationMs: Long = 0L,
+    val videoId: String = ""
 )
 
 data class CurrentAudioFormatDetails(
@@ -167,6 +168,40 @@ class AudioPlaybackService : MediaSessionService() {
         }
 
         /**
+         * Finds a fully cached stream for a track without consulting the user's selected
+         * format/bitrate. Returning the exact original URL preserves Media3's cache key, and
+         * requiring the full content length prevents an offline tap from silently reaching
+         * the network for missing byte ranges.
+         */
+        @JvmStatic
+        @Synchronized
+        fun getCachedPlaybackUri(
+            context: Context,
+            songId: String,
+            videoId: String? = null
+        ): Uri? {
+            val currentCache = getCache(context.applicationContext)
+            val candidates = currentCache.keys.mapNotNull { key ->
+                val metadata = getCachedMediaMetadata(context, key) ?: return@mapNotNull null
+                val matchesSong = songId.isNotBlank() && metadata.songId == songId
+                val matchesVideo = !videoId.isNullOrBlank() && metadata.videoId == videoId
+                if (!matchesSong && !matchesVideo) return@mapNotNull null
+
+                val contentMetadata = currentCache.getContentMetadata(key)
+                val contentLength = androidx.media3.datasource.cache.ContentMetadata
+                    .getContentLength(contentMetadata)
+                if (contentLength <= 0L || !currentCache.isCached(key, 0L, contentLength)) {
+                    return@mapNotNull null
+                }
+
+                val uri = Uri.parse(key)
+                if (uri.scheme != "http" && uri.scheme != "https") return@mapNotNull null
+                key to currentCache.getCachedSpans(key).sumOf { it.length }
+            }
+            return candidates.maxByOrNull { it.second }?.first?.let { Uri.parse(it) }
+        }
+
+        /**
          * Associates the opaque Media3 cache key (typically a signed stream URL) with safe display
          * metadata. Only a SHA-256 digest is used as the preference key; signed URLs are not stored
          * in the metadata preference file.
@@ -178,15 +213,20 @@ class AudioPlaybackService : MediaSessionService() {
             title: String,
             artist: String,
             songId: String = "",
-            durationMs: Long = 0L
+            durationMs: Long = 0L,
+            videoId: String = ""
         ) {
             if (cacheKey.isBlank() || title.isBlank()) return
             val digestKey = cacheMetadataEntryKey(cacheKey)
+            // Keep the video ID when a cache playlist later reopens a track using its direct
+            // cached URL (that offline queue intentionally has no online resolver ID).
+            val previousVideoId = getCachedMediaMetadata(context, cacheKey)?.videoId.orEmpty()
             val payload = org.json.JSONObject()
                 .put("title", title)
                 .put("artist", artist)
                 .put("songId", songId)
                 .put("durationMs", durationMs)
+                .put("videoId", videoId.ifBlank { previousVideoId })
                 .toString()
             context.getSharedPreferences(PREF_MEDIA_CACHE_METADATA, Context.MODE_PRIVATE)
                 .edit().putString(digestKey, payload).apply()
@@ -204,7 +244,8 @@ class AudioPlaybackService : MediaSessionService() {
                     title = title,
                     artist = json.optString("artist", "").trim(),
                     songId = json.optString("songId", ""),
-                    durationMs = json.optLong("durationMs", 0L)
+                    durationMs = json.optLong("durationMs", 0L),
+                    videoId = json.optString("videoId", "")
                 )
             } catch (_: Exception) {
                 null
@@ -1214,7 +1255,8 @@ class AudioPlaybackService : MediaSessionService() {
                 title,
                 artist,
                 songId,
-                cachedSong?.duration ?: 0L
+                cachedSong?.duration ?: 0L,
+                cachedSong?.videoId.orEmpty()
             )
         }
 
