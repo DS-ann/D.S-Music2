@@ -1978,7 +1978,7 @@ private fun AudioFormatRow(
             Column {
                 Text(text = title, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    text = "Prefers this source format when available. No transcoding is performed; if a track has no matching stream, the closest available source format is used.",
+                    text = "Requests this source format without transcoding. If a track has no matching stream, SpatialFlow asks you to choose from formats that track actually offers.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

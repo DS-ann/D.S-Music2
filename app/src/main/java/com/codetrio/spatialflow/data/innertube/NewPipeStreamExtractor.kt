@@ -276,16 +276,17 @@ object NewPipeStreamExtractor {
         purpose: AudioFormatPurpose,
         allowFormatChoice: Boolean
     ): AudioStream? {
-        val candidates = candidatesForFormat(audioStreams, preferredFormat)
+        val requestedFormat = normalizeAudioFormat(preferredFormat)
+        val candidates = candidatesForFormat(audioStreams, requestedFormat)
         if (candidates.isNotEmpty()) {
             return candidates.minByOrNull { stream ->
                 val bitrate = streamBitrateKbps(stream)
                 if (bitrate > 0) kotlin.math.abs(bitrate - targetKbps) else Int.MAX_VALUE
             }
         }
-        if (preferredFormat == "auto") return null
-        if (audioStreams.isEmpty()) throw RequestedAudioFormatUnavailableException(preferredFormat)
-        if (!allowFormatChoice) throw RequestedAudioFormatUnavailableException(preferredFormat)
+        if (requestedFormat == "auto") return null
+        if (audioStreams.isEmpty()) throw RequestedAudioFormatUnavailableException(requestedFormat)
+        if (!allowFormatChoice) throw RequestedAudioFormatUnavailableException(requestedFormat)
 
         val optionPairs = audioStreams.mapIndexed { index, stream -> stream to choiceOption(stream, index) }
             .sortedWith(compareByDescending<Pair<AudioStream, AvailableAudioFormat>> { it.second.bitrateKbps }
@@ -293,7 +294,7 @@ object NewPipeStreamExtractor {
         val selected = AudioFormatSelectionCoordinator.choose(
             songTitle = title,
             purpose = purpose,
-            requestedFormat = preferredFormat,
+            requestedFormat = requestedFormat,
             targetBitrateKbps = targetKbps,
             options = optionPairs.map { it.second }
         )

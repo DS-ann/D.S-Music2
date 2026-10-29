@@ -73,6 +73,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.codetrio.spatialflow.model.SongItem
 import com.codetrio.spatialflow.service.AudioPlaybackService
+import com.codetrio.spatialflow.ui.AudioFormatChoiceDialogHost
 import com.codetrio.spatialflow.ui.PlayerBottomSheetCompose
 import com.codetrio.spatialflow.ui.SettingsScreenContent
 import com.codetrio.spatialflow.ui.TagEditorScreenEntryPoint
@@ -482,6 +483,7 @@ class MainActivity : AppCompatActivity() {
                             activity = this@MainActivity,
                             viewModel = playerViewModel
                         )
+                        AudioFormatChoiceDialogHost()
                     }
                 }
             }

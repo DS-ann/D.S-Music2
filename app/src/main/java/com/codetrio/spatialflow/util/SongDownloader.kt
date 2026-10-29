@@ -260,7 +260,10 @@ object SongDownloader {
                 updateNotification(context, cleanTitleStr, 90, notificationId)
             } else {
                 // No cache entry for this track: use the standard online download path.
-                val downloadStream = NewPipeStreamExtractor.getDownloadStreamData(videoId)
+                val downloadStream = NewPipeStreamExtractor.getDownloadStreamData(
+                    videoId,
+                    allowFormatChoice = true
+                )
                 coroutineContext.ensureActive()
                 val streamUrl = downloadStream?.url
                 if (streamUrl.isNullOrBlank()) {
