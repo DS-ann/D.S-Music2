@@ -1233,11 +1233,18 @@ fun PlayerBottomSheetCompose(
                         var bottomOffsetPx = effectiveBottomNavHeight + with(density) { 16.dp.toPx() }
                         
                         if (showPlayerContentArea) {
-                            val miniPlayerHeightPx = with(density) { MiniPlayerHeight.toPx() }
-                            bottomOffsetPx = effectiveBottomNavHeight + currentBottomGapPx + miniPlayerHeightPx + with(density) { 8.dp.toPx() }
-                            
-                            val topOfPlayerSheetY = sheetVisualState.visualSheetTranslationYProvider()
-                            bottomOffsetPx = screenHeightPx - topOfPlayerSheetY + with(density) { 8.dp.toPx() }
+                            if (currentSheetContentState == PlayerSheetState.EXPANDED) {
+                                // The expanded sheet starts at (or very near) the top of the screen.
+                                // Anchoring the snackbar to that top edge can move it off-screen.
+                                // Keep download/playback messages inside the visible player instead.
+                                bottomOffsetPx = with(density) { 96.dp.toPx() }
+                            } else {
+                                val miniPlayerHeightPx = with(density) { MiniPlayerHeight.toPx() }
+                                bottomOffsetPx = effectiveBottomNavHeight + currentBottomGapPx + miniPlayerHeightPx + with(density) { 8.dp.toPx() }
+
+                                val topOfPlayerSheetY = sheetVisualState.visualSheetTranslationYProvider()
+                                bottomOffsetPx = screenHeightPx - topOfPlayerSheetY + with(density) { 8.dp.toPx() }
+                            }
                         }
                         
                         IntOffset(0, -bottomOffsetPx.roundToInt())
