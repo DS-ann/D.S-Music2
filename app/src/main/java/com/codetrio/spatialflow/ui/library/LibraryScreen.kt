@@ -59,6 +59,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
@@ -182,9 +184,18 @@ fun LibraryScreen(
     val isPlayerExpanded by viewModel.isPlayerExpanded.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
-    var activeTab by rememberSaveable { mutableStateOf("") }
+    var activeTab by rememberSaveable { mutableStateOf("Playlists") }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var sortOrder by rememberSaveable { mutableStateOf(SortOrder.A_Z) }
+    var playlistsAsList by rememberSaveable { mutableStateOf(false) }
+    var albumsAsList by rememberSaveable { mutableStateOf(false) }
+    var artistsAsList by rememberSaveable { mutableStateOf(false) }
+    val currentCollectionAsList = when (activeTab) {
+        "Playlists" -> playlistsAsList
+        "Albums" -> albumsAsList
+        "Artists" -> artistsAsList
+        else -> false
+    }
     var isRefreshing by remember { mutableStateOf(false) }
 
     var showAccountScreen by remember { mutableStateOf(false) }
@@ -216,18 +227,23 @@ fun LibraryScreen(
     // Library sections are local UI state rather than separate NavController destinations.
     // Consume Back here so it returns to the Library landing page.
     BackHandler(
-        enabled = activeTab.isNotEmpty() || showAccountScreen || showHistoryScreen || showCreditsForSong != null
+        enabled = activeTab != "Playlists" || showAccountScreen || showHistoryScreen || showCreditsForSong != null
     ) {
         when {
             showCreditsForSong != null -> showCreditsForSong = null
             showHistoryScreen -> showHistoryScreen = false
             showAccountScreen -> showAccountScreen = false
-            activeTab.isNotEmpty() -> {
-                activeTab = ""
+            activeTab != "Playlists" -> {
+                activeTab = "Playlists"
                 searchQuery = ""
                 mainActivity?.showBottomNavWithAnimation()
             }
         }
+    }
+
+    // Migrate a previously saved blank overview page to the Playlist landing section.
+    LaunchedEffect(Unit) {
+        if (activeTab.isBlank()) activeTab = "Playlists"
     }
 
     // Trigger local files scan on first composition
@@ -341,7 +357,26 @@ fun LibraryScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            IconButton(onClick = { showHistoryScreen = true }) {
+                            if (activeTab == "Playlists" || activeTab == "Albums" || activeTab == "Artists") {
+                                IconButton(
+                                    onClick = {
+                                        when (activeTab) {
+                                            "Playlists" -> playlistsAsList = !playlistsAsList
+                                            "Albums" -> albumsAsList = !albumsAsList
+                                            "Artists" -> artistsAsList = !artistsAsList
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = if (currentCollectionAsList) Icons.Default.GridView else Icons.Default.ViewList,
+                                        contentDescription = if (currentCollectionAsList) "Show as grid" else "Show as list",
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+
+                            IconButton(onClick = { activeTab = "History" }) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_history),
                                     contentDescription = "Listening History",
@@ -378,46 +413,45 @@ fun LibraryScreen(
                     }
                 }
 
-                // Prism-style category chips are shown only inside a selected library section.
-                // The landing page uses large library tiles instead of making the user scan this row.
-                if (activeTab.isNotEmpty()) {
-                    val tabs = listOf(
-                        "Playlists",
-                        "Recap",
-                        "Podcasts",
-                        "Songs",
-                        "Albums",
-                        "Artists",
-                        "Downloaded songs",
-                        "Cache"
-                    )
+                // Keep Library navigation visible while browsing, like Prism's tab-first Library.
+                val tabs = listOf(
+                    "Playlists" to "Playlists",
+                    "Songs" to "Songs",
+                    "Albums" to "Albums",
+                    "Artists" to "Artists",
+                    "History" to "History",
+                    "Downloads" to "Downloaded songs",
+                    "Podcasts" to "Podcasts",
+                    "Recap" to "Recap",
+                    "Local music" to "Device Files",
+                    "Cache" to "Cache"
+                )
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        tabs.forEach { tabName ->
-                            val isSelected = activeTab == tabName
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = {
-                                    activeTab = if (isSelected) "" else tabName
-                                },
-                                label = { Text(tabName, fontWeight = FontWeight.SemiBold) },
-                                shape = RoundedCornerShape(8.dp),
-                                border = null,
-                                colors = FilterChipDefaults.filterChipColors(
-                                    containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    tabs.forEach { (label, tabKey) ->
+                        FilterChip(
+                            selected = activeTab == tabKey,
+                            onClick = {
+                                activeTab = tabKey
+                                if (tabKey == "History") accountViewModel?.loadLibrary()
+                            },
+                            label = { Text(label, fontWeight = FontWeight.SemiBold) },
+                            shape = CircleShape,
+                            border = null,
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
                             )
-                        }
+                        )
                     }
                 }
 
@@ -427,11 +461,11 @@ fun LibraryScreen(
                     .nestedScroll(nestedScrollConnection)
             ) {
                 when (activeTab) {
-                    "Playlists" -> PlaylistsTabContent(nestedScrollConnection, viewModel)
+                    "Playlists" -> PlaylistsTabContent(nestedScrollConnection, viewModel, playlistsAsList)
                     "Podcasts" -> PodcastsTabContent(nestedScrollConnection)
                     "Songs" -> SongsTabContent(nestedScrollConnection, viewModel)
-                    "Albums" -> AlbumsTabContent(nestedScrollConnection)
-                    "Artists" -> ArtistsTabContent(nestedScrollConnection)
+                    "Albums" -> AlbumsTabContent(nestedScrollConnection, albumsAsList)
+                    "Artists" -> ArtistsTabContent(nestedScrollConnection, artistsAsList)
                     "Recap" -> RecapTabContent(nestedScrollConnection, viewModel, onNavigateToExplore)
                     "Cache" -> StreamCacheTabContent(context)
                     "Device Files", "Downloaded songs" -> {
@@ -793,7 +827,20 @@ fun LibraryScreen(
                             }
                         }
                     }
-                    "" -> UnifiedLibraryContent(nestedScrollConnection) { selectedSection -> activeTab = selectedSection }
+                    "History" -> HistoryScreen(
+                        history = history,
+                        currentOnlineSong = currentOnlineSong,
+                        isLoadingStream = isLoadingStream,
+                        isRefreshing = accountViewModel?.isLoading?.collectAsStateWithLifecycle()?.value == true,
+                        onRefresh = { accountViewModel?.loadLibrary() },
+                        onBack = { activeTab = "Playlists" },
+                        onSongClick = { song, queue, index ->
+                            exploreViewModel?.playOnlineSongWithQueue(song, queue, index)
+                        },
+                        onSongMenuClick = { song -> selectedSongForMenu = song },
+                        showTopBar = false
+                    )
+                    "" -> PlaylistsTabContent(nestedScrollConnection, viewModel, playlistsAsList)
                 }
             }
         }
@@ -1266,7 +1313,8 @@ private fun UnifiedLibraryCard(item: UnifiedLibraryItem) {
 @Composable
 private fun PlaylistsTabContent(
     nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection,
-    viewModel: PlayerSharedViewModel
+    viewModel: PlayerSharedViewModel,
+    showAsList: Boolean = false
 ) {
     val context = LocalContext.current
     val activity = remember { getActivityFromContext(context) as? androidx.fragment.app.FragmentActivity }
@@ -1375,6 +1423,32 @@ private fun PlaylistsTabContent(
                     )
                 }
             }
+        } else if (showAsList) {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                items(localPlaylists, key = { it.id }) { playlist ->
+                    ListItem(
+                        headlineContent = {
+                            Text(playlist.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                        },
+                        supportingContent = { Text("Playlist", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        leadingContent = {
+                            Box(
+                                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                            }
+                        },
+                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                            .clickable { selectedLocalPlaylist = playlist }
+                    )
+                }
+            }
         } else {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1439,7 +1513,7 @@ private fun PlaylistsTabContent(
             }
         } else {
             LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
+                columns = GridCells.Fixed(if (showAsList) 1 else 2),
                 contentPadding = PaddingValues(bottom = 160.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -1449,7 +1523,7 @@ private fun PlaylistsTabContent(
                     .nestedScroll(nestedScrollConnection)
             ) {
                 items(onlinePlaylists) { playlist ->
-                    OnlinePlaylistCard(playlist, onClick = {
+                    OnlinePlaylistCard(playlist, asList = showAsList, onClick = {
                         exploreViewModel?.cameFromLibrary = true
                         exploreViewModel?.loadPlaylist(playlist.playlistId)
                         navigateToExplore(activity)
@@ -1674,8 +1748,39 @@ private fun LocalPlaylistDetailsBottomSheet(
 @Composable
 private fun OnlinePlaylistCard(
     playlist: OnlinePlaylist,
+    asList: Boolean = false,
     onClick: () -> Unit
 ) {
+    if (asList) {
+        ListItem(
+            headlineContent = {
+                Text(playlist.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            },
+            supportingContent = {
+                Text(playlist.songCount ?: "Playlist", color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            },
+            leadingContent = {
+                if (!playlist.thumbnailUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current).data(playlist.thumbnailUrl).crossfade(false).build(),
+                        contentDescription = null,
+                        modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    }
+                }
+            },
+            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick)
+        )
+        return
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -1920,7 +2025,10 @@ private fun SongsTabContent(nestedScrollConnection: androidx.compose.ui.input.ne
 }
 
 @Composable
-private fun AlbumsTabContent(nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection) {
+private fun AlbumsTabContent(
+    nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection,
+    showAsList: Boolean = false
+) {
     val context = LocalContext.current
     val activity = remember { getActivityFromContext(context) as? androidx.fragment.app.FragmentActivity }
 
@@ -1962,7 +2070,7 @@ private fun AlbumsTabContent(nestedScrollConnection: androidx.compose.ui.input.n
             }
         } else {
             LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
+                columns = GridCells.Fixed(if (showAsList) 1 else 2),
                 contentPadding = PaddingValues(bottom = 160.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -1972,7 +2080,7 @@ private fun AlbumsTabContent(nestedScrollConnection: androidx.compose.ui.input.n
                     .nestedScroll(nestedScrollConnection)
             ) {
                 items(onlineAlbums) { album ->
-                    OnlineAlbumCard(album, onClick = {
+                    OnlineAlbumCard(album, asList = showAsList, onClick = {
                         exploreViewModel?.cameFromLibrary = true
                         exploreViewModel?.loadAlbum(album.browseId)
                         navigateToExplore(activity)
@@ -1986,8 +2094,35 @@ private fun AlbumsTabContent(nestedScrollConnection: androidx.compose.ui.input.n
 @Composable
 private fun OnlineAlbumCard(
     album: OnlineAlbum,
+    asList: Boolean = false,
     onClick: () -> Unit
 ) {
+    if (asList) {
+        ListItem(
+            headlineContent = { Text(album.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            supportingContent = { Text(album.artists.firstOrNull()?.name ?: "Unknown Artist", color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) },
+            leadingContent = {
+                if (!album.thumbnailUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current).data(album.thumbnailUrl).crossfade(false).build(),
+                        contentDescription = null,
+                        modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Album, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    }
+                }
+            },
+            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick)
+        )
+        return
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -2051,7 +2186,10 @@ private fun OnlineAlbumCard(
 }
 
 @Composable
-private fun ArtistsTabContent(nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection) {
+private fun ArtistsTabContent(
+    nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection,
+    showAsList: Boolean = false
+) {
     val context = LocalContext.current
     val activity = remember { getActivityFromContext(context) as? androidx.fragment.app.FragmentActivity }
 
@@ -2093,7 +2231,7 @@ private fun ArtistsTabContent(nestedScrollConnection: androidx.compose.ui.input.
             }
         } else {
             LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
+                columns = GridCells.Fixed(if (showAsList) 1 else 2),
                 contentPadding = PaddingValues(bottom = 160.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -2103,7 +2241,7 @@ private fun ArtistsTabContent(nestedScrollConnection: androidx.compose.ui.input.
                     .nestedScroll(nestedScrollConnection)
             ) {
                 items(onlineArtists) { artist ->
-                    OnlineArtistCard(artist, onClick = {
+                    OnlineArtistCard(artist, asList = showAsList, onClick = {
                         exploreViewModel?.cameFromLibrary = true
                         exploreViewModel?.loadArtist(artist.browseId, artist.thumbnailUrl)
                         navigateToExplore(activity)
@@ -2117,8 +2255,35 @@ private fun ArtistsTabContent(nestedScrollConnection: androidx.compose.ui.input.
 @Composable
 private fun OnlineArtistCard(
     artist: OnlineArtist,
+    asList: Boolean = false,
     onClick: () -> Unit
 ) {
+    if (asList) {
+        ListItem(
+            headlineContent = { Text(artist.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            supportingContent = { Text("Artist", color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) },
+            leadingContent = {
+                if (!artist.thumbnailUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current).data(artist.thumbnailUrl).crossfade(false).build(),
+                        contentDescription = null,
+                        modifier = Modifier.size(56.dp).clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        Modifier.size(56.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            },
+            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick)
+        )
+        return
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
