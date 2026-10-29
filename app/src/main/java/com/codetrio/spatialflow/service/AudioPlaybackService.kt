@@ -873,14 +873,8 @@ class AudioPlaybackService : MediaSessionService() {
             vm.syncedLyrics.collect { lyrics ->
                 val position = player.currentPosition.coerceAtLeast(0L)
                 val duration = player.duration.coerceAtLeast(0L)
-                val currentText = if (!lyrics.isNullOrEmpty()) {
-                    SpatialFlowWidgetProvider.findCurrentLyricLine(lyrics, position.toInt())
-                } else {
-                    vm.plainLyrics.value?.lineSequence()
-                        ?.firstOrNull { it.isNotBlank() }
-                        ?.trim()
-                }
-                if (!currentText.isNullOrBlank()) {
+                val currentText = currentWidgetLyricText(position)
+                if (currentText != "...") {
                     SpatialFlowWidgetProvider.updateAllWidgetsPartial(
                         this@AudioPlaybackService,
                         position.toInt(),
@@ -899,7 +893,7 @@ class AudioPlaybackService : MediaSessionService() {
                         this@AudioPlaybackService,
                         position.toInt(),
                         duration.toInt(),
-                        plain.lineSequence().firstOrNull { it.isNotBlank() }?.trim() ?: "..."
+                        currentWidgetLyricText(position)
                     )
                 }
             }
@@ -1722,28 +1716,48 @@ class AudioPlaybackService : MediaSessionService() {
         handler.post(progressUpdateRunnable)
     }
 
-    private fun updateWidgetProgress(pos: Long, dur: Long) {
-        var lyricText = "..."
-        viewModel?.syncedLyrics?.value?.let { lyrics ->
-            if (lyrics.isNotEmpty()) {
-                lyricText = SpatialFlowWidgetProvider.findCurrentLyricLine(lyrics, pos.toInt()) ?: "..."
-            }
+    /**
+     * Prefer time-synchronised lyrics; when only plain lyrics exist, show several readable
+     * lines instead of replacing the widget content with "..." on every progress tick.
+     */
+    private fun currentWidgetLyricText(positionMs: Long): String {
+        val vm = viewModel ?: return "..."
+        val synced = vm.syncedLyrics.value
+        if (!synced.isNullOrEmpty()) {
+            return SpatialFlowWidgetProvider.findCurrentLyricLine(synced, positionMs.toInt())
+                ?.takeIf { it.isNotBlank() } ?: "..."
         }
-        SpatialFlowWidgetProvider.updateAllWidgetsPartial(this, pos.toInt(), dur.toInt(), lyricText)
+        val plain = vm.plainLyrics.value.orEmpty()
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .take(4)
+            .joinToString("\n")
+        return plain.ifBlank { "..." }
+    }
+
+    private fun updateWidgetProgress(pos: Long, dur: Long) {
+        SpatialFlowWidgetProvider.updateAllWidgetsPartial(
+            this,
+            pos.toInt(),
+            dur.toInt(),
+            currentWidgetLyricText(pos)
+        )
     }
 
     fun updateWidgetState(isPlaying: Boolean) {
         viewModel?.let { vm ->
             val song = vm.currentSong.value
-            val pos = player.currentPosition.toInt()
-            val dur = player.duration.toInt()
-            var lyricText = "..."
-            vm.syncedLyrics.value?.let { lyrics ->
-                if (lyrics.isNotEmpty()) {
-                    lyricText = SpatialFlowWidgetProvider.findCurrentLyricLine(lyrics, pos) ?: "..."
-                }
-            }
-            SpatialFlowWidgetProvider.updateAllWidgets(this, song, isPlaying, pos, dur, lyricText)
+            val pos = player.currentPosition
+            val dur = player.duration
+            SpatialFlowWidgetProvider.updateAllWidgets(
+                this,
+                song,
+                isPlaying,
+                pos.toInt(),
+                dur.toInt(),
+                currentWidgetLyricText(pos)
+            )
         }
     }
 
