@@ -22,6 +22,8 @@ data class SongItem(
     @JvmField var videoId: String? = null
     @JvmField var artistId: String? = null
     @JvmField var lufs: Float? = null
+    /** True when this queue entry resolves to a fully cached Media3 stream, not a live URL. */
+    @JvmField var isCachedTrack: Boolean = false
 
     private var uriString: String? = null
 
