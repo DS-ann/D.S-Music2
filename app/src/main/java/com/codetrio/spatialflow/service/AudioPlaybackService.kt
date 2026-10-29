@@ -867,7 +867,27 @@ class AudioPlaybackService : MediaSessionService() {
             
             resolveJob = serviceScope.launch {
                 Log.d(TAG, "Pre-resolving stream ahead of injector injection: $videoId")
-                
+
+                // A fully cached stream wins over format/bitrate preferences. Play it through
+                // its exact cache key, otherwise an explicit setting can force a network fetch
+                // even though another quality/container is already available offline.
+                if (!useWebRemixRetry && !useCompatibleFallbackRetry) {
+                    val activeSong = viewModel?.currentSong?.value?.takeIf { it.videoId == videoId }
+                    val cacheSongId = activeSong?.id?.toString()
+                        ?: videoId.hashCode().toLong().toString()
+                    val cachedUri = withContext(Dispatchers.IO) {
+                        getCachedPlaybackUri(applicationContext, cacheSongId, videoId)
+                    }
+                    if (cachedUri != null) {
+                        ensureActive()
+                        if (resolveTargetSongId != videoId) return@launch
+                        Log.i(TAG, "Using fully cached stream for $videoId regardless of selected format/bitrate")
+                        originalSourceUri = cachedUri
+                        loadAudioInternal(cachedUri, keepPlayingUntilReady = true)
+                        return@launch
+                    }
+                }
+
                 // Fetch stream URL only, don't wait for position yet. Cancelling a format-choice
                 // dialog is a user decision, not an extraction error: don't auto-switch formats
                 // or immediately show the same request again.
