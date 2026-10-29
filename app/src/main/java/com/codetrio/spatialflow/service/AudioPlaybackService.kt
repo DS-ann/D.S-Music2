@@ -827,14 +827,32 @@ class AudioPlaybackService : MediaSessionService() {
             resolveJob = serviceScope.launch {
                 Log.d(TAG, "Pre-resolving stream ahead of injector injection: $videoId")
                 
-                // Fetch stream URL only, don't wait for position yet
+                // Fetch stream URL only, don't wait for position yet. Cancelling a format-choice
+                // dialog is a user decision, not an extraction error: don't auto-switch formats
+                // or immediately show the same request again.
+                var formatChoiceCancelled = false
                 var streamUrl = async(Dispatchers.IO) {
                     when {
                         useWebRemixRetry -> YouTubeMusic.getStreamUrlFromWebRemix(videoId).getOrNull()
                         useCompatibleFallbackRetry -> YouTubeMusic.getCompatibleFallbackStreamUrl(videoId).getOrNull()
-                        else -> YouTubeMusic.getStreamUrl(videoId).getOrNull()
+                        else -> {
+                            val result = YouTubeMusic.getStreamUrl(videoId, promptForFormatChoice = true)
+                            formatChoiceCancelled =
+                                result.exceptionOrNull() is com.codetrio.spatialflow.data.innertube.AudioFormatSelectionCancelledException
+                            result.getOrNull()
+                        }
                     }
                 }.await()
+
+                if (formatChoiceCancelled) {
+                    ensureActive()
+                    if (resolveTargetSongId == videoId) {
+                        shouldAutoPlay = false
+                        viewModel?.setIsPlaying(false)
+                        viewModel?.setLoading(false)
+                    }
+                    return@launch
+                }
 
                 if (streamUrl.isNullOrEmpty()) {
                     when {

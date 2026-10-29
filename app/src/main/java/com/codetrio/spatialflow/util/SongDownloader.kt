@@ -359,6 +359,14 @@ object SongDownloader {
                     iconResId = R.drawable.ic_downloaded
                 )
             }
+        } catch (e: com.codetrio.spatialflow.data.innertube.AudioFormatSelectionCancelledException) {
+            task.outputFile?.delete()
+            cancelNotification(context, notificationId)
+            withContext(Dispatchers.Main) {
+                com.codetrio.spatialflow.ui.SnackbarController.showMessage(
+                    "Download cancelled: no format selected"
+                )
+            }
         } catch (e: CancellationException) {
             task.cancelled = true
             task.outputFile?.delete()

@@ -102,6 +102,11 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sign
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import com.codetrio.spatialflow.data.innertube.AudioFormatSelectionCoordinator
+import com.codetrio.spatialflow.data.innertube.AudioFormatPurpose
 
 // ==========================================
 // 1. STEP 1: CORE STATE MACHINE & INTERFACES
@@ -769,6 +774,65 @@ fun PlayerBottomSheetCompose(
                 }
             )
         }
+        val pendingAudioFormatChoice by AudioFormatSelectionCoordinator.pending.collectAsStateWithLifecycle()
+        pendingAudioFormatChoice?.let { request ->
+            val dialogContext = LocalContext.current
+            AlertDialog(
+                onDismissRequest = { AudioFormatSelectionCoordinator.cancel(request) },
+                title = {
+                    Text(
+                        if (request.purpose == AudioFormatPurpose.DOWNLOAD) "Choose available download format"
+                        else "Choose available playback format",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 360.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            "The requested format (${request.requestedFormat.uppercase()}) isn't available for ${request.songTitle}. " +
+                                "Choose one of the formats this song actually offers. Your Settings preference won't be changed.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        request.options.forEach { option ->
+                            TextButton(
+                                onClick = { AudioFormatSelectionCoordinator.select(request, option) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(Modifier.fillMaxWidth()) {
+                                    Text(
+                                        option.formatLabel,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        buildString {
+                                            append(if (option.bitrateKbps > 0) "${option.bitrateKbps} kbps" else "Bitrate unknown")
+                                            option.contentLength?.takeIf { it > 0L }?.let {
+                                                append(" · ")
+                                                append(android.text.format.Formatter.formatFileSize(dialogContext, it))
+                                            }
+                                        },
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { AudioFormatSelectionCoordinator.cancel(request) }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
         val lyricsArtworkProgress by animateFloatAsState(
             targetValue = if (isLyricsModeEnabled) 1f else 0f,
             animationSpec = spring(dampingRatio = 0.86f, stiffness = 420f),
