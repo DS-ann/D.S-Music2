@@ -1246,7 +1246,7 @@ private fun ControlsAndGesturesScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Restore Prism-style defaults", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
-                    Icon(Icons.Rounded.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 }
             })
         }
