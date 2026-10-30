@@ -1060,7 +1060,7 @@ fun FullPlayer(
                             onClick = {
                                 val shareIntent = Intent().apply {
                                     this.action = Intent.ACTION_SEND
-                                    putExtra(Intent.EXTRA_TEXT, "Listening on SpatialFlow. Check out: https://music.youtube.com/watch?v=${songForActions?.videoId.orEmpty()}")
+                                    putExtra(Intent.EXTRA_TEXT, "Listening on D.S Music. Check out: https://music.youtube.com/watch?v=${songForActions?.videoId.orEmpty()}")
                                     type = "text/plain"
                                 }
                                 context.startActivity(Intent.createChooser(shareIntent, "Share Track"))
@@ -1551,7 +1551,7 @@ fun FullPlayer(
                     ?: if (songFileMetadata.isRemote) "Streaming audio (codec not identified yet)"
                        else "Audio format not exposed by file provider"
                 val sourceText = when {
-                    song.isCachedTrack -> "SpatialFlow cache (cached audio stream)"
+                    song.isCachedTrack -> "D.S Music cache (cached audio stream)"
                     song.isDownloadedOffline -> "Downloaded audio file (offline)"
                     !song.videoId.isNullOrBlank() && songFileMetadata.isRemote -> "YouTube Music stream"
                     songFileMetadata.isRemote -> "Remote audio stream"
