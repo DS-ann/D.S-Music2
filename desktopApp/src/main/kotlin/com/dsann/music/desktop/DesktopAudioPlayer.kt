@@ -31,6 +31,12 @@ internal class DesktopAudioPlayer : AutoCloseable {
     @Volatile private var remotePlayer: MediaPlayer? = null
     @Volatile private var remoteAudioPlayer: MediaPlayer? = null
     @Volatile private var onPlaybackCompleted: (() -> Unit)? = null
+    @Volatile private var onRemotePlayerChanged: ((MediaPlayer?) -> Unit)? = null
+
+    fun setOnRemotePlayerChanged(callback: ((MediaPlayer?) -> Unit)?) {
+        onRemotePlayerChanged = callback
+        callback?.invoke(remotePlayer)
+    }
 
     fun setOnPlaybackCompleted(callback: (() -> Unit)?) {
         onPlaybackCompleted = callback
@@ -183,6 +189,7 @@ internal class DesktopAudioPlayer : AutoCloseable {
                 audio = audioPlayer
                 remotePlayer = videoPlayer
                 remoteAudioPlayer = audioPlayer
+                onRemotePlayerChanged?.invoke(videoPlayer)
 
                 // The video-only stream has no soundtrack; the paired audio player supplies it.
                 videoPlayer.volume = 0.0
@@ -247,6 +254,7 @@ internal class DesktopAudioPlayer : AutoCloseable {
                 val media = Media(url)
                 val created = MediaPlayer(media)
                 remotePlayer = created
+                onRemotePlayerChanged?.invoke(created)
                 created.currentTimeProperty().addListener { _, _, newTime ->
                     if (token == generation.get() && newTime != null && newTime.toMillis().isFinite()) {
                         positionMillis = newTime.toMillis().toLong().coerceAtLeast(0L)
@@ -356,6 +364,7 @@ internal class DesktopAudioPlayer : AutoCloseable {
             val oldAudio = remoteAudioPlayer
             remotePlayer = null
             remoteAudioPlayer = null
+            onRemotePlayerChanged?.invoke(null)
             try {
                 Platform.runLater {
                     old?.stop()
