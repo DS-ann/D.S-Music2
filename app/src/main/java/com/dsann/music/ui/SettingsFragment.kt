@@ -2190,7 +2190,7 @@ private fun AppearanceScreen(
                         options = listOf("Original", "Left", "Center"),
                         onSelected = onLyricsAlignmentChange
                     )
-                }
+                },
                 {
                     SettingsChoiceRow(
                         title = "Lyrics font",
