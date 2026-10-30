@@ -322,7 +322,16 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     fun addSongToRemotePlaylist(song: OnlineSong) {
         val playlistId = selectedRemotePlaylistId
         if (!DesktopYouTubeMusic.hasSession() || playlistId.isNullOrBlank()) {
-            addSongToPlaylist(song)
+            val local = playlists.firstOrNull() ?: runCatching {
+                DesktopLibraryStore.createPlaylist("My playlist")
+            }.getOrNull()
+            if (local == null) {
+                downloadMessage = "Could not create a local playlist."
+                return
+            }
+            DesktopLibraryStore.addToPlaylist(local.id, song)
+            refreshSavedLists()
+            downloadMessage = "Added to ${local.title}."
             return
         }
         coroutineScope.launch {
