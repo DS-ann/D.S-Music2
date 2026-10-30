@@ -63,6 +63,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * Migrated from legacy Java/LiveData architecture to StateFlow + Coroutines.
  * Optimized for Material 3 Expressive and Media3 integration.
  */
+data class VideoPlaybackMetadata(val title: String, val uploader: String)
+
 @HiltViewModel
 class PlayerSharedViewModel @Inject constructor(
     private val application: Application,
@@ -378,8 +380,17 @@ class PlayerSharedViewModel @Inject constructor(
 
     private val _isVideoMode = MutableStateFlow(false)
     val isVideoMode: StateFlow<Boolean> = _isVideoMode.asStateFlow()
+
+    private val _videoPlaybackMetadata = MutableStateFlow<VideoPlaybackMetadata?>(null)
+    val videoPlaybackMetadata: StateFlow<VideoPlaybackMetadata?> = _videoPlaybackMetadata.asStateFlow()
+
     fun setVideoModeState(enabled: Boolean) {
         _isVideoMode.value = enabled
+        if (!enabled) _videoPlaybackMetadata.value = null
+    }
+
+    fun setVideoPlaybackMetadata(metadata: VideoPlaybackMetadata?) {
+        _videoPlaybackMetadata.value = metadata
     }
 
     fun isAutoplayEnabled(): Boolean = application
@@ -1415,6 +1426,7 @@ class PlayerSharedViewModel @Inject constructor(
         if (_currentSong.value?.id != song?.id) {
             lyricsController.clearForSongChange(song)
             _isVideoMode.value = false
+            _videoPlaybackMetadata.value = null
         }
         _currentSong.value = song
     }
