@@ -104,12 +104,23 @@ private fun PlayerVisualizer(
             }
         }
     }
+
     androidx.compose.foundation.Canvas(
-        modifier = Modifier.fillMaxWidth().height(if (style == "Ring") 30.dp else 24.dp)
+        modifier = Modifier.fillMaxWidth().height(
+            when (style) {
+                "Ring" -> 36.dp
+                "Bars" -> 24.dp
+                else -> 30.dp
+            }
+        )
     ) {
         val phaseValue = phase.value
-        val centerY = size.height / 2f
+        val phaseAngle = phaseValue * 6.2831855f
+        val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+        val centerY = center.y
+
         when (style) {
+            // Keep the compact bar style as-is; it is already the strongest visual.
             "Bars" -> {
                 val count = 32
                 val gap = 3.dp.toPx()
@@ -126,59 +137,206 @@ private fun PlayerVisualizer(
                     )
                 }
             }
+
+            // Layered harmonics and a changing amplitude envelope make the trace
+            // feel closer to a recorded waveform than a single travelling sine.
             "Wave" -> {
-                val path = androidx.compose.ui.graphics.Path()
-                val points = 70
-                repeat(points + 1) { index ->
-                    val x = size.width * index / points
-                    val y = centerY + kotlin.math.sin(index * 0.24f + phaseValue * 6.28f) * size.height * (if (isPlaying) 0.32f else 0.08f)
-                    if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                drawLine(
+                    color.copy(alpha = 0.12f),
+                    start = androidx.compose.ui.geometry.Offset(0f, centerY),
+                    end = androidx.compose.ui.geometry.Offset(size.width, centerY),
+                    strokeWidth = 1.dp.toPx()
+                )
+
+                val points = 64
+                repeat(2) { layer ->
+                    val path = androidx.compose.ui.graphics.Path()
+                    repeat(points + 1) { index ->
+                        val fraction = index / points.toFloat()
+                        val x = size.width * fraction
+                        val envelope = 0.22f + 0.78f * kotlin.math.abs(
+                            kotlin.math.sin(fraction * 10.5f + layer * 0.9f)
+                        )
+                        val fundamental = kotlin.math.sin(
+                            fraction * 18f + phaseAngle * (0.9f + layer * 0.16f)
+                        )
+                        val harmonic = kotlin.math.sin(
+                            fraction * 37f - phaseAngle * 0.7f + layer * 0.4f
+                        )
+                        val detail = kotlin.math.sin(fraction * 71f + phaseAngle * 0.45f)
+                        val signal = fundamental * 0.56f + harmonic * 0.29f + detail * 0.15f
+                        val activity = if (isPlaying) 0.42f else 0.07f
+                        val layerScale = if (layer == 0) 1f else 0.62f
+                        val y = centerY + signal * envelope * size.height * activity * layerScale
+                        if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                    }
+                    drawPath(
+                        path = path,
+                        color = color.copy(alpha = if (layer == 0) 0.92f else 0.30f),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = if (layer == 0) 1.8.dp.toPx() else 1.dp.toPx(),
+                            cap = androidx.compose.ui.graphics.StrokeCap.Round
+                        )
+                    )
                 }
-                drawPath(
-                    path,
-                    color.copy(alpha = 0.85f),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                )
             }
+
+            // A compact circular spectrum: fine radial ticks plus two rotating arcs.
             "Ring" -> {
-                val radius = size.height * (0.28f + phaseValue * 0.11f)
+                val outerRadius = size.height * 0.43f
                 drawCircle(
-                    color.copy(alpha = if (isPlaying) 0.85f else 0.35f),
-                    radius = radius,
-                    center = androidx.compose.ui.geometry.Offset(size.width / 2f, centerY),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx())
-                )
-                drawCircle(
-                    color.copy(alpha = 0.18f),
-                    radius = radius + 5.dp.toPx(),
-                    center = androidx.compose.ui.geometry.Offset(size.width / 2f, centerY),
+                    color.copy(alpha = 0.12f),
+                    radius = outerRadius,
+                    center = center,
                     style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
                 )
-            }
-            "Pulse" -> {
-                val width = size.width * (0.25f + phaseValue * 0.65f)
-                drawRoundRect(
-                    color.copy(alpha = 0.25f),
-                    topLeft = androidx.compose.ui.geometry.Offset(0f, centerY - 3.dp.toPx()),
-                    size = androidx.compose.ui.geometry.Size(width, 6.dp.toPx()),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())
+
+                val tickCount = 36
+                repeat(tickCount) { index ->
+                    val angle = index * (6.2831855f / tickCount) - 1.5707963f
+                    val level = kotlin.math.abs(
+                        kotlin.math.sin(index * 0.52f + phaseAngle * 1.35f)
+                    )
+                    val activity = if (isPlaying) 0.25f + level * 0.75f else 0.18f
+                    val innerRadius = size.height * 0.34f
+                    val tickLength = size.height * (0.035f + activity * 0.075f)
+                    val start = androidx.compose.ui.geometry.Offset(
+                        center.x + kotlin.math.cos(angle) * innerRadius,
+                        center.y + kotlin.math.sin(angle) * innerRadius
+                    )
+                    val end = androidx.compose.ui.geometry.Offset(
+                        center.x + kotlin.math.cos(angle) * (innerRadius + tickLength),
+                        center.y + kotlin.math.sin(angle) * (innerRadius + tickLength)
+                    )
+                    drawLine(
+                        color.copy(alpha = 0.32f + activity * 0.55f),
+                        start = start,
+                        end = end,
+                        strokeWidth = 1.2.dp.toPx(),
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                }
+
+                val arcRadius = size.height * 0.23f
+                val arcSize = androidx.compose.ui.geometry.Size(arcRadius * 2f, arcRadius * 2f)
+                val arcTopLeft = androidx.compose.ui.geometry.Offset(
+                    center.x - arcRadius,
+                    center.y - arcRadius
                 )
-            }
-            "Glow" -> {
+                drawArc(
+                    color = color.copy(alpha = if (isPlaying) 0.82f else 0.30f),
+                    startAngle = -105f + phaseValue * 82f,
+                    sweepAngle = 126f + kotlin.math.sin(phaseAngle) * 16f,
+                    useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = 2.dp.toPx(),
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                )
+                drawArc(
+                    color = color.copy(alpha = 0.38f),
+                    startAngle = 72f - phaseValue * 58f,
+                    sweepAngle = 68f + kotlin.math.sin(phaseAngle + 1.2f) * 12f,
+                    useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = 1.3.dp.toPx(),
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                )
                 drawCircle(
-                    brush = Brush.radialGradient(
-                        listOf(color.copy(alpha = 0.5f), color.copy(alpha = 0.02f), Color.Transparent),
-                        center = androidx.compose.ui.geometry.Offset(size.width / 2f, centerY),
-                        radius = size.height * (0.25f + phaseValue * 0.5f)
-                    ),
-                    radius = size.height,
-                    center = androidx.compose.ui.geometry.Offset(size.width / 2f, centerY)
+                    color.copy(alpha = if (isPlaying) 0.95f else 0.45f),
+                    radius = 1.7.dp.toPx(),
+                    center = center
                 )
+            }
+
+            // Nested, expanding contours give Pulse a clear centre-out motion
+            // without using the old single rectangle that simply grew to the edge.
+            "Pulse" -> {
+                repeat(3) { index ->
+                    val wave = if (isPlaying) {
+                        (kotlin.math.sin(phaseAngle - index * 0.92f) + 1f) * 0.5f
+                    } else {
+                        0.18f
+                    }
+                    val width = size.width * (0.28f + index * 0.16f + wave * 0.07f)
+                    val height = size.height * (0.24f + index * 0.22f)
+                    drawRoundRect(
+                        color = color.copy(
+                            alpha = if (isPlaying) 0.18f + wave * 0.22f else 0.10f
+                        ),
+                        topLeft = androidx.compose.ui.geometry.Offset(
+                            center.x - width / 2f,
+                            center.y - height / 2f
+                        ),
+                        size = androidx.compose.ui.geometry.Size(width, height),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(height / 2f),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = (1.8f - index * 0.25f).dp.toPx()
+                        )
+                    )
+                }
+                drawCircle(
+                    color.copy(alpha = if (isPlaying) 0.92f else 0.38f),
+                    radius = 1.8.dp.toPx(),
+                    center = center
+                )
+            }
+
+            // Several soft light fields drift independently instead of showing
+            // one hard-edged breathing circle.
+            "Glow" -> {
+                drawLine(
+                    color.copy(alpha = 0.10f),
+                    start = androidx.compose.ui.geometry.Offset(0f, centerY),
+                    end = androidx.compose.ui.geometry.Offset(size.width, centerY),
+                    strokeWidth = 1.dp.toPx()
+                )
+                val anchors = floatArrayOf(0.22f, 0.50f, 0.78f)
+                anchors.forEachIndexed { index, anchor ->
+                    val drift = if (isPlaying) {
+                        kotlin.math.sin(phaseAngle * 0.72f + index * 2.1f) * size.width * 0.055f
+                    } else {
+                        0f
+                    }
+                    val glowCenter = androidx.compose.ui.geometry.Offset(
+                        size.width * anchor + drift,
+                        centerY
+                    )
+                    val radius = size.width * (0.16f + if (isPlaying) {
+                        0.018f * kotlin.math.sin(phaseAngle + index).let { kotlin.math.abs(it) }
+                    } else {
+                        0f
+                    })
+                    val intensity = if (isPlaying) 0.30f else 0.10f
+                    drawOval(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                color.copy(alpha = intensity),
+                                color.copy(alpha = intensity * 0.38f),
+                                Color.Transparent
+                            ),
+                            center = glowCenter,
+                            radius = radius
+                        ),
+                        topLeft = androidx.compose.ui.geometry.Offset(
+                            glowCenter.x - radius,
+                            centerY - size.height * 0.52f
+                        ),
+                        size = androidx.compose.ui.geometry.Size(
+                            radius * 2f,
+                            size.height * 1.04f
+                        )
+                    )
+                }
             }
         }
     }
 }
-
 /**
  * Stateful wrapper for the FullPlayer UI component.
  * Decouples the UI component from ViewModel, Activity, and direct permission handling.
