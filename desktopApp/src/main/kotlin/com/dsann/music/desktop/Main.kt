@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.SwingPanel
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -1278,55 +1279,217 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                             }
 
                             "Playlists" -> {
-                                Column(Modifier.fillMaxSize()) {
-                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        OutlinedTextField(
-                                            value = playlistTitle,
-                                            onValueChange = { playlistTitle = it },
-                                            modifier = Modifier.weight(1f),
-                                            singleLine = true,
-                                            label = { Text("New playlist name") }
-                                        )
-                                        Button(
-                                            onClick = {
-                                                runCatching { DesktopLibraryStore.createPlaylist(playlistTitle) }
-                                                    .onSuccess { playlistTitle = ""; refreshSavedLists(); selectedPlaylistId = it.id }
-                                                    .onFailure { downloadMessage = it.message.orEmpty() }
-                                            },
-                                            enabled = playlistTitle.isNotBlank()
-                                        ) { Text("Create") }
-                                    }
-                                    Spacer(Modifier.height(12.dp))
-                                    if (playlists.isEmpty()) EmptyPanel("No playlists", "Create a playlist, then use the plus button on a search result to add songs.")
-                                    else LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                                        items(playlists, key = { it.id }) { playlist ->
-                                            Column(
-                                                Modifier.fillMaxWidth()
-                                                    .clip(RoundedCornerShape(14.dp))
-                                                    .background(if (selectedPlaylistId == playlist.id) Color(0xFF1D3045) else panelBackground)
-                                                    .padding(12.dp)
-                                            ) {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Column(Modifier.weight(1f).clickable { selectedPlaylistId = playlist.id }) {
-                                                        Text(playlist.title, fontWeight = FontWeight.SemiBold)
-                                                        Text("${playlist.songs.size} songs", color = mutedText, fontSize = 11.sp)
-                                                    }
-                                                    Button(onClick = { selectedPlaylistId = playlist.id }) { Text("Open") }
-                                                    Spacer(Modifier.width(6.dp))
-                                                    Button(onClick = {
-                                                        DesktopLibraryStore.deletePlaylist(playlist.id)
-                                                        if (selectedPlaylistId == playlist.id) selectedPlaylistId = null
-                                                        refreshSavedLists()
-                                                    }) { Text("Delete") }
-                                                }
-                                                if (selectedPlaylistId == playlist.id) {
-                                                    playlist.songs.forEach { saved ->
-                                                        SavedTrackRow(
-                                                            song = saved,
-                                                            label = "PLAYLIST",
-                                                            onClick = { playSavedSong(saved) },
-                                                            onRemove = { downloadMessage = "Playlist item removal is not yet available." }
+                                val openedPlaylist = playlists.firstOrNull { it.id == selectedPlaylistId }
+                                if (openedPlaylist != null) {
+                                    Column(
+                                        Modifier.fillMaxSize()
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    listOf(
+                                                        accentColor.copy(alpha = 0.28f),
+                                                        pageBackground,
+                                                        pageBackground
+                                                    )
+                                                )
+                                            )
+                                    ) {
+                                        Row(
+                                            Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Button(
+                                                onClick = { selectedPlaylistId = null },
+                                                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545))
+                                            ) { Text("← Back") }
+                                            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                                                Text(openedPlaylist.title, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                                                Text("${openedPlaylist.songs.size} songs • This PC", color = mutedText, fontSize = 11.sp)
+                                            }
+                                            Button(
+                                                onClick = {
+                                                    DesktopLibraryStore.deletePlaylist(openedPlaylist.id)
+                                                    selectedPlaylistId = null
+                                                    refreshSavedLists()
+                                                },
+                                                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4A2630))
+                                            ) { Text("Delete") }
+                                        }
+
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Button(
+                                                onClick = {
+                                                    val queue = openedPlaylist.songs.map { saved ->
+                                                        OnlineSong(
+                                                            videoId = saved.videoId,
+                                                            title = saved.title,
+                                                            artist = saved.artist,
+                                                            albumName = saved.album,
+                                                            durationMs = saved.durationMs,
+                                                            thumbnailUrl = saved.thumbnailUrl
                                                         )
+                                                    }
+                                                    if (queue.isNotEmpty()) {
+                                                        onlineQueue = queue
+                                                        playOnlineSong(queue.first(), queue)
+                                                    }
+                                                },
+                                                enabled = openedPlaylist.songs.isNotEmpty(),
+                                                colors = ButtonDefaults.buttonColors(backgroundColor = accentColor, contentColor = Color(0xFF0B1420))
+                                            ) { Text("▶  Play all") }
+                                            Button(
+                                                onClick = {
+                                                    val queue = openedPlaylist.songs.shuffled().map { saved ->
+                                                        OnlineSong(
+                                                            videoId = saved.videoId,
+                                                            title = saved.title,
+                                                            artist = saved.artist,
+                                                            albumName = saved.album,
+                                                            durationMs = saved.durationMs,
+                                                            thumbnailUrl = saved.thumbnailUrl
+                                                        )
+                                                    }
+                                                    if (queue.isNotEmpty()) {
+                                                        onlineQueue = queue
+                                                        playOnlineSong(queue.first(), queue)
+                                                    }
+                                                },
+                                                enabled = openedPlaylist.songs.isNotEmpty(),
+                                                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545))
+                                            ) { Text("Shuffle") }
+                                        }
+                                        Spacer(Modifier.height(14.dp))
+                                        if (openedPlaylist.songs.isEmpty()) {
+                                            EmptyPanel("This playlist is empty", "Use the plus button on a search result to add songs.")
+                                        } else {
+                                            LazyColumn(
+                                                Modifier.fillMaxSize(),
+                                                verticalArrangement = Arrangement.spacedBy(7.dp)
+                                            ) {
+                                                items(openedPlaylist.songs, key = { it.videoId }) { saved ->
+                                                    SavedTrackRow(
+                                                        song = saved,
+                                                        label = "PLAYLIST",
+                                                        onClick = {
+                                                            val queue = openedPlaylist.songs.map { entry ->
+                                                                OnlineSong(
+                                                                    videoId = entry.videoId,
+                                                                    title = entry.title,
+                                                                    artist = entry.artist,
+                                                                    albumName = entry.album,
+                                                                    durationMs = entry.durationMs,
+                                                                    thumbnailUrl = entry.thumbnailUrl
+                                                                )
+                                                            }
+                                                            val current = queue.indexOfFirst { it.videoId == saved.videoId }.coerceAtLeast(0)
+                                                            playOnlineSong(queue[current], queue)
+                                                        },
+                                                        onRemove = {
+                                                            DesktopLibraryStore.removeFromPlaylist(openedPlaylist.id, saved.videoId)
+                                                            refreshSavedLists()
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    Column(Modifier.fillMaxSize()) {
+                                        Row(
+                                            Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            OutlinedTextField(
+                                                value = playlistTitle,
+                                                onValueChange = { playlistTitle = it },
+                                                modifier = Modifier.weight(1f),
+                                                singleLine = true,
+                                                label = { Text("New playlist name") }
+                                            )
+                                            Button(
+                                                onClick = {
+                                                    val title = playlistTitle.trim()
+                                                    if (title.isNotEmpty()) {
+                                                        if (DesktopYouTubeMusic.hasSession()) {
+                                                            coroutineScope.launch {
+                                                                try {
+                                                                    val id = DesktopYouTubeMusic.createRemotePlaylist(
+                                                                        title = title,
+                                                                        privacy = "PRIVATE"
+                                                                    )
+                                                                    playlistTitle = ""
+                                                                    selectedRemotePlaylistId = id
+                                                                    downloadMessage = "Created in your YouTube Music library."
+                                                                    loadRemoteLibrary("Playlists")
+                                                                    openCollection(id, title)
+                                                                } catch (error: Exception) {
+                                                                    downloadMessage = error.message ?: "Could not create the YouTube Music playlist."
+                                                                }
+                                                            }
+                                                        } else {
+                                                            runCatching { DesktopLibraryStore.createPlaylist(title) }
+                                                                .onSuccess {
+                                                                    playlistTitle = ""
+                                                                    refreshSavedLists()
+                                                                    selectedPlaylistId = it.id
+                                                                }
+                                                                .onFailure { downloadMessage = it.message.orEmpty() }
+                                                        }
+                                                    }
+                                                },
+                                                enabled = playlistTitle.isNotBlank(),
+                                                colors = ButtonDefaults.buttonColors(backgroundColor = accentColor, contentColor = Color(0xFF0B1420))
+                                            ) { Text(if (DesktopYouTubeMusic.hasSession()) "Create in YT Music" else "Create") }
+                                        }
+                                        if (DesktopYouTubeMusic.hasSession()) {
+                                            Text(
+                                                "New playlists are created privately in your YouTube Music account.",
+                                                color = mutedText,
+                                                fontSize = 11.sp,
+                                                modifier = Modifier.padding(top = 5.dp)
+                                            )
+                                        } else {
+                                            Text(
+                                                "Connect a YouTube Music account to sync playlists. Signed-out playlists stay on this PC.",
+                                                color = mutedText,
+                                                fontSize = 11.sp,
+                                                modifier = Modifier.padding(top = 5.dp)
+                                            )
+                                        }
+                                        Spacer(Modifier.height(12.dp))
+                                        if (playlists.isEmpty()) {
+                                            EmptyPanel("No local playlists", "Local playlists appear here when you are signed out.")
+                                        } else {
+                                            LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                                                items(playlists, key = { it.id }) { playlist ->
+                                                    Row(
+                                                        Modifier.fillMaxWidth()
+                                                            .clip(RoundedCornerShape(14.dp))
+                                                            .background(panelBackground)
+                                                            .clickable { selectedPlaylistId = playlist.id }
+                                                            .padding(12.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Box(
+                                                            Modifier.size(46.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF263B52)),
+                                                            contentAlignment = Alignment.Center
+                                                        ) { Text("♫", color = accentColor, fontSize = 21.sp) }
+                                                        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                                                            Text(playlist.title, fontWeight = FontWeight.SemiBold)
+                                                            Text("${playlist.songs.size} songs", color = mutedText, fontSize = 11.sp)
+                                                        }
+                                                        Button(
+                                                            onClick = { selectedPlaylistId = playlist.id },
+                                                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545))
+                                                        ) { Text("Open") }
+                                                        Spacer(Modifier.width(6.dp))
+                                                        Button(
+                                                            onClick = {
+                                                                DesktopLibraryStore.deletePlaylist(playlist.id)
+                                                                refreshSavedLists()
+                                                            },
+                                                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4A2630))
+                                                        ) { Text("Delete") }
                                                     }
                                                 }
                                             }
