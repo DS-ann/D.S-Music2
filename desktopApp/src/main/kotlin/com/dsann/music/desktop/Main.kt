@@ -319,6 +319,14 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
         }
     }
 
+    fun refreshSavedLists() {
+        downloads = DesktopLibraryStore.downloads()
+        cacheEntries = DesktopLibraryStore.cache()
+        favoriteSongs = DesktopLibraryStore.favoriteSongs()
+        favoriteIds = favoriteSongs.map { it.videoId }.toSet()
+        playlists = DesktopLibraryStore.playlists()
+    }
+
     fun addSongToRemotePlaylist(song: OnlineSong) {
         val playlistId = selectedRemotePlaylistId
         if (!DesktopYouTubeMusic.hasSession() || playlistId.isNullOrBlank()) {
@@ -342,14 +350,6 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                 downloadMessage = error.message ?: "Could not add the song to the online playlist."
             }
         }
-    }
-
-    fun refreshSavedLists() {
-        downloads = DesktopLibraryStore.downloads()
-        cacheEntries = DesktopLibraryStore.cache()
-        favoriteSongs = DesktopLibraryStore.favoriteSongs()
-        favoriteIds = favoriteSongs.map { it.videoId }.toSet()
-        playlists = DesktopLibraryStore.playlists()
     }
 
     fun loadLyrics(title: String, artist: String, durationMs: Long, videoId: String? = null, album: String? = null) {
