@@ -1990,24 +1990,18 @@ private fun MiniPlayerArtworkProgressOverlay(
                 val fillHeight = size.height * progress
                 if (fillHeight > 0f) {
                     val top = size.height - fillHeight
-                    clipRect(
-                        left = 0f,
-                        top = top,
-                        right = size.width,
-                        bottom = size.height
-                    ) {
-                        drawRect(
-                            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                                colors = listOf(
-                                    accentColor.copy(alpha = 0.10f),
-                                    accentColor.copy(alpha = 0.48f)
-                                ),
-                                startY = top,
-                                endY = size.height
+                    drawRect(
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                            colors = listOf(
+                                accentColor.copy(alpha = 0.10f),
+                                accentColor.copy(alpha = 0.48f)
                             ),
-                            size = size
-                        )
-                    }
+                            startY = top,
+                            endY = size.height
+                        ),
+                        topLeft = androidx.compose.ui.geometry.Offset(0f, top),
+                        size = androidx.compose.ui.geometry.Size(size.width, fillHeight)
+                    )
                     drawLine(
                         color = accentColor.copy(alpha = 0.9f),
                         start = androidx.compose.ui.geometry.Offset(0f, top),
