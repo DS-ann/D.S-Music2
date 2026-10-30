@@ -195,6 +195,9 @@ object InnerTubeParser {
         is SearchItem.Playlist -> "playlist:" + item.playlist.playlistId
     }
 
+    fun findFirstObject(root: JsonElement?, key: String): JsonObject? =
+        findObjects(root, key).firstOrNull()
+
     private fun findObjects(root: JsonElement?, key: String): List<JsonObject> {
         val found = ArrayList<JsonObject>()
         fun visit(node: JsonElement?) {
