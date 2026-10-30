@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
@@ -132,6 +133,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.palette.graphics.Palette
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.ImageLoader
 import coil.imageLoader
 import coil.compose.AsyncImage
@@ -142,6 +145,8 @@ import com.dsann.music.R
 import com.dsann.music.data.db.PlaylistEntity
 import com.dsann.music.data.lyrics.MetadataRepair
 import com.dsann.music.data.lyrics.engine.LyricsCacheManager
+import com.dsann.music.data.innertube.AccountManager
+import com.dsann.music.data.innertube.YouTubeMusic
 import com.dsann.music.data.innertube.OnlineAlbum
 import com.dsann.music.data.innertube.OnlineArtist
 import com.dsann.music.data.innertube.OnlinePlaylist
@@ -1393,6 +1398,7 @@ private fun PlaylistsTabContent(
 ) {
     val context = LocalContext.current
     val lyricsCache = remember(context) { LyricsCacheManager(context.applicationContext) }
+    val coroutineScope = rememberCoroutineScope()
     val activity = remember { getActivityFromContext(context) as? androidx.fragment.app.FragmentActivity }
 
     val accountViewModel = remember(activity) {
@@ -1419,33 +1425,73 @@ private fun PlaylistsTabContent(
 
     if (showCreatePlaylistDialog) {
         var name by remember { mutableStateOf("") }
+        var creating by remember { mutableStateOf(false) }
         AlertDialog(
-            onDismissRequest = { showCreatePlaylistDialog = false },
+            onDismissRequest = { if (!creating) showCreatePlaylistDialog = false },
             title = { Text("Create New Playlist", fontWeight = FontWeight.Bold) },
             text = {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Playlist Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Playlist Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !creating
+                    )
+                    Text(
+                        if (AccountManager.isLoggedIn(context)) {
+                            "This playlist will be created in your YouTube Music library."
+                        } else {
+                            "You are signed out. This playlist will be stored on this device only."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        if (name.isNotBlank()) {
-                            viewModel.createLocalPlaylist(name)
-                            showCreatePlaylistDialog = false
+                        val title = name.trim()
+                        if (title.isNotEmpty() && !creating) {
+                            if (!AccountManager.isLoggedIn(context)) {
+                                viewModel.createLocalPlaylist(title)
+                                showCreatePlaylistDialog = false
+                            } else {
+                                creating = true
+                                coroutineScope.launch {
+                                    val result = YouTubeMusic.createPlaylist(
+                                        title = title,
+                                        description = "",
+                                        privacyStatus = "PRIVATE"
+                                    )
+                                    result.onSuccess { playlistId ->
+                                        showCreatePlaylistDialog = false
+                                        accountViewModel?.loadLibrary()
+                                        exploreViewModel?.cameFromLibrary = true
+                                        exploreViewModel?.loadPlaylist(playlistId)
+                                        navigateToExplore(activity)
+                                    }.onFailure { error ->
+                                        com.dsann.music.ui.SnackbarController.showMessage(
+                                            error.message ?: "Could not create the YouTube Music playlist."
+                                        )
+                                    }
+                                    creating = false
+                                }
+                            }
                         }
                     },
-                    enabled = name.isNotBlank()
+                    enabled = name.isNotBlank() && !creating
                 ) {
-                    Text("Create")
+                    Text(if (creating) "Creating…" else "Create")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showCreatePlaylistDialog = false }) {
+                TextButton(
+                    onClick = { showCreatePlaylistDialog = false },
+                    enabled = !creating
+                ) {
                     Text("Cancel")
                 }
             }
@@ -1453,7 +1499,7 @@ private fun PlaylistsTabContent(
     }
 
     selectedLocalPlaylist?.let { playlist ->
-        LocalPlaylistDetailsBottomSheet(
+        LocalPlaylistDetailsScreen(
             playlist = playlist,
             viewModel = viewModel,
             onDismiss = { selectedLocalPlaylist = null }
@@ -1748,135 +1794,222 @@ private fun PlaylistsTabContent(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LocalPlaylistDetailsBottomSheet(
+private fun LocalPlaylistDetailsScreen(
     playlist: PlaylistEntity,
     viewModel: PlayerSharedViewModel,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     val songsEntity by viewModel.getSongsForLocalPlaylist(playlist.id).collectAsStateWithLifecycle(emptyList())
     val songs = remember(songsEntity) { songsEntity.map { it.toSongItem() } }
+    val artworkUrl = playlist.thumbnailUrl?.takeIf { it.isNotBlank() }
+        ?: songs.firstOrNull { !it.thumbnailUrl.isNullOrBlank() }?.thumbnailUrl
 
-    ModalBottomSheet(
+    var artworkColor by remember(playlist.id) { mutableStateOf(Color(0xFF26364C)) }
+    LaunchedEffect(playlist.id, artworkUrl) {
+        if (!artworkUrl.isNullOrBlank()) {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val request = ImageRequest.Builder(context)
+                        .data(artworkUrl)
+                        .allowHardware(false)
+                        .build()
+                    val result = context.imageLoader.execute(request)
+                    if (result is SuccessResult) {
+                        val bitmap = (result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                        if (bitmap != null) {
+                            val palette = Palette.from(bitmap).generate()
+                            val extracted = palette.getDarkVibrantColor(
+                                palette.getDarkMutedColor(
+                                    palette.getDominantColor(0xFF26364C.toInt())
+                                )
+                            )
+                            withContext(Dispatchers.Main) {
+                                artworkColor = Color(extracted)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Dialog(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Column(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            // Header Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(440.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                artworkColor.copy(alpha = 0.72f),
+                                artworkColor.copy(alpha = 0.32f),
+                                MaterialTheme.colorScheme.background
+                            )
+                        )
+                    )
+            )
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 40.dp)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back to Library",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Text(
+                            "Playlist",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        IconButton(
+                            onClick = {
+                                viewModel.deleteLocalPlaylist(playlist.id)
+                                onDismiss()
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Delete playlist",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(196.dp)
+                                .clip(RoundedCornerShape(22.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (!artworkUrl.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context)
+                                        .data(artworkUrl)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = "Playlist artwork",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.PlaylistPlay,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(72.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(18.dp))
+                        Text(
+                            playlist.title,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            "${songs.size} songs • On this device",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                        if (songs.isNotEmpty()) {
+                            Spacer(Modifier.height(18.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        viewModel.setSongList(songs)
+                                        viewModel.playSong(songs.first())
+                                        onDismiss()
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.PlayArrow, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Play All")
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        val shuffled = songs.shuffled()
+                                        viewModel.setSongList(shuffled)
+                                        viewModel.playSong(shuffled.first())
+                                        onDismiss()
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Shuffle, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Shuffle")
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
                     Text(
-                        playlist.title,
+                        "Songs",
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Text(
-                        "${songs.size} songs",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
 
-                // Delete entire playlist button
-                IconButton(
-                    onClick = {
-                        viewModel.deleteLocalPlaylist(playlist.id)
-                        onDismiss()
+                if (songs.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(180.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "This playlist is empty",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Delete Playlist",
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Action Buttons (Play & Shuffle)
-            if (songs.isNotEmpty()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            viewModel.setSongList(songs)
-                            if (songs.isNotEmpty()) {
-                                viewModel.playSong(songs.first())
-                            }
-                            onDismiss()
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) {
-                        Icon(Icons.Default.PlayArrow, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Play All")
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            val shuffled = songs.shuffled()
-                            viewModel.setSongList(shuffled)
-                            if (shuffled.isNotEmpty()) {
-                                viewModel.playSong(shuffled.first())
-                            }
-                            onDismiss()
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Shuffle, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Shuffle")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            // Songs List
-            if (songs.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "This playlist is empty",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f, fill = false)
-                        .heightIn(max = 400.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp)
-                ) {
-                    items(songs) { song ->
+                } else {
+                    items(songs, key = { it.id }) { song ->
                         Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainer
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 4.dp)
+                                .clip(RoundedCornerShape(14.dp)),
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f)
                         ) {
                             Row(
                                 modifier = Modifier
@@ -1886,25 +2019,19 @@ private fun LocalPlaylistDetailsBottomSheet(
                                         viewModel.playSong(song)
                                         onDismiss()
                                     }
-                                    .padding(8.dp),
+                                    .padding(10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Mini Thumbnail
                                 Box(
                                     modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(RoundedCornerShape(8.dp))
+                                        .size(50.dp)
+                                        .clip(RoundedCornerShape(9.dp))
                                         .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    if (song.thumbnailUrl?.isNotEmpty() == true) {
-                                        androidx.compose.foundation.Image(
-                                            painter = coil.compose.rememberAsyncImagePainter(
-                                                model = ImageRequest.Builder(LocalContext.current)
-                                                    .data(song.thumbnailUrl)
-                                                    .crossfade(true)
-                                                    .build()
-                                            ),
+                                    if (!song.thumbnailUrl.isNullOrBlank()) {
+                                        AsyncImage(
+                                            model = song.thumbnailUrl,
                                             contentDescription = null,
                                             modifier = Modifier.fillMaxSize(),
                                             contentScale = ContentScale.Crop
@@ -1917,14 +2044,11 @@ private fun LocalPlaylistDetailsBottomSheet(
                                         )
                                     }
                                 }
-
                                 Spacer(Modifier.width(12.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
+                                Column(Modifier.weight(1f)) {
                                     Text(
                                         song.title,
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                         color = MaterialTheme.colorScheme.onSurface
@@ -1937,11 +2061,12 @@ private fun LocalPlaylistDetailsBottomSheet(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-
-                                // Delete single song from playlist button
                                 IconButton(
                                     onClick = {
-                                        viewModel.removeSongFromLocalPlaylist(playlist.id, song.videoId ?: song.id.toString())
+                                        viewModel.removeSongFromLocalPlaylist(
+                                            playlist.id,
+                                            song.videoId ?: song.id.toString()
+                                        )
                                     }
                                 ) {
                                     Icon(
