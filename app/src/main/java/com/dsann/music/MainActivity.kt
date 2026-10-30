@@ -677,7 +677,7 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val client = GitHubReleaseClient("MythicalSHUB", "SpatialFlow")
+                val client = GitHubReleaseClient("DS-ann", "D.S-Music2")
                 val release = client.latestRelease ?: return@launch
 
                 val currentVersion = BuildConfig.VERSION_NAME
