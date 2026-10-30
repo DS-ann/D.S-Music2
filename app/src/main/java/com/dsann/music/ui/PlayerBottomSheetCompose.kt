@@ -759,6 +759,7 @@ fun PlayerBottomSheetCompose(
         // Playback state observers combined into stable UI model
         val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
         val isVideoMode by viewModel.isVideoMode.collectAsStateWithLifecycle()
+        val videoPlaybackMetadata by viewModel.videoPlaybackMetadata.collectAsStateWithLifecycle()
         val audioService by viewModel.audioServiceState.collectAsStateWithLifecycle()
         val gestureSettings by viewModel.playerGestureSettings.collectAsStateWithLifecycle()
         val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
@@ -875,13 +876,24 @@ fun PlayerBottomSheetCompose(
             label = "LyricsArtworkSharedElement"
         )
  
+        // While video mode is active, show the extracted video's own title/uploader rather
+        // than leaving the player header stuck on the audio-track metadata.
+        val displaySong = remember(currentSong, isVideoMode, videoPlaybackMetadata) {
+            if (isVideoMode && videoPlaybackMetadata != null && currentSong != null) {
+                currentSong!!.copy(
+                    title = videoPlaybackMetadata!!.title,
+                    artist = videoPlaybackMetadata!!.uploader
+                )
+            } else currentSong
+        }
+
         val uiState = remember(
-            currentSong, isPlaying, isLoading, duration, currentSongIndex,
+            displaySong, isPlaying, isLoading, duration, currentSongIndex,
             miniPlayerBlendColor, isCurrentSongFavorite, isCurrentSongDisliked, repeatMode, isShuffleEnabled,
             playerBackgroundColor, likesCount, isCurrentSongDownloaded, currentSongDownloadProgress
         ) {
             PlayerUiState(
-                currentSong = currentSong,
+                currentSong = displaySong,
                 isPlaying = isPlaying,
                 isLoading = isLoading,
                 duration = duration,
