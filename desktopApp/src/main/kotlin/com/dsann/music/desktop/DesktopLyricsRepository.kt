@@ -7,6 +7,8 @@ import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.text.Normalizer
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -217,7 +219,10 @@ internal object DesktopLyricsRepository {
     }
 
     private fun String.toRequestBodyJson() =
-        this.toRequestBody(okhttp3.MediaType.Companion.toMediaType("application/json; charset=utf-8"))
+        this.toRequestBody("application/json; charset=utf-8".toMediaType())
+
+    private fun com.google.gson.JsonArray.getOrNull(index: Int): com.google.gson.JsonElement? =
+        if (index in 0 until size()) get(index) else null
 
     private const val API_KEY = "AIzaSyAO_JVGg4tq4r2T5Co2t8G3oG1d1dQ"
     private const val USER_AGENT =
