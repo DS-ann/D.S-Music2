@@ -99,6 +99,7 @@ import com.dsann.music.model.SongItem
 import com.dsann.music.ui.player.ArtworkPager
 import com.dsann.music.ui.player.FullPlayerScreen
 import com.dsann.music.ui.player.PlayerUiState
+import com.dsann.music.ui.theme.observeKey
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -748,6 +749,11 @@ fun PlayerBottomSheetCompose(
         val context = LocalContext.current
         val density = LocalDensity.current
         val scope = rememberCoroutineScope()
+        val playerPreferences = remember(context) {
+            context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+        }
+        val playerBackgroundStyle by playerPreferences.observeKey("player_background_style", "Artwork")
+        val miniPlayerStyle by playerPreferences.observeKey("mini_player_style", "Card")
         
         // Playback state observers combined into stable UI model
         val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
@@ -797,21 +803,26 @@ fun PlayerBottomSheetCompose(
         val playerBackgroundColor by viewModel.playerBackgroundColor.collectAsStateWithLifecycle()
         val likesCount by viewModel.likesCountFlow.collectAsStateWithLifecycle()
         val isDark = isSystemInDarkTheme()
-        val dynamicBgColor = remember(playerBackgroundColor, isDark) {
-            val baseColor = Color(playerBackgroundColor)
-            val hsl = FloatArray(3)
-            androidx.core.graphics.ColorUtils.colorToHSL(baseColor.toArgb(), hsl)
-            val isMonochrome = hsl[1] < 0.06f
-            if (isDark) {
-                // Dark Theme: Set a premium, richly-colored dark solid background (Exactly 15.5% lightness for gorgeous color presence)
-                hsl[2] = 0.155f
-                hsl[1] = if (isMonochrome) 0f else hsl[1].coerceIn(0.32f, 0.54f)
-                Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
-            } else {
-                // Light Theme: Set a premium, elegant soft pastel solid background (Exactly 83.5% lightness for deep pastel flavor)
-                hsl[2] = 0.835f
-                hsl[1] = if (isMonochrome) 0f else hsl[1].coerceIn(0.30f, 0.48f)
-                Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
+        val themePlayerSurface = MaterialTheme.colorScheme.surface
+        val dynamicBgColor = remember(playerBackgroundColor, isDark, playerBackgroundStyle, themePlayerSurface) {
+            when (playerBackgroundStyle) {
+                "Theme" -> themePlayerSurface
+                "Black" -> Color.Black
+                else -> {
+                    val baseColor = Color(playerBackgroundColor)
+                    val hsl = FloatArray(3)
+                    androidx.core.graphics.ColorUtils.colorToHSL(baseColor.toArgb(), hsl)
+                    val isMonochrome = hsl[1] < 0.06f
+                    if (isDark) {
+                        hsl[2] = 0.155f
+                        hsl[1] = if (isMonochrome) 0f else hsl[1].coerceIn(0.32f, 0.54f)
+                        Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
+                    } else {
+                        hsl[2] = 0.835f
+                        hsl[1] = if (isMonochrome) 0f else hsl[1].coerceIn(0.30f, 0.48f)
+                        Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
+                    }
+                }
             }
         }
         val isCurrentSongDisliked by viewModel.isCurrentSongDisliked.collectAsStateWithLifecycle()
@@ -1129,6 +1140,17 @@ fun PlayerBottomSheetCompose(
                 virtualHeightProvider = sheetVisualState.playerContentAreaHeightPxProvider
             )
         }
+        val playerShellShape: Shape = if (currentSheetContentState == PlayerSheetState.COLLAPSED) {
+            when (miniPlayerStyle) {
+                "Flat" -> RoundedCornerShape(0.dp)
+                "Compact" -> RoundedCornerShape(18.dp)
+                else -> playerShadowShape
+            }
+        } else playerShadowShape
+        val playerShellElevation = if (
+            currentSheetContentState == PlayerSheetState.COLLAPSED &&
+            miniPlayerStyle != "Card"
+        ) 0.dp else if (currentSheetContentState == PlayerSheetState.COLLAPSED) 6.dp else 0.dp
 
         val velocityTracker = remember { VelocityTracker() }
         
@@ -1242,12 +1264,12 @@ fun PlayerBottomSheetCompose(
                                     transformOrigin = TransformOrigin(0.5f, 1f)
                                 }
                                 .shadow(
-                                    elevation = if (currentSheetContentState == PlayerSheetState.COLLAPSED) 6.dp else 0.dp,
-                                    shape = playerShadowShape
+                                    elevation = playerShellElevation,
+                                    shape = playerShellShape
                                 )
                                 .background(
                                     color = dynamicBgColor,
-                                    shape = playerShadowShape
+                                    shape = playerShellShape
                                 )
                                 .playerSheetVerticalDragGesture(enabled = !isLyricsModeEnabled && !isQueueExpanded, handler = sheetVerticalDragGestureHandler)
                                 .pointerInput(currentSheetContentState, isLyricsModeEnabled) {
