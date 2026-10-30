@@ -3,6 +3,7 @@ package com.dsann.music.ui.player
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -28,6 +29,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,6 +44,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -341,6 +345,192 @@ private fun PlayerVisualizer(
         }
     }
 }
+
+@Composable
+private fun LandscapePlayerDetailsPane(
+    modifier: Modifier = Modifier,
+    syncedLyrics: List<LyricLine>?,
+    plainLyrics: String?,
+    isLyricsLoading: Boolean,
+    lyricsError: Throwable?,
+    currentSong: SongItem?,
+    songList: List<SongItem>,
+    currentSongIndex: Int,
+    currentPositionProvider: () -> Int,
+    isPlaying: Boolean,
+    contentColor: Color,
+    secondaryColor: Color,
+    accentColor: Color,
+    selectedProvider: String?,
+    providerResults: Map<String, LyricsResult>,
+    onSeekTo: (Int) -> Unit,
+    onFetchLyrics: () -> Unit,
+    onPlayQueueItem: (Int) -> Unit
+) {
+    var showQueue by remember { mutableStateOf(false) }
+    val panelShape = RoundedCornerShape(24.dp)
+
+    Column(
+        modifier = modifier
+            .background(contentColor.copy(alpha = 0.035f), panelShape)
+            .padding(14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            listOf("Lyrics", "Up next").forEachIndexed { index, label ->
+                val selected = showQueue == (index == 1)
+                Text(
+                    text = label,
+                    color = if (selected) accentColor else secondaryColor,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier
+                        .background(
+                            if (selected) accentColor.copy(alpha = 0.14f) else Color.Transparent,
+                            RoundedCornerShape(18.dp)
+                        )
+                        .clickable { showQueue = index == 1 }
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = if (showQueue) songList.size.toString() + " tracks" else currentSong?.artist.orEmpty(),
+                color = secondaryColor,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1
+            )
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        if (!showQueue) {
+            when {
+                !syncedLyrics.isNullOrEmpty() -> SyncedLyricsCompose(
+                    onSeekTo = onSeekTo,
+                    lyrics = syncedLyrics,
+                    currentPositionProvider = currentPositionProvider,
+                    isPlaying = isPlaying,
+                    contentColor = contentColor,
+                    dynamicAccentColor = accentColor,
+                    currentSong = currentSong,
+                    selectedProvider = selectedProvider,
+                    providerResults = providerResults,
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                !plainLyrics.isNullOrBlank() -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 8.dp, vertical = 12.dp)
+                    ) {
+                        plainLyrics.lineSequence().filter { it.isNotBlank() }.forEach { line ->
+                            Text(
+                                text = line,
+                                color = contentColor.copy(alpha = 0.88f),
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(vertical = 5.dp)
+                            )
+                        }
+                    }
+                }
+
+                else -> {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(12.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = if (isLyricsLoading) "Finding lyrics…" else "Lyrics",
+                            color = contentColor,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = when {
+                                isLyricsLoading -> "Looking for a synchronized lyrics source."
+                                lyricsError != null -> "Lyrics could not be loaded."
+                                else -> "Lyrics will appear here when available."
+                            },
+                            color = secondaryColor,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        if (!isLyricsLoading) {
+                            Spacer(Modifier.height(14.dp))
+                            Text(
+                                text = "Load lyrics",
+                                color = accentColor,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier
+                                    .background(accentColor.copy(alpha = 0.12f), RoundedCornerShape(18.dp))
+                                    .clickable(onClick = onFetchLyrics)
+                                    .padding(horizontal = 18.dp, vertical = 10.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            if (songList.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("The queue is empty", color = secondaryColor)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    itemsIndexed(songList) { index, song ->
+                        val isCurrent = index == currentSongIndex
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (isCurrent) accentColor.copy(alpha = 0.13f) else Color.Transparent,
+                                    RoundedCornerShape(14.dp)
+                                )
+                                .clickable { onPlayQueueItem(index) }
+                                .padding(horizontal = 12.dp, vertical = 11.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    text = song.title,
+                                    color = if (isCurrent) accentColor else contentColor,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = song.artist,
+                                    color = secondaryColor,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1
+                                )
+                            }
+                            if (isCurrent) {
+                                Text(
+                                    text = "PLAYING",
+                                    color = accentColor,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /**
  * Stateful wrapper for the FullPlayer UI component.
  * Decouples the UI component from ViewModel, Activity, and direct permission handling.
@@ -638,14 +828,21 @@ fun FullPlayer(
             "Vinyl", "Cassette" -> 0.82f
             else -> 0.9f
         }
-        val albumArtSize = screenWidth * artScale
+        val useWidePlayer = configuration.screenWidthDp >= 840 ||
+            (configuration.screenWidthDp >= 600 && configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
+        val albumArtSize = if (useWidePlayer) {
+            minOf(screenHeight * 0.50f, screenWidth * 0.42f)
+        } else {
+            screenWidth * artScale
+        }
 
         val density = androidx.compose.ui.platform.LocalDensity.current
         val statusBarTopDp = with(density) { androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(this).toDp() }
         val minTopOffset = statusBarTopDp + 68.dp // Removed 16.dp extra gap
 
         // Calculate top offset to perfectly match yEndPx in PlayerBottomSheetCompose
-        val topOffset = ((screenHeight - albumArtSize) / 2f - 220.dp).coerceAtLeast(minTopOffset)
+        val topOffset = if (useWidePlayer) minTopOffset
+            else ((screenHeight - albumArtSize) / 2f - 220.dp).coerceAtLeast(minTopOffset)
 
         var lyricsButtonCenterInRoot by remember { mutableStateOf<Offset?>(null) }
         val lyricsRevealProgress by animateFloatAsState(
@@ -657,14 +854,9 @@ fun FullPlayer(
         // Tie the visibility/readiness directly to the lyricsRevealProgress animation state
         val lyricsContentReady = lyricsRevealProgress > 0.8f
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        val useWidePlayer = configuration.screenWidthDp >= 840 ||
+            (configuration.screenWidthDp >= 600 && configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
+        val playerControlsContent: @Composable ColumnScope.() -> Unit = {
             // Header Row (Nav controls + collapse) - Symmetric centering
             Row(
                 modifier = Modifier
@@ -1133,6 +1325,55 @@ fun FullPlayer(
             }
         }
 
+        if (useWidePlayer) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(0.54f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    content = playerControlsContent
+                )
+                LandscapePlayerDetailsPane(
+                    modifier = Modifier.weight(0.46f).fillMaxHeight(),
+                    syncedLyrics = syncedLyrics,
+                    plainLyrics = plainLyrics,
+                    isLyricsLoading = isLyricsLoading,
+                    lyricsError = lyricsError,
+                    currentSong = uiState.currentSong,
+                    songList = songList,
+                    currentSongIndex = currentSongIndex,
+                    currentPositionProvider = currentPositionProvider,
+                    isPlaying = uiState.isPlaying,
+                    contentColor = contentColor,
+                    secondaryColor = contentSecondary,
+                    accentColor = dynamicAccentColor,
+                    selectedProvider = selectedProvider,
+                    providerResults = providerResults,
+                    onSeekTo = onSeekTo,
+                    onFetchLyrics = onFetchLyrics,
+                    onPlayQueueItem = { index -> viewModel.playSongAtIndex(index) }
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                content = playerControlsContent
+            )
+        }
         if (lyricsRevealProgress > 0f) {
             FullScreenLyricsOverlay(
                 currentSong = uiState.currentSong,
