@@ -30,20 +30,26 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
@@ -53,7 +59,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -503,44 +512,70 @@ class MainActivity : AppCompatActivity() {
                                 if (dynamicNavStyle) 34.dp else 26.dp,
                                 label = "RailIconSize"
                             )
-                            NavigationRail(
+                            Surface(
                                 modifier = Modifier
-                                    .align(androidx.compose.ui.Alignment.CenterStart)
-                                    .padding(start = 8.dp),
-                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                contentColor = MaterialTheme.colorScheme.onSurface
+                                    .align(Alignment.CenterStart)
+                                    .padding(start = 12.dp)
+                                    .width(76.dp),
+                                shape = RoundedCornerShape(38.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainer,
+                                tonalElevation = 6.dp
                             ) {
-                                val items = listOf(
-                                    Triple("explore", "Explore", R.drawable.ic_explore),
-                                    Triple("library", "Library", R.drawable.ic_library_music),
-                                    Triple("local_music", "Local Music", R.drawable.ic_music_note),
-                                    Triple("settings", "Settings", R.drawable.ic_settings)
-                                )
-                                items.forEach { (route, label, iconResId) ->
-                                    val selected = currentDestination?.route == route
-                                    NavigationRailItem(
-                                        selected = selected,
-                                        onClick = {
-                                            if (!selected) {
-                                                currentNavController.navigate(route) {
-                                                    popUpTo(currentNavController.graph.findStartDestination().id) {
-                                                        saveState = true
+                                Column(
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    val items = listOf(
+                                        Triple("explore", "Explore", R.drawable.ic_explore),
+                                        Triple("library", "Library", R.drawable.ic_library_music),
+                                        Triple("local_music", "Local Music", R.drawable.ic_music_note),
+                                        Triple("settings", "Settings", R.drawable.ic_settings)
+                                    )
+                                    items.forEach { (route, label, iconResId) ->
+                                        val selected = currentDestination?.route == route
+                                        val tint = if (selected) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(22.dp))
+                                                .background(
+                                                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                    else androidx.compose.ui.graphics.Color.Transparent
+                                                )
+                                                .clickable {
+                                                    if (!selected) {
+                                                        currentNavController.navigate(route) {
+                                                            popUpTo(currentNavController.graph.findStartDestination().id) {
+                                                                saveState = true
+                                                            }
+                                                            launchSingleTop = true
+                                                            restoreState = true
+                                                        }
                                                     }
-                                                    launchSingleTop = true
-                                                    restoreState = true
                                                 }
-                                            }
-                                        },
-                                        icon = {
+                                                .padding(vertical = if (hideNavLabels) 12.dp else 8.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
                                             Icon(
                                                 painter = painterResource(id = iconResId),
                                                 contentDescription = label,
+                                                tint = tint,
                                                 modifier = Modifier.size(railIconSize)
                                             )
-                                        },
-                                        label = if (hideNavLabels) null else { { Text(label) } },
-                                        alwaysShowLabel = !hideNavLabels
-                                    )
+                                            if (!hideNavLabels) {
+                                                Text(
+                                                    text = label,
+                                                    color = tint,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                                    maxLines = 1,
+                                                    modifier = Modifier.padding(top = 2.dp)
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
