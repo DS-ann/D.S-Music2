@@ -451,7 +451,7 @@ class AudioPlaybackService : MediaSessionService() {
     @Volatile private var fullTrackCacheKey: String? = null
     @Volatile private var activeFullTrackCacheWriter: CacheWriter? = null
     private var cacheAssetsSongId: Long? = null
-    private var currentSongName = "SpatialFlow"
+    private var currentSongName = "D.S Music"
     private var currentAlbumArt: Bitmap? = null
     private var lastWidgetProgressUpdateAtMs: Long = 0L
     private var shouldAutoPlay = false
@@ -1754,7 +1754,7 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     fun setSongMetadata(songName: String?, albumArt: Bitmap?) {
-        this.currentSongName = songName ?: "SpatialFlow"
+        this.currentSongName = songName ?: "D.S Music"
         this.currentAlbumArt = albumArt?.let { 
             val size = min(it.width, it.height)
             Bitmap.createBitmap(it, (it.width - size) / 2, (it.height - size) / 2, size, size).scale(512, 512, true)
@@ -2085,7 +2085,7 @@ class AudioPlaybackService : MediaSessionService() {
                 ?: return@let null
             com.dsann.music.model.SongItem(
                 id,
-                mediaItem.mediaMetadata.title?.toString()?.ifBlank { "SpatialFlow" } ?: "SpatialFlow",
+                mediaItem.mediaMetadata.title?.toString()?.ifBlank { "D.S Music" } ?: "D.S Music",
                 mediaItem.mediaMetadata.artist?.toString()?.ifBlank { "Unknown Artist" } ?: "Unknown Artist",
                 -1L,
                 uri?.toString(),
@@ -2736,7 +2736,7 @@ class AudioPlaybackService : MediaSessionService() {
             notificationBuilder.setSmallIcon(R.drawable.ic_music_note)
             notificationBuilder.setContentTitle(currentSongName)
             notificationBuilder.setContentText("Now Playing")
-            notificationBuilder.setSubText("SpatialFlow")
+            notificationBuilder.setSubText("D.S Music")
             notificationBuilder.setChannelId("audio_playback_channel")
             notificationBuilder.setOngoing(isPlaying)
             notificationBuilder.setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
