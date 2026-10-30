@@ -2815,7 +2815,7 @@ private fun RecapTabContent(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "A dynamic reflection of your musical journey on SpatialFlow.",
+                            text = "A dynamic reflection of your musical journey on D.S Music.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -3502,7 +3502,7 @@ private fun StreamCacheTabContent(
                                 fontWeight = FontWeight.ExtraBold
                             )
                             Text(
-                                "SpatialFlow · ${cacheEntries.size} songs",
+                                "D.S Music · ${cacheEntries.size} songs",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
