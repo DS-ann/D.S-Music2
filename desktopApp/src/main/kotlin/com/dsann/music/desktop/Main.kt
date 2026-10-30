@@ -334,8 +334,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     }
 
     fun addSongToRemotePlaylist(song: OnlineSong) {
-        val playlistId = selectedRemotePlaylistId
-        if (!DesktopYouTubeMusic.hasSession() || playlistId.isNullOrBlank()) {
+        if (!DesktopYouTubeMusic.hasSession()) {
             val local = playlists.firstOrNull() ?: runCatching {
                 DesktopLibraryStore.createPlaylist("My playlist")
             }.getOrNull()
@@ -345,13 +344,24 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
             }
             DesktopLibraryStore.addToPlaylist(local.id, song)
             refreshSavedLists()
-            downloadMessage = "Added to ${local.title}."
+            downloadMessage = "Added to ${local.title} on this PC."
             return
         }
+
+        val playlistId = selectedRemotePlaylistId
+        if (playlistId.isNullOrBlank()) {
+            section = "Online Library"
+            loadRemoteLibrary("Playlists")
+            downloadMessage = "Select a YouTube Music playlist, then use Add to playlist again."
+            return
+        }
+
         coroutineScope.launch {
             try {
-                DesktopYouTubeMusic.addRemotePlaylistSongs(playlistId, listOf(song.videoId))
+                val added = DesktopYouTubeMusic.addRemotePlaylistSongs(playlistId, listOf(song.videoId))
+                if (!added) error("YouTube Music did not confirm that the song was added.")
                 downloadMessage = "Added to your YouTube Music playlist."
+                loadRemoteLibrary("Playlists")
             } catch (error: Exception) {
                 downloadMessage = error.message ?: "Could not add the song to the online playlist."
             }
@@ -539,16 +549,6 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                     .onFailure { downloadMessage = it.message ?: "Local favorite saved; online like did not sync." }
             }
         }
-    }
-
-    fun addSongToPlaylist(song: OnlineSong) {
-        var target = playlists.firstOrNull()
-        if (target == null) {
-            target = DesktopLibraryStore.createPlaylist("My playlist")
-        }
-        DesktopLibraryStore.addToPlaylist(target.id, song)
-        refreshSavedLists()
-        downloadMessage = "Added to ${target.title}."
     }
 
     fun startDownload(song: OnlineSong) {
@@ -1202,7 +1202,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                                     onClick = { playCollectionItem(item) },
                                                     onFavorite = { (item as? SearchItem.Song)?.song?.let(::toggleFavorite) },
                                                     onDownload = { (item as? SearchItem.Song)?.song?.let(::startDownload) },
-                                                    onAddToPlaylist = { (item as? SearchItem.Song)?.song?.let(::addSongToPlaylist) }
+                                                    onAddToPlaylist = { (item as? SearchItem.Song)?.song?.let(::addSongToRemotePlaylist) }
                                                 )
                                             }
                                         }
