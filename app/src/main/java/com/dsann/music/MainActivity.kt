@@ -311,8 +311,8 @@ class MainActivity : AppCompatActivity() {
                     // Keep the rail persistent in wide layouts; scroll-driven bottom-bar hiding is phone-only.
                     val showNavigationRail = useNavigationRail && showBottomBar
                     val layoutDirection = LocalLayoutDirection.current
-                    val railSystemInset = WindowInsets.displayCutout
-                        .union(WindowInsets.navigationBars)
+                    // Navigation-bar start inset also covers landscape side-mounted system bars.
+                    val railSystemInset = WindowInsets.navigationBars
                         .asPaddingValues()
                         .calculateStartPadding(layoutDirection)
                     val railStartPadding = railSystemInset + 12.dp
