@@ -74,6 +74,7 @@ import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.SettingsBackupRestore
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -81,6 +82,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -136,6 +139,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.dsann.music.BuildConfig
 import com.dsann.music.MainActivity
+import com.dsann.music.model.PlayerGestureAction
+import com.dsann.music.model.PlayerGestureSettings
 import com.dsann.music.R
 import com.dsann.music.ui.player.SleepTimerBottomSheet
 import com.dsann.music.viewmodel.PlayerSharedViewModel
@@ -977,6 +982,12 @@ fun SettingsScreenContent(
                 onDynamicNavStyleChange = { viewModel.setDynamicNavStyle(it) }
             )
         }
+        composable(SettingsRoute.Controls.route) {
+            ControlsAndGesturesScreen(
+                navController = navController,
+                playerViewModel = playerSharedViewModel
+            )
+        }
         composable(SettingsRoute.Playback.route) {
             PlaybackScreen(
                 navController = navController,
@@ -1067,10 +1078,216 @@ sealed class SettingsRoute(val route: String) {
     object Account : SettingsRoute("account")
     object Appearance : SettingsRoute("appearance")
     object Playback : SettingsRoute("playback")
+    object Controls : SettingsRoute("controls")
     object About : SettingsRoute("about")
     object Feedback : SettingsRoute("feedback")
     object WhatsNew : SettingsRoute("whats_new")
     object BackupRestore : SettingsRoute("backup_restore")
+}
+
+@Composable
+private fun ControlsAndGesturesScreen(
+    navController: androidx.navigation.NavController,
+    playerViewModel: PlayerSharedViewModel
+) {
+    val gestures by playerViewModel.playerGestureSettings.collectAsStateWithLifecycle()
+    Scaffold(
+        topBar = { SettingsDetailTopBar("Controls & Gestures") { navController.popBackStack() } }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp)
+                .padding(bottom = 120.dp)
+        ) {
+            SettingsHeader("Player cover")
+            Text(
+                "Choose what swipes, a double tap and a long press do on the full player's artwork. Swiping down still collapses the player.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            SettingsGroupCard(listOf(
+                {
+                    GestureSettingRow(
+                        "Swipe left",
+                        gestures.coverSwipeLeft,
+                        PlayerGestureAction.choices(),
+                        onSelect = { playerViewModel.setPlayerGesture("cover_swipe_left", it) }
+                    )
+                },
+                {
+                    GestureSettingRow(
+                        "Swipe right",
+                        gestures.coverSwipeRight,
+                        PlayerGestureAction.choices(),
+                        onSelect = { playerViewModel.setPlayerGesture("cover_swipe_right", it) }
+                    )
+                },
+                {
+                    GestureSettingRow(
+                        "Swipe up",
+                        gestures.coverSwipeUp,
+                        PlayerGestureAction.choices(),
+                        onSelect = { playerViewModel.setPlayerGesture("cover_swipe_up", it) }
+                    )
+                },
+                {
+                    GestureSettingRow(
+                        "Double tap",
+                        gestures.coverDoubleTap,
+                        PlayerGestureAction.choices(doubleTap = true),
+                        onSelect = {
+                            playerViewModel.setPlayerGesture("cover_double_tap", it)
+                            if (it == PlayerGestureAction.SEEK_SIDES && gestures.doubleTapSeekSeconds < 3) {
+                                playerViewModel.setDoubleTapSeekSeconds(10)
+                            }
+                        }
+                    )
+                },
+                {
+                    GestureSettingRow(
+                        "Long press",
+                        gestures.coverLongPress,
+                        PlayerGestureAction.choices(),
+                        onSelect = { playerViewModel.setPlayerGesture("cover_long_press", it) }
+                    )
+                }
+            ))
+            if (gestures.coverDoubleTap == PlayerGestureAction.SEEK_SIDES) {
+                SettingsHeader("Double-tap seek")
+                SettingsGroupCard(listOf {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text("Seconds to seek", style = MaterialTheme.typography.bodyLarge)
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(3, 5, 10, 15).forEach { seconds ->
+                                val selected = gestures.doubleTapSeekSeconds == seconds
+                                Surface(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .clickable { playerViewModel.setDoubleTapSeekSeconds(seconds) },
+                                    color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                                ) {
+                                    Text(
+                                        "$seconds s",
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                                        color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                })
+            }
+            SettingsHeader("Mini player")
+            Text(
+                "These actions apply while the player is collapsed. A tap still opens the full player.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            SettingsGroupCard(listOf(
+                {
+                    GestureSettingRow(
+                        "Swipe left",
+                        gestures.miniSwipeLeft,
+                        PlayerGestureAction.choices(mini = true),
+                        onSelect = { playerViewModel.setPlayerGesture("mini_swipe_left", it) }
+                    )
+                },
+                {
+                    GestureSettingRow(
+                        "Swipe right",
+                        gestures.miniSwipeRight,
+                        PlayerGestureAction.choices(mini = true),
+                        onSelect = { playerViewModel.setPlayerGesture("mini_swipe_right", it) }
+                    )
+                },
+                {
+                    GestureSettingRow(
+                        "Swipe up",
+                        gestures.miniSwipeUp,
+                        PlayerGestureAction.choices(mini = true),
+                        onSelect = { playerViewModel.setPlayerGesture("mini_swipe_up", it) }
+                    )
+                },
+                {
+                    GestureSettingRow(
+                        "Pull down",
+                        gestures.miniSwipeDown,
+                        PlayerGestureAction.choices(mini = true),
+                        onSelect = { playerViewModel.setPlayerGesture("mini_swipe_down", it) }
+                    )
+                }
+            ))
+            SettingsHeader("Default actions")
+            SettingsGroupCard(listOf {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            playerViewModel.setPlayerGesture("cover_swipe_left", PlayerGestureAction.NEXT)
+                            playerViewModel.setPlayerGesture("cover_swipe_right", PlayerGestureAction.PREVIOUS)
+                            playerViewModel.setPlayerGesture("cover_swipe_up", PlayerGestureAction.QUEUE)
+                            playerViewModel.setPlayerGesture("cover_double_tap", PlayerGestureAction.SEEK_SIDES)
+                            playerViewModel.setPlayerGesture("cover_long_press", PlayerGestureAction.NONE)
+                            playerViewModel.setPlayerGesture("mini_swipe_left", PlayerGestureAction.NEXT)
+                            playerViewModel.setPlayerGesture("mini_swipe_right", PlayerGestureAction.PREVIOUS)
+                            playerViewModel.setPlayerGesture("mini_swipe_up", PlayerGestureAction.OPEN)
+                            playerViewModel.setPlayerGesture("mini_swipe_down", PlayerGestureAction.STOP)
+                            playerViewModel.setDoubleTapSeekSeconds(10)
+                        }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Restore Prism-style defaults", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Rounded.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+            })
+        }
+    }
+}
+
+@Composable
+private fun GestureSettingRow(
+    title: String,
+    selected: PlayerGestureAction,
+    options: List<PlayerGestureAction>,
+    onSelect: (PlayerGestureAction) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = true }
+                .padding(horizontal = 16.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Text(selected.label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
+            Icon(Icons.Default.ChevronRight, contentDescription = "Change $title", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 6.dp).size(18.dp))
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { action ->
+                DropdownMenuItem(
+                    text = { Text(action.label) },
+                    onClick = {
+                        expanded = false
+                        onSelect(action)
+                    },
+                    trailingIcon = if (action == selected) {
+                        { Icon(Icons.Default.Refresh, contentDescription = "Selected") }
+                    } else null
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -1132,6 +1349,14 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
                         subtitle = "Audio behavior, crossfade, audio focus",
                         icon = Icons.Rounded.PlayCircle,
                         onClick = { navController.navigate(SettingsRoute.Playback.route) }
+                    )
+                },
+                {
+                    SettingsCategoryItem(
+                        title = "Controls & Gestures",
+                        subtitle = "Player swipes, double tap, long press and mini-player actions",
+                        icon = Icons.Rounded.TouchApp,
+                        onClick = { navController.navigate(SettingsRoute.Controls.route) }
                     )
                 },
                 {
