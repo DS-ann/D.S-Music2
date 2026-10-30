@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Button
@@ -56,6 +57,7 @@ import com.dsann.music.data.innertube.SearchFilter
 import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.SearchItem
 import com.dsann.music.data.innertube.SearchResult
+import com.dsann.music.desktop.DesktopHomePage
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import javax.swing.JFileChooser
@@ -159,6 +161,20 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     var autoplayEnabled by remember { mutableStateOf(preferences.getBoolean("autoplay_enabled", true)) }
     var appearancePreset by remember { mutableStateOf(preferences.get("appearance_preset", "Ocean")) }
     var videoMode by remember { mutableStateOf(false) }
+    var homeFeed by remember { mutableStateOf<DesktopHomePage?>(null) }
+    var exploreFeed by remember { mutableStateOf<DesktopHomePage?>(null) }
+    var feedLoading by remember { mutableStateOf(false) }
+    var feedError by remember { mutableStateOf("") }
+    var cookieDraft by remember { mutableStateOf("") }
+    var accountProfile by remember { mutableStateOf<DesktopAccountProfile?>(null) }
+    var accountLoading by remember { mutableStateOf(false) }
+    var accountError by remember { mutableStateOf("") }
+    var remoteLibraryKind by remember { mutableStateOf("Playlists") }
+    var remoteLibraryItems by remember { mutableStateOf<List<SearchItem>>(emptyList()) }
+    var remoteLibraryLoading by remember { mutableStateOf(false) }
+    var remoteLibraryError by remember { mutableStateOf("") }
+    var remotePlaylistTitle by remember { mutableStateOf("") }
+    var selectedRemotePlaylistId by remember { mutableStateOf<String?>(null) }
     val videoSurface = remember { DesktopVideoSurface() }
     val coroutineScope = rememberCoroutineScope()
 
@@ -235,6 +251,86 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                 onlineError = error.message ?: "YouTube Music search failed."
             } finally {
                 onlineSearching = false
+            }
+        }
+    }
+
+    fun loadFeed(explore: Boolean) {
+        feedLoading = true
+        feedError = ""
+        coroutineScope.launch {
+            try {
+                val response = DesktopYouTubeMusic.homePage(explore)
+                if (explore) exploreFeed = response else homeFeed = response
+            } catch (error: Exception) {
+                feedError = error.message ?: "Could not load the YouTube Music feed."
+            } finally {
+                feedLoading = false
+            }
+        }
+    }
+
+    fun connectAccount() {
+        val cookie = cookieDraft.trim()
+        if (cookie.isBlank()) {
+            accountError = "Paste the YouTube Music session cookie from your browser."
+            return
+        }
+        accountLoading = true
+        accountError = ""
+        DesktopYouTubeMusic.setSessionCookie(cookie)
+        coroutineScope.launch {
+            try {
+                accountProfile = DesktopYouTubeMusic.accountProfile()
+                accountError = ""
+                section = "Account"
+            } catch (error: Exception) {
+                DesktopYouTubeMusic.setSessionCookie(null)
+                accountProfile = null
+                accountError = error.message ?: "Could not connect this YouTube Music session."
+            } finally {
+                accountLoading = false
+            }
+        }
+    }
+
+    fun disconnectAccount() {
+        DesktopYouTubeMusic.setSessionCookie(null)
+        accountProfile = null
+        remoteLibraryItems = emptyList()
+        selectedRemotePlaylistId = null
+        cookieDraft = ""
+        accountError = "Disconnected. Account cookies are kept only in memory for this session."
+    }
+
+    fun loadRemoteLibrary(kind: String = remoteLibraryKind) {
+        remoteLibraryKind = kind
+        remoteLibraryLoading = true
+        remoteLibraryError = ""
+        coroutineScope.launch {
+            try {
+                remoteLibraryItems = DesktopYouTubeMusic.accountLibrary(kind.lowercase(Locale.ROOT))
+            } catch (error: Exception) {
+                remoteLibraryItems = emptyList()
+                remoteLibraryError = error.message ?: "Could not load the online library."
+            } finally {
+                remoteLibraryLoading = false
+            }
+        }
+    }
+
+    fun addSongToRemotePlaylist(song: OnlineSong) {
+        val playlistId = selectedRemotePlaylistId
+        if (!DesktopYouTubeMusic.hasSession() || playlistId.isNullOrBlank()) {
+            addSongToPlaylist(song)
+            return
+        }
+        coroutineScope.launch {
+            try {
+                DesktopYouTubeMusic.addRemotePlaylistSongs(playlistId, listOf(song.videoId))
+                downloadMessage = "Added to your YouTube Music playlist."
+            } catch (error: Exception) {
+                downloadMessage = error.message ?: "Could not add the song to the online playlist."
             }
         }
     }
@@ -352,8 +448,15 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     }
 
     fun toggleFavorite(song: OnlineSong) {
-        DesktopLibraryStore.setFavorite(song, song.videoId !in favoriteIds)
+        val enabled = song.videoId !in favoriteIds
+        DesktopLibraryStore.setFavorite(song, enabled)
         refreshSavedLists()
+        if (DesktopYouTubeMusic.hasSession()) {
+            coroutineScope.launch {
+                runCatching { DesktopYouTubeMusic.setRemoteLike(song.videoId, enabled) }
+                    .onFailure { downloadMessage = it.message ?: "Local favorite saved; online like did not sync." }
+            }
+        }
     }
 
     fun addSongToPlaylist(song: OnlineSong) {
@@ -559,11 +662,18 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
 
                     Spacer(Modifier.height(20.dp))
                     Text("YOUR SPACE", color = mutedText, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    listOf("Explore", "Library", "Playlists", "Favorites", "Downloads", "Cache", "Lyrics", "Settings").forEach { item ->
+                    listOf("Home", "Explore", "Library", "Queue", "Online Library", "Playlists", "Favorites", "Downloads", "Cache", "Lyrics", "Account", "Settings").forEach { item ->
                         SidebarItem(
                             label = item,
                             selected = section == item,
-                            onClick = { section = item }
+                            onClick = {
+                                section = item
+                                when (item) {
+                                    "Home" -> if (homeFeed == null) loadFeed(false)
+                                    "Explore" -> if (exploreFeed == null) loadFeed(true)
+                                    "Online Library" -> if (DesktopYouTubeMusic.hasSession() && remoteLibraryItems.isEmpty()) loadRemoteLibrary()
+                                }
+                            }
                         )
                     }
                     Spacer(Modifier.weight(1f))
@@ -590,7 +700,12 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                             Column(Modifier.weight(1f)) {
                                 Text(
                                     when (section) {
+                                        "Home" -> "Home"
+                                        "Home" -> "Home"
                                         "Explore" -> "Explore"
+                                        "Queue" -> "Playback queue"
+                                        "Online Library" -> "YouTube Music library"
+                                        "Account" -> "Account"
                                         "Cache" -> "Offline cache"
                                         "Downloads" -> "Downloads"
                                         "Favorites" -> "Favorites"
@@ -605,7 +720,11 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                 )
                                 Text(
                                     when (section) {
-                                        "Explore" -> "Search, browse and play music from YouTube Music."
+                                        "Home" -> "Personalized music shelves from YouTube Music."
+                                        "Explore" -> "Charts, new releases and discovery shelves."
+                                        "Queue" -> "Upcoming tracks and playback order."
+                                        "Online Library" -> "Your playlists, artists, albums, podcasts and liked tracks."
+                                        "Account" -> "Connect your YouTube Music browser session."
                                         "Cache" -> "Offline songs with cover art and saved lyrics."
                                         "Downloads" -> "Downloaded audio files on this PC."
                                         "Favorites" -> "Your saved songs."
@@ -692,48 +811,70 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                 }
                             }
 
-                            "Explore" -> {
+                            "Home", "Explore" -> {
+                                val isExplore = section == "Explore"
+                                val feed = if (isExplore) exploreFeed else homeFeed
                                 Column(Modifier.fillMaxSize()) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        OutlinedTextField(
-                                            value = onlineQuery,
-                                            onValueChange = { onlineQuery = it },
-                                            modifier = Modifier.weight(1f),
-                                            singleLine = true,
-                                            placeholder = { Text("Search songs, albums, artists, playlists or podcasts") },
-                                            label = { Text("YouTube Music") }
-                                        )
                                         Button(
-                                            onClick = ::searchOnline,
-                                            enabled = onlineQuery.isNotBlank() && !onlineSearching,
+                                            onClick = { section = "Home"; if (homeFeed == null) loadFeed(false) },
                                             colors = ButtonDefaults.buttonColors(
-                                                backgroundColor = accentColor,
-                                                contentColor = Color(0xFF0B1420)
+                                                backgroundColor = if (!isExplore) accentColor else Color(0xFF263545),
+                                                contentColor = if (!isExplore) Color(0xFF0B1420) else Color.White
                                             )
-                                        ) {
-                                            Text(if (onlineSearching) "Searching…" else "Search")
-                                        }
+                                        ) { Text("Home") }
+                                        Button(
+                                            onClick = { section = "Explore"; if (exploreFeed == null) loadFeed(true) },
+                                            colors = ButtonDefaults.buttonColors(
+                                                backgroundColor = if (isExplore) accentColor else Color(0xFF263545),
+                                                contentColor = if (isExplore) Color(0xFF0B1420) else Color.White
+                                            )
+                                        ) { Text("Explore") }
+                                        Spacer(Modifier.weight(1f))
+                                        Button(onClick = { loadFeed(isExplore) }, enabled = !feedLoading) { Text("Refresh") }
                                     }
-                                    Spacer(Modifier.height(16.dp))
+                                    Spacer(Modifier.height(12.dp))
+                                    if (!isExplore) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            OutlinedTextField(
+                                                value = onlineQuery,
+                                                onValueChange = { onlineQuery = it },
+                                                modifier = Modifier.weight(1f),
+                                                singleLine = true,
+                                                placeholder = { Text("Search songs, albums, artists, playlists or podcasts") },
+                                                label = { Text("Search YouTube Music") }
+                                            )
+                                            Button(
+                                                onClick = ::searchOnline,
+                                                enabled = onlineQuery.isNotBlank() && !onlineSearching,
+                                                colors = ButtonDefaults.buttonColors(backgroundColor = accentColor, contentColor = Color(0xFF0B1420))
+                                            ) { Text(if (onlineSearching) "Searching…" else "Search") }
+                                        }
+                                        Spacer(Modifier.height(12.dp))
+                                    }
                                     when {
-                                        onlineSearching -> EmptyPanel("Searching YouTube Music…", "Phone-style top results are collected from separate result categories.")
-                                        onlineError.isNotBlank() -> EmptyPanel("Search failed", onlineError)
-                                        onlineResult == null -> EmptyPanel(
-                                            "Explore music",
-                                            "Search YouTube Music. Results are grouped into songs, videos, albums, artists, playlists, podcasts and episodes."
+                                        feedLoading || onlineSearching -> EmptyPanel(
+                                            if (onlineSearching) "Searching YouTube Music…" else "Loading music feed…",
+                                            "Fetching phone-style categories and recommendation shelves."
                                         )
-                                        else -> {
+                                        feedError.isNotBlank() && feed == null -> EmptyPanel("Feed unavailable", feedError)
+                                        !isExplore && onlineError.isNotBlank() -> EmptyPanel("Search failed", onlineError)
+                                        !isExplore && onlineResult != null -> {
                                             LazyColumn(
                                                 modifier = Modifier.fillMaxSize(),
-                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                                verticalArrangement = Arrangement.spacedBy(9.dp)
                                             ) {
                                                 onlineResult?.topResult?.let { top ->
                                                     item(key = "top-result") {
-                                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                                             Text("TOP RESULT", color = accentColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                                             OnlineResultRow(
                                                                 item = top,
@@ -744,52 +885,217 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                                                 onClick = { openOnlineItem(top) },
                                                                 onFavorite = { (top as? SearchItem.Song)?.song?.let(::toggleFavorite) },
                                                                 onDownload = { (top as? SearchItem.Song)?.song?.let(::startDownload) },
-                                                                onAddToPlaylist = { (top as? SearchItem.Song)?.song?.let(::addSongToPlaylist) }
+                                                                onAddToPlaylist = { (top as? SearchItem.Song)?.song?.let(::addSongToRemotePlaylist) }
                                                             )
                                                         }
                                                     }
                                                 }
-                                                onlineResult?.items.orEmpty().forEachIndexed { index, resultItem ->
-                                                    item(key = "mixed-result-$index") {
-                                                        OnlineResultRow(
-                                                            item = resultItem,
-                                                            isFavorite = ((resultItem as? SearchItem.Song)?.song?.videoId?.let { it in favoriteIds } == true),
-                                                            isDownloading = (resultItem as? SearchItem.Song)?.song?.videoId == downloadingVideoId,
-                                                            downloadProgress = downloadProgress,
-                                                            onClick = { openOnlineItem(resultItem) },
-                                                            onFavorite = { (resultItem as? SearchItem.Song)?.song?.let(::toggleFavorite) },
-                                                            onDownload = { (resultItem as? SearchItem.Song)?.song?.let(::startDownload) },
-                                                            onAddToPlaylist = { (resultItem as? SearchItem.Song)?.song?.let(::addSongToPlaylist) }
-                                                        )
-                                                    }
-                                                }
                                                 onlineResult?.sections.orEmpty().forEach { resultSection ->
-                                                    item(key = "section-${resultSection.filter.name}") {
-                                                        Text(
-                                                            resultSection.filter.label.uppercase(Locale.ROOT),
-                                                            color = mutedText,
-                                                            fontSize = 11.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            modifier = Modifier.padding(top = 10.dp, start = 4.dp)
-                                                        )
+                                                    item(key = "search-section-${resultSection.filter.name}") {
+                                                        Text(resultSection.filter.label.uppercase(Locale.ROOT), color = mutedText, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                                     }
-                                                    items(resultSection.items.size) { index ->
-                                                        val resultItem = resultSection.items[index]
+                                                    items(resultSection.items, key = { item -> DesktopYouTubeMusic.itemTitle(item) + DesktopYouTubeMusic.itemSubtitle(item) }) { item ->
                                                         OnlineResultRow(
-                                                            item = resultItem,
-                                                            isFavorite = ((resultItem as? SearchItem.Song)?.song?.videoId?.let { it in favoriteIds } == true),
-                                                            isDownloading = (resultItem as? SearchItem.Song)?.song?.videoId == downloadingVideoId,
+                                                            item = item,
+                                                            isFavorite = ((item as? SearchItem.Song)?.song?.videoId?.let { it in favoriteIds } == true),
+                                                            isDownloading = (item as? SearchItem.Song)?.song?.videoId == downloadingVideoId,
                                                             downloadProgress = downloadProgress,
-                                                            onClick = { openOnlineItem(resultItem) },
-                                                            onFavorite = { (resultItem as? SearchItem.Song)?.song?.let(::toggleFavorite) },
-                                                            onDownload = { (resultItem as? SearchItem.Song)?.song?.let(::startDownload) },
-                                                            onAddToPlaylist = { (resultItem as? SearchItem.Song)?.song?.let(::addSongToPlaylist) }
+                                                            onClick = { openOnlineItem(item) },
+                                                            onFavorite = { (item as? SearchItem.Song)?.song?.let(::toggleFavorite) },
+                                                            onDownload = { (item as? SearchItem.Song)?.song?.let(::startDownload) },
+                                                            onAddToPlaylist = { (item as? SearchItem.Song)?.song?.let(::addSongToRemotePlaylist) }
                                                         )
                                                     }
                                                 }
                                             }
                                         }
+                                        feed == null -> EmptyPanel(
+                                            if (isExplore) "Explore music" else "Your YouTube Music home",
+                                            if (isExplore) "Load charts, moods and new releases." else "Load personalized recommendations from your YouTube Music home feed."
+                                        )
+                                        else -> {
+                                            LazyColumn(
+                                                modifier = Modifier.fillMaxSize(),
+                                                verticalArrangement = Arrangement.spacedBy(18.dp)
+                                            ) {
+                                                if (feed!!.moods.isNotEmpty()) {
+                                                    item(key = "home-moods") {
+                                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                            Text("MOODS & GENRES", color = mutedText, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                            LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                                                items(feed!!.moods) { mood ->
+                                                                    Button(
+                                                                        onClick = {
+                                                                            onlineQuery = mood
+                                                                            searchOnline()
+                                                                        },
+                                                                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545)),
+                                                                        elevation = ButtonDefaults.elevation(0.dp)
+                                                                    ) { Text(mood) }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                feed!!.sections.forEachIndexed { sectionIndex, shelf ->
+                                                    item(key = "feed-shelf-$sectionIndex") {
+                                                        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                Text(shelf.title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                                                                if (!shelf.browseId.isNullOrBlank()) {
+                                                                    Button(
+                                                                        onClick = { openCollection(shelf.browseId, shelf.title) },
+                                                                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545)),
+                                                                        elevation = ButtonDefaults.elevation(0.dp)
+                                                                    ) { Text("See all") }
+                                                                }
+                                                            }
+                                                            LazyRow(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                                                                items(shelf.items.size) { index ->
+                                                                    val item = shelf.items[index]
+                                                                    Box(Modifier.width(320.dp)) {
+                                                                        OnlineResultRow(
+                                                                            item = item,
+                                                                            isFavorite = ((item as? SearchItem.Song)?.song?.videoId?.let { it in favoriteIds } == true),
+                                                                            isDownloading = (item as? SearchItem.Song)?.song?.videoId == downloadingVideoId,
+                                                                            downloadProgress = downloadProgress,
+                                                                            onClick = { openOnlineItem(item) },
+                                                                            onFavorite = { (item as? SearchItem.Song)?.song?.let(::toggleFavorite) },
+                                                                            onDownload = { (item as? SearchItem.Song)?.song?.let(::startDownload) },
+                                                                            onAddToPlaylist = { (item as? SearchItem.Song)?.song?.let(::addSongToRemotePlaylist) }
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
+                                }
+                            }
+
+                            "Queue" -> {
+                                if (onlineQueue.isEmpty() && currentTrack == null) {
+                                    EmptyPanel("Queue is empty", "Play a song to build your upcoming queue.")
+                                } else {
+                                    LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                        currentOnlineSong?.let { current ->
+                                            item(key = "queue-current") {
+                                                Text("NOW PLAYING", color = accentColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                OnlineResultRow(
+                                                    item = SearchItem.Song(current),
+                                                    featured = true,
+                                                    onClick = { playOnlineSong(current, onlineQueue) }
+                                                )
+                                            }
+                                        }
+                                        items(onlineQueue.size) { index ->
+                                            val song = onlineQueue[index]
+                                            OnlineResultRow(
+                                                item = SearchItem.Song(song),
+                                                featured = index == onlineQueueIndex,
+                                                isFavorite = song.videoId in favoriteIds,
+                                                isDownloading = song.videoId == downloadingVideoId,
+                                                downloadProgress = downloadProgress,
+                                                onClick = { playOnlineSong(song, onlineQueue) },
+                                                onFavorite = { toggleFavorite(song) },
+                                                onDownload = { startDownload(song) },
+                                                onAddToPlaylist = { addSongToRemotePlaylist(song) }
+                                            )
+                                        }
+                                        if (currentTrack != null && onlineQueue.isEmpty()) {
+                                            item(key = "local-queue-current") {
+                                                TrackRow(track = currentTrack, selected = true, onClick = { playTrack(currentTrack) })
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            "Online Library" -> {
+                                Column(Modifier.fillMaxSize()) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        listOf("Playlists", "Artists", "Albums", "Podcasts", "Liked").forEach { kind ->
+                                            Button(
+                                                onClick = { loadRemoteLibrary(kind) },
+                                                enabled = DesktopYouTubeMusic.hasSession() && !remoteLibraryLoading,
+                                                colors = ButtonDefaults.buttonColors(
+                                                    backgroundColor = if (remoteLibraryKind == kind) accentColor else Color(0xFF263545),
+                                                    contentColor = if (remoteLibraryKind == kind) Color(0xFF0B1420) else Color.White
+                                                ),
+                                                elevation = ButtonDefaults.elevation(0.dp)
+                                            ) { Text(kind) }
+                                        }
+                                    }
+                                    Spacer(Modifier.height(12.dp))
+                                    when {
+                                        !DesktopYouTubeMusic.hasSession() -> EmptyPanel("Connect your account", "Open Account and connect a YouTube Music browser session to load your online library.")
+                                        remoteLibraryLoading -> EmptyPanel("Loading library…", "Fetching ${remoteLibraryKind.lowercase(Locale.ROOT)} from YouTube Music.")
+                                        remoteLibraryError.isNotBlank() -> EmptyPanel("Library unavailable", remoteLibraryError)
+                                        remoteLibraryItems.isEmpty() -> EmptyPanel("No online ${remoteLibraryKind.lowercase(Locale.ROOT)}", "This category did not return any items.")
+                                        else -> LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                            items(remoteLibraryItems.size) { index ->
+                                                val item = remoteLibraryItems[index]
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Box(Modifier.weight(1f)) {
+                                                        OnlineResultRow(
+                                                            item = item,
+                                                            onClick = { openOnlineItem(item) }
+                                                        )
+                                                    }
+                                                    if (item is SearchItem.Playlist) {
+                                                        Button(
+                                                            onClick = { selectedRemotePlaylistId = item.playlist.playlistId; downloadMessage = "Selected online playlist: ${item.playlist.title}" },
+                                                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545))
+                                                        ) { Text(if (selectedRemotePlaylistId == item.playlist.playlistId) "Selected" else "Select") }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (downloadMessage.isNotBlank()) Text(downloadMessage, color = mutedText, fontSize = 11.sp)
+                                }
+                            }
+
+                            "Account" -> {
+                                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    FeaturePanel(
+                                        title = "YouTube Music account",
+                                        body = accountProfile?.let { listOfNotNull(it.name, it.handle, it.email).joinToString("\n") }
+                                            ?: "A browser session cookie is used to access your YouTube Music library and account playlists.",
+                                        footnote = "The session cookie is held in memory only and is not saved to disk. Disconnect or restart the app to clear it."
+                                    )
+                                    OutlinedTextField(
+                                        value = cookieDraft,
+                                        onValueChange = { cookieDraft = it },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = false,
+                                        label = { Text("YouTube Music session cookie") },
+                                        placeholder = { Text("Paste Cookie header from music.youtube.com") }
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = ::connectAccount,
+                                            enabled = cookieDraft.isNotBlank() && !accountLoading,
+                                            colors = ButtonDefaults.buttonColors(backgroundColor = accentColor, contentColor = Color(0xFF0B1420))
+                                        ) { Text(if (accountLoading) "Connecting…" else "Connect") }
+                                        Button(
+                                            onClick = ::disconnectAccount,
+                                            enabled = DesktopYouTubeMusic.hasSession(),
+                                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545))
+                                        ) { Text("Disconnect") }
+                                        Button(
+                                            onClick = { section = "Online Library"; loadRemoteLibrary("Playlists") },
+                                            enabled = accountProfile != null
+                                        ) { Text("Open online library") }
+                                    }
+                                    if (accountError.isNotBlank()) Text(accountError, color = Color(0xFFFFC0A8), fontSize = 12.sp)
+                                    if (accountProfile != null) Text("Connected as ${accountProfile!!.name}", color = accentColor, fontWeight = FontWeight.SemiBold)
                                 }
                             }
 
@@ -1104,8 +1410,12 @@ private fun SidebarItem(label: String, selected: Boolean, onClick: () -> Unit) {
         ) {
             Text(
                 when (label) {
+                    "Home" -> "⌂"
                     "Explore" -> "⌕"
                     "Library" -> "♫"
+                    "Queue" -> "☷"
+                    "Online Library" -> "☁"
+                    "Account" -> "◎"
                     "Playlists" -> "≡"
                     "Favorites" -> "♥"
                     "Downloads" -> "↓"
