@@ -703,12 +703,16 @@ fun ExploreScreen(
                                                 }
                                             },
                                             suggestions = suggestions,
+                                            suggestionItems = suggestionItems,
                                             onSuggestionClick = { suggestion ->
                                                 scope.launch {
                                                     isSearchActive = false
                                                     delay(50.milliseconds)
                                                     viewModel.search(suggestion)
                                                 }
+                                            },
+                                            onSuggestionItemClick = { item ->
+                                                activateSearchItem(item)
                                             },
                                             onAccountVisibleChange = onSearchHeaderAccountVisibleChange,
                                             userProfile = userProfile,
@@ -723,144 +727,209 @@ fun ExploreScreen(
 
                                         Box(modifier = Modifier.weight(1f)) {
                                             when {
-                                                isSearching && searchResults.isEmpty() -> {
+                                                isSearching && searchResults.isEmpty() && searchTopResult == null -> {
                                                     Box(
                                                         modifier = Modifier.fillMaxSize(),
                                                         contentAlignment = Alignment.Center
-                                                    ) {
-                                                        LoadingIndicator()
-                                                    }
+                                                    ) { LoadingIndicator() }
                                                 }
 
-                                                searchResults.isNotEmpty() -> {
-                                                    val columns = if (isLandscape) 2 else 1
-                                                    val searchChunks =
-                                                        remember(searchResults, columns) {
-                                                            searchResults.chunked(columns)
-                                                        }
-
+                                                searchQuery.isNotBlank() && (searchResults.isNotEmpty() || searchTopResult != null) -> {
+                                                    val topSongQueue = remember(searchSections, searchTopResult) {
+                                                        (searchSections.flatMap { section ->
+                                                            section.items.filterIsInstance<SearchItem.Song>().map { it.song }
+                                                        } + listOfNotNull((searchTopResult as? SearchItem.Song)?.song))
+                                                            .distinctBy { it.videoId }
+                                                    }
                                                     LazyColumn(
                                                         state = searchListState,
-                                                        modifier = Modifier.fillMaxSize()
-                                                            .background(Color.Transparent),
+                                                        modifier = Modifier.fillMaxSize().background(Color.Transparent),
                                                         contentPadding = PaddingValues(bottom = 120.dp)
                                                     ) {
-                                                        itemsIndexed(
-                                                            items = searchChunks,
-                                                            key = { idx, chunk ->
-                                                                val baseKey =
-                                                                    chunk.joinToString("-") { item ->
-                                                                        when (item) {
-                                                                            is SearchItem.Song -> "song-${item.song.videoId}"
-                                                                            is SearchItem.Album -> "album-${item.album.browseId}"
-                                                                            is SearchItem.Artist -> "artist-${item.artist.browseId}"
-                                                                            is SearchItem.Playlist -> "playlist-${item.playlist.playlistId}"
+                                                        if (currentFilter == null) {
+                                                            searchTopResult?.let { top ->
+                                                                item(key = "search-top-result") {
+                                                                    SearchTopResultCard(
+                                                                        item = top,
+                                                                        isCurrentlyPlaying = top is SearchItem.Song &&
+                                                                            top.song.videoId == currentOnlineSong?.videoId,
+                                                                        isLoading = top is SearchItem.Song && isLoadingStream &&
+                                                                            top.song.videoId == currentOnlineSong?.videoId,
+                                                                        onSongMenuClick = { selectedSongForMenu = it },
+                                                                        onTouchDown = {
+                                                                            if (top is SearchItem.Song) {
+                                                                                playerSharedViewModel.specPrefetch(
+                                                                                    SongItem.createOnlineSong(
+                                                                                        top.song.videoId, top.song.title, top.song.artist, "",
+                                                                                        top.song.durationMs, top.song.thumbnailUrl, top.song.artistId,
+                                                                                        top.song.albumName
+                                                                                    )
+                                                                                )
+                                                                            }
+                                                                        },
+                                                                        onClick = { activateSearchItem(top, topSongQueue) }
+                                                                    )
+                                                                }
+                                                            }
+
+                                                            searchSections.forEach { section ->
+                                                                item(key = "search-section:${section.filter.name}") {
+                                                                    Row(
+                                                                        modifier = Modifier.fillMaxWidth()
+                                                                            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 6.dp),
+                                                                        verticalAlignment = Alignment.CenterVertically
+                                                                    ) {
+                                                                        Text(
+                                                                            section.filter.label,
+                                                                            modifier = Modifier.weight(1f),
+                                                                            style = MaterialTheme.typography.titleMedium,
+                                                                            fontWeight = FontWeight.SemiBold
+                                                                        )
+                                                                        TextButton(onClick = { viewModel.setSearchFilter(section.filter) }) {
+                                                                            Text("See all")
                                                                         }
                                                                     }
-                                                                "$idx-$baseKey"
-                                                            }
-                                                        ) { _, chunk ->
-                                                            Row(
-                                                                modifier = Modifier.fillMaxWidth()
-                                                                    .padding(horizontal = 8.dp),
-                                                                horizontalArrangement = Arrangement.spacedBy(
-                                                                    8.dp
+                                                                }
+
+                                                                val songRows = section.items.filterIsInstance<SearchItem.Song>()
+                                                                val useRows = section.filter in setOf(
+                                                                    SearchFilter.SONGS, SearchFilter.VIDEOS,
+                                                                    SearchFilter.EPISODES, SearchFilter.LIVE
                                                                 )
-                                                            ) {
-                                                                chunk.forEach { item ->
-                                                                    Box(
-                                                                        modifier = Modifier.weight(
-                                                                            1f
-                                                                        )
-                                                                    ) {
+                                                                if (useRows) {
+                                                                    items(
+                                                                        section.items,
+                                                                        key = { item ->
+                                                                            when (item) {
+                                                                                is SearchItem.Song -> "song:${item.song.videoId}"
+                                                                                is SearchItem.Album -> "album:${item.album.browseId}"
+                                                                                is SearchItem.Artist -> "artist:${item.artist.browseId}"
+                                                                                is SearchItem.Playlist -> "playlist:${item.playlist.playlistId}"
+                                                                            }
+                                                                        }
+                                                                    ) { item ->
                                                                         SearchResultItem(
                                                                             item = item,
-                                                                            isCurrentlyPlaying = when (item) {
-                                                                                is SearchItem.Song -> item.song.videoId == currentOnlineSong?.videoId
-                                                                                else -> false
-                                                                            },
-                                                                            isLoading = isLoadingStream && when (item) {
-                                                                                is SearchItem.Song -> item.song.videoId == currentOnlineSong?.videoId
-                                                                                else -> false
-                                                                            },
-                                                                            onSongMenuClick = {
-                                                                                selectedSongForMenu =
-                                                                                    it
-                                                                            },
+                                                                            isCurrentlyPlaying = item is SearchItem.Song &&
+                                                                                item.song.videoId == currentOnlineSong?.videoId,
+                                                                            isLoading = item is SearchItem.Song && isLoadingStream &&
+                                                                                item.song.videoId == currentOnlineSong?.videoId,
+                                                                            onSongMenuClick = { selectedSongForMenu = it },
                                                                             onTouchDown = {
                                                                                 if (item is SearchItem.Song) {
                                                                                     playerSharedViewModel.specPrefetch(
                                                                                         SongItem.createOnlineSong(
-                                                                                            item.song.videoId,
-                                                                                            item.song.title,
-                                                                                            item.song.artist,
-                                                                                            "",
-                                                                                            item.song.durationMs,
-                                                                                            item.song.thumbnailUrl,
-                                                                                            item.song.artistId
+                                                                                            item.song.videoId, item.song.title, item.song.artist, "",
+                                                                                            item.song.durationMs, item.song.thumbnailUrl, item.song.artistId,
+                                                                                            item.song.albumName
                                                                                         )
                                                                                     )
                                                                                 }
                                                                             },
-                                                                            onClick = {
-                                                                                when (item) {
-                                                                                    is SearchItem.Song -> {
-                                                                                        // A search-song tap starts a song-seeded radio mix instead of
-                                                                                        // ending the queue at the current search-result list.
-                                                                                        viewModel.startRadio(item.song)
-                                                                                    }
-
-                                                                                    is SearchItem.Album -> viewModel.loadAlbum(
-                                                                                        item.album.browseId
-                                                                                    )
-
-                                                                                    is SearchItem.Artist -> viewModel.loadArtist(
-                                                                                        item.artist.browseId,
-                                                                                        item.artist.thumbnailUrl
-                                                                                    )
-
-                                                                                    is SearchItem.Playlist -> viewModel.loadPlaylist(
-                                                                                        item.playlist.playlistId
-                                                                                    )
-                                                                                }
-                                                                            }
+                                                                            onClick = { activateSearchItem(item, songRows.map { it.song }) }
                                                                         )
                                                                     }
+                                                                } else {
+                                                                    item(key = "search-shelf:${section.filter.name}") {
+                                                                        LazyRow(
+                                                                            contentPadding = PaddingValues(horizontal = 12.dp),
+                                                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                                                        ) {
+                                                                            items(
+                                                                                section.items,
+                                                                                key = { item ->
+                                                                                    when (item) {
+                                                                                        is SearchItem.Song -> "song:${item.song.videoId}"
+                                                                                        is SearchItem.Album -> "album:${item.album.browseId}"
+                                                                                        is SearchItem.Artist -> "artist:${item.artist.browseId}"
+                                                                                        is SearchItem.Playlist -> "playlist:${item.playlist.playlistId}"
+                                                                                    }
+                                                                                }
+                                                                            ) { item ->
+                                                                                SearchBrowseCard(item) { activateSearchItem(item) }
+                                                                            }
+                                                                        }
+                                                                    }
                                                                 }
-                                                                if (chunk.size < columns) {
-                                                                    Spacer(
-                                                                        modifier = Modifier.weight(
-                                                                            1f
-                                                                        )
+                                                            }
+                                                            if (searchSections.isEmpty() && searchResults.isNotEmpty()) {
+                                                                item(key = "search-fallback-heading") {
+                                                                    Text(
+                                                                        "More results",
+                                                                        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 6.dp),
+                                                                        style = MaterialTheme.typography.titleMedium,
+                                                                        fontWeight = FontWeight.SemiBold
+                                                                    )
+                                                                }
+                                                                items(searchResults, key = { item ->
+                                                                    when (item) {
+                                                                        is SearchItem.Song -> "song:${item.song.videoId}"
+                                                                        is SearchItem.Album -> "album:${item.album.browseId}"
+                                                                        is SearchItem.Artist -> "artist:${item.artist.browseId}"
+                                                                        is SearchItem.Playlist -> "playlist:${item.playlist.playlistId}"
+                                                                    }
+                                                                }) { item ->
+                                                                    SearchResultItem(
+                                                                        item = item,
+                                                                        isCurrentlyPlaying = item is SearchItem.Song && item.song.videoId == currentOnlineSong?.videoId,
+                                                                        isLoading = item is SearchItem.Song && isLoadingStream && item.song.videoId == currentOnlineSong?.videoId,
+                                                                        onSongMenuClick = { selectedSongForMenu = it },
+                                                                        onClick = { activateSearchItem(item) }
                                                                     )
                                                                 }
                                                             }
-                                                        }
-                                                        item {
-                                                            if (isSearching) {
-                                                                Box(
-                                                                    modifier = Modifier.fillMaxWidth()
-                                                                        .padding(16.dp),
-                                                                    contentAlignment = Alignment.Center
-                                                                ) {
-                                                                    LoadingIndicator(
-                                                                        modifier = Modifier.size(
-                                                                            32.dp
-                                                                        )
-                                                                    )
+                                                        } else {
+                                                            items(searchResults, key = { item ->
+                                                                when (item) {
+                                                                    is SearchItem.Song -> "song:${item.song.videoId}"
+                                                                    is SearchItem.Album -> "album:${item.album.browseId}"
+                                                                    is SearchItem.Artist -> "artist:${item.artist.browseId}"
+                                                                    is SearchItem.Playlist -> "playlist:${item.playlist.playlistId}"
                                                                 }
+                                                            }) { item ->
+                                                                SearchResultItem(
+                                                                    item = item,
+                                                                    isCurrentlyPlaying = item is SearchItem.Song && item.song.videoId == currentOnlineSong?.videoId,
+                                                                    isLoading = item is SearchItem.Song && isLoadingStream && item.song.videoId == currentOnlineSong?.videoId,
+                                                                    onSongMenuClick = { selectedSongForMenu = it },
+                                                                    onTouchDown = {
+                                                                        if (item is SearchItem.Song) {
+                                                                            playerSharedViewModel.specPrefetch(
+                                                                                SongItem.createOnlineSong(
+                                                                                    item.song.videoId, item.song.title, item.song.artist, "",
+                                                                                    item.song.durationMs, item.song.thumbnailUrl, item.song.artistId,
+                                                                                    item.song.albumName
+                                                                                )
+                                                                            )
+                                                                        }
+                                                                    },
+                                                                    onClick = {
+                                                                        activateSearchItem(
+                                                                            item,
+                                                                            searchResults.filterIsInstance<SearchItem.Song>().map { it.song }
+                                                                        )
+                                                                    }
+                                                                )
+                                                            }
+                                                            if (isSearching) item {
+                                                                Box(
+                                                                    Modifier.fillMaxWidth().padding(16.dp),
+                                                                    contentAlignment = Alignment.Center
+                                                                ) { LoadingIndicator(Modifier.size(28.dp)) }
                                                             }
                                                         }
                                                     }
-                                                    LaunchedEffect(searchListState) {
-                                                        snapshotFlow { searchListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
-                                                            .collect { lastVisibleIndex ->
-                                                                val threshold =
-                                                                    if (isLandscape) searchChunks.size - 2 else searchResults.size - 3
-                                                                if (lastVisibleIndex != null && lastVisibleIndex >= threshold) {
-                                                                    viewModel.loadMoreResults()
+
+                                                    LaunchedEffect(searchListState, currentFilter, searchResults.size, searchSections.size) {
+                                                        if (currentFilter != null) {
+                                                            snapshotFlow { searchListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+                                                                .collect { lastVisibleIndex ->
+                                                                    val threshold = searchResults.size - 3
+                                                                    if (lastVisibleIndex != null && lastVisibleIndex >= threshold) {
+                                                                        viewModel.loadMoreResults()
+                                                                    }
                                                                 }
-                                                            }
+                                                        }
                                                     }
                                                 }
 
@@ -871,9 +940,7 @@ fun ExploreScreen(
                                                     ) {
                                                         Column(
                                                             horizontalAlignment = Alignment.CenterHorizontally,
-                                                            verticalArrangement = Arrangement.spacedBy(
-                                                                8.dp
-                                                            )
+                                                            verticalArrangement = Arrangement.spacedBy(8.dp)
                                                         ) {
                                                             Icon(
                                                                 imageVector = Icons.Default.Search,
