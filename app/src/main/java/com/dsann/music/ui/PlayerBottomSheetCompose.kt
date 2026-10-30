@@ -703,6 +703,8 @@ fun PlayerBottomSheetCompose(
         
         // Playback state observers combined into stable UI model
         val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
+        val isVideoMode by viewModel.isVideoMode.collectAsStateWithLifecycle()
+        val audioService by viewModel.audioServiceState.collectAsStateWithLifecycle()
         val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
         val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
         val duration by viewModel.duration.collectAsStateWithLifecycle()
@@ -1181,6 +1183,7 @@ fun PlayerBottomSheetCompose(
                             // outside graphicsLayer, taps on the old 90%-screen layout bounds could
                             // open lyrics even when the visible cover was elsewhere/smaller.
                             .clickable(
+                                enabled = !isVideoMode,
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
                             ) {
@@ -1208,15 +1211,40 @@ fun PlayerBottomSheetCompose(
                             }
                             .zIndex(if (isQueueExpanded) 1f else if (isLyricsModeEnabled || lyricsArtworkProgress > 0f) 6f else 3f)
                     ) {
-                        ArtworkPager(
-                            viewModel = viewModel,
-                            currentSong = currentSong!!,
-                            songList = songList,
-                            currentSongIndex = uiState.currentSongIndex,
-                            context = context,
-                            userScrollEnabled = playerContentExpansionFraction.value > 0.95f && !isLyricsModeEnabled && !isQueueExpanded,
-                            modifier = Modifier.fillMaxSize()
-                        )
+                        if (
+                            isVideoMode &&
+                            audioService != null &&
+                            playerContentExpansionFraction.value > 0.95f &&
+                            !isLyricsModeEnabled &&
+                            !isQueueExpanded
+                        ) {
+                            androidx.compose.ui.viewinterop.AndroidView(
+                                factory = { viewContext ->
+                                    androidx.media3.ui.PlayerView(viewContext).apply {
+                                        player = audioService?.getPlayerInstance()
+                                        useController = true
+                                        controllerShowTimeoutMs = 3000
+                                        resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                        setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                                        keepScreenOn = true
+                                    }
+                                },
+                                update = { playerView ->
+                                    playerView.player = audioService?.getPlayerInstance()
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            ArtworkPager(
+                                viewModel = viewModel,
+                                currentSong = currentSong!!,
+                                songList = songList,
+                                currentSongIndex = uiState.currentSongIndex,
+                                context = context,
+                                userScrollEnabled = playerContentExpansionFraction.value > 0.95f && !isLyricsModeEnabled && !isQueueExpanded,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
                 }
             }
