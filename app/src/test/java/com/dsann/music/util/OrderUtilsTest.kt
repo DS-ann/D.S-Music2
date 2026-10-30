@@ -32,8 +32,8 @@ class OrderUtilsTest {
     @Test
     fun currentIndexFollowsMovedItem() {
         assertEquals(3, OrderUtils.moveIndex(1, 1, 3))
-        assertEquals(0, OrderUtils.moveIndex(3, 1, 3))
-        assertEquals(2, OrderUtils.moveIndex(2, 1, 3))
+        assertEquals(2, OrderUtils.moveIndex(3, 1, 3))
+        assertEquals(1, OrderUtils.moveIndex(2, 1, 3))
     }
 
     @Test
