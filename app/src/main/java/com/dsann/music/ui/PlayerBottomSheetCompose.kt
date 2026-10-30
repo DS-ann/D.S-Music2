@@ -1527,7 +1527,12 @@ fun PlayerBottomSheetCompose(
                                                 videoQualityOptions.forEach { option ->
                                                     TextButton(
                                                         onClick = {
-                                                            audioService?.setVideoStreamQuality(option.url)
+                                                            audioService?.setVideoStreamQuality(
+                                                                streamUrl = option.url,
+                                                                audioUrl = option.audioUrl,
+                                                                videoMimeType = option.mimeType,
+                                                                audioMimeType = option.audioMimeType
+                                                            )
                                                             selectedVideoQuality = option.label
                                                             showVideoQualityDialog = false
                                                         }
