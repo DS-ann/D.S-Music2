@@ -434,11 +434,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putString("player_buttons", safe.joinToString(",")) }
     }
     fun movePlayerButton(from: Int, to: Int) {
-        val current = _playerButtons.value.toMutableList()
-        if (from !in current.indices || to !in current.indices) return
-        val moved = current.removeAt(from)
-        current.add(to, moved)
-        setPlayerButtons(current)
+        setPlayerButtons(com.dsann.music.util.OrderUtils.move(_playerButtons.value, from, to))
     }
 
     private val _playerTitleAlign = MutableStateFlow(prefs.getString("player_title_align", "Left") ?: "Left")
