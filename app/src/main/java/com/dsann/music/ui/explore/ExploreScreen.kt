@@ -1463,7 +1463,9 @@ fun ExploreScreen(
         onRemoveFromSearchHistory: (String) -> Unit,
         onHistoryItemClick: (String) -> Unit,
         suggestions: List<String>,
+        suggestionItems: List<SearchItem>,
         onSuggestionClick: (String) -> Unit,
+        onSuggestionItemClick: (SearchItem) -> Unit,
         onAccountVisibleChange: (Boolean) -> Unit,
         userProfile: UserProfile?,
         homeMoods: List<String>,
@@ -1688,15 +1690,39 @@ fun ExploreScreen(
                                 )
                             }
                         }
-                    } else if (suggestions.isNotEmpty()) {
-                        items(suggestions) { suggestion ->
+                    } else if (suggestions.isNotEmpty() || suggestionItems.isNotEmpty()) {
+                        item(key = "typed-query") {
+                            ListItem(
+                                headlineContent = { Text("Search for \"$searchQuery\"") },
+                                leadingContent = { Icon(Icons.Default.Search, null) },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                modifier = Modifier.clickable { onSearch(searchQuery.trim()) }
+                            )
+                        }
+                        items(suggestions, key = { "suggestion:$it" }) { suggestion ->
                             ListItem(
                                 headlineContent = { Text(suggestion) },
                                 leadingContent = { Icon(Icons.Default.Search, null) },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                modifier = Modifier.clickable {
-                                    onSuggestionClick(suggestion)
+                                modifier = Modifier.clickable { onSuggestionClick(suggestion) }
+                            )
+                        }
+                        items(
+                            suggestionItems,
+                            key = { item ->
+                                when (item) {
+                                    is SearchItem.Song -> "suggestion-song:" + item.song.videoId
+                                    is SearchItem.Album -> "suggestion-album:" + item.album.browseId
+                                    is SearchItem.Artist -> "suggestion-artist:" + item.artist.browseId
+                                    is SearchItem.Playlist -> "suggestion-playlist:" + item.playlist.playlistId
                                 }
+                            }
+                        ) { item ->
+                            SearchResultItem(
+                                item = item,
+                                isCurrentlyPlaying = false,
+                                isLoading = false,
+                                onClick = { onSuggestionItemClick(item) }
                             )
                         }
                     } else {
@@ -1857,13 +1883,8 @@ fun ExploreScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val filters = listOf(
-                        null to "All",
-                        SearchFilter.SONGS to "Songs",
-                        SearchFilter.ALBUMS to "Albums",
-                        SearchFilter.ARTISTS to "Artists",
-                        SearchFilter.PLAYLISTS to "Playlists"
-                    )
+                    val filters: List<Pair<SearchFilter?, String>> =
+                        listOf(null to "Top results") + SearchFilter.values().map { it to it.label }
                     items(filters) { (filter, label) ->
                         val selected = currentFilter == filter
                         FilterChip(
