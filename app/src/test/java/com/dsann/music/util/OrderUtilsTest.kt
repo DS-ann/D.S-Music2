@@ -39,9 +39,9 @@ class OrderUtilsTest {
     @Test
     fun currentIndexShiftsWhenOtherItemCrossesIt() {
         assertEquals(3, OrderUtils.moveIndex(2, 4, 1))
-        assertEquals(1, OrderUtils.moveIndex(2, 4, 1))
-        assertEquals(2, OrderUtils.moveIndex(2, 0, 3))
-        assertEquals(1, OrderUtils.moveIndex(2, 3, 0))
+        assertEquals(1, OrderUtils.moveIndex(4, 4, 1))
+        assertEquals(1, OrderUtils.moveIndex(2, 0, 3))
+        assertEquals(3, OrderUtils.moveIndex(2, 3, 0))
     }
 
     @Test
