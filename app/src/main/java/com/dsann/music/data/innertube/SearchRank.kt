@@ -240,7 +240,9 @@ internal object SearchRank {
         allResults: List<Pair<SearchFilter, List<SearchItem>>>,
         live: List<SearchItem>
     ): SearchResult {
-        val topArtist = (top as? SearchItem.Artist)?.artist?.title?.let(::norm)
+        val effectiveTop = top ?: live.firstOrNull()
+        val topKey = effectiveTop?.let(::key)
+        val topArtist = (effectiveTop as? SearchItem.Artist)?.artist?.title?.let(::norm)
         fun relatedToTopArtist(item: SearchItem): Boolean = topArtist != null && when (item) {
             is SearchItem.Song -> norm(item.song.artist) == topArtist
             is SearchItem.Album -> item.album.artists.any { norm(it.name) == topArtist }
@@ -253,17 +255,17 @@ internal object SearchRank {
                 val related = if (items.any(::relatedToTopArtist)) 0.8 else 0.0
                 maxOf(best, related, if (filter == SearchFilter.SONGS) 0.5 else 0.0)
             }
-            .map { (filter, items, _) -> filter to items.filterNot { key(it) == key(top ?: return@map emptyList()) } }
+            .map { (filter, items, _) -> filter to items.filterNot { key(it) == topKey } }
             .filter { it.second.isNotEmpty() }
 
         val extraSections = allResults
             .filter { it.first == SearchFilter.PODCASTS || it.first == SearchFilter.EPISODES }
             .mapNotNull { (filter, items) ->
-                val remaining = items.distinctBy(::key).filterNot { key(it) == key(top ?: return@mapNotNull null) }
+                val remaining = items.distinctBy(::key).filterNot { key(it) == topKey }
                 remaining.takeIf { it.isNotEmpty() }?.let { filter to it.take(6) }
             }
 
-        val sections = rankedSections + extraSections + (live.filterNot { it == top }
+        val sections = rankedSections + extraSections + (live.filterNot { key(it) == topKey }
             .takeIf { it.isNotEmpty() }?.let { listOf(SearchFilter.LIVE to it) }.orEmpty())
 
         val visibleSections = sections.map { (filter, items) -> SearchResultSection(filter, items) }
@@ -271,7 +273,7 @@ internal object SearchRank {
         return SearchResult(
             items = allItems,
             continuation = null,
-            topResult = top ?: live.firstOrNull(),
+            topResult = effectiveTop,
             sections = visibleSections
         )
     }
