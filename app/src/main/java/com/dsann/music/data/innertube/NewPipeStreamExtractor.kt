@@ -8,6 +8,7 @@ import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.StreamInfo
+import org.schabi.newpipe.extractor.stream.StreamType
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 
@@ -22,7 +23,9 @@ data class VideoStreamOption(
     val mimeType: String?,
     /** Non-null when YouTube exposes this resolution as a video-only DASH stream. */
     val audioUrl: String? = null,
-    val audioMimeType: String? = null
+    val audioMimeType: String? = null,
+    val videoTitle: String? = null,
+    val videoUploader: String? = null
 ) {
     val label: String get() = if (height > 0) "${height}p" else resolution.ifBlank { "Unknown quality" }
     val usesSeparateAudio: Boolean get() = !audioUrl.isNullOrBlank()
@@ -412,6 +415,15 @@ object NewPipeStreamExtractor {
         if (videoId.isNullOrBlank()) return@withContext emptyList()
         val info = fetchStreamInfo(videoId) ?: return@withContext emptyList()
 
+        // A YouTube Music song can resolve to an audio-only upload. Reject it explicitly
+        // rather than displaying a blank video surface just because it has a video ID.
+        if (info.streamType == StreamType.AUDIO_STREAM ||
+            info.streamType == StreamType.AUDIO_LIVE_STREAM ||
+            info.streamType == StreamType.POST_LIVE_AUDIO_STREAM
+        ) {
+            return@withContext emptyList()
+        }
+
         val muxed = info.videoStreams
             .asSequence()
             .filterNot { it.isVideoOnly }
@@ -422,7 +434,9 @@ object NewPipeStreamExtractor {
                     url = stream.content,
                     resolution = stream.resolution,
                     height = height,
-                    mimeType = stream.format?.mimeType?.substringBefore(';')?.trim()
+                    mimeType = stream.format?.mimeType?.substringBefore(';')?.trim(),
+                    videoTitle = info.name,
+                    videoUploader = info.uploaderName
                 )
             }
             .toList()
@@ -456,7 +470,9 @@ object NewPipeStreamExtractor {
                         height = height,
                         mimeType = stream.format?.mimeType?.substringBefore(';')?.trim(),
                         audioUrl = separateAudio.content,
-                        audioMimeType = separateAudio.format?.mimeType?.substringBefore(';')?.trim()
+                        audioMimeType = separateAudio.format?.mimeType?.substringBefore(';')?.trim(),
+                        videoTitle = info.name,
+                        videoUploader = info.uploaderName
                     )
                 }
                 .toList()
