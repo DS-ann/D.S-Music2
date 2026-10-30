@@ -83,9 +83,9 @@
                 android:background="@android:color/transparent"
                 android:src="@drawable/ic_favorite_border" />
 
-            <View
+            <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="0dp"
+                android:layout_height="1dp"
                 android:layout_weight="1" />
 
             <ImageButton
@@ -99,7 +99,8 @@
                 android:id="@+id/widget_play_pause"
                 android:layout_width="72dp"
                 android:layout_height="72dp"
-                android:layout_marginHorizontal="20dp"
+                android:layout_marginStart="20dp"
+                android:layout_marginEnd="20dp"
                 android:background="@android:color/transparent"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_play" />
@@ -111,9 +112,9 @@
                 android:background="@android:color/transparent"
                 android:src="@drawable/ic_skip_next" />
 
-            <View
+            <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="0dp"
+                android:layout_height="1dp"
                 android:layout_weight="1" />
 
             <ImageButton
