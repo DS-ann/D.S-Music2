@@ -1398,17 +1398,16 @@ private fun PlaylistsTabContent(
 ) {
     val context = LocalContext.current
     val lyricsCache = remember(context) { LyricsCacheManager(context.applicationContext) }
-    val coroutineScope = rememberCoroutineScope()
-    val activity = remember { getActivityFromContext(context) as? androidx.fragment.app.FragmentActivity }
-
+    val scope = rememberCoroutineScope()
+    val activity = remember(context) { getActivityFromContext(context) as? androidx.fragment.app.FragmentActivity }
     val accountViewModel = remember(activity) {
         activity?.let { ViewModelProvider(it)[AccountViewModel::class.java] }
     }
     val exploreViewModel = remember(activity) {
         activity?.let { ViewModelProvider(it)[ExploreViewModel::class.java] }
     }
-
-    val onlinePlaylists by accountViewModel?.playlists?.collectAsStateWithLifecycle(emptyList()) ?: remember { mutableStateOf(emptyList()) }
+    val onlinePlaylists by accountViewModel?.playlists?.collectAsStateWithLifecycle(emptyList())
+        ?: remember { mutableStateOf(emptyList()) }
     val localPlaylists by viewModel.localPlaylistsFlow.collectAsStateWithLifecycle(emptyList())
 
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
@@ -1417,35 +1416,31 @@ private fun PlaylistsTabContent(
     var isDeletingOnlinePlaylist by remember { mutableStateOf(false) }
     var showCachePlaylist by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = showCachePlaylist) {
-        showCachePlaylist = false
-    }
+    BackHandler(enabled = showCachePlaylist) { showCachePlaylist = false }
 
-    LaunchedEffect(Unit) {
-        accountViewModel?.refreshAll()
-    }
+    LaunchedEffect(Unit) { accountViewModel?.refreshAll() }
 
     if (showCreatePlaylistDialog) {
         var name by remember { mutableStateOf("") }
         var creating by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { if (!creating) showCreatePlaylistDialog = false },
-            title = { Text("Create New Playlist", fontWeight = FontWeight.Bold) },
+            title = { Text("Create playlist", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
-                        label = { Text("Playlist Name") },
+                        label = { Text("Playlist name") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !creating
                     )
                     Text(
                         if (AccountManager.isLoggedIn(context)) {
-                            "This playlist will be created in your YouTube Music library."
+                            "This playlist will be saved to your YouTube Music library."
                         } else {
-                            "You are signed out. This playlist will be stored on this device only."
+                            "You are signed out. This playlist will be stored on this device."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1462,13 +1457,12 @@ private fun PlaylistsTabContent(
                                 showCreatePlaylistDialog = false
                             } else {
                                 creating = true
-                                coroutineScope.launch {
-                                    val result = YouTubeMusic.createPlaylist(
+                                scope.launch {
+                                    YouTubeMusic.createPlaylist(
                                         title = title,
                                         description = "",
                                         privacyStatus = "PRIVATE"
-                                    )
-                                    result.onSuccess { playlistId ->
+                                    ).onSuccess { playlistId ->
                                         showCreatePlaylistDialog = false
                                         accountViewModel?.loadLibrary()
                                         exploreViewModel?.cameFromLibrary = true
@@ -1493,9 +1487,7 @@ private fun PlaylistsTabContent(
                 TextButton(
                     onClick = { showCreatePlaylistDialog = false },
                     enabled = !creating
-                ) {
-                    Text("Cancel")
-                }
+                ) { Text("Cancel") }
             }
         )
     }
@@ -1523,7 +1515,7 @@ private fun PlaylistsTabContent(
                     onClick = {
                         if (!isDeletingOnlinePlaylist) {
                             isDeletingOnlinePlaylist = true
-                            coroutineScope.launch {
+                            scope.launch {
                                 YouTubeMusic.deletePlaylist(playlist.playlistId)
                                     .onSuccess { deleted ->
                                         if (deleted) {
@@ -1565,18 +1557,9 @@ private fun PlaylistsTabContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { showCachePlaylist = false }) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back to playlists",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to playlists")
                 }
-                Text(
-                    "Cache",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Text("Cache", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
             Box(modifier = Modifier.weight(1f)) {
                 StreamCacheTabContent(
@@ -1594,83 +1577,130 @@ private fun PlaylistsTabContent(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-        // My Playlists Section Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                "My Playlists",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            IconButton(onClick = { showCreatePlaylistDialog = true }) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = "Create Playlist",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-
-        // Cache is a virtual playlist next to user-created playlists. It opens the
-        // existing cache-backed list without being a separate category in the Library rail.
-        if (showAsList) {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                item(key = "spatialflow-cache-playlist") {
-                    ListItem(
-                        headlineContent = {
-                            Text("Cache", maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
-                        },
-                        supportingContent = {
-                            Text("Cached songs with artwork and lyrics", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        },
-                        leadingContent = {
-                            Box(
-                                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                            }
-                        },
-                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                            .clickable { showCachePlaylist = true }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Playlists", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        localPlaylists.size.toString() + " on device · " +
+                            onlinePlaylists.size.toString() + " on YouTube Music",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                if (localPlaylists.isEmpty()) {
-                    item(key = "create-playlist-prompt") {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth().height(72.dp)
-                                .clickable { showCreatePlaylistDialog = true },
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainer
+                IconButton(onClick = { showCreatePlaylistDialog = true }) {
+                    Icon(Icons.Default.Add, contentDescription = "Create playlist", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+
+            LazyVerticalGrid(
+                columns = if (showAsList) GridCells.Fixed(1) else GridCells.Adaptive(minSize = 152.dp),
+                contentPadding = PaddingValues(bottom = 160.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(nestedScrollConnection)
+            ) {
+                item(key = "ds-cache-folder") {
+                    if (showAsList) {
+                        ListItem(
+                            headlineContent = { Text("Cache", fontWeight = FontWeight.SemiBold) },
+                            supportingContent = { Text("Cached audio, artwork and lyrics") },
+                            leadingContent = {
+                                Box(
+                                    Modifier.size(54.dp).clip(RoundedCornerShape(10.dp))
+                                        .background(MaterialTheme.colorScheme.primaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                }
+                            },
+                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                .clickable { showCachePlaylist = true }
+                        )
+                    } else {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().height(190.dp).clickable {
+                                showCachePlaylist = true
+                            },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
                         ) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(
-                                    "+ Create a playlist to get started",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
+                            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(
+                                    Modifier.fillMaxWidth().weight(1f)
+                                        .background(MaterialTheme.colorScheme.primaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Folder,
+                                        null,
+                                        modifier = Modifier.size(42.dp),
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                                Text("Cache", modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold)
                             }
                         }
                     }
-                } else {
-                    items(localPlaylists, key = { it.id }) { playlist ->
+                }
+
+                item(key = "ds-create-playlist") {
+                    if (showAsList) {
                         ListItem(
-                            headlineContent = {
-                                Text(playlist.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
-                            },
-                            supportingContent = { Text("Playlist", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                            headlineContent = { Text("Create playlist", fontWeight = FontWeight.SemiBold) },
+                            supportingContent = { Text("New playlist") },
                             leadingContent = {
                                 Box(
-                                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp))
+                                    Modifier.size(54.dp).clip(RoundedCornerShape(10.dp))
+                                        .background(MaterialTheme.colorScheme.secondaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                                }
+                            },
+                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                .clickable { showCreatePlaylistDialog = true }
+                        )
+                    } else {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().height(190.dp).clickable {
+                                showCreatePlaylistDialog = true
+                            },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                        ) {
+                            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.Add,
+                                        null,
+                                        modifier = Modifier.size(42.dp),
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
+                                Text("Create playlist", modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                items(localPlaylists, key = { "local-" + it.id }) { playlist ->
+                    if (showAsList) {
+                        ListItem(
+                            headlineContent = {
+                                Text(playlist.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            },
+                            supportingContent = { Text("On this device") },
+                            leadingContent = {
+                                Box(
+                                    Modifier.size(54.dp).clip(RoundedCornerShape(10.dp))
                                         .background(MaterialTheme.colorScheme.primaryContainer),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -1681,161 +1711,42 @@ private fun PlaylistsTabContent(
                             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
                                 .clickable { selectedLocalPlaylist = playlist }
                         )
-                    }
-                }
-            }
-        } else {
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                item(key = "spatialflow-cache-playlist") {
-                    Column(
-                        modifier = Modifier
-                            .width(120.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { showCachePlaylist = true }
-                            .padding(8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(96.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center
+                    } else {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().height(190.dp).clickable {
+                                selectedLocalPlaylist = playlist
+                            },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
                         ) {
-                            Icon(
-                                Icons.Default.Folder,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(36.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Cache",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            "Cached songs",
-                            style = MaterialTheme.typography.labelSmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                if (localPlaylists.isEmpty()) {
-                    item(key = "create-playlist-prompt") {
-                        Column(
-                            modifier = Modifier
-                                .width(144.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { showCreatePlaylistDialog = true }
-                                .padding(8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Box(
-                                modifier = Modifier.size(96.dp).clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = "Create Playlist",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(36.dp)
+                            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(
+                                    Modifier.fillMaxWidth().weight(1f)
+                                        .background(MaterialTheme.colorScheme.primaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.PlaylistPlay,
+                                        null,
+                                        modifier = Modifier.size(42.dp),
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                                Text(
+                                    playlist.title,
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "Create playlist",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                } else {
-                    items(localPlaylists) { playlist ->
-                        Column(
-                            modifier = Modifier
-                                .width(120.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { selectedLocalPlaylist = playlist }
-                                .padding(8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(96.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.PlaylistPlay,
-                                    null,
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.size(36.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                playlist.title,
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
                         }
                     }
                 }
-            }
-        }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text(
-            "YT Music Playlists",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        if (onlinePlaylists.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No online playlists found", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(if (showAsList) 1 else 2),
-                contentPadding = PaddingValues(bottom = 160.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f)
-                    .nestedScroll(nestedScrollConnection)
-            ) {
-                items(onlinePlaylists) { playlist ->
+                items(onlinePlaylists, key = { "youtube-" + it.playlistId }) { playlist ->
                     OnlinePlaylistCard(
-                        playlist,
+                        playlist = playlist,
                         asList = showAsList,
                         onClick = {
                             exploreViewModel?.cameFromLibrary = true
@@ -1846,7 +1757,6 @@ private fun PlaylistsTabContent(
                     )
                 }
             }
-        }
         }
     }
 }
