@@ -2091,7 +2091,6 @@ private fun DesktopMiniPlayerVisualizer(style: String, isPlaying: Boolean, color
         }
     }
     Canvas(Modifier.fillMaxWidth().height(22.dp).padding(horizontal = 10.dp)) {
-        val active = if (isPlaying) 1f else 0f
         val midY = size.height / 2f
         when (style) {
             "Bars", "Spectrum" -> {
@@ -2100,9 +2099,11 @@ private fun DesktopMiniPlayerVisualizer(style: String, isPlaying: Boolean, color
                 val barWidth = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
                 repeat(count) { index ->
                     val position = index.toFloat() / count
-                    val envelope = if (style == "Bars") 0.35f + 0.65f * kotlin.math.abs(kotlin.math.sin(index * 0.42 + phase * 6.283)) else {
-                        0.18f + 0.82f * kotlin.math.abs(kotlin.math.sin(index * 0.19 + phase * 5.4) * kotlin.math.cos(index * 0.07 - phase * 2.1))
-                    }
+                    val envelope = (if (style == "Bars") {
+                        0.35 + 0.65 * kotlin.math.abs(kotlin.math.sin(index * 0.42 + phase * 6.283))
+                    } else {
+                        0.18 + 0.82 * kotlin.math.abs(kotlin.math.sin(index * 0.19 + phase * 5.4) * kotlin.math.cos(index * 0.07 - phase * 2.1))
+                    }).toFloat()
                     val h = size.height * (0.12f + envelope * if (isPlaying) 0.82f else 0.08f)
                     drawRoundRect(
                         color.copy(alpha = if (isPlaying) 0.48f + envelope * 0.45f else 0.28f),
@@ -2137,7 +2138,7 @@ private fun DesktopMiniPlayerVisualizer(style: String, isPlaying: Boolean, color
                 drawCircle(color, 3.dp.toPx(), androidx.compose.ui.geometry.Offset(cx + kotlin.math.cos(angle) * radius, cy + kotlin.math.sin(angle) * radius))
             }
             "Glow" -> {
-                val alpha = if (isPlaying) 0.35f + 0.4f * kotlin.math.abs(kotlin.math.sin(phase * 6.283)) else 0.18f
+                val alpha = if (isPlaying) (0.35 + 0.4 * kotlin.math.abs(kotlin.math.sin(phase * 6.283))).toFloat() else 0.18f
                 drawRoundRect(
                     Brush.horizontalGradient(listOf(Color.Transparent, color.copy(alpha = alpha), Color.Transparent)),
                     topLeft = androidx.compose.ui.geometry.Offset(0f, midY - 2.dp.toPx()),
