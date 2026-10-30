@@ -183,20 +183,6 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     val videoSurface = remember { DesktopVideoSurface() }
     val coroutineScope = rememberCoroutineScope()
 
-    LaunchedEffect(videoMode, currentOnlineSong?.videoId, videoQualityOptions, selectedVideoQuality, videoFullscreen) {
-        if (!videoMode) videoFullscreen = false
-        videoSurface.setVideoControls(
-            options = videoQualityOptions,
-            selectedLabel = selectedVideoQuality,
-            onQuality = { option ->
-                EventQueue.invokeLater { selectVideoQuality(option) }
-            },
-            onFullscreen = {
-                EventQueue.invokeLater { videoFullscreen = !videoFullscreen }
-            }
-        )
-    }
-
     val currentTrack = tracks.getOrNull(selectedIndex)
     val nowPlayingTitle = currentOnlineSong?.title ?: currentSavedSong?.title ?: currentTrack?.title.orEmpty()
 
@@ -490,6 +476,20 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                 videoSwitching = false
             }
         }
+    }
+
+    LaunchedEffect(videoMode, currentOnlineSong?.videoId, videoQualityOptions, selectedVideoQuality, videoFullscreen) {
+        if (!videoMode) videoFullscreen = false
+        videoSurface.setVideoControls(
+            options = videoQualityOptions,
+            selectedLabel = selectedVideoQuality,
+            onQuality = { option ->
+                EventQueue.invokeLater { selectVideoQuality(option) }
+            },
+            onFullscreen = {
+                EventQueue.invokeLater { videoFullscreen = !videoFullscreen }
+            }
+        )
     }
 
     fun openCollection(browseId: String, title: String) {
