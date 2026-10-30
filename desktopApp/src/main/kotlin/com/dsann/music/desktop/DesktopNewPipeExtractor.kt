@@ -12,6 +12,7 @@ import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.Locale
 import kotlin.math.abs
 
 internal data class DesktopResolvedStream(
@@ -67,7 +68,7 @@ internal object DesktopNewPipeExtractor {
         initialized = true
     }
 
-    suspend fun resolve(videoId: String, targetBitrateKbps: Int = 256): DesktopResolvedStream {
+    suspend fun resolve(videoId: String, targetBitrateKbps: Int = 256, preferredFormat: String = "m4a"): DesktopResolvedStream {
         val cached = cache[videoId]
         if (cached != null && System.currentTimeMillis() - cached.second < CACHE_TTL_MS) {
             return cached.first
@@ -89,7 +90,13 @@ internal object DesktopNewPipeExtractor {
                     stream.codec?.contains("mp4a", true) == true ||
                     stream.itag == 140
             }
-            val candidates = aac.ifEmpty { audioStreams }
+            val requestedCandidates = when (preferredFormat.lowercase(Locale.ROOT)) {
+                "m4a", "aac" -> aac
+                "mp3" -> audioStreams.filter { it.format?.mimeType.orEmpty().contains("mpeg", true) || it.codec?.contains("mp3", true) == true }
+                else -> audioStreams
+            }
+            // If the chosen container is unavailable, fall back to the Windows-native AAC-capable stream.
+            val candidates = requestedCandidates.ifEmpty { aac.ifEmpty { audioStreams } }
             val selected = candidates.minByOrNull { stream ->
                 val kbps = stream.averageBitrate.takeIf { it > 0 }
                     ?: (stream.bitrate / 1000).takeIf { it > 0 }
