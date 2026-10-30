@@ -87,6 +87,13 @@ private fun desktopAccentFor(preset: String): Color = when (preset) {
     "Amber" -> Color(0xFFFFC36F)
     "Rose" -> Color(0xFFFF8FA3)
     "Monochrome" -> Color(0xFFC9CDD4)
+    "Crimson" -> Color(0xFFFF6B75)
+    "Teal" -> Color(0xFF48C9C0)
+    "Indigo" -> Color(0xFF8294FF)
+    "Sunset" -> Color(0xFFFF9B70)
+    "Mint" -> Color(0xFF9DD9A8)
+    "Ice" -> Color(0xFF91D9F5)
+    "Gold" -> Color(0xFFE8C56C)
     else -> Color(0xFF6FA8FF)
 }
 private val mutedText = Color(0xFF9AA8B8)
@@ -115,16 +122,16 @@ fun main() = application {
 
     Window(
         onCloseRequest = ::exitApplication,
-        title = "SpatialFlow",
+        title = "D.S Music", 
         state = rememberWindowState(width = 1320.dp, height = 850.dp),
         resizable = true
     ) {
-        SpatialFlowDesktopApp(player)
+        DSMusicDesktopApp(player)
     }
 }
 
 @Composable
-private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
+private fun DSMusicDesktopApp(player: DesktopAudioPlayer) {
     val preferences = remember {
         Preferences.userNodeForPackage(DesktopPreferenceKey::class.java)
     }
@@ -813,7 +820,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                             Text("S", color = accentColor, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                         }
                         Column(Modifier.padding(start = 11.dp)) {
-                            Text("SpatialFlow", fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                            Text("D.S Music", fontSize = 19.sp, fontWeight = FontWeight.Bold)
                             Text("DESKTOP", fontSize = 10.sp, color = mutedText, letterSpacing = 2.sp)
                         }
                     }
@@ -940,7 +947,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                     scanning -> EmptyPanel("Scanning your music folder…", "Large libraries are scanned in the background.")
                                     folderPath.isBlank() -> EmptyPanel(
                                         "Start with your music folder",
-                                        "Choose a folder on this PC. SpatialFlow will scan supported audio files and build your local library."
+                                        "Choose a folder on this PC. D.S Music will scan supported audio files and build your local library."
                                     )
                                     tracks.isEmpty() -> EmptyPanel("Your library is empty", statusMessage.ifBlank { "Choose another folder to scan for music." })
                                     visibleTracks.isEmpty() -> EmptyPanel("No matches", "Try another title, artist or format.")
@@ -1648,7 +1655,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.spacedBy(7.dp)
                                         ) {
-                                            items(listOf("Ocean", "Violet", "Emerald", "Amber", "Rose", "Monochrome")) { preset ->
+                                            items(listOf("Ocean", "Violet", "Emerald", "Amber", "Rose", "Monochrome", "Crimson", "Teal", "Indigo", "Sunset", "Mint", "Ice", "Gold")) { preset ->
                                                 Button(
                                                     onClick = { appearancePreset = preset },
                                                     colors = ButtonDefaults.buttonColors(
@@ -1681,51 +1688,55 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                     }
                                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Text("Player action buttons", fontWeight = FontWeight.SemiBold)
-                                        Text("Select and arrange the extra actions shown beside transport controls.", color = mutedText, fontSize = 11.sp)
-                                        listOf("lyrics" to "Lyrics", "video" to "Video", "share" to "Copy link").forEach { (key, label) ->
+                                        Text("Shown actions are listed in their actual player order. Move them with the arrows.", color = mutedText, fontSize = 11.sp)
+                                        val actionLabels = listOf("lyrics" to "Lyrics", "video" to "Video", "share" to "Copy link")
+                                        desktopButtons.forEachIndexed { index, key ->
+                                            val label = actionLabels.firstOrNull { it.first == key }?.second ?: key
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Button(
                                                     onClick = {
-                                                        val next = if (key in desktopButtons) desktopButtons - key else (desktopButtons + key).take(3)
-                                                        desktopButtons = if (next.isEmpty()) listOf("lyrics") else next
-                                                        preferences.put("desktop_player_buttons", desktopButtons.joinToString(","))
+                                                        val next = (desktopButtons - key).ifEmpty { listOf("lyrics") }
+                                                        desktopButtons = next
+                                                        preferences.put("desktop_player_buttons", next.joinToString(","))
                                                         runCatching { preferences.flush() }
                                                     },
-                                                    colors = ButtonDefaults.buttonColors(
-                                                        backgroundColor = if (key in desktopButtons) accentColor else Color(0xFF263545),
-                                                        contentColor = if (key in desktopButtons) Color(0xFF0B1420) else Color.White
-                                                    )
-                                                ) { Text(if (key in desktopButtons) "✓ $label" else "+ $label") }
-                                                val index = desktopButtons.indexOf(key)
+                                                    colors = ButtonDefaults.buttonColors(backgroundColor = accentColor, contentColor = Color(0xFF0B1420))
+                                                ) { Text("✓ $label") }
                                                 if (index > 0) {
                                                     Spacer(Modifier.width(4.dp))
-                                                    Button(
-                                                        onClick = {
-                                                            val mutable = desktopButtons.toMutableList()
-                                                            val moved = mutable.removeAt(index)
-                                                            mutable.add(index - 1, moved)
-                                                            desktopButtons = mutable
-                                                            preferences.put("desktop_player_buttons", mutable.joinToString(","))
-                                                            runCatching { preferences.flush() }
-                                                        },
-                                                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545))
-                                                    ) { Text("↑") }
+                                                    Button(onClick = {
+                                                        val next = desktopButtons.toMutableList().apply {
+                                                            add(index - 1, removeAt(index))
+                                                        }
+                                                        desktopButtons = next
+                                                        preferences.put("desktop_player_buttons", next.joinToString(","))
+                                                        runCatching { preferences.flush() }
+                                                    }, colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545))) { Text("↑") }
                                                 }
-                                                if (index in 0 until desktopButtons.lastIndex) {
+                                                if (index < desktopButtons.lastIndex) {
                                                     Spacer(Modifier.width(4.dp))
-                                                    Button(
-                                                        onClick = {
-                                                            val mutable = desktopButtons.toMutableList()
-                                                            val moved = mutable.removeAt(index)
-                                                            mutable.add(index + 1, moved)
-                                                            desktopButtons = mutable
-                                                            preferences.put("desktop_player_buttons", mutable.joinToString(","))
-                                                            runCatching { preferences.flush() }
-                                                        },
-                                                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545))
-                                                    ) { Text("↓") }
+                                                    Button(onClick = {
+                                                        val next = desktopButtons.toMutableList().apply {
+                                                            add(index + 1, removeAt(index))
+                                                        }
+                                                        desktopButtons = next
+                                                        preferences.put("desktop_player_buttons", next.joinToString(","))
+                                                        runCatching { preferences.flush() }
+                                                    }, colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545))) { Text("↓") }
                                                 }
                                             }
+                                        }
+                                        actionLabels.filterNot { it.first in desktopButtons }.forEach { (key, label) ->
+                                            Button(
+                                                onClick = {
+                                                    val next = (desktopButtons + key).take(3)
+                                                    desktopButtons = next
+                                                    preferences.put("desktop_player_buttons", next.joinToString(","))
+                                                    runCatching { preferences.flush() }
+                                                },
+                                                enabled = desktopButtons.size < 3,
+                                                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545))
+                                            ) { Text("+ $label") }
                                         }
                                     }
                                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1794,7 +1805,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                             }
                                         }
                                         LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                            items(listOf("Off", "Bars", "Wave", "Ring", "Pulse", "Glow")) { option ->
+                                            items(listOf("Off", "Bars", "Spectrum", "Wave", "Line", "Pulse", "Orbit", "Glow")) { option ->
                                                 Button(
                                                     onClick = {
                                                         desktopVisualizer = option
@@ -1899,7 +1910,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                     if (videoFullscreen && videoMode && currentOnlineSong != null) {
                         Window(
                             onCloseRequest = { videoFullscreen = false },
-                            title = "${currentOnlineSong?.title ?: "SpatialFlow Video"}",
+                            title = "${currentOnlineSong?.title ?: "D.S Music Video"}",
                             state = rememberWindowState(placement = WindowPlacement.Fullscreen),
                             resizable = true,
                             undecorated = true
@@ -2066,41 +2077,72 @@ private fun TrackRow(track: DesktopTrack, selected: Boolean, onClick: () -> Unit
 
 @Composable
 private fun DesktopMiniPlayerVisualizer(style: String, isPlaying: Boolean, color: Color) {
-    val transition = rememberInfiniteTransition(label = "desktop-player-visualizer")
-    val phase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "desktop-player-visualizer-phase"
-    )
-    Canvas(Modifier.fillMaxWidth().height(18.dp).padding(horizontal = 10.dp)) {
-        val amplitude = if (isPlaying) phase else 0.12f
+    // Animate only while audio is playing. A paused/idle player draws a static indicator,
+    // avoiding a permanent animation loop and unnecessary Windows CPU/GPU wakeups.
+    var phase by remember { mutableStateOf(0f) }
+    LaunchedEffect(isPlaying, style) {
+        if (isPlaying && style != "Off") {
+            while (true) {
+                phase = (phase + 0.075f) % 1f
+                delay(70L)
+            }
+        } else {
+            phase = 0f
+        }
+    }
+    Canvas(Modifier.fillMaxWidth().height(22.dp).padding(horizontal = 10.dp)) {
+        val active = if (isPlaying) 1f else 0f
+        val midY = size.height / 2f
         when (style) {
-            "Bars" -> {
-                val count = 30
-                val gap = 3.dp.toPx()
-                val width = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
+            "Bars", "Spectrum" -> {
+                val count = if (style == "Bars") 24 else 40
+                val gap = if (style == "Bars") 3.dp.toPx() else 1.5.dp.toPx()
+                val barWidth = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
                 repeat(count) { index ->
-                    val wave = kotlin.math.abs(kotlin.math.sin(index.toDouble() * 0.65 + phase.toDouble() * 6.28)).toFloat()
-                    val height = size.height * (0.1f + wave * amplitude)
+                    val position = index.toFloat() / count
+                    val envelope = if (style == "Bars") 0.35f + 0.65f * kotlin.math.abs(kotlin.math.sin(index * 0.42 + phase * 6.283)) else {
+                        0.18f + 0.82f * kotlin.math.abs(kotlin.math.sin(index * 0.19 + phase * 5.4) * kotlin.math.cos(index * 0.07 - phase * 2.1))
+                    }
+                    val h = size.height * (0.12f + envelope * if (isPlaying) 0.82f else 0.08f)
                     drawRoundRect(
-                        color = color.copy(alpha = 0.35f + wave * 0.5f),
-                        topLeft = androidx.compose.ui.geometry.Offset(index.toFloat() * (width + gap), (size.height - height) / 2f),
-                        size = androidx.compose.ui.geometry.Size(width, height),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(width / 2f)
+                        color.copy(alpha = if (isPlaying) 0.48f + envelope * 0.45f else 0.28f),
+                        topLeft = androidx.compose.ui.geometry.Offset(index * (barWidth + gap), midY - h / 2f),
+                        size = androidx.compose.ui.geometry.Size(barWidth, h),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f)
                     )
                 }
             }
-            "Wave", "Pulse", "Ring", "Glow" -> {
-                val height = size.height * (if (isPlaying) 0.5f + phase * 0.45f else 0.2f)
+            "Wave", "Line" -> {
+                val points = if (style == "Wave") 64 else 32
+                val stroke = if (style == "Wave") 2.dp.toPx() else 1.dp.toPx()
+                for (i in 0 until points - 1) {
+                    val x1 = size.width * i / (points - 1)
+                    val x2 = size.width * (i + 1) / (points - 1)
+                    val y1 = midY + kotlin.math.sin(i * 0.24 + phase * 6.283) * size.height * (if (isPlaying) 0.36f else 0.025f)
+                    val y2 = midY + kotlin.math.sin((i + 1) * 0.24 + phase * 6.283) * size.height * (if (isPlaying) 0.36f else 0.025f)
+                    drawLine(color.copy(alpha = 0.9f), androidx.compose.ui.geometry.Offset(x1, y1.toFloat()), androidx.compose.ui.geometry.Offset(x2, y2.toFloat()), stroke)
+                }
+            }
+            "Pulse" -> {
+                val radius = size.height * (if (isPlaying) 0.12f + phase * 0.28f else 0.12f)
+                drawCircle(color.copy(alpha = 0.75f), radius, androidx.compose.ui.geometry.Offset(size.width / 2f, midY), style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
+                drawCircle(color.copy(alpha = 0.9f), 2.5.dp.toPx(), androidx.compose.ui.geometry.Offset(size.width / 2f, midY))
+            }
+            "Orbit" -> {
+                val cx = size.width / 2f
+                val cy = midY
+                val radius = size.height * 0.34f
+                drawCircle(color.copy(alpha = 0.45f), radius, androidx.compose.ui.geometry.Offset(cx, cy), style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))
+                val angle = phase * 6.283f
+                drawCircle(color, 3.dp.toPx(), androidx.compose.ui.geometry.Offset(cx + kotlin.math.cos(angle) * radius, cy + kotlin.math.sin(angle) * radius))
+            }
+            "Glow" -> {
+                val alpha = if (isPlaying) 0.35f + 0.4f * kotlin.math.abs(kotlin.math.sin(phase * 6.283)) else 0.18f
                 drawRoundRect(
-                    Brush.horizontalGradient(listOf(Color.Transparent, color.copy(alpha = 0.65f), Color.Transparent)),
-                    topLeft = androidx.compose.ui.geometry.Offset(0f, (size.height - height) / 2f),
-                    size = androidx.compose.ui.geometry.Size(size.width, height),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(height / 2f)
+                    Brush.horizontalGradient(listOf(Color.Transparent, color.copy(alpha = alpha), Color.Transparent)),
+                    topLeft = androidx.compose.ui.geometry.Offset(0f, midY - 2.dp.toPx()),
+                    size = androidx.compose.ui.geometry.Size(size.width, 4.dp.toPx()),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx())
                 )
             }
         }
