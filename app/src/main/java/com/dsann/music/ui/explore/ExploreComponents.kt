@@ -391,10 +391,17 @@ fun SearchResultItem(
             Spacer(modifier = Modifier.height(1.dp))
             Text(
                 text = when (item) {
-                    is SearchItem.Song -> "${item.song.artist}${item.song.duration?.let { " • $it" } ?: ""}"
+                    is SearchItem.Song -> when {
+                        item.song.isLive -> "LIVE • ${item.song.artist}"
+                        item.song.isEpisode -> "Episode • ${item.song.artist}"
+                        item.song.isVideo -> "Video • ${item.song.artist}"
+                        else -> "${item.song.artist}${item.song.duration?.let { " • $it" } ?: ""}"
+                    }
                     is SearchItem.Album -> "Album • ${item.album.artists.joinToString { it.name }}${item.album.year?.let { " • $it" } ?: ""}"
                     is SearchItem.Artist -> "Artist${item.artist.subscriberCount?.let { " • $it" } ?: ""}"
-                    is SearchItem.Playlist -> "Playlist${item.playlist.songCount?.let { " • $it songs" } ?: ""}"
+                    is SearchItem.Playlist -> if (item.playlist.isPodcast) {
+                        "Podcast${item.playlist.author?.name?.let { " • $it" } ?: ""}"
+                    } else "Playlist${item.playlist.songCount?.let { " • $it songs" } ?: ""}"
                 },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -455,6 +462,165 @@ fun SearchResultItem(
         }
     }
 }
+
+/**
+ * Large lead result used at the top of the Top results page. It keeps the same item actions
+ * as the regular rows while making the best match visually distinct.
+ */
+@Composable
+fun SearchTopResultCard(
+    item: SearchItem,
+    isCurrentlyPlaying: Boolean,
+    isLoading: Boolean,
+    onSongMenuClick: ((OnlineSong) -> Unit)? = null,
+    onTouchDown: () -> Unit = {},
+    onClick: () -> Unit
+) {
+    val thumbnail = when (item) {
+        is SearchItem.Song -> item.song.thumbnailUrl
+        is SearchItem.Album -> item.album.thumbnailUrl
+        is SearchItem.Artist -> item.artist.thumbnailUrl
+        is SearchItem.Playlist -> item.playlist.thumbnailUrl
+    }
+    val title = when (item) {
+        is SearchItem.Song -> item.song.title
+        is SearchItem.Album -> item.album.title
+        is SearchItem.Artist -> item.artist.title
+        is SearchItem.Playlist -> item.playlist.title
+    }
+    val detail = when (item) {
+        is SearchItem.Song -> when {
+            item.song.isLive -> "LIVE • ${item.song.artist}"
+            item.song.isEpisode -> "Episode • ${item.song.artist}"
+            item.song.isVideo -> "Video • ${item.song.artist}"
+            else -> "Song • ${item.song.artist}"
+        }
+        is SearchItem.Album -> "Album • " + item.album.artists.joinToString { it.name }
+        is SearchItem.Artist -> "Artist" + (item.artist.subscriberCount?.let { " • $it" } ?: "")
+        is SearchItem.Playlist -> (if (item.playlist.isPodcast) "Podcast" else "Playlist") +
+            (item.playlist.author?.name?.let { " • $it" } ?: "")
+    }
+    val imageShape = if (item is SearchItem.Artist) CircleShape else RoundedCornerShape(14.dp)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .pointerInput(item) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.type == androidx.compose.ui.input.pointer.PointerEventType.Press) onTouchDown()
+                    }
+                }
+            }
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    if (item is SearchItem.Song) onSongMenuClick?.invoke(item.song)
+                }
+            )
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current).data(thumbnail)
+                .size(320, 320).precision(Precision.INEXACT).crossfade(false).build(),
+            contentDescription = null,
+            modifier = Modifier.size(92.dp).clip(imageShape),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                "TOP RESULT",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = if (isCurrentlyPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (isLoading) {
+                Spacer(Modifier.height(6.dp))
+                LoadingIndicator(Modifier.size(18.dp))
+            }
+        }
+        if (item is SearchItem.Song && onSongMenuClick != null) {
+            IconButton(onClick = { onSongMenuClick(item.song) }) {
+                Icon(Icons.Default.MoreVert, "More options")
+            }
+        } else {
+            Icon(Icons.Default.PlayArrow, "Open result", tint = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+/** Compact image cards for albums, artists, and playlists in a Top results shelf. */
+@Composable
+fun SearchBrowseCard(item: SearchItem, onClick: () -> Unit) {
+    val (thumbnail, title, subtitle, isArtist) = when (item) {
+        is SearchItem.Song -> QuadSearchCard(
+            item.song.thumbnailUrl, item.song.title,
+            when {
+                item.song.isLive -> "Live"
+                item.song.isEpisode -> "Episode"
+                item.song.isVideo -> "Video"
+                else -> item.song.artist
+            }, false
+        )
+        is SearchItem.Album -> QuadSearchCard(
+            item.album.thumbnailUrl, item.album.title,
+            "Album • " + item.album.artists.joinToString { it.name }, false
+        )
+        is SearchItem.Artist -> QuadSearchCard(
+            item.artist.thumbnailUrl, item.artist.title, "Artist", true
+        )
+        is SearchItem.Playlist -> QuadSearchCard(
+            item.playlist.thumbnailUrl, item.playlist.title,
+            if (item.playlist.isPodcast) "Podcast" else "Playlist",
+            false
+        )
+    }
+    Column(
+        modifier = Modifier.width(132.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick)
+            .padding(4.dp)
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current).data(thumbnail)
+                .size(260, 260).precision(Precision.INEXACT).crossfade(false).build(),
+            contentDescription = null,
+            modifier = Modifier.size(124.dp).clip(if (isArtist) CircleShape else RoundedCornerShape(12.dp)),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(Modifier.height(7.dp))
+        Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+private data class QuadSearchCard(
+    val thumbnail: String?,
+    val title: String,
+    val subtitle: String,
+    val isArtist: Boolean
+)
 
 // ===== Bento Discovery Cells =====
 
