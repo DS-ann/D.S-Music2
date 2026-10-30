@@ -307,9 +307,26 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _hideNavLabels = MutableStateFlow(prefs.getBoolean("hide_nav_labels", false))
     val hideNavLabels: StateFlow<Boolean> = _hideNavLabels.asStateFlow()
 
-    fun setHideNavLabels(hide: Boolean) {
+    // More precise navigation label modes, while retaining the old boolean for existing installs.
+    private val _navLabelsMode = MutableStateFlow(
+        prefs.getString("nav_label_mode", if (prefs.getBoolean("hide_nav_labels", false)) "Never" else "Always")
+            ?.takeIf { it in listOf("Always", "Selected", "Never") } ?: "Always"
+    )
+    val navLabelsMode: StateFlow<String> = _navLabelsMode.asStateFlow()
+
+    fun setNavLabelsMode(mode: String) {
+        val safe = mode.takeIf { it in listOf("Always", "Selected", "Never") } ?: "Always"
+        _navLabelsMode.value = safe
+        val hide = safe == "Never"
         _hideNavLabels.value = hide
-        prefs.edit {putBoolean("hide_nav_labels", hide)}
+        prefs.edit {
+            putString("nav_label_mode", safe)
+            putBoolean("hide_nav_labels", hide)
+        }
+    }
+
+    fun setHideNavLabels(hide: Boolean) {
+        setNavLabelsMode(if (hide) "Never" else "Always")
     }
 
     // ── Dynamic Nav Style ──────────────────────────────────────────────────
@@ -367,9 +384,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     )
     val miniPlayerStyle: StateFlow<String> = _miniPlayerStyle.asStateFlow()
     fun setMiniPlayerStyle(value: String) {
-        val safe = value.takeIf { it in listOf("Card", "Flat", "Compact") } ?: "Card"
+        val safe = value.takeIf { it in listOf("Card", "Flat", "Compact", "Pill") } ?: "Card"
         _miniPlayerStyle.value = safe
         prefs.edit { putString("mini_player_style", safe) }
+    }
+
+    private val _miniPlayerProgressStyle = MutableStateFlow(
+        prefs.getString("mini_player_progress", "Ring") ?: "Ring"
+    )
+    val miniPlayerProgressStyle: StateFlow<String> = _miniPlayerProgressStyle.asStateFlow()
+    fun setMiniPlayerProgressStyle(value: String) {
+        val safe = value.takeIf { it in listOf("Ring", "Line", "Fill", "None") } ?: "Ring"
+        _miniPlayerProgressStyle.value = safe
+        prefs.edit { putString("mini_player_progress", safe) }
     }
 
     // ── Player, your way ────────────────────────────────────────────────────
@@ -1027,6 +1054,7 @@ fun SettingsScreenContent(
     val playerArtworkShape by viewModel.playerArtworkShape.collectAsStateWithLifecycle()
     val playerBackgroundStyle by viewModel.playerBackgroundStyle.collectAsStateWithLifecycle()
     val miniPlayerStyle by viewModel.miniPlayerStyle.collectAsStateWithLifecycle()
+    val miniPlayerProgressStyle by viewModel.miniPlayerProgressStyle.collectAsStateWithLifecycle()
     val playerLayout by viewModel.playerLayout.collectAsStateWithLifecycle()
     val playerButtons by viewModel.playerButtons.collectAsStateWithLifecycle()
     val playerTitleAlign by viewModel.playerTitleAlign.collectAsStateWithLifecycle()
@@ -1046,7 +1074,7 @@ fun SettingsScreenContent(
     val lyricsFontFamily by viewModel.lyricsFontFamily.collectAsStateWithLifecycle()
     val uiDensity by viewModel.uiDensity.collectAsStateWithLifecycle()
     val autoplayEnabled by viewModel.autoplayEnabled.collectAsStateWithLifecycle()
-    val hideNavLabels by viewModel.hideNavLabels.collectAsStateWithLifecycle()
+    val navLabelsMode by viewModel.navLabelsMode.collectAsStateWithLifecycle()
     val dynamicNavStyle by viewModel.dynamicNavStyle.collectAsStateWithLifecycle()
     val crossfadeEnabled by viewModel.crossfadeEnabled.collectAsStateWithLifecycle()
     val crossfadeDuration by viewModel.crossfadeDuration.collectAsStateWithLifecycle()
@@ -1230,6 +1258,8 @@ fun SettingsScreenContent(
                 onPlayerBackgroundStyleChange = { viewModel.setPlayerBackgroundStyle(it) },
                 miniPlayerStyle = miniPlayerStyle,
                 onMiniPlayerStyleChange = { viewModel.setMiniPlayerStyle(it) },
+                miniPlayerProgressStyle = miniPlayerProgressStyle,
+                onMiniPlayerProgressStyleChange = { viewModel.setMiniPlayerProgressStyle(it) },
                 lyricsTextSize = lyricsTextSize,
                 onLyricsTextSizeChange = { viewModel.setLyricsTextSize(it) },
                 lyricsAlignment = lyricsAlignment,
@@ -1238,8 +1268,8 @@ fun SettingsScreenContent(
                 onLyricsFontFamilyChange = { viewModel.setLyricsFontFamily(it) },
                 uiDensity = uiDensity,
                 onUiDensityChange = { viewModel.setUiDensity(it) },
-                hideNavLabels = hideNavLabels,
-                onHideNavLabelsChange = { viewModel.setHideNavLabels(it) },
+                navLabelsMode = navLabelsMode,
+                onNavLabelsModeChange = { viewModel.setNavLabelsMode(it) },
                 dynamicNavStyle = dynamicNavStyle,
                 onDynamicNavStyleChange = { viewModel.setDynamicNavStyle(it) },
                 playerLayout = playerLayout,
@@ -2260,6 +2290,8 @@ private fun AppearanceScreen(
     onPlayerBackgroundStyleChange: (String) -> Unit,
     miniPlayerStyle: String,
     onMiniPlayerStyleChange: (String) -> Unit,
+    miniPlayerProgressStyle: String,
+    onMiniPlayerProgressStyleChange: (String) -> Unit,
     lyricsTextSize: String,
     onLyricsTextSizeChange: (String) -> Unit,
     lyricsAlignment: String,
@@ -2268,8 +2300,8 @@ private fun AppearanceScreen(
     onLyricsFontFamilyChange: (String) -> Unit,
     uiDensity: String,
     onUiDensityChange: (String) -> Unit,
-    hideNavLabels: Boolean,
-    onHideNavLabelsChange: (Boolean) -> Unit,
+    navLabelsMode: String,
+    onNavLabelsModeChange: (String) -> Unit,
     dynamicNavStyle: Boolean,
     onDynamicNavStyleChange: (Boolean) -> Unit,
     playerLayout: String,
@@ -2498,16 +2530,25 @@ private fun AppearanceScreen(
                         title = "Mini player style",
                         description = "Card, flat or compact mini-player surfaces.",
                         selected = miniPlayerStyle,
-                        options = listOf("Card", "Flat", "Compact"),
+                        options = listOf("Card", "Flat", "Compact", "Pill"),
                         onSelected = onMiniPlayerStyleChange
                     )
                 },
                 {
                     SettingsChoiceRow(
+                        title = "Mini-player progress",
+                        description = "Use a circular ring, a slim line, a filling track, or hide progress around the mini-player artwork.",
+                        selected = miniPlayerProgressStyle,
+                        options = listOf("Ring", "Line", "Fill", "None"),
+                        onSelected = onMiniPlayerProgressStyleChange
+                    )
+                },
+                {
+                    SettingsChoiceRow(
                         title = "Player artwork shape",
-                        description = "Rounded, square or circular album artwork.",
+                        description = "Rounded, square, circular, squircle, flower, cookie, arch or slanted album artwork.",
                         selected = playerArtworkShape,
-                        options = listOf("Rounded", "Square", "Circle"),
+                        options = listOf("Rounded", "Square", "Circle", "Squircle", "Flower", "Cookie", "Arch", "Slanted"),
                         onSelected = onPlayerArtworkShapeChange
                     )
                 }
@@ -2557,7 +2598,15 @@ private fun AppearanceScreen(
 
             SettingsHeader("Navigation")
             SettingsGroupCard(buildList {
-                add { HideNavLabelsRow(hideNavLabels, onHideNavLabelsChange) }
+                add {
+                    SettingsChoiceRow(
+                        title = "Navigation labels",
+                        description = "Always show every label, show only the selected tab's label, or hide all labels.",
+                        selected = navLabelsMode,
+                        options = listOf("Always", "Selected", "Never"),
+                        onSelected = onNavLabelsModeChange
+                    )
+                }
                 add { DynamicNavStyleRow(dynamicNavStyle, onDynamicNavStyleChange) }
             })
         }
