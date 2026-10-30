@@ -721,6 +721,48 @@ object InnerTubeClient {
         post("$BASE_URL/browse/edit_playlist", body, ClientType.WEB_REMIX)
     }
 
+    /**
+     * Edit an owned YouTube Music playlist. Privacy values are PRIVATE, UNLISTED or PUBLIC.
+     * Each property is an independent ACTION_SET_* entry, matching YouTube Music's web client.
+     */
+    suspend fun editPlaylist(
+        playlistId: String,
+        title: String? = null,
+        description: String? = null,
+        privacyStatus: String? = null
+    ): JsonObject = withContext(Dispatchers.IO) {
+        require(playlistId.isNotBlank()) { "Playlist ID is missing." }
+        require(privacyStatus == null || privacyStatus in setOf("PRIVATE", "UNLISTED", "PUBLIC")) {
+            "Choose Private, Unlisted or Public."
+        }
+        val actions = com.google.gson.JsonArray()
+        title?.takeIf { it.isNotBlank() }?.let { value ->
+            actions.add(JsonObject().apply {
+                addProperty("action", "ACTION_SET_PLAYLIST_NAME")
+                addProperty("playlistName", value.trim())
+            })
+        }
+        description?.let { value ->
+            actions.add(JsonObject().apply {
+                addProperty("action", "ACTION_SET_PLAYLIST_DESCRIPTION")
+                addProperty("playlistDescription", value)
+            })
+        }
+        privacyStatus?.let { value ->
+            actions.add(JsonObject().apply {
+                addProperty("action", "ACTION_SET_PLAYLIST_PRIVACY")
+                addProperty("playlistPrivacy", value)
+            })
+        }
+        require(actions.size() > 0) { "There are no playlist changes to save." }
+        val body = JsonObject().apply {
+            add("context", webRemixContext())
+            addProperty("playlistId", playlistId.removePrefix("VL"))
+            add("actions", actions)
+        }
+        post("$BASE_URL/browse/edit_playlist", body, ClientType.WEB_REMIX)
+    }
+
     // ========== Subscriptions ==========
 
     /**
