@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import java.io.File
@@ -412,12 +413,16 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     fun toggleVideoMode() {
         val song = currentOnlineSong ?: return
         if (videoSwitching) return
-        // Read JavaFX's media clock immediately. positionMs is only the UI polling snapshot
-        // and can lag behind the video by a visible fraction of a second.
+        // Capture the JavaFX clock, not the delayed Compose progress snapshot.
         val resumePosition = player.currentPositionSnapshot()
+        val wasPlaying = player.isPlaying && !player.isPaused
         val wasVideo = videoMode
         videoSwitching = true
-        statusMessage = if (wasVideo) "Switching to audio…" else "Resolving video stream…"
+        // Stop the existing HTTP stream while resolving the replacement. Video -> audio then
+        // downloads only audio bytes from the current timestamp; audio -> video starts at the
+        // same timestamp on a low-resolution muxed stream.
+        player.pause()
+        statusMessage = if (wasVideo) "Switching to audio…" else "Resolving data-saver video…"
         coroutineScope.launch {
             try {
                 if (wasVideo) {
@@ -425,7 +430,8 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                     player.playUrl(
                         stream.url,
                         song.durationMs.takeIf { it > 0L } ?: stream.durationMs,
-                        resumePosition
+                        resumePosition,
+                        autoPlay = wasPlaying
                     )
                     videoMode = false
                     videoQualityOptions = emptyList()
@@ -433,12 +439,13 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                     videoFullscreen = false
                 } else {
                     val options = DesktopNewPipeExtractor.getVideoOptions(song.videoId)
-                    val selected = options.firstOrNull()
+                    val selected = options.lastOrNull()
                         ?: error("No compatible muxed video stream is available for this track.")
                     player.playUrl(
                         selected.url,
                         song.durationMs,
-                        resumePosition
+                        resumePosition,
+                        autoPlay = wasPlaying
                     )
                     videoQualityOptions = options
                     selectedVideoQuality = selected.label
@@ -446,6 +453,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                 }
                 statusMessage = ""
             } catch (error: Exception) {
+                if (wasPlaying) player.resume()
                 statusMessage = error.message ?: if (wasVideo) {
                     "Could not restore audio playback."
                 } else {
@@ -461,18 +469,22 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
         val song = currentOnlineSong ?: return
         if (!videoMode || videoSwitching || option.url.isBlank()) return
         val resumePosition = player.currentPositionSnapshot()
+        val wasPlaying = player.isPlaying && !player.isPaused
         videoSwitching = true
+        player.pause()
         statusMessage = "Switching to ${option.label}…"
         coroutineScope.launch {
             try {
                 player.playUrl(
                     option.url,
                     song.durationMs,
-                    resumePosition
+                    resumePosition,
+                    autoPlay = wasPlaying
                 )
                 selectedVideoQuality = option.label
                 statusMessage = ""
             } catch (error: Exception) {
+                if (wasPlaying) player.resume()
                 statusMessage = error.message ?: "Could not switch video quality."
             } finally {
                 videoSwitching = false
@@ -1440,8 +1452,9 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                         Window(
                             onCloseRequest = { videoFullscreen = false },
                             title = "${currentOnlineSong?.title ?: "SpatialFlow Video"}",
-                            state = rememberWindowState(width = 1280.dp, height = 720.dp),
-                            resizable = true
+                            state = rememberWindowState(placement = WindowPlacement.Fullscreen),
+                            resizable = true,
+                            undecorated = true
                         ) {
                             Surface(
                                 modifier = Modifier.fillMaxSize(),
