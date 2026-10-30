@@ -181,6 +181,39 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     )
     val darkMode: StateFlow<Boolean> = _darkMode.asStateFlow()
+    private val _themeMode = MutableStateFlow(
+        prefs.getString("theme_mode", "system")?.lowercase()?.takeIf { it in listOf("system", "light", "dark") } ?: "system"
+    )
+    val themeMode: StateFlow<String> = _themeMode.asStateFlow()
+
+    fun setThemeMode(mode: String) {
+        val safe = mode.lowercase().takeIf { it in listOf("system", "light", "dark") } ?: "system"
+        _themeMode.value = safe
+        prefs.edit { putString("theme_mode", safe) }
+        when (safe) {
+            "dark" -> {
+                _darkMode.value = true
+                prefs.edit { putBoolean(KEY_DARK_MODE, true) }
+                androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
+                    androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
+                )
+            }
+            "light" -> {
+                _darkMode.value = false
+                prefs.edit { putBoolean(KEY_DARK_MODE, false) }
+                androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
+                    androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
+                )
+            }
+            else -> {
+                val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+                _darkMode.value = systemDark
+                androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
+                    androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                )
+            }
+        }
+    }
 
     fun setDarkMode(enabled: Boolean) {
         _darkMode.value = enabled
@@ -357,6 +390,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val safe = value.takeIf { it in listOf("Original", "Left", "Center") } ?: "Original"
         _lyricsAlignment.value = safe
         prefs.edit { putString("lyrics_alignment", safe) }
+    }
+
+    private val _lyricsFontFamily = MutableStateFlow(
+        prefs.getString("lyrics_font_family", "Rounded") ?: "Rounded"
+    )
+    val lyricsFontFamily: StateFlow<String> = _lyricsFontFamily.asStateFlow()
+    fun setLyricsFontFamily(value: String) {
+        val safe = value.takeIf { it in listOf("Rounded", "Sans", "Serif", "Mono") } ?: "Rounded"
+        _lyricsFontFamily.value = safe
+        prefs.edit { putString("lyrics_font_family", safe) }
     }
 
     private val _uiDensity = MutableStateFlow(
@@ -842,6 +885,7 @@ fun SettingsScreenContent(
     playerSharedViewModel: PlayerSharedViewModel = androidx.lifecycle.viewmodel.compose.viewModel(LocalContext.current.findActivity() as androidx.activity.ComponentActivity)
 ) {
     val darkMode by viewModel.darkMode.collectAsStateWithLifecycle()
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val isPlayerExpanded by playerSharedViewModel.isPlayerExpanded.collectAsStateWithLifecycle()
     val amoledBlack by viewModel.amoledBlack.collectAsStateWithLifecycle()
     val dynamicAlbumTheme by viewModel.dynamicAlbumTheme.collectAsStateWithLifecycle()
@@ -851,6 +895,7 @@ fun SettingsScreenContent(
     val miniPlayerStyle by viewModel.miniPlayerStyle.collectAsStateWithLifecycle()
     val lyricsTextSize by viewModel.lyricsTextSize.collectAsStateWithLifecycle()
     val lyricsAlignment by viewModel.lyricsAlignment.collectAsStateWithLifecycle()
+    val lyricsFontFamily by viewModel.lyricsFontFamily.collectAsStateWithLifecycle()
     val uiDensity by viewModel.uiDensity.collectAsStateWithLifecycle()
     val autoplayEnabled by viewModel.autoplayEnabled.collectAsStateWithLifecycle()
     val hideNavLabels by viewModel.hideNavLabels.collectAsStateWithLifecycle()
@@ -1022,6 +1067,8 @@ fun SettingsScreenContent(
             AppearanceScreen(
                 navController = navController,
                 darkMode = darkMode,
+                themeMode = themeMode,
+                onThemeModeChange = { viewModel.setThemeMode(it) },
                 onDarkModeChange = { viewModel.setDarkMode(it) },
                 amoledBlack = amoledBlack,
                 onAmoledBlackChange = { viewModel.setAmoledBlack(it) },
@@ -1039,6 +1086,8 @@ fun SettingsScreenContent(
                 onLyricsTextSizeChange = { viewModel.setLyricsTextSize(it) },
                 lyricsAlignment = lyricsAlignment,
                 onLyricsAlignmentChange = { viewModel.setLyricsAlignment(it) },
+                lyricsFontFamily = lyricsFontFamily,
+                onLyricsFontFamilyChange = { viewModel.setLyricsFontFamily(it) },
                 uiDensity = uiDensity,
                 onUiDensityChange = { viewModel.setUiDensity(it) },
                 hideNavLabels = hideNavLabels,
@@ -1434,8 +1483,8 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
                 },
                 {
                     SettingsCategoryItem(
-                        title = "Appearance",
-                        subtitle = "Themes, layout, visual styles",
+                        title = "Customize",
+                        subtitle = "Theme, colors, icons, player, lyrics, typography and navigation",
                         icon = Icons.Rounded.Palette,
                         onClick = { navController.navigate(SettingsRoute.Appearance.route) }
                     )
@@ -2019,6 +2068,8 @@ private fun ManualSyncRow() {
 private fun AppearanceScreen(
     navController: androidx.navigation.NavController,
     darkMode: Boolean,
+    themeMode: String,
+    onThemeModeChange: (String) -> Unit,
     onDarkModeChange: (Boolean) -> Unit,
     amoledBlack: Boolean,
     onAmoledBlackChange: (Boolean) -> Unit,
@@ -2036,6 +2087,8 @@ private fun AppearanceScreen(
     onLyricsTextSizeChange: (String) -> Unit,
     lyricsAlignment: String,
     onLyricsAlignmentChange: (String) -> Unit,
+    lyricsFontFamily: String,
+    onLyricsFontFamilyChange: (String) -> Unit,
     uiDensity: String,
     onUiDensityChange: (String) -> Unit,
     hideNavLabels: Boolean,
@@ -2063,7 +2116,15 @@ private fun AppearanceScreen(
 
             SettingsHeader("Theme")
             SettingsGroupCard(buildList {
-                add { ThemeRow(darkMode, onDarkModeChange) }
+                add {
+                    SettingsChoiceRow(
+                        title = "Theme mode",
+                        description = "System follows your device setting. Light and Dark stay fixed until you change them.",
+                        selected = themeMode.replaceFirstChar { it.uppercase() },
+                        options = listOf("System", "Light", "Dark"),
+                        onSelected = { onThemeModeChange(it.lowercase()) }
+                    )
+                }
                 if (darkMode) add { AmoledBlackRow(amoledBlack, onAmoledBlackChange) }
                 add { DynamicAlbumThemeRow(dynamicAlbumTheme, onDynamicAlbumThemeChange) }
             })
@@ -2128,6 +2189,15 @@ private fun AppearanceScreen(
                         selected = lyricsAlignment,
                         options = listOf("Original", "Left", "Center"),
                         onSelected = onLyricsAlignmentChange
+                    )
+                }
+                {
+                    SettingsChoiceRow(
+                        title = "Lyrics font",
+                        description = "Choose rounded, neutral sans-serif, serif or monospaced lyric lettering.",
+                        selected = lyricsFontFamily,
+                        options = listOf("Rounded", "Sans", "Serif", "Mono"),
+                        onSelected = onLyricsFontFamilyChange
                     )
                 }
             ))
