@@ -354,7 +354,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         searchContinuationJob?.cancel()
         searchContinuationJob = viewModelScope.launch {
             try {
-                val result = YouTubeMusic.searchContinuation(cont)
+                val result = YouTubeMusic.searchContinuation(cont, _uiState.value.searchFilter)
                 result.onSuccess { searchResult ->
                     var newItemsToPrefetch = emptyList<SearchItem>()
                     _uiState.update { state ->
