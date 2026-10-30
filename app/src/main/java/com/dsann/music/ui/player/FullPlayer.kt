@@ -68,6 +68,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
@@ -774,6 +775,7 @@ fun FullPlayer(
     val currentSongId = uiState.currentSong?.id
     val audioService by viewModel.audioServiceState.collectAsStateWithLifecycle()
     val isVideoMode by viewModel.isVideoMode.collectAsStateWithLifecycle()
+    val videoPlaybackMetadata by viewModel.videoPlaybackMetadata.collectAsStateWithLifecycle()
     var showSongInfoDialog by remember { mutableStateOf(false) }
     var lastLyricsFetchSongId by remember { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
@@ -842,8 +844,14 @@ fun FullPlayer(
         }
         val useWidePlayer = configuration.screenWidthDp >= 840 ||
             (configuration.screenWidthDp >= 600 && configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
+        val compactLandscape = useWidePlayer &&
+            configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val albumArtSize = if (useWidePlayer) {
-            minOf(screenHeight * 0.50f, screenWidth * 0.42f)
+            if (compactLandscape) {
+                minOf(screenHeight * 0.28f, screenWidth * 0.30f)
+            } else {
+                minOf(screenHeight * 0.50f, screenWidth * 0.42f)
+            }
         } else {
             screenWidth * artScale
         }
@@ -871,7 +879,7 @@ fun FullPlayer(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
+                    .height(if (compactLandscape) 40.dp else 56.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -902,7 +910,7 @@ fun FullPlayer(
                     .size(albumArtSize)
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 12.dp))
 
             // Metadata row: title/artist
             Row(
@@ -926,7 +934,12 @@ fun FullPlayer(
                         else -> FontWeight.Bold
                     }
                     Text(
-                        text = uiState.currentSong?.title ?: "Unknown Title",
+                        text = if (isVideoMode) {
+                            videoPlaybackMetadata?.title?.takeIf { it.isNotBlank() }
+                                ?: uiState.currentSong?.title ?: "Unknown Title"
+                        } else {
+                            uiState.currentSong?.title ?: "Unknown Title"
+                        },
                         style = MaterialTheme.typography.headlineMediumEmphasized,
                         fontSize = titleSize,
                         fontWeight = titleWeight,
@@ -937,7 +950,12 @@ fun FullPlayer(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = uiState.currentSong?.artist ?: "Unknown Artist",
+                        text = if (isVideoMode) {
+                            videoPlaybackMetadata?.uploader?.takeIf { it.isNotBlank() }
+                                ?: uiState.currentSong?.artist ?: "Unknown Artist"
+                        } else {
+                            uiState.currentSong?.artist ?: "Unknown Artist"
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = contentSecondary,
                         maxLines = 1,
@@ -964,7 +982,7 @@ fun FullPlayer(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(if (compactLandscape) 8.dp else 16.dp))
 
             if (visualizerStyle != "Off") {
                 PlayerVisualizer(
@@ -977,7 +995,7 @@ fun FullPlayer(
                     },
                     colorMode = visualizerColor
                 )
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 10.dp))
             }
 
             // Reorderable action chips. The selected order is saved by Customize.
@@ -1006,7 +1024,13 @@ fun FullPlayer(
                     com.dsann.music.util.SongDownloader.isDownloading(songForActions?.videoId)
 
                 val orderedButtons = if (playerLayout == "Minimal") playerButtons.take(3) else playerButtons
-                orderedButtons.forEach { action ->
+                // The audio/video switch is a playback mode control, not a cosmetic action.
+                // Keep it available in Minimal mode even when it falls outside the first three
+                // user-ordered buttons.
+                val playerButtonsWithVideo = if (
+                    !songForActions?.videoId.isNullOrBlank() && "video" !in orderedButtons
+                ) orderedButtons + "video" else orderedButtons
+                playerButtonsWithVideo.forEach { action ->
                     when (action) {
                         "lyrics" -> PillChip(
                             style = playerButtonStyle,
@@ -1137,7 +1161,7 @@ fun FullPlayer(
                 Spacer(modifier = Modifier.width(12.dp))
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(if (compactLandscape) 8.dp else 24.dp))
 
             // Premium Wavy Seek Bar (Isolated)
             WavySliderWithLabels(
@@ -1156,7 +1180,7 @@ fun FullPlayer(
                 scrubberThumbStyle = scrubberThumbStyle
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 16.dp))
 
             androidx.compose.material3.ButtonGroup(
                 modifier = Modifier
@@ -1184,7 +1208,7 @@ fun FullPlayer(
                                 Modifier
                                     .animateWidth(interactionSource)
                                     .weight(1f)
-                                    .height(76.dp)
+                                    .height(if (compactLandscape) 52.dp else 76.dp)
                             },
                             interactionSource = interactionSource,
                             shape = RoundedCornerShape(cornerRadius),
@@ -1226,7 +1250,7 @@ fun FullPlayer(
                                 Modifier
                                     .animateWidth(interactionSource)
                                     .weight(1.2f)
-                                    .height(76.dp)
+                                    .height(if (compactLandscape) 52.dp else 76.dp)
                             },
                             interactionSource = interactionSource,
                             shape = RoundedCornerShape(cornerRadius),
@@ -1276,7 +1300,7 @@ fun FullPlayer(
                                 Modifier
                                     .animateWidth(interactionSource)
                                     .weight(1f)
-                                    .height(76.dp)
+                                    .height(if (compactLandscape) 52.dp else 76.dp)
                             },
                             interactionSource = interactionSource,
                             shape = RoundedCornerShape(cornerRadius),
@@ -1302,13 +1326,13 @@ fun FullPlayer(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 16.dp))
 
             // Swipe Up / Click Chevron Up Indicator to expand Queue
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(if (compactLandscape) 24.dp else 48.dp)
                     .pointerInput(Unit) {
                         detectVerticalDragGestures { _, dragAmount ->
                             if (dragAmount < -10f && !isQueueExpanded && !isLyricsModeEnabled) {
@@ -1329,7 +1353,7 @@ fun FullPlayer(
                     contentDescription = "Open Queue",
                     tint = contentColor.copy(alpha = 0.5f),
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(if (compactLandscape) 24.dp else 32.dp)
                         .graphicsLayer { rotationZ = 180f }
                 )
             }
@@ -1348,7 +1372,7 @@ fun FullPlayer(
                     modifier = Modifier
                         .weight(0.54f)
                         .fillMaxHeight()
-                        .verticalScroll(rememberScrollState()),
+                        .clipToBounds(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     content = playerControlsContent
                 )
@@ -1557,10 +1581,16 @@ fun FullPlayer(
                     songFileMetadata.isRemote -> "Remote audio stream"
                     else -> "Device audio file"
                 }
-                val displayTitle = song.title.takeIf { it.isNotBlank() && !it.equals("Unknown Title", true) }
+                val displayTitle = (
+                    if (isVideoMode) videoPlaybackMetadata?.title?.takeIf { it.isNotBlank() }
+                    else null
+                ) ?: song.title.takeIf { it.isNotBlank() && !it.equals("Unknown Title", true) }
                     ?: onlineStreamMetadata?.title
                     ?: "Title not supplied by source"
-                val displayArtist = song.artist.takeIf { it.isNotBlank() && !it.equals("Unknown Artist", true) }
+                val displayArtist = (
+                    if (isVideoMode) videoPlaybackMetadata?.uploader?.takeIf { it.isNotBlank() }
+                    else null
+                ) ?: song.artist.takeIf { it.isNotBlank() && !it.equals("Unknown Artist", true) }
                     ?: onlineStreamMetadata?.artist
                     ?: "Artist not supplied by source"
                 val details = mutableListOf(
@@ -1573,7 +1603,7 @@ fun FullPlayer(
                             ?: if (song.albumId > 0L) "Album ID ${song.albumId} (title unavailable)" else "Album title unavailable in source metadata"
                     ),
                     "Duration" to durationText,
-                    "Source" to sourceText,
+                    "Source" to if (isVideoMode) "YouTube video stream" else sourceText,
                     "Song size" to sizeText,
                     "Bitrate" to bitrateText,
                     "Format" to formatText
@@ -1596,7 +1626,7 @@ fun FullPlayer(
                     ?: details.add("Loudness" to "Not analyzed")
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { showSongInfoDialog = false },
-                    title = { Text("Song information", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
+                    title = { Text(if (isVideoMode) "Video information" else "Song information", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
                     text = {
                         Column(
                             modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)

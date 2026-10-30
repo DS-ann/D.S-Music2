@@ -789,8 +789,19 @@ fun PlayerBottomSheetCompose(
                     val options = com.dsann.music.data.innertube.NewPipeStreamExtractor
                         .getVideoStreamOptions(videoId)
                     videoQualityOptions = options
-                    selectedVideoQuality = com.dsann.music.data.innertube.NewPipeStreamExtractor
-                        .dataSaverVideoOption(options)?.label
+                    val defaultVideoOption = com.dsann.music.data.innertube.NewPipeStreamExtractor
+                        .dataSaverVideoOption(options)
+                    selectedVideoQuality = defaultVideoOption?.label
+                    if (isVideoMode && defaultVideoOption != null) {
+                        viewModel.setVideoPlaybackMetadata(
+                            com.dsann.music.viewmodel.VideoPlaybackMetadata(
+                                title = defaultVideoOption.videoTitle?.takeIf { it.isNotBlank() }
+                                    ?: currentSong?.title.orEmpty(),
+                                uploader = defaultVideoOption.videoUploader?.takeIf { it.isNotBlank() }
+                                    ?: currentSong?.artist.orEmpty()
+                            )
+                        )
+                    }
                 } catch (_: Exception) {
                     videoQualityOptions = emptyList()
                 } finally {
@@ -967,11 +978,28 @@ fun PlayerBottomSheetCompose(
             }
         }
 
+        // Restore the expanded player from the Activity-scoped ViewModel after rotation or
+        // a window-size change. The media service keeps playing; the sheet must keep its state.
+        val restoredPlayerExpanded = viewModel.isPlayerExpanded.value ||
+            viewModel.playerExpansionFraction.value >= 0.5f
+        val restoredExpansionFraction = if (restoredPlayerExpanded) {
+            1f
+        } else {
+            viewModel.playerExpansionFraction.value.coerceIn(0f, 1f)
+        }
+
         // Animation States
-        val playerContentExpansionFraction = remember { Animatable(0f) }
+        val playerContentExpansionFraction = remember(viewModel) {
+            Animatable(restoredExpansionFraction)
+        }
         val isPlaybackReady by viewModel.isPlaybackReady.collectAsStateWithLifecycle()
 
-        var currentSheetContentState by remember { mutableStateOf(PlayerSheetState.COLLAPSED) }
+        var currentSheetContentState by remember(viewModel) {
+            mutableStateOf(
+                if (restoredPlayerExpanded) PlayerSheetState.EXPANDED
+                else PlayerSheetState.COLLAPSED
+            )
+        }
 
         fun performPlayerGesture(action: PlayerGestureAction, touchedLeftSide: Boolean = false) {
             when (action) {
@@ -1027,7 +1055,21 @@ fun PlayerBottomSheetCompose(
         var pendingSheetAnimation by remember { mutableStateOf<SheetAnimationRequest?>(null) }
         var sheetAnimationRequestId by remember { mutableStateOf(0) }
 
-        val currentSheetTranslationY = remember { Animatable(screenHeightPx) }
+        val currentSheetTranslationY = remember(viewModel) {
+            Animatable(sheetCollapsedTargetYState.value * (1f - restoredExpansionFraction))
+        }
+
+        // A rotation changes the sheet's coordinate space. Recalculate its Y position using
+        // the new height while retaining the previously saved expansion fraction.
+        LaunchedEffect(screenHeightPx, containerWidthDp, useNavigationRail) {
+            val fraction = if (viewModel.isPlayerExpanded.value) {
+                1f
+            } else {
+                viewModel.playerExpansionFraction.value.coerceIn(0f, 1f)
+            }
+            playerContentExpansionFraction.snapTo(fraction)
+            currentSheetTranslationY.snapTo(sheetCollapsedTargetYState.value * (1f - fraction))
+        }
         val visualOvershootScaleY = remember { Animatable(1f) }
         val offsetAnimatable = remember { Animatable(0f) }
 
@@ -1365,7 +1407,11 @@ fun PlayerBottomSheetCompose(
                         else -> 0.9f
                     }
                     val albumArtSizeDp = if (useWidePlayer) {
-                        minOf(containerHeight * 0.50f, screenWidth.dp * 0.42f)
+                        if (configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+                            minOf(containerHeight * 0.28f, screenWidth.dp * 0.30f)
+                        } else {
+                            minOf(containerHeight * 0.50f, screenWidth.dp * 0.42f)
+                        }
                     } else {
                         (screenWidth * albumArtScale).dp
                     }

@@ -913,8 +913,20 @@ object YouTubeMusic {
      */
     suspend fun deletePlaylist(playlistId: String): Result<Boolean> = withContext(Dispatchers.IO) {
         runCatching {
+            require(playlistId.isNotBlank()) { "Playlist ID is missing." }
+            check(!InnerTubeClient.cookie.isNullOrBlank()) {
+                "Connect your YouTube Music account first."
+            }
             val response = InnerTubeClient.deletePlaylist(playlistId)
-            response.has("command") || response.has("responseContext")
+            response.getAsJsonObject("error")?.let { error ->
+                throw IllegalStateException(
+                    error.get("message")?.asString ?: "YouTube Music could not delete this playlist."
+                )
+            }
+            if (response.entrySet().isEmpty()) {
+                throw IllegalStateException("YouTube Music returned an empty delete response.")
+            }
+            true
         }
     }
 

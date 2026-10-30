@@ -476,10 +476,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putString("player_times", safe) }
     }
 
-    private val _scrubberStyle = MutableStateFlow(prefs.getString("scrubber_style", "Wave") ?: "Wave")
+    private val _scrubberStyle = MutableStateFlow(
+        prefs.getString("scrubber_style", "Waveform")
+            ?.let { if (it == "Wave") "Waveform" else it }
+            ?.takeIf { it in listOf("Hairline", "Bold", "Thumb", "Waveform") }
+            ?: "Waveform"
+    )
     val scrubberStyle: StateFlow<String> = _scrubberStyle.asStateFlow()
     fun setScrubberStyle(value: String) {
-        val safe = value.takeIf { it in listOf("Hairline", "Bold", "Thumb", "Waveform") } ?: "Wave"
+        val safe = value.takeIf { it in listOf("Hairline", "Bold", "Thumb", "Waveform") } ?: "Waveform"
         _scrubberStyle.value = safe
         prefs.edit { putString("scrubber_style", safe) }
     }

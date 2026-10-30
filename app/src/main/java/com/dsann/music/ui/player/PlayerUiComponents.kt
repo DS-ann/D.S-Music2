@@ -278,10 +278,18 @@ internal fun WavySliderWithLabels(
     var isScrubbing by remember { mutableStateOf(false) }
     var sliderScrubPos by remember { mutableFloatStateOf(0f) }
 
-    val currentPosition = currentPositionProvider()
-    val safeDur = if (duration > 0) duration.toFloat() else 1f
-    val displayPos = if (isScrubbing) (sliderScrubPos * safeDur).toInt() else currentPosition
-    val progressRatio = (currentPosition.toFloat() / safeDur).coerceIn(0f, 1f)
+    val currentPosition = currentPositionProvider().coerceAtLeast(0)
+    // A missing duration is not a one-millisecond track. Treat progress as unknown/zero
+    // until Media3 publishes a valid duration, otherwise any restored position renders full.
+    val safeDur = duration.takeIf { it > 0 }?.toFloat()
+    val displayPos = if (isScrubbing && safeDur != null) {
+        (sliderScrubPos * safeDur).toInt()
+    } else {
+        currentPosition
+    }
+    val progressRatio = safeDur?.let {
+        (currentPosition.toFloat() / it).coerceIn(0f, 1f)
+    } ?: 0f
 
     Column(
         modifier = modifier
@@ -300,15 +308,16 @@ internal fun WavySliderWithLabels(
         } * scrubberThickness.coerceIn(0.6f, 2f)
         val waveEnabled = scrubberStyle == "Waveform"
         WavyMusicSlider(
-            value = if (isScrubbing) sliderScrubPos else progressRatio,
+            value = if (isScrubbing && safeDur != null) sliderScrubPos else progressRatio,
             onValueChange = {
                 isScrubbing = true
                 sliderScrubPos = it
             },
             onValueChangeFinished = {
                 isScrubbing = false
-                onSeekTo((sliderScrubPos * safeDur).toInt())
+                safeDur?.let { onSeekTo((sliderScrubPos * it).toInt()) }
             },
+            enabled = safeDur != null,
             activeTrackColor = activeColor,
             inactiveTrackColor = contentColor.copy(alpha = if (isDark) 0.08f else 0.06f),
             thumbColor = contentColor,
