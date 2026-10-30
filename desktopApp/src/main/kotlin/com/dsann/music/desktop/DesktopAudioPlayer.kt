@@ -29,6 +29,7 @@ internal class DesktopAudioPlayer : AutoCloseable {
     @Volatile private var paused = true
     @Volatile private var remoteMode = false
     @Volatile private var remotePlayer: MediaPlayer? = null
+    @Volatile private var remoteAudioPlayer: MediaPlayer? = null
     @Volatile private var onPlaybackCompleted: (() -> Unit)? = null
 
     fun setOnPlaybackCompleted(callback: (() -> Unit)?) {
@@ -102,6 +103,126 @@ internal class DesktopAudioPlayer : AutoCloseable {
             { runPlayback(file, startPositionMs.coerceAtLeast(0L), token) },
             "SpatialFlow-Audio"
         ).apply { isDaemon = true; start() }
+    }
+
+    /**
+     * Plays a video-only DASH stream in the MediaView and its paired audio-only stream
+     * through a second JavaFX MediaPlayer. Both players seek and start together.
+     */
+    fun playVideoAndAudio(
+        videoUrl: String,
+        audioUrl: String,
+        knownDurationMs: Long = 0L,
+        startPositionMs: Long = 0L,
+        autoPlay: Boolean = true
+    ) {
+        require(videoUrl.isNotBlank()) { "Video stream URL is empty." }
+        require(audioUrl.isNotBlank()) { "Audio stream URL is empty." }
+        stop()
+        val token = generation.incrementAndGet()
+        currentFile = null
+        currentUrl = videoUrl
+        remoteMode = true
+        positionMillis = startPositionMs.coerceAtLeast(0L)
+        durationMillis = knownDurationMs.coerceAtLeast(0L)
+        errorMessage = null
+        paused = !autoPlay
+        isPaused = !autoPlay
+        isPlaying = true
+
+        ensureJavaFx()
+        Platform.runLater {
+            if (token != generation.get()) return@runLater
+            var video: MediaPlayer? = null
+            var audio: MediaPlayer? = null
+            var videoReady = false
+            var audioReady = false
+            var started = false
+
+            fun fail(message: String) {
+                if (token != generation.get()) return
+                errorMessage = message
+                isPlaying = false
+                paused = true
+                isPaused = true
+                runCatching { video?.stop() }
+                runCatching { audio?.stop() }
+            }
+
+            fun startWhenReady() {
+                if (!videoReady || !audioReady || started || token != generation.get()) return
+                val videoPlayer = video ?: return
+                val audioPlayer = audio ?: return
+                started = true
+                val duration = videoPlayer.totalDuration
+                if (duration != null && duration.toMillis().isFinite() && duration.toMillis() > 0.0) {
+                    durationMillis = duration.toMillis().toLong()
+                }
+                val target = startPositionMs.coerceAtLeast(0L)
+                if (target > 0L) {
+                    videoPlayer.seek(Duration.millis(target.toDouble()))
+                    audioPlayer.seek(Duration.millis(target.toDouble()))
+                }
+                if (autoPlay) {
+                    videoPlayer.play()
+                    audioPlayer.play()
+                    paused = false
+                    isPaused = false
+                } else {
+                    videoPlayer.pause()
+                    audioPlayer.pause()
+                    paused = true
+                    isPaused = true
+                }
+            }
+
+            try {
+                video = MediaPlayer(Media(videoUrl))
+                audio = MediaPlayer(Media(audioUrl))
+                remotePlayer = video
+                remoteAudioPlayer = audio
+
+                // The video-only stream has no soundtrack; the paired audio player supplies it.
+                video.volume = 0.0
+                audio.volume = 1.0
+
+                video.currentTimeProperty().addListener { _, _, newTime ->
+                    if (token == generation.get() && newTime != null && newTime.toMillis().isFinite()) {
+                        positionMillis = newTime.toMillis().toLong().coerceAtLeast(0L)
+                    }
+                }
+                video.setOnReady {
+                    if (token == generation.get()) {
+                        videoReady = true
+                        startWhenReady()
+                    }
+                }
+                audio.setOnReady {
+                    if (token == generation.get()) {
+                        audioReady = true
+                        startWhenReady()
+                    }
+                }
+                video.setOnError {
+                    fail(video.error?.message ?: "Windows could not decode the selected video stream.")
+                }
+                audio.setOnError {
+                    fail(audio.error?.message ?: "Windows could not decode the paired audio stream.")
+                }
+                video.setOnEndOfMedia {
+                    if (token == generation.get()) {
+                        runCatching { audio.stop() }
+                        positionMillis = durationMillis
+                        isPlaying = false
+                        paused = true
+                        isPaused = true
+                        onPlaybackCompleted?.invoke()
+                    }
+                }
+            } catch (error: Exception) {
+                fail(error.message ?: "Unable to open the paired video and audio streams.")
+            }
+        }
     }
 
     fun playUrl(url: String, knownDurationMs: Long = 0L, startPositionMs: Long = 0L, autoPlay: Boolean = true) {
@@ -179,7 +300,10 @@ internal class DesktopAudioPlayer : AutoCloseable {
         paused = true
         isPaused = true
         if (remoteMode) {
-            Platform.runLater { remotePlayer?.pause() }
+            Platform.runLater {
+                remotePlayer?.pause()
+                remoteAudioPlayer?.pause()
+            }
         } else {
             try {
                 outputLine?.let { it.stop(); it.flush() }
@@ -192,7 +316,10 @@ internal class DesktopAudioPlayer : AutoCloseable {
         paused = false
         isPaused = false
         if (remoteMode) {
-            Platform.runLater { remotePlayer?.play() }
+            Platform.runLater {
+                remotePlayer?.play()
+                remoteAudioPlayer?.play()
+            }
         } else {
             try { outputLine?.start() } catch (_: Exception) { }
             synchronized(gate) { gate.notifyAll() }
@@ -208,6 +335,7 @@ internal class DesktopAudioPlayer : AutoCloseable {
         if (remoteMode) {
             Platform.runLater {
                 remotePlayer?.seek(Duration.millis(target.toDouble()))
+                remoteAudioPlayer?.seek(Duration.millis(target.toDouble()))
                 positionMillis = target
             }
         } else {
@@ -223,11 +351,15 @@ internal class DesktopAudioPlayer : AutoCloseable {
 
         if (remoteMode) {
             val old = remotePlayer
+            val oldAudio = remoteAudioPlayer
             remotePlayer = null
+            remoteAudioPlayer = null
             try {
                 Platform.runLater {
                     old?.stop()
                     old?.dispose()
+                    oldAudio?.stop()
+                    oldAudio?.dispose()
                 }
             } catch (_: Exception) { }
         }
