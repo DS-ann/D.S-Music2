@@ -47,11 +47,18 @@ fun ArtworkPager(
     val artworkShapeName by context
         .getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
         .observeKey("player_artwork_shape", "Rounded")
-    val artworkShape = remember(artworkShapeName) {
-        when (artworkShapeName) {
-            "Square" -> RectangleShape
-            "Circle" -> CircleShape
-            else -> RoundedCornerShape(24.dp)
+    val playerLayout by context
+        .getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+        .observeKey("player_layout", "Standard")
+    val artworkShape = remember(artworkShapeName, playerLayout) {
+        when (playerLayout) {
+            "Vinyl" -> CircleShape
+            "Cassette" -> RoundedCornerShape(12.dp)
+            else -> when (artworkShapeName) {
+                "Square" -> RectangleShape
+                "Circle" -> CircleShape
+                else -> RoundedCornerShape(24.dp)
+            }
         }
     }
 
