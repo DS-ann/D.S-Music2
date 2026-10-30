@@ -248,6 +248,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit {putBoolean(KEY_AUDIO_FOCUS, enabled)}
     }
 
+    private val _autoplayEnabled = MutableStateFlow(prefs.getBoolean(KEY_AUTOPLAY_ENABLED, true))
+    val autoplayEnabled: StateFlow<Boolean> = _autoplayEnabled.asStateFlow()
+
+    fun setAutoplayEnabled(enabled: Boolean) {
+        _autoplayEnabled.value = enabled
+        prefs.edit { putBoolean(KEY_AUTOPLAY_ENABLED, enabled) }
+    }
+
     // ── Pure AMOLED Black ──────────────────────────────────────────────────
     private val _amoledBlack = MutableStateFlow(prefs.getBoolean(KEY_AMOLED_BLACK, false))
     val amoledBlack: StateFlow<Boolean> = _amoledBlack.asStateFlow()
@@ -282,6 +290,28 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setDynamicAlbumTheme(enabled: Boolean) {
         _dynamicAlbumTheme.value = enabled
         prefs.edit {putBoolean(KEY_DYNAMIC_ALBUM_THEME, enabled)}
+    }
+
+    private val _appearancePreset = MutableStateFlow(
+        prefs.getString(KEY_APPEARANCE_PRESET, "Ocean") ?: "Ocean"
+    )
+    val appearancePreset: StateFlow<String> = _appearancePreset.asStateFlow()
+
+    fun setAppearancePreset(preset: String) {
+        val safePreset = preset.takeIf { it in listOf("Ocean", "Violet", "Emerald", "Amber", "Rose", "Monochrome") } ?: "Ocean"
+        _appearancePreset.value = safePreset
+        prefs.edit { putString(KEY_APPEARANCE_PRESET, safePreset) }
+    }
+
+    private val _playerArtworkShape = MutableStateFlow(
+        prefs.getString(KEY_PLAYER_ARTWORK_SHAPE, "Rounded") ?: "Rounded"
+    )
+    val playerArtworkShape: StateFlow<String> = _playerArtworkShape.asStateFlow()
+
+    fun setPlayerArtworkShape(shape: String) {
+        val safeShape = shape.takeIf { it in listOf("Rounded", "Square", "Circle") } ?: "Rounded"
+        _playerArtworkShape.value = safeShape
+        prefs.edit { putString(KEY_PLAYER_ARTWORK_SHAPE, safeShape) }
     }
 
     // ── Ignore Short Audio ──────────────────────────────────────────────────
@@ -547,6 +577,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     _darkMode.value = prefs.getBoolean(KEY_DARK_MODE, true)
                     _amoledBlack.value = prefs.getBoolean(KEY_AMOLED_BLACK, false)
                     _dynamicAlbumTheme.value = prefs.getBoolean(KEY_DYNAMIC_ALBUM_THEME, false)
+                    _appearancePreset.value = prefs.getString(KEY_APPEARANCE_PRESET, "Ocean") ?: "Ocean"
+                    _playerArtworkShape.value = prefs.getString(KEY_PLAYER_ARTWORK_SHAPE, "Rounded") ?: "Rounded"
+                    _autoplayEnabled.value = prefs.getBoolean(KEY_AUTOPLAY_ENABLED, true)
                     _crossfadeEnabled.value = prefs.getBoolean(KEY_CROSSFADE_ENABLED, false)
                     _crossfadeDuration.value = prefs.getFloat(KEY_CROSSFADE_DURATION, 3f)
                     _audioFocus.value = prefs.getBoolean(KEY_AUDIO_FOCUS, true)
@@ -706,6 +739,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         const val KEY_DOWNLOAD_BITRATE = "download_bitrate"
         const val KEY_SYNC_FREQUENCY = "sync_frequency"
         const val KEY_DYNAMIC_ALBUM_THEME = "dynamic_album_theme"
+        const val KEY_APPEARANCE_PRESET = "appearance_preset"
+        const val KEY_PLAYER_ARTWORK_SHAPE = "player_artwork_shape"
+        const val KEY_AUTOPLAY_ENABLED = "autoplay_enabled"
         const val KEY_VOLUME_NORMALIZATION_ENABLED = "volume_normalization_enabled"
         const val KEY_TARGET_LUFS = "target_lufs"
     }
@@ -754,6 +790,9 @@ fun SettingsScreenContent(
     val isPlayerExpanded by playerSharedViewModel.isPlayerExpanded.collectAsStateWithLifecycle()
     val amoledBlack by viewModel.amoledBlack.collectAsStateWithLifecycle()
     val dynamicAlbumTheme by viewModel.dynamicAlbumTheme.collectAsStateWithLifecycle()
+    val appearancePreset by viewModel.appearancePreset.collectAsStateWithLifecycle()
+    val playerArtworkShape by viewModel.playerArtworkShape.collectAsStateWithLifecycle()
+    val autoplayEnabled by viewModel.autoplayEnabled.collectAsStateWithLifecycle()
     val hideNavLabels by viewModel.hideNavLabels.collectAsStateWithLifecycle()
     val dynamicNavStyle by viewModel.dynamicNavStyle.collectAsStateWithLifecycle()
     val crossfadeEnabled by viewModel.crossfadeEnabled.collectAsStateWithLifecycle()
@@ -928,6 +967,10 @@ fun SettingsScreenContent(
                 onAmoledBlackChange = { viewModel.setAmoledBlack(it) },
                 dynamicAlbumTheme = dynamicAlbumTheme,
                 onDynamicAlbumThemeChange = { viewModel.setDynamicAlbumTheme(it) },
+                appearancePreset = appearancePreset,
+                onAppearancePresetChange = { viewModel.setAppearancePreset(it) },
+                playerArtworkShape = playerArtworkShape,
+                onPlayerArtworkShapeChange = { viewModel.setPlayerArtworkShape(it) },
                 hideNavLabels = hideNavLabels,
                 onHideNavLabelsChange = { viewModel.setHideNavLabels(it) },
                 dynamicNavStyle = dynamicNavStyle,
@@ -943,6 +986,11 @@ fun SettingsScreenContent(
                 onCrossfadeDurationChange = { viewModel.setCrossfadeDuration(it) },
                 audioFocus = audioFocus,
                 onAudioFocusToggle = { viewModel.setAudioFocus(it) },
+                autoplayEnabled = autoplayEnabled,
+                onAutoplayToggle = { enabled ->
+                    viewModel.setAutoplayEnabled(enabled)
+                    if (!enabled) playerSharedViewModel.removeAutoplayRecommendationsFromQueue()
+                },
                 sleepTimerEndTime = sleepTimerEndTime,
                 sleepTimerMode = sleepTimerMode,
                 onStartSleepTimer = { playerSharedViewModel.startCustomSleepTimer(it) },
@@ -1686,6 +1734,10 @@ private fun AppearanceScreen(
     onAmoledBlackChange: (Boolean) -> Unit,
     dynamicAlbumTheme: Boolean,
     onDynamicAlbumThemeChange: (Boolean) -> Unit,
+    appearancePreset: String,
+    onAppearancePresetChange: (String) -> Unit,
+    playerArtworkShape: String,
+    onPlayerArtworkShapeChange: (String) -> Unit,
     hideNavLabels: Boolean,
     onHideNavLabelsChange: (Boolean) -> Unit,
     dynamicNavStyle: Boolean,
@@ -1711,6 +1763,28 @@ private fun AppearanceScreen(
                 add { DynamicAlbumThemeRow(dynamicAlbumTheme, onDynamicAlbumThemeChange) }
             })
 
+            SettingsHeader("Personalization")
+            SettingsGroupCard(listOf(
+                {
+                    SettingsChoiceRow(
+                        title = "Accent palette",
+                        description = "Choose the app-wide accent color. Album-art colors can still override it when Dynamic colors is on.",
+                        selected = appearancePreset,
+                        options = listOf("Ocean", "Violet", "Emerald", "Amber", "Rose", "Monochrome"),
+                        onSelected = onAppearancePresetChange
+                    )
+                },
+                {
+                    SettingsChoiceRow(
+                        title = "Player artwork shape",
+                        description = "Change the corners of the large player artwork.",
+                        selected = playerArtworkShape,
+                        options = listOf("Rounded", "Square", "Circle"),
+                        onSelected = onPlayerArtworkShapeChange
+                    )
+                }
+            ))
+
             SettingsHeader("Navigation Bar")
             SettingsGroupCard(buildList {
                 add { HideNavLabelsRow(hideNavLabels, onHideNavLabelsChange) }
@@ -1718,6 +1792,56 @@ private fun AppearanceScreen(
             })
         }
     }
+}
+
+@Composable
+private fun SettingsChoiceRow(
+    title: String,
+    description: String,
+    selected: String,
+    options: List<String>,
+    onSelected: (String) -> Unit
+) {
+    ListItem(
+        content = {
+            Column {
+                Text(title, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        trailingContent = {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                options.forEach { option ->
+                    val active = selected == option
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .clickable { onSelected(option) },
+                        shape = RoundedCornerShape(50),
+                        color = if (active) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            text = option,
+                            color = if (active) MaterialTheme.colorScheme.onPrimaryContainer
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+            }
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    )
 }
 
 @Composable
@@ -1845,6 +1969,8 @@ private fun PlaybackScreen(
     onCrossfadeDurationChange: (Float) -> Unit,
     audioFocus: Boolean,
     onAudioFocusToggle: (Boolean) -> Unit,
+    autoplayEnabled: Boolean,
+    onAutoplayToggle: (Boolean) -> Unit,
     sleepTimerEndTime: Long,
     sleepTimerMode: PlayerSharedViewModel.SleepTimerMode,
     onStartSleepTimer: (Int) -> Unit,
@@ -1870,6 +1996,11 @@ private fun PlaybackScreen(
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 120.dp)
         ) {
+            SettingsHeader("Autoplay")
+            SettingsGroupCard(listOf(
+                { AutoplayRow(autoplayEnabled, onAutoplayToggle) }
+            ))
+
             SettingsHeader("Crossfade")
             SettingsGroupCard(listOf(
                 { CrossfadeRow(crossfadeEnabled, onCrossfadeToggle, crossfadeDuration, onCrossfadeDurationChange) }
@@ -1906,6 +2037,27 @@ private fun PlaybackScreen(
             ))
         }
     }
+}
+
+@Composable
+private fun AutoplayRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
+    ListItem(
+        onClick = { onToggle(!checked) },
+        content = {
+            Column {
+                Text("Autoplay", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "Continue with similar YouTube Music tracks when the current queue ends.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        trailingContent = {
+            Switch(checked = checked, onCheckedChange = onToggle)
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
