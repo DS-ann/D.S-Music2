@@ -28,6 +28,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "SpatialFlow"
+rootProject.name = "D.S Music"
 include ':app'
 include ':desktopApp'
