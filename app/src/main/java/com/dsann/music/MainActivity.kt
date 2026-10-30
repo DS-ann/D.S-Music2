@@ -191,7 +191,10 @@ class MainActivity : AppCompatActivity() {
             val dynamicAlbumColor = if (currentSong != null) playerBackgroundColor else null
 
             SpatialFlowTheme(darkTheme = isDarkTheme, dynamicAlbumColor = dynamicAlbumColor) {
-                val hideNavLabels by prefs.observeKey("hide_nav_labels", false)
+                val navLabelsMode by prefs.observeKey(
+                    "nav_label_mode",
+                    if (prefs.getBoolean("hide_nav_labels", false)) "Never" else "Always"
+                )
                 val dynamicNavStyle by prefs.observeKey("dynamic_nav_style", false)
                 val hasSeenOnboarding by prefs.observeKey("has_seen_onboarding_1_8", false)
 
@@ -291,7 +294,8 @@ class MainActivity : AppCompatActivity() {
                                         }
                                     },
                                     icon = { Icon(painter = painterResource(id = iconResId), contentDescription = label, modifier = Modifier.size(navIconSize)) },
-                                    label = if (hideNavLabels) null else { { Text(label) } }
+                                    label = if (navLabelsMode == "Never") null else { { Text(label) } },
+                                    alwaysShowLabel = navLabelsMode == "Always"
                                 )
                             }
                         }
@@ -564,7 +568,7 @@ class MainActivity : AppCompatActivity() {
                                                         }
                                                     }
                                                 }
-                                                .padding(vertical = if (hideNavLabels) 12.dp else 8.dp),
+                                                .padding(vertical = if (navLabelsMode == "Never") 12.dp else 8.dp),
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
                                             Icon(
@@ -573,7 +577,7 @@ class MainActivity : AppCompatActivity() {
                                                 tint = tint,
                                                 modifier = Modifier.size(railIconSize)
                                             )
-                                            if (!hideNavLabels) {
+                                            if (navLabelsMode == "Always" || (navLabelsMode == "Selected" && selected)) {
                                                 Text(
                                                     text = label,
                                                     color = tint,
