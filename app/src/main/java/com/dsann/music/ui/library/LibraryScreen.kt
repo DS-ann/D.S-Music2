@@ -2839,10 +2839,12 @@ private fun RecapTabContent(
                 summary.title,
                 summary.artist,
                 -1L,
-                summary.thumbnailUrl,
+                null,
                 summary.totalMs,
                 summary.lastTimestamp
-            )
+            ).apply {
+                thumbnailUrl = summary.thumbnailUrl
+            }
         } else {
             SongItem.createOnlineSong(
                 videoId = summary.id,
