@@ -3,7 +3,6 @@ package com.dsann.music.ui.player
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -54,11 +53,7 @@ fun ArtworkPager(
         when (playerLayout) {
             "Vinyl" -> CircleShape
             "Cassette" -> RoundedCornerShape(12.dp)
-            else -> when (artworkShapeName) {
-                "Square" -> RectangleShape
-                "Circle" -> CircleShape
-                else -> RoundedCornerShape(24.dp)
-            }
+            else -> DsmCoverShapes.of(artworkShapeName, 24.dp)
         }
     }
 
