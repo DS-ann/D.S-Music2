@@ -80,8 +80,9 @@ fun SpatialFlowTheme(
     }
     val amoledEnabled by prefs.observeKey("amoled_black", false)
     val albumArtThemeEnabled by prefs.observeKey("dynamic_album_theme", false)
+    val appearancePreset by prefs.observeKey("appearance_preset", "Ocean")
 
-    val colorScheme = remember(darkTheme, amoledEnabled, albumArtThemeEnabled, dynamicAlbumColor) {
+    val colorScheme = remember(darkTheme, amoledEnabled, albumArtThemeEnabled, dynamicAlbumColor, appearancePreset) {
         val baseScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (darkTheme) dynamicDarkColorScheme(context)
             else dynamicLightColorScheme(context)
@@ -239,7 +240,32 @@ fun SpatialFlowTheme(
                 finalDynamicScheme
             }
         } else {
-            finalScheme
+            val presetArgb = when (appearancePreset) {
+                "Violet" -> 0xFFB69CFF.toInt()
+                "Emerald" -> 0xFF62C9A2.toInt()
+                "Amber" -> 0xFFFFC36F.toInt()
+                "Rose" -> 0xFFFF8FA3.toInt()
+                "Monochrome" -> 0xFFC9CDD4.toInt()
+                else -> 0xFF6FA8FF.toInt()
+            }
+            val onPrimary = if (androidx.core.graphics.ColorUtils.calculateLuminance(presetArgb) > 0.52) {
+                Color(0xFF10131A)
+            } else {
+                Color.White
+            }
+            val containerArgb = androidx.core.graphics.ColorUtils.blendARGB(
+                presetArgb,
+                if (darkTheme) android.graphics.Color.BLACK else android.graphics.Color.WHITE,
+                if (darkTheme) 0.62f else 0.82f
+            )
+            finalScheme.copy(
+                primary = Color(presetArgb),
+                onPrimary = onPrimary,
+                primaryContainer = Color(containerArgb),
+                onPrimaryContainer = if (darkTheme) Color.White else Color(0xFF171923),
+                secondary = Color(presetArgb),
+                onSecondary = onPrimary
+            )
         }
     }
 
