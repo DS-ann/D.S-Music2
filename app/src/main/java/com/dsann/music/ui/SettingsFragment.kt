@@ -329,6 +329,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putString("player_background_style", safe) }
     }
 
+    private val _miniPlayerStyle = MutableStateFlow(
+        prefs.getString("mini_player_style", "Card") ?: "Card"
+    )
+    val miniPlayerStyle: StateFlow<String> = _miniPlayerStyle.asStateFlow()
+    fun setMiniPlayerStyle(value: String) {
+        val safe = value.takeIf { it in listOf("Card", "Flat", "Compact") } ?: "Card"
+        _miniPlayerStyle.value = safe
+        prefs.edit { putString("mini_player_style", safe) }
+    }
+
     private val _lyricsTextSize = MutableStateFlow(
         prefs.getString("lyrics_text_size", "Standard") ?: "Standard"
     )
@@ -838,6 +848,7 @@ fun SettingsScreenContent(
     val appearancePreset by viewModel.appearancePreset.collectAsStateWithLifecycle()
     val playerArtworkShape by viewModel.playerArtworkShape.collectAsStateWithLifecycle()
     val playerBackgroundStyle by viewModel.playerBackgroundStyle.collectAsStateWithLifecycle()
+    val miniPlayerStyle by viewModel.miniPlayerStyle.collectAsStateWithLifecycle()
     val lyricsTextSize by viewModel.lyricsTextSize.collectAsStateWithLifecycle()
     val lyricsAlignment by viewModel.lyricsAlignment.collectAsStateWithLifecycle()
     val uiDensity by viewModel.uiDensity.collectAsStateWithLifecycle()
@@ -1022,6 +1033,8 @@ fun SettingsScreenContent(
                 onPlayerArtworkShapeChange = { viewModel.setPlayerArtworkShape(it) },
                 playerBackgroundStyle = playerBackgroundStyle,
                 onPlayerBackgroundStyleChange = { viewModel.setPlayerBackgroundStyle(it) },
+                miniPlayerStyle = miniPlayerStyle,
+                onMiniPlayerStyleChange = { viewModel.setMiniPlayerStyle(it) },
                 lyricsTextSize = lyricsTextSize,
                 onLyricsTextSizeChange = { viewModel.setLyricsTextSize(it) },
                 lyricsAlignment = lyricsAlignment,
@@ -2017,6 +2030,8 @@ private fun AppearanceScreen(
     onPlayerArtworkShapeChange: (String) -> Unit,
     playerBackgroundStyle: String,
     onPlayerBackgroundStyleChange: (String) -> Unit,
+    miniPlayerStyle: String,
+    onMiniPlayerStyleChange: (String) -> Unit,
     lyricsTextSize: String,
     onLyricsTextSizeChange: (String) -> Unit,
     lyricsAlignment: String,
@@ -2073,6 +2088,15 @@ private fun AppearanceScreen(
                         selected = playerBackgroundStyle,
                         options = listOf("Artwork", "Theme", "Black"),
                         onSelected = onPlayerBackgroundStyleChange
+                    )
+                },
+                {
+                    SettingsChoiceRow(
+                        title = "Mini player style",
+                        description = "Card adds a floating surface, Flat removes the card elevation, and Compact uses a smaller rounded shape.",
+                        selected = miniPlayerStyle,
+                        options = listOf("Card", "Flat", "Compact"),
+                        onSelected = onMiniPlayerStyleChange
                     )
                 },
                 {
