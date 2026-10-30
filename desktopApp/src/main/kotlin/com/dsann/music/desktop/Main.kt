@@ -1176,7 +1176,12 @@ private fun formatTime(milliseconds: Long): String {
 private fun OnlineResultRow(
     item: SearchItem,
     featured: Boolean = false,
-    onClick: () -> Unit
+    isFavorite: Boolean = false,
+    isDownloading: Boolean = false,
+    onClick: () -> Unit,
+    onFavorite: () -> Unit = {},
+    onDownload: () -> Unit = {},
+    onAddToPlaylist: () -> Unit = {}
 ) {
     val title = DesktopYouTubeMusic.itemTitle(item)
     val subtitle = DesktopYouTubeMusic.itemSubtitle(item)
@@ -1226,7 +1231,31 @@ private fun OnlineResultRow(
                 Text(title, maxLines = 1, fontWeight = FontWeight.SemiBold)
                 Text(subtitle, maxLines = 1, color = mutedText, fontSize = 11.sp)
             }
-            Text(type, color = accentColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            if (item is SearchItem.Song) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Button(
+                        onClick = onFavorite,
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545)),
+                        elevation = ButtonDefaults.elevation(0.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 5.dp)
+                    ) { Text(if (isFavorite) "♥" else "♡") }
+                    Button(
+                        onClick = onDownload,
+                        enabled = !isDownloading,
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545)),
+                        elevation = ButtonDefaults.elevation(0.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 5.dp)
+                    ) { Text(if (isDownloading) "$downloadProgress%" else "↓") }
+                    Button(
+                        onClick = onAddToPlaylist,
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545)),
+                        elevation = ButtonDefaults.elevation(0.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 5.dp)
+                    ) { Text("+") }
+                }
+            } else {
+                Text(type, color = accentColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
