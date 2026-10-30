@@ -1413,6 +1413,8 @@ private fun PlaylistsTabContent(
 
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var selectedLocalPlaylist by remember { mutableStateOf<PlaylistEntity?>(null) }
+    var selectedOnlinePlaylistToDelete by remember { mutableStateOf<OnlinePlaylist?>(null) }
+    var isDeletingOnlinePlaylist by remember { mutableStateOf(false) }
     var showCachePlaylist by remember { mutableStateOf(false) }
 
     BackHandler(enabled = showCachePlaylist) {
@@ -1503,6 +1505,56 @@ private fun PlaylistsTabContent(
             playlist = playlist,
             viewModel = viewModel,
             onDismiss = { selectedLocalPlaylist = null }
+        )
+    }
+
+    selectedOnlinePlaylistToDelete?.let { playlist ->
+        AlertDialog(
+            onDismissRequest = {
+                if (!isDeletingOnlinePlaylist) selectedOnlinePlaylistToDelete = null
+            },
+            title = { Text("Delete YouTube Music playlist?") },
+            text = {
+                Text("Delete “" + playlist.title + "” from your YouTube Music library? This cannot be undone.")
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !isDeletingOnlinePlaylist,
+                    onClick = {
+                        if (!isDeletingOnlinePlaylist) {
+                            isDeletingOnlinePlaylist = true
+                            coroutineScope.launch {
+                                YouTubeMusic.deletePlaylist(playlist.playlistId)
+                                    .onSuccess { deleted ->
+                                        if (deleted) {
+                                            accountViewModel?.loadLibrary()
+                                            com.dsann.music.ui.SnackbarController.showMessage(
+                                                "Deleted “" + playlist.title + "” from YouTube Music"
+                                            )
+                                        } else {
+                                            com.dsann.music.ui.SnackbarController.showMessage(
+                                                "YouTube Music did not confirm playlist deletion"
+                                            )
+                                        }
+                                    }
+                                    .onFailure { error ->
+                                        com.dsann.music.ui.SnackbarController.showMessage(
+                                            error.message ?: "Could not delete this YouTube Music playlist"
+                                        )
+                                    }
+                                isDeletingOnlinePlaylist = false
+                                selectedOnlinePlaylistToDelete = null
+                            }
+                        }
+                    }
+                ) { Text(if (isDeletingOnlinePlaylist) "Deleting…" else "Delete") }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !isDeletingOnlinePlaylist,
+                    onClick = { selectedOnlinePlaylistToDelete = null }
+                ) { Text("Cancel") }
+            }
         )
     }
 
@@ -1782,11 +1834,16 @@ private fun PlaylistsTabContent(
                     .nestedScroll(nestedScrollConnection)
             ) {
                 items(onlinePlaylists) { playlist ->
-                    OnlinePlaylistCard(playlist, asList = showAsList, onClick = {
-                        exploreViewModel?.cameFromLibrary = true
-                        exploreViewModel?.loadPlaylist(playlist.playlistId)
-                        navigateToExplore(activity)
-                    })
+                    OnlinePlaylistCard(
+                        playlist,
+                        asList = showAsList,
+                        onClick = {
+                            exploreViewModel?.cameFromLibrary = true
+                            exploreViewModel?.loadPlaylist(playlist.playlistId)
+                            navigateToExplore(activity)
+                        },
+                        onDelete = { selectedOnlinePlaylistToDelete = playlist }
+                    )
                 }
             }
         }
@@ -2088,7 +2145,8 @@ private fun LocalPlaylistDetailsScreen(
 private fun OnlinePlaylistCard(
     playlist: OnlinePlaylist,
     asList: Boolean = false,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDelete: () -> Unit
 ) {
     if (asList) {
         ListItem(
@@ -2113,6 +2171,15 @@ private fun OnlinePlaylistCard(
                     ) {
                         Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
                     }
+                }
+            },
+            trailingContent = {
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Delete YouTube Music playlist",
+                        tint = MaterialTheme.colorScheme.error
+                    )
                 }
             },
             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -2160,6 +2227,19 @@ private fun OnlinePlaylistCard(
                             modifier = Modifier.size(48.dp)
                         )
                     }
+                }
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(5.dp)
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f), CircleShape)
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Delete YouTube Music playlist",
+                        tint = MaterialTheme.colorScheme.error
+                    )
                 }
             }
             Column(modifier = Modifier.padding(12.dp)) {
