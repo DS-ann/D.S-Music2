@@ -30,8 +30,12 @@ internal data class DesktopVideoOption(
     val height: Int,
     val mimeType: String,
     val bitrateKbps: Int,
-    val sizeBytes: Long?
-)
+    val sizeBytes: Long?,
+    val audioUrl: String? = null,
+    val audioMimeType: String? = null
+) {
+    val usesSeparateAudio: Boolean get() = !audioUrl.isNullOrBlank()
+}
 
 internal object DesktopNewPipeExtractor {
     private val cache = ConcurrentHashMap<String, Pair<DesktopResolvedStream, Long>>()
@@ -147,7 +151,8 @@ internal object DesktopNewPipeExtractor {
                 ServiceList.YouTube,
                 "https://www.youtube.com/watch?v=$videoId"
             )
-            val allOptions = info.videoStreams
+
+            val muxed = info.videoStreams
                 .asSequence()
                 .filter { !it.isVideoOnly() && it.content.startsWith("http", true) }
                 .mapNotNull { stream ->
@@ -163,14 +168,61 @@ internal object DesktopNewPipeExtractor {
                         sizeBytes = stream.itagItem?.contentLength?.takeIf { it > 0L }
                     )
                 }
-                .groupBy { it.height }
-                .mapNotNull { (_, sameHeight) -> sameHeight.maxByOrNull { it.bitrateKbps } }
                 .toList()
 
-            // JavaFX Media on Windows has dependable MP4/H.264 support, but WebM decoding
-            // depends on the system runtime. Keep only MP4 choices whenever YouTube offers them.
-            val mp4Options = allOptions.filter { it.mimeType.contains("video/mp4", ignoreCase = true) }
-            val options = (mp4Options.ifEmpty { allOptions }).sortedByDescending { it.height }
+            // YouTube may publish only DASH video-only formats. Pair those with the smallest
+            // AAC/M4A audio-only format so the JavaFX video surface can still play sound.
+            val audioStreams = info.audioStreams.filter { it.content.startsWith("http", true) }
+            val aac = audioStreams.filter {
+                it.format?.mimeType.orEmpty().contains("audio/mp4", true) ||
+                    it.codec?.contains("mp4a", true) == true ||
+                    it.itag == 140
+            }
+            val audioCandidates = aac.ifEmpty { audioStreams }
+            val audio = audioCandidates.minByOrNull { stream ->
+                val bitrate = stream.averageBitrate.takeIf { it > 0 }
+                    ?: (stream.bitrate / 1000).takeIf { it > 0 }
+                    ?: Int.MAX_VALUE
+                bitrate
+            }
+
+            val separate = if (audio == null) emptyList() else info.videoOnlyStreams
+                .asSequence()
+                .filter { it.content.startsWith("http", true) }
+                .mapNotNull { stream ->
+                    val resolution = stream.getResolution()
+                    val height = resolution.filter { it.isDigit() }.toIntOrNull() ?: return@mapNotNull null
+                    val mime = stream.format?.mimeType?.substringBefore(';')?.trim().orEmpty()
+                    DesktopVideoOption(
+                        url = stream.content,
+                        label = "${height}p",
+                        height = height,
+                        mimeType = mime,
+                        bitrateKbps = (stream.getBitrate() / 1000).takeIf { it > 0 } ?: 0,
+                        sizeBytes = stream.itagItem?.contentLength?.takeIf { it > 0L },
+                        audioUrl = audio.content,
+                        audioMimeType = audio.format?.mimeType?.substringBefore(';')?.trim()
+                    )
+                }
+                .toList()
+
+            // One option per resolution. Prefer one muxed HTTP stream for lower request
+            // overhead; otherwise use separate video + audio DASH streams.
+            val all = (muxed + separate)
+                .groupBy { it.height }
+                .mapNotNull { (_, sameHeight) ->
+                    sameHeight.firstOrNull {
+                        !it.usesSeparateAudio && it.mimeType.contains("video/mp4", true)
+                    }
+                        ?: sameHeight.firstOrNull { !it.usesSeparateAudio }
+                        ?: sameHeight.firstOrNull {
+                            it.usesSeparateAudio && it.mimeType.contains("video/mp4", true)
+                        }
+                        ?: sameHeight.firstOrNull()
+                }
+
+            val mp4 = all.filter { it.mimeType.contains("video/mp4", true) }
+            val options = (mp4.ifEmpty { all }).sortedByDescending { it.height }
             videoOptionsCache[videoId] = options to System.currentTimeMillis()
             options
         }
