@@ -86,6 +86,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dsann.music.MainActivity
 import com.dsann.music.R
@@ -685,6 +687,48 @@ fun Modifier.miniPlayerDismissHorizontalGesture(
     }
 }
 
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.VideoOverlayControls(
+    qualityLabel: String?,
+    qualityEnabled: Boolean,
+    onOpenQuality: () -> Unit,
+    onToggleFullscreen: () -> Unit,
+    fullscreen: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = Color.Black.copy(alpha = 0.62f)
+        ) {
+            IconButton(onClick = onOpenQuality, enabled = qualityEnabled) {
+                Text(
+                    text = "⚙",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        Surface(
+            shape = CircleShape,
+            color = Color.Black.copy(alpha = 0.62f)
+        ) {
+            IconButton(onClick = onToggleFullscreen) {
+                Text(
+                    text = if (fullscreen) "⛶" else "⛶",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
 // ==========================================
 // 7. STEP 7: THE MASTER ASSEMBLY CONTAINER
 // ==========================================
@@ -705,6 +749,36 @@ fun PlayerBottomSheetCompose(
         val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
         val isVideoMode by viewModel.isVideoMode.collectAsStateWithLifecycle()
         val audioService by viewModel.audioServiceState.collectAsStateWithLifecycle()
+        var videoQualityOptions by remember {
+            mutableStateOf<List<com.dsann.music.data.innertube.VideoStreamOption>>(emptyList())
+        }
+        var selectedVideoQuality by remember { mutableStateOf<String?>(null) }
+        var videoQualityLoading by remember { mutableStateOf(false) }
+        var showVideoQualityDialog by remember { mutableStateOf(false) }
+        var isVideoFullscreen by remember { mutableStateOf(false) }
+
+        LaunchedEffect(isVideoMode, currentSong?.videoId) {
+            val videoId = currentSong?.videoId
+            if (!isVideoMode || videoId.isNullOrBlank()) {
+                videoQualityOptions = emptyList()
+                selectedVideoQuality = null
+                showVideoQualityDialog = false
+                isVideoFullscreen = false
+            } else {
+                videoQualityLoading = true
+                try {
+                    val options = com.dsann.music.data.innertube.NewPipeStreamExtractor
+                        .getVideoStreamOptions(videoId)
+                    videoQualityOptions = options
+                    selectedVideoQuality = options.firstOrNull()?.label
+                } catch (_: Exception) {
+                    videoQualityOptions = emptyList()
+                } finally {
+                    videoQualityLoading = false
+                }
+            }
+        }
+
         val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
         val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
         val duration by viewModel.duration.collectAsStateWithLifecycle()
@@ -1218,22 +1292,109 @@ fun PlayerBottomSheetCompose(
                             !isLyricsModeEnabled &&
                             !isQueueExpanded
                         ) {
-                            androidx.compose.ui.viewinterop.AndroidView(
-                                factory = { viewContext ->
-                                    androidx.media3.ui.PlayerView(viewContext).apply {
-                                        player = audioService?.getPlayerInstance()
-                                        useController = true
-                                        controllerShowTimeoutMs = 3000
-                                        resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
-                                        setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                                        keepScreenOn = true
+                            Box(Modifier.fillMaxSize()) {
+                                if (!isVideoFullscreen) {
+                                    androidx.compose.ui.viewinterop.AndroidView(
+                                        factory = { viewContext ->
+                                            androidx.media3.ui.PlayerView(viewContext).apply {
+                                                player = audioService?.getPlayerInstance()
+                                                useController = true
+                                                controllerShowTimeoutMs = 3000
+                                                resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                                setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                                                keepScreenOn = true
+                                            }
+                                        },
+                                        update = { playerView ->
+                                            playerView.player = audioService?.getPlayerInstance()
+                                        },
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                                VideoOverlayControls(
+                                    qualityLabel = selectedVideoQuality,
+                                    qualityEnabled = videoQualityOptions.isNotEmpty() && !videoQualityLoading,
+                                    onOpenQuality = { showVideoQualityDialog = true },
+                                    onToggleFullscreen = { isVideoFullscreen = !isVideoFullscreen },
+                                    fullscreen = false
+                                )
+                            }
+
+                            if (isVideoFullscreen) {
+                                Dialog(
+                                    onDismissRequest = { isVideoFullscreen = false },
+                                    properties = DialogProperties(usePlatformDefaultWidth = false)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Color.Black)
+                                    ) {
+                                        androidx.compose.ui.viewinterop.AndroidView(
+                                            factory = { viewContext ->
+                                                androidx.media3.ui.PlayerView(viewContext).apply {
+                                                    player = audioService?.getPlayerInstance()
+                                                    useController = true
+                                                    controllerShowTimeoutMs = 3000
+                                                    resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                                    setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                                                    keepScreenOn = true
+                                                }
+                                            },
+                                            update = { playerView ->
+                                                playerView.player = audioService?.getPlayerInstance()
+                                            },
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                        VideoOverlayControls(
+                                            qualityLabel = selectedVideoQuality,
+                                            qualityEnabled = videoQualityOptions.isNotEmpty() && !videoQualityLoading,
+                                            onOpenQuality = { showVideoQualityDialog = true },
+                                            onToggleFullscreen = { isVideoFullscreen = false },
+                                            fullscreen = true
+                                        )
                                     }
-                                },
-                                update = { playerView ->
-                                    playerView.player = audioService?.getPlayerInstance()
-                                },
-                                modifier = Modifier.fillMaxSize()
-                            )
+                                }
+                            }
+
+                            if (showVideoQualityDialog) {
+                                AlertDialog(
+                                    onDismissRequest = { showVideoQualityDialog = false },
+                                    title = { Text("Video quality") },
+                                    text = {
+                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            if (videoQualityLoading) {
+                                                Text("Loading available qualities…")
+                                            } else if (videoQualityOptions.isEmpty()) {
+                                                Text("No alternative muxed video qualities are available for this track.")
+                                            } else {
+                                                videoQualityOptions.forEach { option ->
+                                                    TextButton(
+                                                        onClick = {
+                                                            audioService?.setVideoStreamQuality(option.url)
+                                                            selectedVideoQuality = option.label
+                                                            showVideoQualityDialog = false
+                                                        }
+                                                    ) {
+                                                        Text(
+                                                            if (selectedVideoQuality == option.label) {
+                                                                "✓  ${option.label}"
+                                                            } else {
+                                                                option.label
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    confirmButton = {
+                                        TextButton(onClick = { showVideoQualityDialog = false }) {
+                                            Text("Close")
+                                        }
+                                    }
+                                )
+                            }
                         } else {
                             ArtworkPager(
                                 viewModel = viewModel,
