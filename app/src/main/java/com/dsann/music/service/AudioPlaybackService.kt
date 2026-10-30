@@ -663,6 +663,9 @@ class AudioPlaybackService : MediaSessionService() {
                     }
                 }
             }
+            // A user-selected track can replace the current item without changing the
+            // playing/paused state, so onIsPlayingChanged is not guaranteed to run.
+            updateWidgetState(player.isPlaying)
         }
     }
 
@@ -793,18 +796,7 @@ class AudioPlaybackService : MediaSessionService() {
             }
             ACTION_CYCLE_PLAYBACK_MODE -> cycleNotificationPlaybackMode()
             ACTION_TOGGLE_FAV -> viewModel?.toggleFavorite()
-            ACTION_WIDGET_FETCH_LYRICS -> {
-                val vm = viewModel
-                val song = vm?.currentSong?.value
-                if (song != null) {
-                    if (vm.syncedLyrics.value.isNullOrEmpty() && vm.plainLyrics.value.isNullOrBlank()) {
-                        vm.fetchLyricsForCurrentSong()
-                    }
-                    updateWidgetState(player.isPlaying)
-                } else {
-                    Log.w(TAG, "Widget requested lyrics before a current song was available")
-                }
-            }
+            ACTION_WIDGET_FETCH_LYRICS -> requestWidgetLyrics()
             ACTION_WIDGET_REFRESH_STATE -> {
                 updateWidgetState(player.isPlaying)
             }
@@ -1571,8 +1563,11 @@ class AudioPlaybackService : MediaSessionService() {
             mediaUri?.scheme == "http" || mediaUri?.scheme == "https"
         if (!isRemoteTrack) return
 
-        val songId = mediaItem?.mediaId?.takeIf { it.isNotBlank() }
-            ?: activeSong?.id?.toString()?.takeIf { it.isNotBlank() }
+        // The image request can finish before ExoPlayer transitions away from the previous
+        // item. The ViewModel already points at the newly selected track, so prefer its stable
+        // ID rather than accidentally attaching the new artwork to the old media item.
+        val songId = activeSong?.id?.toString()?.takeIf { it.isNotBlank() }
+            ?: mediaItem?.mediaId?.takeIf { it.isNotBlank() }
             ?: return
         serviceScope.launch(Dispatchers.IO) {
             storeCachedMediaArtwork(applicationContext, songId, artwork)
@@ -1618,7 +1613,12 @@ class AudioPlaybackService : MediaSessionService() {
         }
         persistCurrentSongArtwork(this.currentAlbumArt)
         val mediaItem = player.currentMediaItem
-        if (mediaItem != null) {
+        val activeSong = viewModel?.currentSong?.value
+        // A fast artwork response for the next song must not overwrite the metadata of the
+        // previous MediaItem while stream resolution is still in progress.
+        if (mediaItem != null &&
+            (activeSong == null || mediaItem.mediaId == activeSong.id.toString())
+        ) {
             val metadataBuilder = mediaItem.mediaMetadata.buildUpon()
                 .setTitle(currentSongName)
                 .setArtist(viewModel?.currentSong?.value?.artist ?: "Unknown Artist")
@@ -1795,6 +1795,94 @@ class AudioPlaybackService : MediaSessionService() {
         handler.post(progressUpdateRunnable)
     }
 
+    private fun requestWidgetLyrics() {
+        val vm = viewModel
+        val activeSong = vm?.currentSong?.value
+        if (vm != null && activeSong != null) {
+            if (vm.syncedLyrics.value.isNullOrEmpty() && vm.plainLyrics.value.isNullOrBlank()) {
+                vm.fetchLyricsForCurrentSong()
+            }
+            updateWidgetState(player.isPlaying)
+            return
+        }
+
+        // A widget can be tapped while the Activity (and its ViewModel) is not bound.
+        // Recover the current track from the active Media3 item and use the same lyrics
+        // provider pipeline instead of leaving the lyrics page permanently blank.
+        val item = player.currentMediaItem ?: return
+        val title = item.mediaMetadata.title?.toString()?.trim().orEmpty()
+        val artist = item.mediaMetadata.artist?.toString()?.trim().orEmpty()
+        if (title.isBlank()) return
+        val uri = item.localConfiguration?.uri
+        val cachedMetadata = uri?.let { getCachedMediaMetadata(applicationContext, it.toString()) }
+        val durationMs = player.duration.takeIf {
+            it > 0L && it != androidx.media3.common.C.TIME_UNSET
+        } ?: cachedMetadata?.durationMs ?: 0L
+
+        com.dsann.music.data.lyrics.LyricsRepository.getInstance(applicationContext).fetchLyrics(
+            title = title,
+            artist = artist.ifBlank { "Unknown Artist" },
+            album = item.mediaMetadata.albumTitle?.toString(),
+            durationMs = durationMs,
+            filePath = uri?.toString(),
+            videoId = cachedMetadata?.videoId,
+            callback = object : com.dsann.music.data.lyrics.LyricsRepository.ExtendedLyricsCallback {
+                override fun onLyricsFound(result: com.dsann.music.data.lyrics.LyricsResult) {
+                    publishWidgetLyrics(result)
+                }
+
+                override fun onLyricsUpgraded(betterResult: com.dsann.music.data.lyrics.LyricsResult) {
+                    publishWidgetLyrics(betterResult)
+                }
+
+                override fun onLyricsNotFound(reason: String) {
+                    publishWidgetLyrics(null, "Lyrics not found")
+                }
+
+                override fun onInstrumental() {
+                    publishWidgetLyrics(null, "Instrumental")
+                }
+
+                override fun onSearchStatus(message: String) {
+                    publishWidgetLyrics(null, message)
+                }
+            }
+        )
+    }
+
+    private fun publishWidgetLyrics(
+        result: com.dsann.music.data.lyrics.LyricsResult?,
+        fallbackText: String? = null
+    ) {
+        handler.post {
+            val position = player.currentPosition.coerceAtLeast(0L)
+            val duration = player.duration.coerceAtLeast(0L)
+            val synced = result?.syncedLyrics
+            val timedLine = if (!synced.isNullOrBlank()) {
+                SpatialFlowWidgetProvider.findCurrentLyricLine(
+                    com.dsann.music.data.lyrics.LrcParser.parse(synced),
+                    position.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                )
+            } else null
+            val plain = result?.plainLyrics.orEmpty()
+                .lineSequence()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .take(4)
+                .joinToString("\\n")
+            val text = timedLine?.takeIf { it.isNotBlank() }
+                ?: plain.ifBlank { fallbackText.orEmpty() }
+            if (text.isNotBlank()) {
+                SpatialFlowWidgetProvider.updateAllWidgetsPartial(
+                    this@AudioPlaybackService,
+                    position.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                    duration.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                    text
+                )
+            }
+        }
+    }
+
     /**
      * Prefer time-synchronised lyrics; when only plain lyrics exist, show several readable
      * lines instead of replacing the widget content with "..." on every progress tick.
@@ -1825,19 +1913,36 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     fun updateWidgetState(isPlaying: Boolean) {
-        viewModel?.let { vm ->
-            val song = vm.currentSong.value
-            val pos = player.currentPosition
-            val dur = player.duration
-            SpatialFlowWidgetProvider.updateAllWidgets(
-                this,
-                song,
-                isPlaying,
-                pos.toInt(),
-                dur.toInt(),
-                currentWidgetLyricText(pos)
-            )
+        val position = player.currentPosition.coerceAtLeast(0L)
+        val duration = player.duration.coerceAtLeast(0L)
+        val activeSong = viewModel?.currentSong?.value
+        val item = player.currentMediaItem
+        val song = activeSong ?: item?.let { mediaItem ->
+            val uri = mediaItem.localConfiguration?.uri
+            val id = mediaItem.mediaId.toLongOrNull()
+                ?: uri?.toString()?.hashCode()?.toLong()
+                ?: return@let null
+            com.dsann.music.model.SongItem(
+                id,
+                mediaItem.mediaMetadata.title?.toString()?.ifBlank { "SpatialFlow" } ?: "SpatialFlow",
+                mediaItem.mediaMetadata.artist?.toString()?.ifBlank { "Unknown Artist" } ?: "Unknown Artist",
+                -1L,
+                uri?.toString(),
+                duration,
+                System.currentTimeMillis()
+            ).apply {
+                if (uri != null) contentUri = uri
+                thumbnailUrl = mediaItem.mediaMetadata.artworkUri?.toString()
+            }
         }
+        SpatialFlowWidgetProvider.updateAllWidgets(
+            this,
+            song,
+            isPlaying,
+            position.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            duration.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            currentWidgetLyricText(position)
+        )
     }
 
     private fun setupMediaSession() {
