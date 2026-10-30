@@ -441,12 +441,22 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                     val options = DesktopNewPipeExtractor.getVideoOptions(song.videoId)
                     val selected = options.lastOrNull()
                         ?: error("No compatible muxed video stream is available for this track.")
-                    player.playUrl(
-                        selected.url,
-                        song.durationMs,
-                        resumePosition,
-                        autoPlay = wasPlaying
-                    )
+                    if (selected.usesSeparateAudio) {
+                        player.playVideoAndAudio(
+                            videoUrl = selected.url,
+                            audioUrl = selected.audioUrl.orEmpty(),
+                            knownDurationMs = song.durationMs,
+                            startPositionMs = resumePosition,
+                            autoPlay = wasPlaying
+                        )
+                    } else {
+                        player.playUrl(
+                            selected.url,
+                            song.durationMs,
+                            resumePosition,
+                            autoPlay = wasPlaying
+                        )
+                    }
                     videoQualityOptions = options
                     selectedVideoQuality = selected.label
                     videoMode = true
@@ -475,12 +485,22 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
         statusMessage = "Switching to ${option.label}…"
         coroutineScope.launch {
             try {
-                player.playUrl(
-                    option.url,
-                    song.durationMs,
-                    resumePosition,
-                    autoPlay = wasPlaying
-                )
+                if (option.usesSeparateAudio) {
+                    player.playVideoAndAudio(
+                        videoUrl = option.url,
+                        audioUrl = option.audioUrl.orEmpty(),
+                        knownDurationMs = song.durationMs,
+                        startPositionMs = resumePosition,
+                        autoPlay = wasPlaying
+                    )
+                } else {
+                    player.playUrl(
+                        option.url,
+                        song.durationMs,
+                        resumePosition,
+                        autoPlay = wasPlaying
+                    )
+                }
                 selectedVideoQuality = option.label
                 statusMessage = ""
             } catch (error: Exception) {
