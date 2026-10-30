@@ -108,6 +108,39 @@ internal object DesktopYouTubeMusic {
         }
     }
 
+    suspend fun browse(browseId: String): List<SearchItem> = withContext(Dispatchers.IO) {
+        val normalizedId = when {
+            browseId.startsWith("VL") || browseId.startsWith("MPSP") ||
+                browseId.startsWith("MPRE") || browseId.startsWith("UC") -> browseId
+            else -> "VL" + browseId
+        }
+        val client = JsonObject().apply {
+            addProperty("clientName", "WEB_REMIX")
+            addProperty("clientVersion", CLIENT_VERSION)
+            addProperty("hl", Locale.getDefault().language.ifBlank { "en" })
+            addProperty("gl", Locale.getDefault().country.ifBlank { "US" })
+        }
+        val body = JsonObject().apply {
+            add("context", JsonObject().apply { add("client", client) })
+            addProperty("browseId", normalizedId)
+        }
+        val request = Request.Builder()
+            .url("$MUSIC_BASE/browse?key=$API_KEY&prettyPrint=false")
+            .post(JsonParserBody.encode(body))
+            .header("Content-Type", "application/json; charset=utf-8")
+            .header("Origin", "https://music.youtube.com")
+            .header("Referer", "https://music.youtube.com/")
+            .header("User-Agent", USER_AGENT)
+            .header("X-YouTube-Client-Name", "67")
+            .header("X-YouTube-Client-Version", CLIENT_VERSION)
+            .build()
+        http.newCall(request).execute().use { response ->
+            val text = response.body?.string().orEmpty()
+            check(response.isSuccessful) { "YouTube browse returned HTTP ${response.code}." }
+            DesktopSearchParser.parseBrowse(JsonParser.parseString(text).asJsonObject)
+        }
+    }
+
     private suspend fun search(query: String, filter: SearchFilter?): SearchResult = withContext(Dispatchers.IO) {
         val live = filter == SearchFilter.LIVE
         val web = live
@@ -323,6 +356,19 @@ private object DesktopSearchParser {
             }
         }
         return null
+    }
+
+    fun parseBrowse(json: JsonObject): List<SearchItem> {
+        val results = mutableListOf<SearchItem>()
+        findObjects(json, "musicResponsiveListItemRenderer").forEach { renderer ->
+            val wrapper = JsonObject().apply { add("musicResponsiveListItemRenderer", renderer) }
+            parseMusicItem(wrapper)?.let(results::add)
+        }
+        findObjects(json, "musicTwoRowItemRenderer").forEach { renderer ->
+            val wrapper = JsonObject().apply { add("musicTwoRowItemRenderer", renderer) }
+            parseMusicItem(wrapper)?.let(results::add)
+        }
+        return results.distinctBy(::simpleKey)
     }
 
     private fun parseLive(json: JsonObject): SearchResult {
