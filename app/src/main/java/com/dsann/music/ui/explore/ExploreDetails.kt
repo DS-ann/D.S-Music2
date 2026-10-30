@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -44,13 +45,19 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -76,6 +83,7 @@ import com.dsann.music.data.innertube.OnlineArtist
 import com.dsann.music.data.innertube.OnlinePlaylist
 import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.PlaylistPage
+import com.dsann.music.data.innertube.YouTubeMusic
 import com.dsann.music.data.innertube.SearchItem
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dsann.music.viewmodel.PlayerSharedViewModel
@@ -144,10 +152,17 @@ fun PlaylistDetailView(
     onBack: () -> Unit,
     onSongClick: (OnlineSong, List<OnlineSong>, Int) -> Unit,
     onSongMenuClick: (OnlineSong) -> Unit,
-    onStartRadioClick: (String) -> Unit
+    onStartRadioClick: (String) -> Unit,
+    onPlaylistSaved: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val scope = rememberCoroutineScope()
+    var editing by remember(playlistPage.playlist.playlistId) { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    var editTitle by remember(playlistPage.playlist.title) { mutableStateOf(playlistPage.playlist.title) }
+    var editDescription by remember(playlistPage.description) { mutableStateOf(playlistPage.description.orEmpty()) }
+    var editPrivacy by remember(playlistPage.privacy) { mutableStateOf(playlistPage.privacy ?: "PRIVATE") }
 
     AdaptiveDetailContainer(
         isLandscape = isLandscape,
@@ -161,11 +176,34 @@ fun PlaylistDetailView(
         sharedElementKey = playlistPage.playlist.playlistId,
         onBack = onBack,
         headerActions = {
-            ExpressiveConnectedButtonGroup(
-                onShuffleClick = { if (playlistPage.songs.isNotEmpty()) onSongClick(playlistPage.songs.first(), playlistPage.songs.shuffled(), 0) },
-                onRadioClick = { if (playlistPage.songs.isNotEmpty()) onStartRadioClick(playlistPage.songs.first().videoId) },
-                modifier = Modifier.fillMaxWidth()
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.weight(1f)) {
+                    ExpressiveConnectedButtonGroup(
+                        onShuffleClick = { if (playlistPage.songs.isNotEmpty()) onSongClick(playlistPage.songs.first(), playlistPage.songs.shuffled(), 0) },
+                        onRadioClick = { if (playlistPage.songs.isNotEmpty()) onStartRadioClick(playlistPage.songs.first().videoId) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                if (playlistPage.isOwned) {
+                    IconButton(
+                        onClick = {
+                            editTitle = playlistPage.playlist.title
+                            editDescription = playlistPage.description.orEmpty()
+                            editPrivacy = playlistPage.privacy ?: "PRIVATE"
+                            editing = true
+                        },
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit playlist")
+                    }
+                }
+            }
         }
     ) {
         item {
@@ -186,6 +224,87 @@ fun PlaylistDetailView(
                 onClick = { onSongClick(song, playlistPage.songs, index) }
             )
         }
+    }
+
+    if (editing && playlistPage.isOwned) {
+        AlertDialog(
+            onDismissRequest = { if (!saving) editing = false },
+            title = { Text("Edit playlist") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = editTitle,
+                        onValueChange = { editTitle = it },
+                        label = { Text("Title") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !saving
+                    )
+                    OutlinedTextField(
+                        value = editDescription,
+                        onValueChange = { editDescription = it },
+                        label = { Text("Description") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 4,
+                        enabled = !saving
+                    )
+                    Text("Who can see it", style = MaterialTheme.typography.labelLarge)
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        listOf(
+                            "PRIVATE" to "Private · only you",
+                            "UNLISTED" to "Unlisted · anyone with the link",
+                            "PUBLIC" to "Public · everyone"
+                        ).forEach { (value, label) ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable(enabled = !saving) { editPrivacy = value }
+                                    .padding(horizontal = 8.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                androidx.compose.material3.RadioButton(
+                                    selected = editPrivacy == value,
+                                    onClick = { editPrivacy = value },
+                                    enabled = !saving
+                                )
+                                Text(label, modifier = Modifier.padding(start = 8.dp))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = editTitle.isNotBlank() && !saving,
+                    onClick = {
+                        saving = true
+                        scope.launch {
+                            val result = YouTubeMusic.editPlaylist(
+                                playlistId = playlistPage.playlist.playlistId,
+                                title = editTitle.trim(),
+                                description = editDescription,
+                                privacyStatus = editPrivacy
+                            )
+                            result.onSuccess {
+                                onPlaylistSaved(editTitle.trim(), editDescription, editPrivacy)
+                                editing = false
+                                com.dsann.music.ui.SnackbarController.showMessage("Playlist updated on YouTube Music.")
+                            }.onFailure { error ->
+                                com.dsann.music.ui.SnackbarController.showMessage(
+                                    error.message ?: "Could not update the playlist."
+                                )
+                            }
+                            saving = false
+                        }
+                    }
+                ) { Text(if (saving) "Saving…" else "Save") }
+            },
+            dismissButton = {
+                TextButton(enabled = !saving, onClick = { editing = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 
