@@ -357,7 +357,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     )
     val playerBackgroundStyle: StateFlow<String> = _playerBackgroundStyle.asStateFlow()
     fun setPlayerBackgroundStyle(value: String) {
-        val safe = value.takeIf { it in listOf("Artwork", "Theme", "Black") } ?: "Artwork"
+        val safe = value.takeIf { it in listOf("Artwork", "Theme", "Black", "Gradient") } ?: "Artwork"
         _playerBackgroundStyle.value = safe
         prefs.edit { putString("player_background_style", safe) }
     }
@@ -370,6 +370,107 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val safe = value.takeIf { it in listOf("Card", "Flat", "Compact") } ?: "Card"
         _miniPlayerStyle.value = safe
         prefs.edit { putString("mini_player_style", safe) }
+    }
+
+    // ── Player, your way ────────────────────────────────────────────────────
+    private val _playerLayout = MutableStateFlow(
+        prefs.getString("player_layout", "Standard")?.takeIf {
+            it in listOf("Standard", "Cover", "Lyrics", "Minimal", "Vinyl", "Cassette")
+        } ?: "Standard"
+    )
+    val playerLayout: StateFlow<String> = _playerLayout.asStateFlow()
+    fun setPlayerLayout(value: String) {
+        val safe = value.takeIf { it in listOf("Standard", "Cover", "Lyrics", "Minimal", "Vinyl", "Cassette") } ?: "Standard"
+        _playerLayout.value = safe
+        prefs.edit { putString("player_layout", safe) }
+    }
+
+    private val availablePlayerButtons = listOf("lyrics", "video", "queue", "share", "download", "like", "dislike", "sleep")
+    private val defaultPlayerButtons = listOf("lyrics", "video", "queue", "share", "download")
+    private fun readPlayerButtons(): List<String> {
+        val stored = prefs.getString("player_buttons", null)
+        val parsed = stored?.split(",")?.map { it.trim().lowercase() }
+            ?.filter { it in availablePlayerButtons }?.distinct().orEmpty()
+        return (parsed + defaultPlayerButtons.filter { it !in parsed }).take(6)
+            .let { safe -> if (safe.size >= 3) safe else defaultPlayerButtons }
+    }
+    private val _playerButtons = MutableStateFlow(readPlayerButtons())
+    val playerButtons: StateFlow<List<String>> = _playerButtons.asStateFlow()
+    fun setPlayerButtons(buttons: List<String>) {
+        val safe = buttons.filter { it in availablePlayerButtons }.distinct().take(6)
+        if (safe.size < 3) return
+        _playerButtons.value = safe
+        prefs.edit { putString("player_buttons", safe.joinToString(",")) }
+    }
+    fun movePlayerButton(from: Int, to: Int) {
+        val current = _playerButtons.value.toMutableList()
+        if (from !in current.indices || to !in current.indices) return
+        val moved = current.removeAt(from)
+        current.add(to, moved)
+        setPlayerButtons(current)
+    }
+
+    private val _playerTitleAlign = MutableStateFlow(prefs.getString("player_title_align", "Left") ?: "Left")
+    val playerTitleAlign: StateFlow<String> = _playerTitleAlign.asStateFlow()
+    fun setPlayerTitleAlign(value: String) {
+        val safe = value.takeIf { it in listOf("Left", "Centered") } ?: "Left"
+        _playerTitleAlign.value = safe
+        prefs.edit { putString("player_title_align", safe) }
+    }
+
+    private val _playerTitleSize = MutableStateFlow(prefs.getString("player_title_size", "Medium") ?: "Medium")
+    val playerTitleSize: StateFlow<String> = _playerTitleSize.asStateFlow()
+    fun setPlayerTitleSize(value: String) {
+        val safe = value.takeIf { it in listOf("Small", "Medium", "Large") } ?: "Medium"
+        _playerTitleSize.value = safe
+        prefs.edit { putString("player_title_size", safe) }
+    }
+
+    private val _playerTitleWeight = MutableStateFlow(prefs.getString("player_title_weight", "Bold") ?: "Bold")
+    val playerTitleWeight: StateFlow<String> = _playerTitleWeight.asStateFlow()
+    fun setPlayerTitleWeight(value: String) {
+        val safe = value.takeIf { it in listOf("Light", "Regular", "Bold") } ?: "Bold"
+        _playerTitleWeight.value = safe
+        prefs.edit { putString("player_title_weight", safe) }
+    }
+
+    private val _playerTitleScroll = MutableStateFlow(prefs.getBoolean("player_title_scroll", true))
+    val playerTitleScroll: StateFlow<Boolean> = _playerTitleScroll.asStateFlow()
+    fun setPlayerTitleScroll(value: Boolean) {
+        _playerTitleScroll.value = value
+        prefs.edit { putBoolean("player_title_scroll", value) }
+    }
+
+    private val _playerTimes = MutableStateFlow(prefs.getString("player_times", "Both") ?: "Both")
+    val playerTimes: StateFlow<String> = _playerTimes.asStateFlow()
+    fun setPlayerTimes(value: String) {
+        val safe = value.takeIf { it in listOf("Both", "Elapsed", "Time left", "None") } ?: "Both"
+        _playerTimes.value = safe
+        prefs.edit { putString("player_times", safe) }
+    }
+
+    private val _scrubberStyle = MutableStateFlow(prefs.getString("scrubber_style", "Wave") ?: "Wave")
+    val scrubberStyle: StateFlow<String> = _scrubberStyle.asStateFlow()
+    fun setScrubberStyle(value: String) {
+        val safe = value.takeIf { it in listOf("Hairline", "Bold", "Thumb", "Waveform") } ?: "Wave"
+        _scrubberStyle.value = safe
+        prefs.edit { putString("scrubber_style", safe) }
+    }
+
+    private val _scrubberColor = MutableStateFlow(prefs.getString("scrubber_color", "Accent") ?: "Accent")
+    val scrubberColor: StateFlow<String> = _scrubberColor.asStateFlow()
+    fun setScrubberColor(value: String) {
+        val safe = value.takeIf { it in listOf("Accent", "White", "Cover") } ?: "Accent"
+        _scrubberColor.value = safe
+        prefs.edit { putString("scrubber_color", safe) }
+    }
+
+    private val _visualizerStyle = MutableStateFlow(prefs.getString("player_visualizer", "Off") ?: "Off")
+    val visualizerStyle: StateFlow<String> = _visualizerStyle.asStateFlow()
+    fun setVisualizerStyle(value: String) {
+        val safe = value.takeIf { it in listOf("Off", "Bars", "Wave", "Ring", "Pulse", "Glow") } ?: "Off"
+        _visualizerStyle.value = safe
+        prefs.edit { putString("player_visualizer", safe) }
     }
 
     private val _lyricsTextSize = MutableStateFlow(
@@ -2108,7 +2209,7 @@ private fun AppearanceScreen(
                 .padding(bottom = 120.dp)
         ) {
             Text(
-                "Make SpatialFlow look and feel the way you want. Each group changes a different part of the app.",
+                "Make the player and interface your own: choose a layout, arrange its buttons, tune typography and progress, and set its background.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
