@@ -323,6 +323,7 @@ class PlayerSharedViewModel @Inject constructor(
         Log.d(TAG, "Restoring UI state from old ViewModel instance to prevent memory leak and state wipe.")
         _songList.value = oldVm._songList.value
         _localSongs.value = oldVm._localSongs.value
+        _isVideoMode.value = oldVm._isVideoMode.value
         _currentSongIndex.value = oldVm._currentSongIndex.value
         _currentSong.value = oldVm._currentSong.value
         _songUri.value = oldVm._songUri.value
@@ -370,6 +371,30 @@ class PlayerSharedViewModel @Inject constructor(
     val isQueueExpanded: StateFlow<Boolean> = _isQueueExpanded.asStateFlow()
     fun setQueueExpanded(expanded: Boolean) {
         _isQueueExpanded.value = expanded
+    }
+
+    private val _isVideoMode = MutableStateFlow(false)
+    val isVideoMode: StateFlow<Boolean> = _isVideoMode.asStateFlow()
+    fun setVideoModeState(enabled: Boolean) {
+        _isVideoMode.value = enabled
+    }
+
+    fun isAutoplayEnabled(): Boolean = application
+        .getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+        .getBoolean("autoplay_enabled", true)
+
+    /** Remove unplayed recommendations inserted automatically, keeping the current item and manual queue. */
+    fun removeAutoplayRecommendationsFromQueue() {
+        val songs = _songList.value
+        val currentIndex = _currentSongIndex.value
+        if (songs.isEmpty() || currentIndex !in songs.indices) return
+        val updated = songs.filterIndexed { index, song ->
+            index <= currentIndex || !song.isAutoplayRecommendation
+        }
+        if (updated.size != songs.size) {
+            _songList.value = updated
+            audioService?.refreshNativeQueue()
+        }
     }
 
     private val _localSongs = MutableStateFlow<List<SongItem>>(emptyList())
@@ -1291,6 +1316,7 @@ class PlayerSharedViewModel @Inject constructor(
     fun setCurrentSong(song: SongItem?) {
         if (_currentSong.value?.id != song?.id) {
             lyricsController.clearForSongChange(song)
+            _isVideoMode.value = false
         }
         _currentSong.value = song
     }
@@ -1436,10 +1462,12 @@ class PlayerSharedViewModel @Inject constructor(
         val nextIndex = getNextSongIndex()
         if (nextIndex >= 0) {
             playSongAtIndex(nextIndex)
-        } else {
+        } else if (isAutoplayEnabled()) {
             _currentSong.value?.videoId?.let {
                 YouTubeMusic.fetchAndAppendRelatedSongs(this, it)
             } ?: audioService?.pause()
+        } else {
+            audioService?.pause()
         }
     }
 
