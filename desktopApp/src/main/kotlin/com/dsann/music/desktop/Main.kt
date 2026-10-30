@@ -161,6 +161,10 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     var autoplayEnabled by remember { mutableStateOf(preferences.getBoolean("autoplay_enabled", true)) }
     var appearancePreset by remember { mutableStateOf(preferences.get("appearance_preset", "Ocean")) }
     var videoMode by remember { mutableStateOf(false) }
+    var videoSwitching by remember { mutableStateOf(false) }
+    var videoFullscreen by remember { mutableStateOf(false) }
+    var videoQualityOptions by remember { mutableStateOf<List<DesktopVideoOption>>(emptyList()) }
+    var selectedVideoQuality by remember { mutableStateOf<String?>(null) }
     var homeFeed by remember { mutableStateOf<DesktopHomePage?>(null) }
     var exploreFeed by remember { mutableStateOf<DesktopHomePage?>(null) }
     var feedLoading by remember { mutableStateOf(false) }
@@ -177,6 +181,20 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     var selectedRemotePlaylistId by remember { mutableStateOf<String?>(null) }
     val videoSurface = remember { DesktopVideoSurface() }
     val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(videoMode, currentOnlineSong?.videoId, videoQualityOptions, selectedVideoQuality, videoFullscreen) {
+        if (!videoMode) videoFullscreen = false
+        videoSurface.setVideoControls(
+            options = videoQualityOptions,
+            selectedLabel = selectedVideoQuality,
+            onQuality = { option ->
+                EventQueue.invokeLater { selectVideoQuality(option) }
+            },
+            onFullscreen = {
+                EventQueue.invokeLater { videoFullscreen = !videoFullscreen }
+            }
+        )
+    }
 
     val currentTrack = tracks.getOrNull(selectedIndex)
     val nowPlayingTitle = currentOnlineSong?.title ?: currentSavedSong?.title ?: currentTrack?.title.orEmpty()
@@ -393,22 +411,39 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
 
     fun toggleVideoMode() {
         val song = currentOnlineSong ?: return
-        val resumePosition = positionMs.coerceAtLeast(0L)
+        if (videoSwitching) return
+        // Read JavaFX's media clock immediately. positionMs is only the UI polling snapshot
+        // and can lag behind the video by a visible fraction of a second.
+        val resumePosition = player.currentPositionSnapshot()
         val wasVideo = videoMode
+        videoSwitching = true
         statusMessage = if (wasVideo) "Switching to audio…" else "Resolving video stream…"
         coroutineScope.launch {
             try {
-                val stream = if (wasVideo) {
-                    DesktopNewPipeExtractor.resolve(song.videoId, targetBitrate, playbackFormat)
+                if (wasVideo) {
+                    val stream = DesktopNewPipeExtractor.resolve(song.videoId, targetBitrate, playbackFormat)
+                    player.playUrl(
+                        stream.url,
+                        song.durationMs.takeIf { it > 0L } ?: stream.durationMs,
+                        resumePosition
+                    )
+                    videoMode = false
+                    videoQualityOptions = emptyList()
+                    selectedVideoQuality = null
+                    videoFullscreen = false
                 } else {
-                    DesktopNewPipeExtractor.resolveVideo(song.videoId)
+                    val options = DesktopNewPipeExtractor.getVideoOptions(song.videoId)
+                    val selected = options.firstOrNull()
+                        ?: error("No compatible muxed video stream is available for this track.")
+                    player.playUrl(
+                        selected.url,
+                        song.durationMs,
+                        resumePosition
+                    )
+                    videoQualityOptions = options
+                    selectedVideoQuality = selected.label
+                    videoMode = true
                 }
-                player.playUrl(
-                    stream.url,
-                    song.durationMs.takeIf { it > 0L } ?: stream.durationMs,
-                    resumePosition
-                )
-                videoMode = !wasVideo
                 statusMessage = ""
             } catch (error: Exception) {
                 statusMessage = error.message ?: if (wasVideo) {
@@ -416,6 +451,31 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                 } else {
                     "No compatible muxed video stream is available for this track."
                 }
+            } finally {
+                videoSwitching = false
+            }
+        }
+    }
+
+    fun selectVideoQuality(option: DesktopVideoOption) {
+        val song = currentOnlineSong ?: return
+        if (!videoMode || videoSwitching || option.url.isBlank()) return
+        val resumePosition = player.currentPositionSnapshot()
+        videoSwitching = true
+        statusMessage = "Switching to ${option.label}…"
+        coroutineScope.launch {
+            try {
+                player.playUrl(
+                    option.url,
+                    song.durationMs,
+                    resumePosition
+                )
+                selectedVideoQuality = option.label
+                statusMessage = ""
+            } catch (error: Exception) {
+                statusMessage = error.message ?: "Could not switch video quality."
+            } finally {
+                videoSwitching = false
             }
         }
     }
@@ -764,7 +824,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
 
                         Spacer(Modifier.height(22.dp))
 
-                        if (videoMode && currentOnlineSong != null) {
+                        if (videoMode && currentOnlineSong != null && !videoFullscreen) {
                             SwingPanel(
                                 factory = { videoSurface },
                                 update = { it.attach(player.getRemoteMediaPlayer()) },
@@ -1329,8 +1389,11 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Text("Appearance palette", fontWeight = FontWeight.SemiBold)
                                         Text("Choose the accent used by the Windows player and controls.", color = mutedText, fontSize = 11.sp)
-                                        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                            listOf("Ocean", "Violet", "Emerald", "Amber", "Rose", "Monochrome").forEach { preset ->
+                                        LazyRow(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(7.dp)
+                                        ) {
+                                            items(listOf("Ocean", "Violet", "Emerald", "Amber", "Rose", "Monochrome")) { preset ->
                                                 Button(
                                                     onClick = { appearancePreset = preset },
                                                     colors = ButtonDefaults.buttonColors(
@@ -1370,6 +1433,26 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
 
                         if (statusMessage.isNotBlank() && section != "Library") {
                             Text(statusMessage, color = Color(0xFFFFC0A8), fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
+                        }
+                    }
+
+                    if (videoFullscreen && videoMode && currentOnlineSong != null) {
+                        Window(
+                            onCloseRequest = { videoFullscreen = false },
+                            title = "${currentOnlineSong?.title ?: "SpatialFlow Video"}",
+                            state = rememberWindowState(width = 1280.dp, height = 720.dp),
+                            resizable = true
+                        ) {
+                            Surface(
+                                modifier = Modifier.fillMaxSize(),
+                                color = Color.Black
+                            ) {
+                                SwingPanel(
+                                    factory = { videoSurface },
+                                    update = { it.attach(player.getRemoteMediaPlayer()) },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
                     }
 
