@@ -23,7 +23,7 @@ import com.dsann.music.model.SongItem;
 import java.util.Objects;
 
 /**
- * Base Widget Provider for SpatialFlow.
+ * Base Widget Provider for D.S Music.
  * Handles common playback control intents and updates all 3 widget sizes.
  */
 public class SpatialFlowWidgetProvider extends AppWidgetProvider {
@@ -179,7 +179,7 @@ public class SpatialFlowWidgetProvider extends AppWidgetProvider {
 
             } else {
                 if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
-                    views.setTextViewText(R.id.widget_song_title, "SpatialFlow");
+                    views.setTextViewText(R.id.widget_song_title, "D.S Music");
                     views.setTextViewText(R.id.widget_artist_name, "Select a song");
                 }
                 if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
@@ -221,7 +221,7 @@ public class SpatialFlowWidgetProvider extends AppWidgetProvider {
             try {
                 RemoteViews fallback = new RemoteViews(context.getPackageName(), layoutId);
                 if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
-                    fallback.setTextViewText(R.id.widget_song_title, song != null ? song.title : "SpatialFlow");
+                    fallback.setTextViewText(R.id.widget_song_title, song != null ? song.title : "D.S Music");
                     fallback.setTextViewText(R.id.widget_artist_name, song != null ? song.artist : "Select a song");
                 }
                 setupPendingIntents(context, fallback, isPlaying, layoutId, providerClass);
