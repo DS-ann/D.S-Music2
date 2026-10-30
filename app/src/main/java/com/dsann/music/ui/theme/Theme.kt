@@ -289,10 +289,15 @@ fun SpatialFlowTheme(
         }
     }
 
+    val adjustedDensity = remember(baseDensity, fontScale) {
+        object : androidx.compose.ui.unit.Density {
+            override val density: Float = baseDensity.density
+            override val fontScale: Float =
+                (baseDensity.fontScale * fontScale).coerceIn(0.8f, 1.25f)
+        }
+    }
     CompositionLocalProvider(
-        LocalDensity provides baseDensity.copy(
-            fontScale = (baseDensity.fontScale * fontScale).coerceIn(0.8f, 1.25f)
-        )
+        LocalDensity provides adjustedDensity
     ) {
         MaterialExpressiveTheme(
             colorScheme = colorScheme,
