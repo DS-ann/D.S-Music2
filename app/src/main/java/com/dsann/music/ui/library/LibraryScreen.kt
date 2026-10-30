@@ -2808,11 +2808,11 @@ private fun RecapTabContent(
         filteredEvents.groupBy { it.hourOfDay.coerceIn(0, 23) }
             .maxByOrNull { it.value.size }?.key
     }
-    val peakHabit = when (peakHour) {
+    val peakHabit = when (peakHour ?: -1) {
         in 5..11 -> "Morning Spark"
         in 12..16 -> "Afternoon Groove"
         in 17..21 -> "Evening Harmony"
-        null -> "Waiting for data"
+        -1 -> "Waiting for data"
         else -> "Midnight Mystique"
     }
     val totalMinutes = totalMs / 60_000L
