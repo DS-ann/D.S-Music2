@@ -27,6 +27,8 @@ import com.dsann.music.data.innertube.SearchFilter
 import com.dsann.music.data.innertube.SearchItem
 import com.dsann.music.data.innertube.YouTubeMusic
 import com.dsann.music.data.innertube.path
+import com.dsann.music.model.PlayerGestureAction
+import com.dsann.music.model.PlayerGestureSettings
 import com.dsann.music.model.SongItem
 import com.dsann.music.model.toPlaylistSongEntity
 import com.dsann.music.service.AudioPlaybackService
@@ -382,6 +384,101 @@ class PlayerSharedViewModel @Inject constructor(
     fun isAutoplayEnabled(): Boolean = application
         .getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
         .getBoolean("autoplay_enabled", true)
+
+    // ── Prism-style player gestures ───────────────────────────────────────────
+    private val gesturePreferences = application.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+    private val _playerGestureSettings = MutableStateFlow(
+        PlayerGestureSettings.fromPreferences(gesturePreferences)
+    )
+    val playerGestureSettings: StateFlow<PlayerGestureSettings> = _playerGestureSettings.asStateFlow()
+
+    fun setPlayerGesture(key: String, action: PlayerGestureAction) {
+        val allowed = setOf(
+            "cover_swipe_left", "cover_swipe_right", "cover_swipe_up",
+            "cover_double_tap", "cover_long_press",
+            "mini_swipe_left", "mini_swipe_right", "mini_swipe_up", "mini_swipe_down"
+        )
+        if (key !in allowed) return
+        gesturePreferences.edit { putString(key, action.name) }
+        _playerGestureSettings.value = PlayerGestureSettings.fromPreferences(gesturePreferences)
+    }
+
+    fun setDoubleTapSeekSeconds(seconds: Int) {
+        gesturePreferences.edit { putInt("double_tap_seek_seconds", seconds.coerceIn(3, 30)) }
+        _playerGestureSettings.value = PlayerGestureSettings.fromPreferences(gesturePreferences)
+    }
+
+    // One recommendation job is shared by proactive preloading and the actual end-of-queue
+    // transition. This prevents two simultaneous YouTube requests and duplicate queue writes.
+    private var autoplayFetchJob: Job? = null
+    private var autoplayFetchingVideoId: String? = null
+    private val autoplayFetchedVideoIds = mutableSetOf<String>()
+
+    fun prefetchAutoplayRecommendations(videoId: String): Job? {
+        if (videoId.isBlank() || !isAutoplayEnabled()) return null
+        if (autoplayFetchingVideoId == videoId && autoplayFetchJob?.isActive == true) {
+            return autoplayFetchJob
+        }
+        if (videoId in autoplayFetchedVideoIds) return autoplayFetchJob
+        autoplayFetchingVideoId = videoId
+        val requestJob = viewModelScope.launch {
+            try {
+                val currentVideoId = _currentSong.value?.videoId
+                if (currentVideoId != videoId || !isAutoplayEnabled()) return@launch
+
+                var candidates = YouTubeMusic.relatedSongs(videoId).getOrDefault(emptyList())
+                val existingIds = _songList.value.mapNotNull { it.videoId }.toMutableSet()
+                var fresh = candidates.filter { it.videoId.isNotBlank() && it.videoId !in existingIds }
+                    .distinctBy { it.videoId }
+
+                // Some tracks have an empty/duplicate Up Next panel. Fall back to the song's
+                // generated radio mix rather than leaving ExoPlayer permanently in STATE_ENDED.
+                if (fresh.isEmpty()) {
+                    candidates = YouTubeMusic.startRadio(videoId).getOrDefault(emptyList())
+                    fresh = candidates.filter { it.videoId.isNotBlank() && it.videoId !in existingIds }
+                        .distinctBy { it.videoId }
+                }
+
+                if (_currentSong.value?.videoId != videoId || !isAutoplayEnabled()) return@launch
+                autoplayFetchedVideoIds += videoId
+
+                if (fresh.isEmpty()) {
+                    Log.w(TAG, "Autoplay returned no new songs for $videoId")
+                    return@launch
+                }
+
+                val additions = fresh.map { onlineSong ->
+                    SongItem.createOnlineSong(
+                        onlineSong.videoId,
+                        onlineSong.title,
+                        onlineSong.artist,
+                        "",
+                        onlineSong.durationMs,
+                        onlineSong.thumbnailUrl,
+                        onlineSong.artistId,
+                        onlineSong.albumName
+                    ).apply { isAutoplayRecommendation = true }
+                }
+                val latest = _songList.value
+                val latestIds = latest.mapNotNull { it.videoId }.toSet()
+                val uniqueAdditions = additions.filter { it.videoId !in latestIds }
+                if (uniqueAdditions.isNotEmpty()) {
+                    _songList.value = latest + uniqueAdditions
+                    audioService?.refreshNativeQueue()
+                    Log.d(TAG, "Autoplay queued ${uniqueAdditions.size} new recommendations for $videoId")
+                }
+            } catch (error: Exception) {
+                Log.w(TAG, "Autoplay recommendation request failed for $videoId", error)
+            } finally {
+                if (autoplayFetchingVideoId == videoId) {
+                    autoplayFetchingVideoId = null
+                    autoplayFetchJob = null
+                }
+            }
+        }
+        autoplayFetchJob = requestJob
+        return requestJob
+    }
 
     /** Remove unplayed recommendations inserted automatically, keeping the current item and manual queue. */
     fun removeAutoplayRecommendationsFromQueue() {
@@ -1463,9 +1560,31 @@ class PlayerSharedViewModel @Inject constructor(
         if (nextIndex >= 0) {
             playSongAtIndex(nextIndex)
         } else if (isAutoplayEnabled()) {
-            _currentSong.value?.videoId?.let {
-                YouTubeMusic.fetchAndAppendRelatedSongs(this, it)
-            } ?: audioService?.pause()
+            val sourceVideoId = _currentSong.value?.videoId
+            if (sourceVideoId.isNullOrBlank()) {
+                audioService?.pause()
+            } else {
+                val job = prefetchAutoplayRecommendations(sourceVideoId)
+                if (job == null) {
+                    audioService?.pause()
+                } else {
+                    viewModelScope.launch {
+                        job.join()
+                        // Never let a slow response start recommendations for a track the
+                        // listener has already changed manually.
+                        if (_currentSong.value?.videoId != sourceVideoId) return@launch
+                        val appendedIndex = getNextSongIndex()
+                        if (appendedIndex >= 0) {
+                            playSongAtIndex(appendedIndex)
+                        } else {
+                            audioService?.pause()
+                            com.dsann.music.ui.SnackbarController.showMessage(
+                                "Autoplay couldn't find another track. Playback has stopped."
+                            )
+                        }
+                    }
+                }
+            }
         } else {
             audioService?.pause()
         }
