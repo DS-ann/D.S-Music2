@@ -567,6 +567,18 @@ class AudioPlaybackService : MediaSessionService() {
 
             val song = viewModel?.currentSong?.value
             val videoId = song?.videoId?.takeIf { it.isNotBlank() }
+
+            if (viewModel?.isVideoMode?.value == true && !videoId.isNullOrBlank()) {
+                val videoPosition = player.currentPosition.coerceAtLeast(0L)
+                viewModel?.setVideoModeState(false)
+                viewModel?.setLoading(true)
+                Log.w(TAG, "Video decoder/stream failed for $videoId; restoring audio-only playback", error)
+                com.dsann.music.ui.SnackbarController.showMessage(
+                    "This video format is not supported by this device. Switched back to audio."
+                )
+                loadAndPlay("innertube://$videoId".toUri(), videoPosition)
+                return
+            }
             viewModel?.setLoading(videoId != null && playbackRecoveryStage < 2)
             if (videoId != null && playbackRecoveryStage < 2) {
                 if (lastPlaybackRecoveryVideoId != videoId) {
@@ -1845,7 +1857,10 @@ class AudioPlaybackService : MediaSessionService() {
             
             val mediaItem = buildMediaItem(uri)
             val requestedStartPosition = pendingSeekPos
-            if (currentSong?.isCachedTrack == true) {
+            // A Cache playlist item is cache-only only while it is still using its exact
+            // cached URI. Switching that item to a freshly resolved video/audio stream must use
+            // the network source, not an offline-only CacheDataSource.
+            if (currentSong?.isCachedTrack == true && uri == currentSong.contentUri) {
                 val cacheSource = buildCacheOnlyMediaSource(mediaItem)
                 if (requestedStartPosition >= 0L) {
                     player.setMediaSource(cacheSource, requestedStartPosition)
