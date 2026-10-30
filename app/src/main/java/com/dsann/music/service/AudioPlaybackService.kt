@@ -467,7 +467,6 @@ class AudioPlaybackService : MediaSessionService() {
     private var forceCompatibleFallbackOnNextResolveVideoId: String? = null
     private var playbackRecoveryStage = 0
     private var isRecoveringPlaybackError = false
-    private var isFetchingRelatedProactively = false
     private var isResolvingVideoMode = false
 
     private lateinit var telemetryManager: com.dsann.music.data.innertube.YouTubeTelemetryManager
@@ -1261,7 +1260,10 @@ class AudioPlaybackService : MediaSessionService() {
             if (!isAutoplayEnabled()) return
             val currentSong = vm.currentSong.value
             if (currentSong != null && !currentSong.videoId.isNullOrEmpty()) {
-                fetchAndAppendRelatedSongsProactively(currentSong.videoId!!)
+                // Use the same de-duplicated request the end-of-queue transition awaits.
+                // This fills recommendations before the last track finishes without issuing
+                // a second independent request when STATE_ENDED arrives.
+                vm.prefetchAutoplayRecommendations(currentSong.videoId!!)
             }
             return
         }
@@ -1335,54 +1337,7 @@ class AudioPlaybackService : MediaSessionService() {
         preloadNextSongIntoQueue()
     }
 
-    private fun fetchAndAppendRelatedSongsProactively(videoId: String) {
-        if (!isAutoplayEnabled() || isFetchingRelatedProactively) return
-        isFetchingRelatedProactively = true
-        
-        serviceScope.launch(Dispatchers.IO) {
-            try {
-                Log.d(TAG, "Native queue is ending. Proactively fetching related songs for autoplay loop from YouTube Music...")
-                val result = YouTubeMusic.relatedSongs(videoId)
-                result.onSuccess { related ->
-                    if (related.isNotEmpty()) {
-                        serviceScope.launch(Dispatchers.Main) {
-                            viewModel?.let { vm ->
-                                val existingIds = vm.songList.value.map { it.id }.toSet()
-                                val newSongs = related.map { onlineSong ->
-                                    com.dsann.music.model.SongItem.createOnlineSong(
-                                        onlineSong.videoId,
-                                        onlineSong.title,
-                                        onlineSong.artist,
-                                        "", // streamUrl placeholder
-                                        onlineSong.durationMs,
-                                        onlineSong.thumbnailUrl,
-                                        onlineSong.artistId
-                                    ).apply {
-                                        isAutoplayRecommendation = true
-                                    }
-                                }.filter { it.id !in existingIds }
-                                
-                                if (newSongs.isNotEmpty()) {
-                                    val newList = ArrayList(vm.songList.value)
-                                    newList.addAll(newSongs)
-                                    vm.setSongList(newList)
-                                    Log.d(TAG, "Successfully pre-appended ${newSongs.size} related songs to autoplay queue.")
-                                    
-                                    // Re-trigger preloading so the newly appended song gets hot-queued immediately!
-                                    preloadNextSongIntoQueue()
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to proactively fetch related songs for loop", e)
-            } finally {
-                isFetchingRelatedProactively = false
-            }
-        }
-    }
-    
+
     /**
      * Prepare the non-audio requirements of a Cache playlist item. The cache folder deliberately
      * contains only tracks with a saved cover and a positive lyrics result.
