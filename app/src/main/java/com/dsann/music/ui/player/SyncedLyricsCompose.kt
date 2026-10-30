@@ -187,7 +187,8 @@ internal fun SyncedLyricsCompose(
                 val actual = currentPositionProvider().coerceAtLeast(0)
                 shownMs = actual.toDouble()
                 if (lyricClock.intValue != actual) lyricClock.intValue = actual
-                delay(40L)
+                // While paused only seeks can change the clock; 5 Hz is responsive without idle frame-rate polling.
+                delay(200L)
             }
         }
 
