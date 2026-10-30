@@ -2644,22 +2644,64 @@ private fun PlayerButtonsSettings(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            playerButtonNames.forEach { (key, label) ->
-                val checked = key in selected
+            val orderedSelected = selected.filter { it in playerButtonNames.keys }
+            Text(
+                "Shown in player · in this order",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+            )
+            // Render the selected actions from the saved list, not the master lookup map.
+            // Iterating playerButtonNames here used to keep the original display order even
+            // when the stored order changed, making the reorder controls appear broken.
+            orderedSelected.forEachIndexed { index, key ->
+                val label = playerButtonNames[key] ?: key
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     androidx.compose.material3.Checkbox(
-                        checked = checked,
-                        enabled = checked || selected.size < 6,
+                        checked = true,
                         onCheckedChange = { enabled ->
-                            val updated = if (enabled) selected + key else selected - key
-                            if (updated.size >= 3) onSelectionChanged(updated)
+                            if (!enabled && orderedSelected.size > 3) {
+                                onSelectionChanged(orderedSelected - key)
+                            }
                         }
                     )
                     Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    val index = selected.indexOf(key)
-                    if (index >= 0) {
-                        TextButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) { Text("↑") }
-                        TextButton(onClick = { onMove(index, index + 1) }, enabled = index < selected.lastIndex) { Text("↓") }
+                    TextButton(
+                        onClick = { onMove(index, index - 1) },
+                        enabled = index > 0
+                    ) { Text("↑") }
+                    TextButton(
+                        onClick = { onMove(index, index + 1) },
+                        enabled = index < orderedSelected.lastIndex
+                    ) { Text("↓") }
+                }
+            }
+
+            val availableActions = playerButtonNames.filterKeys { it !in orderedSelected }
+            if (availableActions.isNotEmpty()) {
+                Text(
+                    "Available actions",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
+                )
+                availableActions.forEach { (key, label) ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.Checkbox(
+                            checked = false,
+                            enabled = orderedSelected.size < 6,
+                            onCheckedChange = { enabled ->
+                                if (enabled && orderedSelected.size < 6) {
+                                    onSelectionChanged(orderedSelected + key)
+                                }
+                            }
+                        )
+                        Text(
+                            label,
+                            Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
