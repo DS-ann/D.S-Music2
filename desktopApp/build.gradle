@@ -37,9 +37,9 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe)
-            packageName = 'SpatialFlow'
+            packageName = 'D.S Music'
             packageVersion = '1.8.18'
-            description = 'SpatialFlow desktop music player'
+            description = 'D.S Music desktop music player'
             vendor = 'DS-ann'
 
             windows {
