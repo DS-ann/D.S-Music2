@@ -1,0 +1,38 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '2.3.21'
+    id 'org.jetbrains.kotlin.plugin.compose' version '2.3.21'
+    id 'org.jetbrains.compose' version '1.10.3'
+}
+
+
+dependencies {
+    implementation(compose.desktop.currentOs)
+    implementation(compose.material)
+
+    // Java Sound codecs for common local formats.
+    implementation 'com.googlecode.soundlibs:mp3spi:1.9.5.4'
+    implementation 'com.googlecode.soundlibs:vorbisspi:1.0.3.3'
+}
+
+kotlin {
+    jvmToolchain(17)
+}
+
+compose.desktop {
+    application {
+        mainClass = 'com.dsann.music.desktop.MainKt'
+
+        nativeDistributions {
+            targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe)
+            packageName = 'SpatialFlow'
+            packageVersion = '1.8.18'
+            description = 'SpatialFlow desktop music player'
+            vendor = 'DS-ann'
+
+            windows {
+                menu = true
+                shortcut = true
+            }
+        }
+    }
+}
