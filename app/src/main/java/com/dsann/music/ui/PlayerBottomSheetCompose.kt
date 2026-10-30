@@ -776,7 +776,8 @@ fun PlayerBottomSheetCompose(
                     val options = com.dsann.music.data.innertube.NewPipeStreamExtractor
                         .getVideoStreamOptions(videoId)
                     videoQualityOptions = options
-                    selectedVideoQuality = options.lastOrNull()?.label
+                    selectedVideoQuality = com.dsann.music.data.innertube.NewPipeStreamExtractor
+                        .dataSaverVideoOption(options)?.label
                 } catch (_: Exception) {
                     videoQualityOptions = emptyList()
                 } finally {
@@ -1425,7 +1426,9 @@ fun PlayerBottomSheetCompose(
                                 if (!isVideoFullscreen) {
                                     androidx.compose.ui.viewinterop.AndroidView(
                                         factory = { viewContext ->
-                                            androidx.media3.ui.PlayerView(viewContext).apply {
+                                            (android.view.LayoutInflater.from(viewContext)
+                                                .inflate(com.dsann.music.R.layout.view_video_player, null)
+                                                as androidx.media3.ui.PlayerView).apply {
                                                 player = audioService?.getPlayerInstance()
                                                 useController = true
                                                 controllerShowTimeoutMs = 3000
@@ -1461,14 +1464,16 @@ fun PlayerBottomSheetCompose(
                                     ) {
                                         androidx.compose.ui.viewinterop.AndroidView(
                                             factory = { viewContext ->
-                                                androidx.media3.ui.PlayerView(viewContext).apply {
-                                                    player = audioService?.getPlayerInstance()
-                                                    useController = true
-                                                    controllerShowTimeoutMs = 3000
-                                                    resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
-                                                    setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                                                    keepScreenOn = true
-                                                }
+                                                (android.view.LayoutInflater.from(viewContext)
+                                                .inflate(com.dsann.music.R.layout.view_video_player, null)
+                                                as androidx.media3.ui.PlayerView).apply {
+                                                player = audioService?.getPlayerInstance()
+                                                useController = true
+                                                controllerShowTimeoutMs = 3000
+                                                resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                                setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                                                keepScreenOn = true
+                                            }
                                             },
                                             update = { playerView ->
                                                 playerView.player = audioService?.getPlayerInstance()
