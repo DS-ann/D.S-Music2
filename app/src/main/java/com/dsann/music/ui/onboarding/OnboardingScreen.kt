@@ -319,7 +319,7 @@ package com.dsann.music.ui.onboarding
             iconTint = MaterialTheme.colorScheme.onSurface
         ) {
             Text(
-                text = "Welcome\nto SpatialFlow.",
+                text = "Welcome\nto D.S Music.",
                 style = MaterialTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black,
                 fontSize = 42.sp,
