@@ -173,7 +173,10 @@ fun ExploreScreen(
 
     val searchQuery = uiState.searchQuery
     val searchResults = uiState.searchResults
+    val searchTopResult = uiState.searchTopResult
+    val searchSections = uiState.searchSections
     val suggestions = uiState.suggestions
+    val suggestionItems = uiState.suggestionItems
     val isSearching = uiState.isSearching
     val homeSections = uiState.homeSections
     val isLoadingHome = uiState.isLoadingHome
@@ -201,6 +204,29 @@ fun ExploreScreen(
     val localPlaylists by playerSharedViewModel.localPlaylistsFlow.collectAsStateWithLifecycle(
         emptyList()
     )
+
+    fun activateSearchItem(item: SearchItem, songQueue: List<OnlineSong>? = null) {
+        when (item) {
+            is SearchItem.Song -> {
+                val queue = songQueue.orEmpty().ifEmpty { listOf(item.song) }
+                val index = queue.indexOfFirst { it.videoId == item.song.videoId }.coerceAtLeast(0)
+                viewModel.playOnlineSongWithQueue(item.song, queue, index)
+                isSearchActive = false
+            }
+            is SearchItem.Album -> {
+                isSearchActive = false
+                viewModel.loadAlbum(item.album.browseId)
+            }
+            is SearchItem.Artist -> {
+                isSearchActive = false
+                viewModel.loadArtist(item.artist.browseId, item.artist.thumbnailUrl)
+            }
+            is SearchItem.Playlist -> {
+                isSearchActive = false
+                viewModel.loadPlaylist(item.playlist.playlistId)
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.playbackTriggerEvent.collect {
