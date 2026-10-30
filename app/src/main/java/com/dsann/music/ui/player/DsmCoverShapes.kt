@@ -49,8 +49,8 @@ internal object DsmCoverShapes {
             val angle = 2.0 * PI * i / steps
             val x = cos(angle)
             val y = sin(angle)
-            val px = cx + cx * sign(x).toFloat() * abs(x).pow(0.5)
-            val py = cy + cy * sign(y).toFloat() * abs(y).pow(0.5)
+            val px = cx + cx * sign(x).toFloat() * abs(x).pow(0.5).toFloat()
+            val py = cy + cy * sign(y).toFloat() * abs(y).pow(0.5).toFloat()
             if (i == 0) moveTo(px, py) else lineTo(px, py)
         }
         close()
