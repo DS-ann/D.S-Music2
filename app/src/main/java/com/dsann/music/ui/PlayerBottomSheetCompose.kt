@@ -1188,6 +1188,7 @@ fun PlayerBottomSheetCompose(
             when (miniPlayerStyle) {
                 "Flat" -> RoundedCornerShape(0.dp)
                 "Compact" -> RoundedCornerShape(18.dp)
+                "Pill" -> RoundedCornerShape(40.dp)
                 else -> playerShadowShape
             }
         } else playerShadowShape
@@ -1750,6 +1751,11 @@ private fun MiniPlayerContentInternal(
 ) {
 
     val isDark = isSystemInDarkTheme()
+    val context = LocalContext.current
+    val miniPlayerProgressStyle by remember(context) {
+        context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+            .observeKey("mini_player_progress", "Ring")
+    }
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val contentColor = if (isDark) Color.White else Color(0xFF1C1B1F)
     val contentSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1C1B1F).copy(alpha = 0.6f)
@@ -1780,17 +1786,44 @@ private fun MiniPlayerContentInternal(
             }
 
             val amplitudeAnimatable = remember { Animatable(if (isPlaying) 1f else 0f) }
-            LaunchedEffect(isPlaying) {
-                amplitudeAnimatable.animateTo(
-                    targetValue = if (isPlaying) 1f else 0f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
+            LaunchedEffect(isPlaying, miniPlayerProgressStyle) {
+                if (miniPlayerProgressStyle == "Ring") {
+                    amplitudeAnimatable.animateTo(
+                        targetValue = if (isPlaying) 1f else 0f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow
+                        )
                     )
-                )
+                } else {
+                    amplitudeAnimatable.snapTo(0f)
+                }
             }
 
-                CircularWavyProgressIndicator(
+            when (miniPlayerProgressStyle) {
+                "None" -> Unit
+                "Line", "Fill" -> {
+                    val trackHeight = if (miniPlayerProgressStyle == "Line") 2.dp else 5.dp
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp)
+                            .height(trackHeight)
+                            .background(
+                                accentColor.copy(alpha = if (miniPlayerProgressStyle == "Line") 0.20f else 0.12f),
+                                CircleShape
+                            )
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(progressAnimatable.value)
+                                .fillMaxSize()
+                                .background(accentColor, CircleShape)
+                        )
+                    }
+                }
+                else -> CircularWavyProgressIndicator(
                     progress = { progressAnimatable.value },
                     modifier = Modifier.size(58.dp),
                     color = accentColor,
@@ -1806,6 +1839,7 @@ private fun MiniPlayerContentInternal(
                         cap = androidx.compose.ui.graphics.StrokeCap.Round
                     )
                 )
+            }
 
             Box(modifier = Modifier.size(48.dp)) {
                 // Placeholder Box for structure: AsyncImage is managed globally via parent's floating shared element!
