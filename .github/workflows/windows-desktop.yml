@@ -1,4 +1,4 @@
-name: Build SpatialFlow Windows Desktop
+name: Build D.S music Windows Desktop
 
 on:
   push:
@@ -42,7 +42,7 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v7
         with:
-          name: SpatialFlow-Windows
+          name: D.S music
           path: desktopApp/build/compose/binaries/main/exe/*.exe
           if-no-files-found: error
           retention-days: 14
