@@ -238,6 +238,7 @@ fun FullPlayer(
     val hasLyrics = !syncedLyrics.isNullOrEmpty() || !plainLyrics.isNullOrBlank()
     val currentSongId = uiState.currentSong?.id
     val audioService by viewModel.audioServiceState.collectAsStateWithLifecycle()
+    val isVideoMode by viewModel.isVideoMode.collectAsStateWithLifecycle()
     var showSongInfoDialog by remember { mutableStateOf(false) }
     var lastLyricsFetchSongId by remember { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
@@ -458,6 +459,18 @@ fun FullPlayer(
                 )
 
 
+
+                if (!uiState.currentSong?.videoId.isNullOrBlank()) {
+                    PillChip(
+                        icon = painterResource(id = R.drawable.ic_youtube),
+                        label = if (isVideoMode) "Audio" else "Video",
+                        isSelected = isVideoMode,
+                        onClick = { audioService?.setVideoMode(!isVideoMode) },
+                        contentColor = contentColor,
+                        accentColor = dynamicAccentColor,
+                        isDark = isDark
+                    )
+                }
 
                 PillChip(
                     icon = painterResource(id = R.drawable.ic_share),
