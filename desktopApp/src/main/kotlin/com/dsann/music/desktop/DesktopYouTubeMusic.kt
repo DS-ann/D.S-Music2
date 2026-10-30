@@ -26,6 +26,26 @@ import java.text.Normalizer
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
+internal data class DesktopHomeSection(
+    val title: String,
+    val items: List<SearchItem>,
+    val browseId: String? = null,
+    val params: String? = null
+)
+
+internal data class DesktopHomePage(
+    val sections: List<DesktopHomeSection>,
+    val continuation: String? = null,
+    val moods: List<String> = emptyList()
+)
+
+internal data class DesktopAccountProfile(
+    val name: String,
+    val handle: String?,
+    val email: String?,
+    val avatarUrl: String?
+)
+
 /**
  * Windows-side adaptation of the phone app's current YouTube Music search pipeline:
  * mixed search plus independently requested category shelves, a best-match result,
@@ -40,6 +60,33 @@ internal object DesktopYouTubeMusic {
     private const val CLIENT_VERSION = "1.20260531.05.00"
     private const val USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+    @Volatile private var sessionCookie: String? = null
+
+    fun setSessionCookie(cookie: String?) {
+        sessionCookie = cookie?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
+    fun hasSession(): Boolean = !sessionCookie.isNullOrBlank()
+
+    private fun okhttp3.Request.Builder.withSession(origin: String): okhttp3.Request.Builder = apply {
+        val cookieValue = sessionCookie?.takeIf { it.isNotBlank() } ?: return@apply
+        header("Cookie", cookieValue)
+        val cookieMap = cookieValue.split(';').mapNotNull { pair ->
+            val index = pair.indexOf('=')
+            if (index <= 0) null else pair.substring(0, index).trim() to pair.substring(index + 1).trim()
+        }.toMap()
+        val sapisid = cookieMap["SAPISID"]
+            ?: cookieMap["__Secure-3PAPISID"]
+            ?: cookieMap["__Secure-1PAPISID"]
+        if (!sapisid.isNullOrBlank()) {
+            val timestamp = System.currentTimeMillis() / 1000L
+            val digest = java.security.MessageDigest.getInstance("SHA-1")
+                .digest("$timestamp $sapisid $origin".toByteArray(Charsets.UTF_8))
+                .joinToString("") { byte -> "%02x".format(byte) }
+            header("Authorization", "SAPISIDHASH ${timestamp}_$digest")
+        }
+    }
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -129,6 +176,7 @@ internal object DesktopYouTubeMusic {
             .header("User-Agent", USER_AGENT)
             .header("X-YouTube-Client-Name", "67")
             .header("X-YouTube-Client-Version", CLIENT_VERSION)
+            .withSession("https://music.youtube.com")
             .build()
 
         http.newCall(request).execute().use { response ->
@@ -176,35 +224,174 @@ internal object DesktopYouTubeMusic {
     }
 
     suspend fun browse(browseId: String): List<SearchItem> = withContext(Dispatchers.IO) {
-        val normalizedId = when {
-            browseId.startsWith("VL") || browseId.startsWith("MPSP") ||
-                browseId.startsWith("MPRE") || browseId.startsWith("UC") -> browseId
-            else -> "VL" + browseId
+        DesktopSearchParser.parseBrowse(browseResponse(browseId = normalizeBrowseId(browseId)))
+    }
+
+    suspend fun homePage(explore: Boolean = false, continuation: String? = null): DesktopHomePage =
+        withContext(Dispatchers.IO) {
+            val response = if (continuation != null) {
+                browseResponse(continuation = continuation)
+            } else {
+                browseResponse(browseId = if (explore) "FEmusic_explore" else "FEmusic_home")
+            }
+            DesktopSearchParser.parseHome(response)
         }
-        val client = JsonObject().apply {
+
+    suspend fun accountProfile(): DesktopAccountProfile = withContext(Dispatchers.IO) {
+        check(hasSession()) { "Connect a YouTube Music session first." }
+        val response = postInnerTube(
+            "$MUSIC_BASE/account/account_menu",
+            JsonObject().apply { add("context", webRemixContext()) }
+        )
+        val header = response.path("actions.0.openPopupAction.popup.multiPageMenuRenderer.header.activeAccountHeaderRenderer")
+            ?.asJsonObject ?: error("YouTube did not return an account profile. Check the session cookie.")
+        DesktopAccountProfile(
+            name = header.path("accountName.runs.0.text")?.stringOrNull()
+                ?: header.path("accountName.simpleText")?.stringOrNull() ?: "Connected account",
+            handle = header.path("channelHandle.runs.0.text")?.stringOrNull()
+                ?: header.path("channelHandle.simpleText")?.stringOrNull(),
+            email = header.path("email.runs.0.text")?.stringOrNull()
+                ?: header.path("email.simpleText")?.stringOrNull(),
+            avatarUrl = DesktopSearchParser.highResThumbnail(header.path("accountPhoto.thumbnails")?.asJsonArray)
+        )
+    }
+
+    suspend fun accountLibrary(kind: String): List<SearchItem> = withContext(Dispatchers.IO) {
+        check(hasSession()) { "Connect a YouTube Music session first." }
+        val browseId = when (kind.lowercase(Locale.ROOT)) {
+            "playlists" -> "FEmusic_liked_playlists"
+            "artists" -> "FEmusic_library_corpus_artists"
+            "albums" -> "FEmusic_library_corpus_albums"
+            "podcasts" -> "FEmusic_library_corpus_podcasts"
+            "songs", "liked" -> "FEmusic_liked_videos"
+            else -> error("Unsupported library category: $kind")
+        }
+        val response = browseResponse(browseId = browseId)
+        val items = DesktopSearchParser.parseBrowse(response).toMutableList()
+        var continuation = DesktopSearchParser.extractContinuation(response)
+        var pages = 0
+        while (!continuation.isNullOrBlank() && pages < 15) {
+            pages++
+            val next = runCatching { browseResponse(continuation = continuation) }.getOrNull() ?: break
+            items += DesktopSearchParser.parseBrowse(next)
+            continuation = DesktopSearchParser.extractContinuation(next)
+        }
+        items.distinctBy(::itemKey)
+    }
+
+    suspend fun setRemoteLike(videoId: String, liked: Boolean): Boolean = withContext(Dispatchers.IO) {
+        check(hasSession()) { "Connect a YouTube Music session first." }
+        val path = when {
+            liked -> "$MUSIC_BASE/like/like"
+            else -> "$MUSIC_BASE/like/removelike"
+        }
+        val body = JsonObject().apply {
+            add("context", webRemixContext())
+            add("target", JsonObject().apply { addProperty("videoId", videoId) })
+        }
+        val response = postInnerTube(path, body)
+        response.entrySet().isNotEmpty()
+    }
+
+    suspend fun createRemotePlaylist(
+        title: String,
+        description: String = "",
+        privacy: String = "PRIVATE",
+        videoIds: List<String> = emptyList()
+    ): String = withContext(Dispatchers.IO) {
+        check(hasSession()) { "Connect a YouTube Music session first." }
+        require(title.isNotBlank()) { "Enter a playlist title." }
+        val body = JsonObject().apply {
+            add("context", webRemixContext())
+            addProperty("title", title.trim())
+            addProperty("description", description)
+            addProperty("privacyStatus", privacy)
+            if (videoIds.isNotEmpty()) add("videoIds", JsonArray().apply { videoIds.forEach(::add) })
+        }
+        val response = postInnerTube("$MUSIC_BASE/playlist/create", body)
+        response.get("playlistId")?.stringOrNull()
+            ?: error("YouTube Music did not create the playlist.")
+    }
+
+    suspend fun addRemotePlaylistSongs(playlistId: String, videoIds: List<String>): Boolean =
+        withContext(Dispatchers.IO) {
+            check(hasSession()) { "Connect a YouTube Music session first." }
+            val actions = JsonArray().apply {
+                videoIds.forEach { id ->
+                    add(JsonObject().apply {
+                        addProperty("action", "ACTION_ADD_VIDEO")
+                        addProperty("addedVideoId", id)
+                    })
+                }
+            }
+            val body = JsonObject().apply {
+                add("context", webRemixContext())
+                addProperty("playlistId", playlistId)
+                add("actions", actions)
+            }
+            postInnerTube("$MUSIC_BASE/browse/edit_playlist", body).entrySet().isNotEmpty()
+        }
+
+    suspend fun deleteRemotePlaylist(playlistId: String): Boolean = withContext(Dispatchers.IO) {
+        check(hasSession()) { "Connect a YouTube Music session first." }
+        val body = JsonObject().apply {
+            add("context", webRemixContext())
+            addProperty("playlistId", playlistId)
+        }
+        postInnerTube("$MUSIC_BASE/playlist/delete", body).entrySet().isNotEmpty()
+    }
+
+    private fun normalizeBrowseId(value: String): String = when {
+        value.startsWith("VL") || value.startsWith("MPSP") ||
+            value.startsWith("MPRE") || value.startsWith("UC") ||
+            value.startsWith("FEmusic_") -> value
+        else -> "VL$value"
+    }
+
+    private fun webRemixContext(): JsonObject = JsonObject().apply {
+        add("client", JsonObject().apply {
             addProperty("clientName", "WEB_REMIX")
             addProperty("clientVersion", CLIENT_VERSION)
             addProperty("hl", Locale.getDefault().language.ifBlank { "en" })
             addProperty("gl", Locale.getDefault().country.ifBlank { "US" })
-        }
+        })
+    }
+
+    private fun browseResponse(
+        browseId: String? = null,
+        continuation: String? = null,
+        params: String? = null
+    ): JsonObject {
         val body = JsonObject().apply {
-            add("context", JsonObject().apply { add("client", client) })
-            addProperty("browseId", normalizedId)
+            add("context", webRemixContext())
+            if (continuation != null) addProperty("continuation", continuation)
+            else {
+                browseId?.let { addProperty("browseId", it) }
+                params?.let { addProperty("params", it) }
+            }
         }
+        return postInnerTube("$MUSIC_BASE/browse", body)
+    }
+
+    private fun postInnerTube(url: String, body: JsonObject): JsonObject {
         val request = Request.Builder()
-            .url("$MUSIC_BASE/browse?key=$API_KEY&prettyPrint=false")
+            .url("$url?key=$API_KEY&prettyPrint=false")
             .post(JsonParserBody.encode(body))
             .header("Content-Type", "application/json; charset=utf-8")
+            .header("Accept-Language", "${Locale.getDefault().language},en;q=0.9")
+            .header("X-Goog-Api-Format-Version", "1")
+            .header("X-Origin", "https://music.youtube.com")
             .header("Origin", "https://music.youtube.com")
             .header("Referer", "https://music.youtube.com/")
             .header("User-Agent", USER_AGENT)
             .header("X-YouTube-Client-Name", "67")
             .header("X-YouTube-Client-Version", CLIENT_VERSION)
+            .withSession("https://music.youtube.com")
             .build()
         http.newCall(request).execute().use { response ->
-            val text = response.body?.string().orEmpty()
-            check(response.isSuccessful) { "YouTube browse returned HTTP ${response.code}." }
-            DesktopSearchParser.parseBrowse(JsonParser.parseString(text).asJsonObject)
+            val raw = response.body?.string().orEmpty()
+            check(response.isSuccessful) { "YouTube Music request returned HTTP ${response.code}." }
+            JsonParser.parseString(raw).asJsonObject
         }
     }
 
@@ -241,6 +428,7 @@ internal object DesktopYouTubeMusic {
             .header("User-Agent", USER_AGENT)
             .header("X-YouTube-Client-Name", if (web) "1" else "67")
             .header("X-YouTube-Client-Version", clientVersion)
+            .withSession(if (web) "https://www.youtube.com" else "https://music.youtube.com")
             .build()
 
         http.newCall(request).execute().use { response ->
@@ -424,6 +612,48 @@ private object DesktopSearchParser {
         }
         return null
     }
+
+    fun parseHome(json: JsonObject): DesktopHomePage {
+        val sections = findObjects(json, "musicCarouselShelfRenderer").mapNotNull { carousel ->
+            val title = carousel.path("header.musicCarouselShelfBasicHeaderRenderer.title.runs.0.text")?.stringOrNull()
+                ?: carousel.path("header.musicCarouselShelfBasicHeaderRenderer.title.simpleText")?.stringOrNull()
+                ?: return@mapNotNull null
+            val contents = carousel.getAsJsonArray("contents") ?: JsonArray()
+            val parsedItems = contents.mapNotNull { child ->
+                if (!child.isJsonObject) return@mapNotNull null
+                val obj = child.asJsonObject
+                when {
+                    obj.has("musicTwoRowItemRenderer") -> parseMusicItem(obj)
+                    obj.has("musicResponsiveListItemRenderer") -> parseMusicItem(obj)
+                    else -> null
+                }
+            }.distinctBy(::simpleKey)
+            if (parsedItems.isEmpty()) return@mapNotNull null
+            DesktopHomeSection(
+                title = title,
+                items = parsedItems,
+                browseId = carousel.path("header.musicCarouselShelfBasicHeaderRenderer.moreContentButton.buttonRenderer.navigationEndpoint.browseEndpoint.browseId")?.stringOrNull(),
+                params = carousel.path("header.musicCarouselShelfBasicHeaderRenderer.moreContentButton.buttonRenderer.navigationEndpoint.browseEndpoint.params")?.stringOrNull()
+            )
+        }
+        val chips = json.path("contents.singleColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.header.chipCloudRenderer.chips")
+            ?.asJsonArray.orEmpty()
+        val moods = chips.mapNotNull { chip ->
+            chip.path("chipCloudChipRenderer.text.runs.0.text")?.stringOrNull()
+        }.filter { it.isNotBlank() }
+        return DesktopHomePage(
+            sections = sections,
+            continuation = extractContinuation(json),
+            moods = moods
+        )
+    }
+
+    fun extractContinuation(json: JsonObject): String? =
+        json.path("contents.singleColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.continuations.0.nextContinuationData.continuation")?.stringOrNull()
+            ?: json.path("continuationContents.sectionListContinuation.continuations.0.nextContinuationData.continuation")?.stringOrNull()
+            ?: json.path("continuationContents.musicShelfContinuation.continuations.0.nextContinuationData.continuation")?.stringOrNull()
+            ?: json.path("continuationContents.gridContinuation.continuations.0.nextContinuationData.continuation")?.stringOrNull()
+            ?: json.path("continuationContents.musicGridContinuation.continuations.0.nextContinuationData.continuation")?.stringOrNull()
 
     fun parseBrowse(json: JsonObject): List<SearchItem> {
         val results = mutableListOf<SearchItem>()
