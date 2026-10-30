@@ -159,6 +159,9 @@ internal object DesktopLyricsRepository {
         return DesktopLyrics(text, provider, lines.any { it.startMs > 0L }, lines)
     }
 
+    fun parseOffline(raw: String): DesktopLyrics =
+        DesktopLyrics(raw, "Offline lyrics", raw.contains(Regex("""\\[\\d{1,2}:\\d{2}""")), parseLines(raw))
+
     private fun parseLines(raw: String): List<DesktopLyricLine> {
         val timePattern = Regex("""\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?]""")
         return raw.lineSequence().flatMap { line ->
