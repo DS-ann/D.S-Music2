@@ -7,6 +7,8 @@ import javafx.util.Duration
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.DataLine
@@ -34,6 +36,33 @@ internal class DesktopAudioPlayer : AutoCloseable {
     }
 
     fun getRemoteMediaPlayer(): MediaPlayer? = remotePlayer
+
+    /**
+     * Snapshot the actual JavaFX media clock immediately before replacing the source.
+     * The Compose progress state is polled, so it must not be used as a resume timestamp.
+     */
+    fun currentPositionSnapshot(): Long {
+        if (!remoteMode) return positionMillis
+        val activePlayer = remotePlayer ?: return positionMillis
+        if (Platform.isFxApplicationThread()) {
+            return activePlayer.currentTime.toMillis().toLong().coerceAtLeast(0L)
+        }
+
+        val snapshot = CompletableFuture<Long>()
+        try {
+            Platform.runLater {
+                val current = if (remoteMode && remotePlayer === activePlayer) {
+                    activePlayer.currentTime.toMillis().toLong()
+                } else {
+                    positionMillis
+                }
+                snapshot.complete(current.coerceAtLeast(0L))
+            }
+            return snapshot.get(900L, TimeUnit.MILLISECONDS).coerceAtLeast(0L)
+        } catch (_: Exception) {
+            return positionMillis.coerceAtLeast(0L)
+        }
+    }
 
     @Volatile var currentFile: File? = null
         private set
@@ -95,6 +124,11 @@ internal class DesktopAudioPlayer : AutoCloseable {
                 val media = Media(url)
                 val created = MediaPlayer(media)
                 remotePlayer = created
+                created.currentTimeProperty().addListener { _, _, newTime ->
+                    if (token == generation.get() && newTime != null && newTime.toMillis().isFinite()) {
+                        positionMillis = newTime.toMillis().toLong().coerceAtLeast(0L)
+                    }
+                }
                 created.setOnReady {
                     if (token != generation.get()) return@setOnReady
                     val mediaDuration = created.totalDuration
