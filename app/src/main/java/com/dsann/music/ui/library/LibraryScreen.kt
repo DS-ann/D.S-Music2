@@ -2677,6 +2677,27 @@ private fun OnlineArtistCard(
     }
 }
 
+private data class ReplaySongSummary(
+    val id: String,
+    val title: String,
+    val artist: String,
+    val thumbnailUrl: String?,
+    val totalMs: Long,
+    val sessions: Int,
+    val lastTimestamp: Long
+)
+
+private data class ReplayArtistSummary(
+    val name: String,
+    val totalMs: Long,
+    val sessions: Int
+)
+
+private data class ReplayMonthSummary(
+    val label: String,
+    val totalMs: Long
+)
+
 @Composable
 private fun RecapTabContent(
     nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection,
@@ -2684,520 +2705,499 @@ private fun RecapTabContent(
     onNavigateToExplore: () -> Unit
 ) {
     val context = LocalContext.current
-    val recap by viewModel.listeningRecapFlow.collectAsStateWithLifecycle(null)
+    val events by viewModel.listeningHistoryEventsFlow.collectAsStateWithLifecycle(emptyList())
+    val years = remember(events) {
+        events.map { event ->
+            java.util.Calendar.getInstance().apply {
+                timeInMillis = event.timestamp
+            }.get(java.util.Calendar.YEAR).toString()
+        }.distinct().sortedDescending()
+    }
+    val periods = remember(years) {
+        listOf("This month", "Last 30 days") + years + "All time"
+    }
+    var selectedPeriod by rememberSaveable { mutableStateOf("This month") }
+    LaunchedEffect(periods) {
+        if (selectedPeriod !in periods) selectedPeriod = "All time"
+    }
 
-    if (recap == null) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.BarChart,
-                    contentDescription = "No Stats",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.size(64.dp)
+    val now = System.currentTimeMillis()
+    val startTime = remember(selectedPeriod) {
+        when (selectedPeriod) {
+            "This month" -> java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.DAY_OF_MONTH, 1)
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }.timeInMillis
+            "Last 30 days" -> now - 30L * 24L * 60L * 60L * 1000L
+            "All time" -> Long.MIN_VALUE
+            else -> selectedPeriod.toIntOrNull()?.let { year ->
+                java.util.Calendar.getInstance().apply {
+                    clear()
+                    set(year, java.util.Calendar.JANUARY, 1, 0, 0, 0)
+                }.timeInMillis
+            } ?: Long.MIN_VALUE
+        }
+    }
+    val filteredEvents = remember(events, selectedPeriod, startTime) {
+        events.filter { it.timestamp >= startTime && it.timestamp <= now }
+    }
+    val topSongs = remember(filteredEvents) {
+        filteredEvents.groupBy { it.songId }
+            .map { entry ->
+                val id = entry.key
+                val rows = entry.value
+                val latest = rows.maxByOrNull { it.timestamp } ?: rows.first()
+                ReplaySongSummary(
+                    id = id,
+                    title = latest.title,
+                    artist = latest.artist,
+                    thumbnailUrl = latest.thumbnailUrl,
+                    totalMs = rows.sumOf { it.duration.coerceAtLeast(0L) },
+                    sessions = rows.size,
+                    lastTimestamp = rows.maxOfOrNull { it.timestamp } ?: latest.timestamp
+                )
+            }
+            .sortedByDescending { it.totalMs }
+            .take(100)
+    }
+    val topArtists = remember(filteredEvents) {
+        filteredEvents.groupBy { it.artist.ifBlank { "Unknown Artist" } }
+            .map { entry ->
+                ReplayArtistSummary(
+                    name = entry.key,
+                    totalMs = entry.value.sumOf { it.duration.coerceAtLeast(0L) },
+                    sessions = entry.value.size
+                )
+            }
+            .sortedByDescending { it.totalMs }
+            .take(8)
+    }
+    val monthly = remember(filteredEvents) {
+        val monthFormatter = java.text.SimpleDateFormat("MMM", java.util.Locale.getDefault())
+        filteredEvents.groupBy { event ->
+            val calendar = java.util.Calendar.getInstance().apply { timeInMillis = event.timestamp }
+            "%04d-%02d".format(
+                java.util.Locale.ROOT,
+                calendar.get(java.util.Calendar.YEAR),
+                calendar.get(java.util.Calendar.MONTH) + 1
+            )
+        }.toList()
+            .sortedBy { it.first }
+            .takeLast(8)
+            .map { entry ->
+                val timestamp = entry.second.minOfOrNull { it.timestamp } ?: 0L
+                ReplayMonthSummary(
+                    label = monthFormatter.format(java.util.Date(timestamp)),
+                    totalMs = entry.second.sumOf { it.duration.coerceAtLeast(0L) }
+                )
+            }
+    }
+    val totalMs = remember(filteredEvents) {
+        filteredEvents.sumOf { it.duration.coerceAtLeast(0L) }
+    }
+    val activeDays = remember(filteredEvents) {
+        filteredEvents.map { event ->
+            java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT)
+                .format(java.util.Date(event.timestamp))
+        }.distinct().size
+    }
+    val peakHour = remember(filteredEvents) {
+        filteredEvents.groupBy { it.hourOfDay.coerceIn(0, 23) }
+            .maxByOrNull { it.value.size }?.key
+    }
+    val peakHabit = when (peakHour) {
+        in 5..11 -> "Morning Spark"
+        in 12..16 -> "Afternoon Groove"
+        in 17..21 -> "Evening Harmony"
+        null -> "Waiting for data"
+        else -> "Midnight Mystique"
+    }
+    val totalMinutes = totalMs / 60_000L
+    val totalListenText = if (totalMinutes >= 60L) {
+        (totalMinutes / 60L).toString() + "h " + (totalMinutes % 60L).toString() + "m"
+    } else {
+        totalMinutes.toString() + " min"
+    }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(topArtists) {
+        topArtists.forEach { artist -> viewModel.resolveArtistProfileImage(artist.name) }
+    }
+
+    fun toSongItem(summary: ReplaySongSummary): SongItem {
+        val localId = summary.id.toLongOrNull()
+        return if (localId != null) {
+            SongItem(
+                localId,
+                summary.title,
+                summary.artist,
+                -1L,
+                summary.thumbnailUrl,
+                summary.totalMs,
+                summary.lastTimestamp
+            )
+        } else {
+            SongItem.createOnlineSong(
+                videoId = summary.id,
+                title = summary.title,
+                artist = summary.artist,
+                streamUrl = null,
+                durationMs = summary.totalMs,
+                thumbnailUrl = summary.thumbnailUrl
+            )
+        }
+    }
+
+    fun playReplay(shuffle: Boolean) {
+        val queue = topSongs.map { summary -> toSongItem(summary) }
+        if (queue.isEmpty()) return
+        viewModel.setShuffleEnabled(shuffle)
+        viewModel.setSongList(queue)
+        viewModel.playSongAtIndex(0)
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(nestedScrollConnection),
+        contentPadding = PaddingValues(bottom = 160.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item(key = "replay-header") {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Text(
+                    "Replay",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold
                 )
                 Text(
-                    text = "Your Flow is warming up",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Start playing your favorite tracks, and your listening flow highlights will appear here!",
+                    "Your listening, recapped on this device",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 24.dp)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
-    } else {
-        val data = recap!!
-
-        val heroSong = remember(data.topSongs) { data.topSongs.firstOrNull() }
-        var topSongColor by remember(heroSong?.thumbnailUrl) { mutableStateOf<Color?>(null) }
-        LaunchedEffect(heroSong?.thumbnailUrl) {
-            val url = heroSong?.thumbnailUrl
-            if (!url.isNullOrEmpty()) {
-                withContext(Dispatchers.IO) {
-                    try {
-                        val loader = context.imageLoader
-                        val request = ImageRequest.Builder(context)
-                            .data(url)
-                            .allowHardware(false)
-                            .build()
-                        val result = loader.execute(request)
-                        if (result is SuccessResult) {
-                            val bitmap = (result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
-                            if (bitmap != null) {
-                                val palette = Palette.from(bitmap).generate()
-                                val vibrantColor = palette.getVibrantColor(0)
-                                val dominantColor = palette.getDominantColor(0)
-                                val darkVibrantColor = palette.getDarkVibrantColor(0)
-                                val mutedColor = palette.getMutedColor(0)
-                                val lightVibrantColor = palette.getLightVibrantColor(0)
-                                
-                                val extractedInt = if (vibrantColor != 0) vibrantColor
-                                                   else if (dominantColor != 0) dominantColor
-                                                   else if (darkVibrantColor != 0) darkVibrantColor
-                                                   else if (mutedColor != 0) mutedColor
-                                                   else if (lightVibrantColor != 0) lightVibrantColor
-                                                   else 0
-                                if (extractedInt != 0) {
-                                    topSongColor = Color(extractedInt)
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        android.util.Log.e("RecapColor", "Failed to extract color: ${e.message}")
-                    }
+        item(key = "replay-periods") {
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                periods.forEach { period ->
+                    FilterChip(
+                        selected = selectedPeriod == period,
+                        onClick = { selectedPeriod = period },
+                        label = { Text(period) },
+                        border = null
+                    )
                 }
             }
         }
 
-        LaunchedEffect(data.topArtists) {
-            data.topArtists.forEach { item ->
-                viewModel.resolveArtistProfileImage(item.artist)
-            }
-        }
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .nestedScroll(nestedScrollConnection),
-            contentPadding = PaddingValues(bottom = 160.dp)
-        ) {
-            // Sleek Gradient Banner
-            item {
-                val brush = Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                        MaterialTheme.colorScheme.background
-                    )
-                )
+        if (filteredEvents.isEmpty()) {
+            item(key = "replay-empty") {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(brush)
-                        .padding(horizontal = 24.dp, vertical = 28.dp)
+                    Modifier.fillMaxWidth().padding(32.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.BarChart,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                            modifier = Modifier.size(56.dp)
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text("Nothing to replay yet", fontWeight = FontWeight.Bold)
                         Text(
-                            text = "YOUR FLOW HIGHLIGHTS",
-                            style = MaterialTheme.typography.labelMedium,
+                            "Songs you play will appear here with listening time, top artists and your most-played tracks.",
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+        } else {
+            item(key = "replay-hero") {
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.primaryContainer,
+                                    MaterialTheme.colorScheme.tertiaryContainer,
+                                    MaterialTheme.colorScheme.secondaryContainer
+                                )
+                            )
+                        )
+                        .padding(22.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            selectedPeriod.uppercase(),
+                            style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            letterSpacing = 2.sp
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Your Personal Listening Recap",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.ExtraBold,
+                            totalListenText,
+                            style = MaterialTheme.typography.displayMedium,
+                            fontWeight = FontWeight.Black,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "A dynamic reflection of your musical journey on D.S Music.",
-                            style = MaterialTheme.typography.bodyMedium,
+                            "listened",
+                            style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-                }
-            }
-
-            // Glassmorphic Summary Metrics
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(IntrinsicSize.Min)
-                        .padding(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Total Listening Card
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(18.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Headset,
-                                contentDescription = "Minutes Played",
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            Text(
-                                text = "${data.totalMinutes} min",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Black,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            Text(
-                                text = "Total listen time",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
-                            )
+                        Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+                            Column {
+                                Text(filteredEvents.size.toString(), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                                Text("plays", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Column {
+                                Text(topSongs.size.toString(), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                                Text("songs", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Column {
+                                Text(activeDays.toString(), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                                Text("active days", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
-                    }
-
-                    // Peak Habit Mood Card
-                    val moodIconRes = when (data.peakMood) {
-                        "Morning Spark" -> R.drawable.ic_morning
-                        "Afternoon Groove" -> R.drawable.ic_afternoon
-                        "Evening Harmony" -> R.drawable.ic_evening
-                        else -> R.drawable.ic_evening
-                    }
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                        Text(
+                            "Peak listening time · " + peakHabit,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(18.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                painter = painterResource(id = moodIconRes),
-                                contentDescription = "Peak Vibe",
-                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Text(
-                                text = data.peakMood,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
-                            Text(
-                                text = data.peakMoodDescription,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Top Songs Ranked Shelf
-            item {
-                Text(
-                    text = "Top Played Songs",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Black,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 24.dp, top = 28.dp, bottom = 12.dp)
-                )
-            }
-
-            // Hero #1 Song Card
-            if (data.topSongs.isNotEmpty()) {
-                val heroSong = data.topSongs.first()
-                item {
-                    val cardBgColor = topSongColor ?: MaterialTheme.colorScheme.primaryContainer
-                    val isDark = topSongColor?.let { 
-                        (0.2126f * it.red + 0.7152f * it.green + 0.0722f * it.blue) < 0.5f 
-                    } ?: true
-
-                    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
-                    val animatedCardBgColor by animateColorAsState(
-                        targetValue = cardBgColor,
-                        animationSpec = effectsSpec,
-                        label = "TopSongCardBgAnimation"
-                    )
-
-                    val titleColor = if (topSongColor != null) {
-                        if (isDark) Color.White else Color(0xFF1C1B1F)
-                    } else {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    }
-
-                    val artistColor = if (topSongColor != null) {
-                        if (isDark) Color.White.copy(alpha = 0.75f) else Color(0xFF1C1B1F).copy(alpha = 0.75f)
-                    } else {
-                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                    }
-
-                    val playedCountColor = if (topSongColor != null) {
-                        if (isDark) Color.White else Color(0xFF1C1B1F)
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    }
-
-                    val badgeBgColor = if (topSongColor != null) {
-                        if (isDark) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.2f)
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    }
-
-                    val badgeTextColor = if (topSongColor != null) {
-                        if (isDark) Color.White else Color.Black
-                    } else {
-                        MaterialTheme.colorScheme.onPrimary
-                    }
-
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 8.dp)
-                            .clickable {
-                                val songItem = if (heroSong.songId.toLongOrNull() != null && !heroSong.thumbnailUrl.isNullOrEmpty() && !heroSong.thumbnailUrl.startsWith("http")) {
-                                    SongItem(
-                                        heroSong.songId.toLong(),
-                                        heroSong.title,
-                                        heroSong.artist,
-                                        -1L,
-                                        heroSong.thumbnailUrl,
-                                        0L,
-                                        System.currentTimeMillis()
-                                    )
-                                } else {
-                                    SongItem.createOnlineSong(
-                                        videoId = heroSong.songId,
-                                        title = heroSong.title,
-                                        artist = heroSong.artist,
-                                        streamUrl = null,
-                                        durationMs = 0L,
-                                        thumbnailUrl = heroSong.thumbnailUrl
-                                    )
-                                }
-                                viewModel.playSong(songItem)
-                            },
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = animatedCardBgColor
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Card(
-                                shape = RoundedCornerShape(16.dp),
-                                modifier = Modifier.size(110.dp),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                        topSongs.firstOrNull()?.let { first ->
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.42f))
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                if (!heroSong.thumbnailUrl.isNullOrEmpty()) {
+                                if (!first.thumbnailUrl.isNullOrBlank()) {
                                     AsyncImage(
-                                        model = heroSong.thumbnailUrl,
-                                        contentDescription = "Cover Art",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
+                                        model = ImageRequest.Builder(context).data(first.thumbnailUrl).crossfade(false).build(),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(54.dp).clip(RoundedCornerShape(10.dp)),
+                                        contentScale = ContentScale.Crop
                                     )
                                 } else {
                                     Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
+                                        Modifier.size(54.dp).clip(RoundedCornerShape(10.dp))
                                             .background(MaterialTheme.colorScheme.surfaceVariant),
                                         contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.MusicNote,
-                                            contentDescription = "Placeholder",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(36.dp)
-                                        )
-                                    }
+                                    ) { Icon(Icons.Default.MusicNote, null) }
                                 }
-                            }
-
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = badgeBgColor,
-                                    modifier = Modifier.wrapContentSize()
-                                ) {
-                                    Text(
-                                        text = "YOUR #1 TRACK",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = badgeTextColor,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text("Your #1 song", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(first.title, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(first.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                                 }
-                                Text(
-                                    text = heroSong.title,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = titleColor,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = heroSong.artist,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = artistColor
-                                )
-                                Text(
-                                    text = "Played ${heroSong.count} times",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = playedCountColor
-                                )
                             }
                         }
                     }
                 }
             }
-
-            // Remaining Top Songs (Ranked List)
-            if (data.topSongs.size > 1) {
-                items(data.topSongs.drop(1)) { song ->
-                    ListItem(
-                        headlineContent = { Text(song.title, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        supportingContent = { Text(song.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        leadingContent = {
-                            Box(
-                                modifier = Modifier
-                                    .size(54.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (!song.thumbnailUrl.isNullOrEmpty()) {
-                                    AsyncImage(
-                                        model = song.thumbnailUrl,
-                                        contentDescription = "Cover",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                } else {
-                                    Icon(Icons.Default.MusicNote, null)
-                                }
-                            }
-                        },
-                        trailingContent = {
-                            Text(
-                                text = "${song.count} plays",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        },
-                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                            .clickable {
-                                val songItem = if (song.songId.toLongOrNull() != null && !song.thumbnailUrl.isNullOrEmpty() && !song.thumbnailUrl.startsWith("http")) {
-                                    SongItem(
-                                        song.songId.toLong(),
-                                        song.title,
-                                        song.artist,
-                                        -1L,
-                                        song.thumbnailUrl,
-                                        0L,
-                                        System.currentTimeMillis()
-                                    )
-                                } else {
-                                    SongItem.createOnlineSong(
-                                        videoId = song.songId,
-                                        title = song.title,
-                                        artist = song.artist,
-                                        streamUrl = null,
-                                        durationMs = 0L,
-                                        thumbnailUrl = song.thumbnailUrl
-                                    )
-                                }
-                                viewModel.playSong(songItem)
-                            }
-                    )
-                }
-            }
-
-            // Top Artists Shelf
-            if (data.topArtists.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "Your Top Artists",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(start = 24.dp, top = 24.dp, bottom = 12.dp)
-                    )
-                }
-
-                item {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 24.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+            item(key = "replay-actions") {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = { playReplay(false) },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        enabled = topSongs.isNotEmpty()
                     ) {
-                        items(data.topArtists) { item ->
-                            val imageUrl = viewModel.artistProfileMap[item.artist]
-                            Column(
-                                modifier = Modifier
-                                    .width(96.dp)
-                                    .clickable {
-                                        onNavigateToExplore()
-                                    },
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(80.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (!imageUrl.isNullOrEmpty()) {
-                                        AsyncImage(
-                                            model = imageUrl,
-                                            contentDescription = "Artist picture",
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    } else {
-                                        Icon(Icons.Default.Person, null, modifier = Modifier.size(36.dp))
+                        Icon(Icons.Default.PlayArrow, null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Play")
+                    }
+                    OutlinedButton(
+                        onClick = { playReplay(true) },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        enabled = topSongs.isNotEmpty()
+                    ) {
+                        Icon(Icons.Default.Shuffle, null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Shuffle")
+                    }
+                    if (AccountManager.isLoggedIn(context)) {
+                        IconButton(
+                            onClick = {
+                                val ids = topSongs.map { it.id }.filter { it.toLongOrNull() == null }.take(100)
+                                if (ids.isNotEmpty()) {
+                                    scope.launch {
+                                        YouTubeMusic.createPlaylist(
+                                            title = "Replay - " + selectedPeriod,
+                                            description = "Made with D.S Music Replay",
+                                            privacyStatus = "PRIVATE",
+                                            videoIds = ids
+                                        ).onSuccess {
+                                            accountViewModelRefreshReplay(context)
+                                            com.dsann.music.ui.SnackbarController.showMessage("Saved Replay to YouTube Music")
+                                        }.onFailure { error ->
+                                            com.dsann.music.ui.SnackbarController.showMessage(
+                                                error.message ?: "Could not save Replay"
+                                            )
+                                        }
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = item.artist,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center
-                                )
-                                Text(
-                                    text = "${item.count} songs played",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center
-                                )
+                            }
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.PlaylistPlay, "Save Replay playlist")
+                        }
+                    }
+                }
+            }
+            if (monthly.size > 1) {
+                item(key = "replay-monthly") {
+                    Column(
+                        Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(9.dp)
+                    ) {
+                        Text("Listening by month", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        val maximum = monthly.maxOfOrNull { it.totalMs }?.coerceAtLeast(1L) ?: 1L
+                        monthly.forEach { month ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(month.label, modifier = Modifier.width(48.dp), style = MaterialTheme.typography.labelSmall)
+                                Box(
+                                    Modifier.weight(1f).height(9.dp).clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    Box(
+                                        Modifier.fillMaxWidth((month.totalMs.toFloat() / maximum).coerceIn(0f, 1f))
+                                            .fillMaxHeight()
+                                            .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                    )
+                                }
                             }
                         }
+                    }
+                }
+            }
+            if (topArtists.isNotEmpty()) {
+                item(key = "replay-top-artists") {
+                    Column {
+                        Text(
+                            "Top artists",
+                            modifier = Modifier.padding(start = 20.dp, bottom = 8.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            items(topArtists, key = { it.name }) { artist ->
+                                Column(
+                                    Modifier.width(104.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    val image = viewModel.artistProfileMap[artist.name]
+                                    if (!image.isNullOrBlank()) {
+                                        AsyncImage(
+                                            model = image,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(88.dp).clip(CircleShape),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else {
+                                        Box(
+                                            Modifier.size(88.dp).clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(Icons.Default.Person, null, modifier = Modifier.size(36.dp))
+                                        }
+                                    }
+                                    Spacer(Modifier.height(6.dp))
+                                    Text(artist.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(
+                                        artist.sessions.toString() + " plays",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            item(key = "replay-top-songs-title") {
+                Text(
+                    "Top songs",
+                    modifier = Modifier.padding(start = 20.dp, top = 8.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            itemsIndexed(topSongs, key = { _, item -> item.id }) { index, item ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        val queue = topSongs.map { summary -> toSongItem(summary) }
+                        viewModel.setShuffleEnabled(false)
+                        viewModel.setSongList(queue)
+                        viewModel.playSongAtIndex(index)
+                    }.padding(horizontal = 16.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        (index + 1).toString(),
+                        modifier = Modifier.width(32.dp),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = if (index < 3) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (!item.thumbnailUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(item.thumbnailUrl).crossfade(false).build(),
+                            contentDescription = null,
+                            modifier = Modifier.size(52.dp).clip(RoundedCornerShape(10.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(
+                            Modifier.size(52.dp).clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) { Icon(Icons.Default.MusicNote, null) }
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(item.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(item.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text((item.totalMs / 60_000L).toString() + " min", style = MaterialTheme.typography.labelMedium)
+                        Text(
+                            item.sessions.toString() + " plays",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
         }
     }
 }
+
+private fun accountViewModelRefreshReplay(context: Context) {
+    val activity = getActivityFromContext(context) as? androidx.fragment.app.FragmentActivity ?: return
+    ViewModelProvider(activity)[AccountViewModel::class.java].loadLibrary()
+}
+
 
 private fun isSpatialFlowDownloadedSong(song: SongItem): Boolean =
     isSpatialFlowDownloadedLocation(song.mediaStoreRelativePath, song.path ?: song.data)
