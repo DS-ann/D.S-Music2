@@ -1889,15 +1889,25 @@ class AudioPlaybackService : MediaSessionService() {
             }
             
             val mediaItem = buildMediaItem(uri)
+            val requestedStartPosition = pendingSeekPos
             if (currentSong?.isCachedTrack == true) {
-                player.setMediaSource(buildCacheOnlyMediaSource(mediaItem))
+                val cacheSource = buildCacheOnlyMediaSource(mediaItem)
+                if (requestedStartPosition >= 0L) {
+                    player.setMediaSource(cacheSource, requestedStartPosition)
+                } else {
+                    player.setMediaSource(cacheSource)
+                }
             } else {
-                player.setMediaItem(mediaItem)
+                if (requestedStartPosition >= 0L) {
+                    player.setMediaItem(mediaItem, requestedStartPosition)
+                } else {
+                    player.setMediaItem(mediaItem)
+                }
             }
-            
-            // The pending resume point is applied from onPlaybackStateChanged(STATE_READY).
-            // Do not consume it here: ExoPlayer can discard a pre-prepare seek while swapping
-            // from a muxed video item back to an audio-only item.
+            // Store the resume point inside the new Media3 media source transaction. This
+            // survives video/audio swaps more reliably than seeking before prepare. Later
+            // asynchronous cross-device resume requests still use the READY listener.
+            if (requestedStartPosition >= 0L) pendingSeekPos = -1L
 
             // Effects/normalization were removed; every newly loaded track must start
             // with normal playback gain rather than inherit a stale crossfade volume.
@@ -2462,36 +2472,62 @@ class AudioPlaybackService : MediaSessionService() {
         if (!enabled) {
             if (!vm.isVideoMode.value) return
             val position = captureVideoModePosition(vm)
+            val wasPlaying = player.isPlaying
+            // Stop spending bandwidth on the muxed video while the audio-only source is resolved.
+            player.pause()
             vm.setVideoModeState(false)
-            loadAndPlay("innertube://$videoId".toUri(), position)
+            if (wasPlaying) {
+                loadAndPlay("innertube://$videoId".toUri(), position)
+            } else {
+                loadAudio("innertube://$videoId".toUri(), position)
+            }
             return
         }
 
         if (vm.isVideoMode.value) return
         val songId = song.id
         val position = captureVideoModePosition(vm)
+        val wasPlaying = player.isPlaying
         isResolvingVideoMode = true
         vm.setLoading(true)
+        // Pause the current audio stream during extraction to avoid overlapping audio and video
+        // downloads. Its original timestamp and play/pause state are restored on the new source.
+        player.pause()
         serviceScope.launch {
-            val videoUrl = withContext(Dispatchers.IO) {
-                com.dsann.music.data.innertube.NewPipeStreamExtractor.getVideoStreamUrl(videoId)
-            }
-            isResolvingVideoMode = false
+            try {
+                val videoUrl = withContext(Dispatchers.IO) {
+                    com.dsann.music.data.innertube.NewPipeStreamExtractor.getVideoStreamUrl(videoId)
+                }
 
-            if (viewModel?.currentSong?.value?.id != songId) {
+                if (viewModel?.currentSong?.value?.id != songId) {
+                    vm.setLoading(false)
+                    return@launch
+                }
+                if (videoUrl.isNullOrBlank()) {
+                    vm.setLoading(false)
+                    if (wasPlaying) player.play()
+                    com.dsann.music.ui.SnackbarController.showMessage(
+                        "No compatible video stream is available for this track. Audio playback is unchanged."
+                    )
+                    return@launch
+                }
+
+                vm.setVideoModeState(true)
+                if (wasPlaying) {
+                    loadAndPlay(videoUrl.toUri(), position)
+                } else {
+                    loadAudio(videoUrl.toUri(), position)
+                }
+            } catch (error: Exception) {
                 vm.setLoading(false)
-                return@launch
-            }
-            if (videoUrl.isNullOrBlank()) {
-                vm.setLoading(false)
+                if (viewModel?.currentSong?.value?.id == songId && wasPlaying) player.play()
+                Log.w(TAG, "Video mode switch failed for $videoId", error)
                 com.dsann.music.ui.SnackbarController.showMessage(
-                    "No compatible video stream is available for this track. Audio playback is unchanged."
+                    "Could not switch to video. Audio playback remains available."
                 )
-                return@launch
+            } finally {
+                isResolvingVideoMode = false
             }
-
-            vm.setVideoModeState(true)
-            loadAndPlay(videoUrl.toUri(), position)
         }
     }
 
@@ -2505,7 +2541,15 @@ class AudioPlaybackService : MediaSessionService() {
         val song = vm.currentSong.value ?: return
         if (song.videoId.isNullOrBlank()) return
         val position = captureVideoModePosition(vm)
-        loadAndPlay(streamUrl.toUri(), position)
+        val wasPlaying = player.isPlaying
+        // A quality swap is another stream replacement: pause first so the old resolution
+        // does not continue consuming network while the new one begins.
+        player.pause()
+        if (wasPlaying) {
+            loadAndPlay(streamUrl.toUri(), position)
+        } else {
+            loadAudio(streamUrl.toUri(), position)
+        }
     }
 
     private fun captureVideoModePosition(vm: PlayerSharedViewModel): Long {
