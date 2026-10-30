@@ -14,6 +14,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -92,6 +94,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dsann.music.MainActivity
 import com.dsann.music.R
+import com.dsann.music.model.PlayerGestureAction
 import com.dsann.music.model.SongItem
 import com.dsann.music.ui.player.ArtworkPager
 import com.dsann.music.ui.player.FullPlayerScreen
@@ -750,6 +753,8 @@ fun PlayerBottomSheetCompose(
         val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
         val isVideoMode by viewModel.isVideoMode.collectAsStateWithLifecycle()
         val audioService by viewModel.audioServiceState.collectAsStateWithLifecycle()
+        val gestureSettings by viewModel.playerGestureSettings.collectAsStateWithLifecycle()
+        val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
         var videoQualityOptions by remember {
             mutableStateOf<List<com.dsann.music.data.innertube.VideoStreamOption>>(emptyList())
         }
@@ -918,6 +923,54 @@ fun PlayerBottomSheetCompose(
         val isPlaybackReady by viewModel.isPlaybackReady.collectAsStateWithLifecycle()
 
         var currentSheetContentState by remember { mutableStateOf(PlayerSheetState.COLLAPSED) }
+
+        fun performPlayerGesture(action: PlayerGestureAction, touchedLeftSide: Boolean = false) {
+            when (action) {
+                PlayerGestureAction.NEXT -> viewModel.playNextSong()
+                PlayerGestureAction.PREVIOUS -> viewModel.playPreviousSong()
+                PlayerGestureAction.SEEK_BACK -> viewModel.seekTo((currentPosition - 10_000).coerceAtLeast(0))
+                PlayerGestureAction.SEEK_AHEAD -> viewModel.seekTo(currentPosition + 10_000)
+                PlayerGestureAction.SEEK_SIDES -> {
+                    val delta = gestureSettings.doubleTapSeekSeconds * 1000
+                    viewModel.seekTo(if (touchedLeftSide) {
+                        (currentPosition - delta).coerceAtLeast(0)
+                    } else {
+                        currentPosition + delta
+                    })
+                }
+                PlayerGestureAction.PLAY_PAUSE -> {
+                    if (isPlaying) viewModel.pauseAudio() else viewModel.playAudio()
+                }
+                PlayerGestureAction.LIKE -> viewModel.toggleFavorite()
+                PlayerGestureAction.QUEUE -> viewModel.setQueueExpanded(true)
+                PlayerGestureAction.LYRICS -> viewModel.setLyricsModeEnabled(true)
+                PlayerGestureAction.VIDEO -> audioService?.setVideoMode(!isVideoMode)
+                PlayerGestureAction.STOP -> viewModel.dismissPlayer()
+                PlayerGestureAction.OPEN -> currentSheetContentState = PlayerSheetState.EXPANDED
+                PlayerGestureAction.NONE -> Unit
+            }
+        }
+
+        fun handleCoverTap() {
+            when {
+                isLyricsModeEnabled -> viewModel.setLyricsModeEnabled(false)
+                currentSheetContentState != PlayerSheetState.EXPANDED ||
+                    playerContentExpansionFraction.value < 0.95f -> {
+                    currentSheetContentState = PlayerSheetState.EXPANDED
+                }
+                playerContentExpansionFraction.value >= 0.98f && !isQueueExpanded -> {
+                    viewModel.setLyricsModeEnabled(true)
+                }
+            }
+        }
+
+        fun handleMiniSwipeDown() {
+            if (gestureSettings.miniSwipeDown == PlayerGestureAction.STOP) {
+                viewModel.dismissPlayer()
+            } else {
+                performPlayerGesture(gestureSettings.miniSwipeDown)
+            }
+        }
 
         // Keep one animation owner for gesture, tap and Back transitions. The old drag handler
         // and the state observer both animated the same Animatables, sometimes cancelling a
@@ -1150,9 +1203,37 @@ fun PlayerBottomSheetCompose(
                                         placeable.placeRelative(startPaddingPx, 0)
                                     }
                                 }
-                                .miniPlayerDismissHorizontalGesture(
-                                    enabled = currentSheetContentState == PlayerSheetState.COLLAPSED,
-                                    handler = miniDismissGestureHandler
+                                .then(
+                                    if (currentSheetContentState == PlayerSheetState.COLLAPSED) {
+                                        Modifier.pointerInput(gestureSettings, isLyricsModeEnabled, isQueueExpanded) {
+                                            var dragX = 0f
+                                            var dragY = 0f
+                                            detectDragGestures(
+                                                onDragStart = {
+                                                    dragX = 0f
+                                                    dragY = 0f
+                                                },
+                                                onDrag = { change, amount ->
+                                                    dragX += amount.x
+                                                    dragY += amount.y
+                                                    change.consume()
+                                                },
+                                                onDragEnd = {
+                                                    if (isLyricsModeEnabled || isQueueExpanded) return@detectDragGestures
+                                                    if (kotlin.math.max(kotlin.math.abs(dragX), kotlin.math.abs(dragY)) < 24.dp.toPx()) return@detectDragGestures
+                                                    when {
+                                                        kotlin.math.abs(dragX) >= kotlin.math.abs(dragY) && dragX < 0 ->
+                                                            performPlayerGesture(gestureSettings.miniSwipeLeft)
+                                                        kotlin.math.abs(dragX) >= kotlin.math.abs(dragY) && dragX > 0 ->
+                                                            performPlayerGesture(gestureSettings.miniSwipeRight)
+                                                        dragY < 0 ->
+                                                            performPlayerGesture(gestureSettings.miniSwipeUp)
+                                                        else -> handleMiniSwipeDown()
+                                                    }
+                                                }
+                                            )
+                                        }
+                                    } else Modifier
                                 )
                                 .graphicsLayer {
                                     translationX = offsetAnimatable.value
@@ -1168,16 +1249,18 @@ fun PlayerBottomSheetCompose(
                                     shape = playerShadowShape
                                 )
                                 .playerSheetVerticalDragGesture(enabled = !isLyricsModeEnabled && !isQueueExpanded, handler = sheetVerticalDragGestureHandler)
-                                .clickable(
-                                    enabled = !isLyricsModeEnabled,
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null
-                                ) {
-                                    currentSheetContentState = if (currentSheetContentState == PlayerSheetState.COLLAPSED) {
-                                        PlayerSheetState.EXPANDED
-                                    } else {
-                                        PlayerSheetState.COLLAPSED
-                                    }
+                                .pointerInput(currentSheetContentState, isLyricsModeEnabled) {
+                                    detectTapGestures(
+                                        onTap = {
+                                            if (!isLyricsModeEnabled) {
+                                                currentSheetContentState = if (currentSheetContentState == PlayerSheetState.COLLAPSED) {
+                                                    PlayerSheetState.EXPANDED
+                                                } else {
+                                                    PlayerSheetState.COLLAPSED
+                                                }
+                                            }
+                                        }
+                                    )
                                 }
                         ) {
                             val verticalDragModifier = Modifier.playerSheetVerticalDragGesture(
@@ -1257,32 +1340,77 @@ fun PlayerBottomSheetCompose(
                             // Put the click target inside the transformed layer. With clickable
                             // outside graphicsLayer, taps on the old 90%-screen layout bounds could
                             // open lyrics even when the visible cover was elsewhere/smaller.
-                            .clickable(
-                                enabled = !isVideoMode || playerContentExpansionFraction.value <= 0.95f,
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
+                            .pointerInput(
+                                gestureSettings,
+                                currentSheetContentState,
+                                isLyricsModeEnabled,
+                                isQueueExpanded,
+                                isVideoMode
                             ) {
-                                when {
-                                    isLyricsModeEnabled -> {
-                                        // Tapping the compact cover in the lyrics app bar returns
-                                        // to the full player.
-                                        viewModel.setLyricsModeEnabled(false)
-                                    }
-                                    currentSheetContentState != PlayerSheetState.EXPANDED ||
-                                        playerContentExpansionFraction.value < 0.95f -> {
-                                        // First tap from mini-player only expands the player.
-                                        currentSheetContentState = PlayerSheetState.EXPANDED
-                                    }
-                                    else -> {
-                                        // Lyrics open only from a deliberate tap on the visible artwork.
-                                        // Other upper player surfaces must remain player controls.
-                                        if (playerContentExpansionFraction.value >= 0.98f &&
-                                            !isQueueExpanded
+                                detectTapGestures(
+                                    onTap = {
+                                        if (!isVideoMode || playerContentExpansionFraction.value <= 0.95f) {
+                                            handleCoverTap()
+                                        }
+                                    },
+                                    onDoubleTap = { position ->
+                                        if (currentSheetContentState == PlayerSheetState.EXPANDED &&
+                                            playerContentExpansionFraction.value >= 0.95f &&
+                                            !isLyricsModeEnabled && !isQueueExpanded
                                         ) {
-                                            viewModel.setLyricsModeEnabled(true)
+                                            performPlayerGesture(
+                                                gestureSettings.coverDoubleTap,
+                                                touchedLeftSide = position.x < size.width / 2f
+                                            )
+                                        }
+                                    },
+                                    onLongPress = {
+                                        if (currentSheetContentState == PlayerSheetState.EXPANDED &&
+                                            playerContentExpansionFraction.value >= 0.95f
+                                        ) {
+                                            performPlayerGesture(gestureSettings.coverLongPress)
                                         }
                                     }
-                                }
+                                )
+                            }
+                            .pointerInput(
+                                gestureSettings,
+                                currentSheetContentState,
+                                isLyricsModeEnabled,
+                                isQueueExpanded,
+                                isVideoMode
+                            ) {
+                                var dragX = 0f
+                                var dragY = 0f
+                                detectDragGestures(
+                                    onDragStart = {
+                                        dragX = 0f
+                                        dragY = 0f
+                                    },
+                                    onDrag = { change, amount ->
+                                        dragX += amount.x
+                                        dragY += amount.y
+                                        change.consume()
+                                    },
+                                    onDragEnd = {
+                                        if (currentSheetContentState != PlayerSheetState.EXPANDED ||
+                                            playerContentExpansionFraction.value < 0.95f ||
+                                            isLyricsModeEnabled || isQueueExpanded || isVideoMode
+                                        ) return@detectDragGestures
+
+                                        val threshold = 34.dp.toPx()
+                                        if (kotlin.math.max(kotlin.math.abs(dragX), kotlin.math.abs(dragY)) < threshold) return@detectDragGestures
+                                        when {
+                                            kotlin.math.abs(dragX) >= kotlin.math.abs(dragY) && dragX < 0 ->
+                                                performPlayerGesture(gestureSettings.coverSwipeLeft)
+                                            kotlin.math.abs(dragX) >= kotlin.math.abs(dragY) && dragX > 0 ->
+                                                performPlayerGesture(gestureSettings.coverSwipeRight)
+                                            dragY < 0 ->
+                                                performPlayerGesture(gestureSettings.coverSwipeUp)
+                                            else -> currentSheetContentState = PlayerSheetState.COLLAPSED
+                                        }
+                                    }
+                                )
                             }
                             .zIndex(if (isQueueExpanded) 1f else if (isLyricsModeEnabled || lyricsArtworkProgress > 0f) 6f else 3f)
                     ) {
