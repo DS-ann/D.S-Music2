@@ -255,6 +255,12 @@ fun SpatialFlowTheme(
                 "Amber" -> 0xFFFFC36F.toInt()
                 "Rose" -> 0xFFFF8FA3.toInt()
                 "Monochrome" -> 0xFFC9CDD4.toInt()
+                "Crimson" -> 0xFFD94A65.toInt()
+                "Teal" -> 0xFF36B9A8.toInt()
+                "Cyan" -> 0xFF43B8D2.toInt()
+                "Indigo" -> 0xFF6475E9.toInt()
+                "Lime" -> 0xFF9FBF42.toInt()
+                "Graphite" -> 0xFF8A939F.toInt()
                 else -> 0xFF6FA8FF.toInt()
             }
             val onPrimary = if (androidx.core.graphics.ColorUtils.calculateLuminance(presetArgb) > 0.52) {
