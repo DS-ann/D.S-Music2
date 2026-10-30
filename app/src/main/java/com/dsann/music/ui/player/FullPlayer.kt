@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -854,8 +855,6 @@ fun FullPlayer(
         // Tie the visibility/readiness directly to the lyricsRevealProgress animation state
         val lyricsContentReady = lyricsRevealProgress > 0.8f
 
-        val useWidePlayer = configuration.screenWidthDp >= 840 ||
-            (configuration.screenWidthDp >= 600 && configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
         val playerControlsContent: @Composable ColumnScope.() -> Unit = {
             // Header Row (Nav controls + collapse) - Symmetric centering
             Row(
