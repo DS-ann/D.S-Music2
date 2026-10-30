@@ -1,6 +1,6 @@
 name: Manual Android + Windows Release
 
-run-name: Publish SpatialFlow ${{ inputs.release_tag }} (Android + Windows)
+run-name: Publish D.S Music ${{ inputs.release_tag }} (Android + Windows)
 
 on:
   workflow_dispatch:
@@ -29,7 +29,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: spatialflow-dual-release-${{ inputs.release_tag }}
+  group: dsmusic-dual-release-${{ inputs.release_tag }}
   cancel-in-progress: false
 
 jobs:
@@ -41,7 +41,7 @@ jobs:
       - name: Checkout Android source
         uses: actions/checkout@v7
         with:
-          repository: DS-ann/SpatialFlow
+          repository: DS-ann/D.S-Music2
           ref: ${{ inputs.phone_ref }}
 
       - name: Set up JDK 17
@@ -86,9 +86,9 @@ jobs:
           SOURCE_APK="$BUILD_DIR/app-arm64-v8a-release-unsigned.apk"
           test -s "$SOURCE_APK"
 
-          KEYSTORE="$RUNNER_TEMP/spatialflow-release-keystore.p12"
-          ALIGNED_APK="$RUNNER_TEMP/spatialflow-android-aligned.apk"
-          OUTPUT_APK="$RUNNER_TEMP/SpatialFlow-Android.apk"
+          KEYSTORE="$RUNNER_TEMP/dsmusic-release-keystore.p12"
+          ALIGNED_APK="$RUNNER_TEMP/dsmusic-android-aligned.apk"
+          OUTPUT_APK="$RUNNER_TEMP/D.S-Music-Android.apk"
           ZIPALIGN="$ANDROID_HOME/build-tools/37.0.0/zipalign"
           APK_SIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
 
@@ -107,15 +107,15 @@ jobs:
             --out "$OUTPUT_APK" "$ALIGNED_APK"
 
           mkdir -p release-assets/android
-          cp "$OUTPUT_APK" release-assets/android/SpatialFlow-Android.apk
-          sha256sum release-assets/android/SpatialFlow-Android.apk \
-            > release-assets/android/SpatialFlow-Android.apk.sha256
-          "$APK_SIGNER" verify --verbose --print-certs release-assets/android/SpatialFlow-Android.apk
+          cp "$OUTPUT_APK" release-assets/android/D.S-Music-Android.apk
+          sha256sum release-assets/android/D.S-Music-Android.apk \
+            > release-assets/android/D.S-Music-Android.apk.sha256
+          "$APK_SIGNER" verify --verbose --print-certs release-assets/android/D.S-Music-Android.apk
 
       - name: Upload Android release assets
         uses: actions/upload-artifact@v7
         with:
-          name: spatialflow-android-release
+          name: dsmusic-android-release
           path: release-assets/android/*
           if-no-files-found: error
           retention-days: 7
@@ -128,7 +128,7 @@ jobs:
       - name: Checkout Windows desktop source
         uses: actions/checkout@v7
         with:
-          repository: DS-ann/SpatialFlow
+          repository: DS-ann/D.S-Music2
           ref: ${{ inputs.windows_ref }}
 
       - name: Set up JDK 17
@@ -156,16 +156,16 @@ jobs:
             throw "Gradle did not create a Windows .exe installer."
           }
           New-Item -ItemType Directory -Force -Path "release-assets/windows" | Out-Null
-          $destination = "release-assets/windows/SpatialFlow-Windows-Setup.exe"
+          $destination = "release-assets/windows/D.S-Music-Windows-Setup.exe"
           Copy-Item $source.FullName $destination -Force
           $hash = (Get-FileHash $destination -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  SpatialFlow-Windows-Setup.exe" |
-            Set-Content "release-assets/windows/SpatialFlow-Windows-Setup.exe.sha256" -Encoding ascii
+          "$hash  D.S-Music-Windows-Setup.exe" |
+            Set-Content "release-assets/windows/D.S-Music-Windows-Setup.exe.sha256" -Encoding ascii
 
       - name: Upload Windows release assets
         uses: actions/upload-artifact@v7
         with:
-          name: spatialflow-windows-release
+          name: dsmusic-windows-release
           path: release-assets/windows/*
           if-no-files-found: error
           retention-days: 7
@@ -181,21 +181,21 @@ jobs:
       - name: Download Android release assets
         uses: actions/download-artifact@v8
         with:
-          name: spatialflow-android-release
+          name: dsmusic-android-release
           path: release-assets/android
 
       - name: Download Windows release assets
         uses: actions/download-artifact@v8
         with:
-          name: spatialflow-windows-release
+          name: dsmusic-windows-release
           path: release-assets/windows
 
       - name: Verify both release packages are present
         shell: bash
         run: |
           set -euo pipefail
-          test -s release-assets/android/SpatialFlow-Android.apk
-          test -s release-assets/windows/SpatialFlow-Windows-Setup.exe
+          test -s release-assets/android/D.S-Music-Android.apk
+          test -s release-assets/windows/D.S-Music-Windows-Setup.exe
           ls -lh release-assets/android release-assets/windows
 
       - name: Create or update GitHub Release
@@ -203,14 +203,14 @@ jobs:
         with:
           tag_name: ${{ inputs.release_tag }}
           target_commitish: ${{ inputs.windows_ref }}
-          name: SpatialFlow ${{ inputs.release_tag }} — Android + Windows
+          name: D.S Music ${{ inputs.release_tag }} — Android + Windows
           draft: false
           prerelease: ${{ inputs.prerelease }}
           make_latest: true
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            release-assets/android/SpatialFlow-Android.apk
-            release-assets/android/SpatialFlow-Android.apk.sha256
-            release-assets/windows/SpatialFlow-Windows-Setup.exe
-            release-assets/windows/SpatialFlow-Windows-Setup.exe.sha256
+            release-assets/android/D.S-Music-Android.apk
+            release-assets/android/D.S-Music-Android.apk.sha256
+            release-assets/windows/D.S-Music-Windows-Setup.exe
+            release-assets/windows/D.S-Music-Windows-Setup.exe.sha256
