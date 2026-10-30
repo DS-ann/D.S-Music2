@@ -169,7 +169,11 @@ class MainActivity : AppCompatActivity() {
 
         setupSystemBars()
 
-        playerViewModel.loadLastPlaybackState()
+        // Keep the live ViewModel position during a configuration change. Only read the
+        // persisted checkpoint when creating a fresh playback ViewModel after process death.
+        if (savedInstanceState == null || playerViewModel.currentSong.value == null) {
+            playerViewModel.loadLastPlaybackState()
+        }
 
         // Media3 cache index loading can be slow on cold/large caches. Prepare it off
         // the UI thread before creating the playback service.
