@@ -7,7 +7,7 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 
 /**
- * Converts karaoke formats from external lyrics catalogues into SpatialFlow's
+ * Converts karaoke formats from external lyrics catalogues into D.S Music's
  * existing LyricLine/LyricWord model. Raw payloads are wrapped with an internal
  * marker so they survive the existing LyricsResult and cache flow.
  */
