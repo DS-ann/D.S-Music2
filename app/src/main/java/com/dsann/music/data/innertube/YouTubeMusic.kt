@@ -78,9 +78,9 @@ object YouTubeMusic {
             // Live broadcasts come from standard YouTube search; every other category comes from YouTube Music.
             kotlinx.coroutines.withTimeout(15000L.milliseconds) {
                 val response = if (filter == SearchFilter.LIVE) {
-                    InnerTubeClient.liveSearch(query.trim())
+                    InnerTubeClient.liveSearch(query.trim(), anonymous = true)
                 } else {
-                    InnerTubeClient.search(query.trim(), filter?.value)
+                    InnerTubeClient.search(query.trim(), filter?.value, anonymous = true)
                 }
                 if (response.entrySet().isEmpty()) {
                     throw IllegalStateException(
@@ -121,63 +121,32 @@ object YouTubeMusic {
         runCatching {
             kotlinx.coroutines.withTimeout(30000L.milliseconds) {
                 coroutineScope {
-                    val mixedRequest = async(Dispatchers.IO) { search(query, null).getOrNull() }
+                    val normalizedQuery = query.trim()
+                    require(normalizedQuery.isNotEmpty()) { "Enter a search query." }
+
+                    // Prism's strategy: independent searches for each result kind, plus
+                    // YouTube Music's own unfiltered Top result card. Do not let a mixed,
+                    // trend-heavy shelf decide what the query means.
+                    val cardRequest = async(Dispatchers.IO) {
+                        runCatching {
+                            InnerTubeClient.search(normalizedQuery, anonymous = true)
+                                .let(InnerTubeParser::parseTopSearchCard)
+                        }.getOrNull()
+                    }
                     val requests = SearchFilter.values().map { filter ->
-                        filter to async(Dispatchers.IO) { search(query, filter).getOrNull() }
-                    }
-                    val mixed = mixedRequest.await()
-                    val sections = requests.mapNotNull { (filter, request) ->
-                        val found = request.await()?.items.orEmpty()
-                        val unique = found.distinctBy { searchItemKey(it) }.take(6)
-                        unique.takeIf { it.isNotEmpty() }?.let { SearchResultSection(filter, it) }
-                    }
-
-                    val candidates = (mixed?.items.orEmpty() + sections.flatMap { it.items })
-                        .distinctBy { searchItemKey(it) }
-                    if (candidates.isEmpty()) {
-                        throw IllegalStateException("No search results were returned")
-                    }
-
-                    val normalizedQuery = normalizeSearchText(query)
-                    fun score(item: SearchItem): Int {
-                        val title = normalizeSearchText(when (item) {
-                            is SearchItem.Song -> item.song.title
-                            is SearchItem.Album -> item.album.title
-                            is SearchItem.Artist -> item.artist.title
-                            is SearchItem.Playlist -> item.playlist.title
-                        })
-                        val detail = normalizeSearchText(when (item) {
-                            is SearchItem.Song -> item.song.artist
-                            is SearchItem.Album -> item.album.artists.joinToString(" ") { it.name }
-                            is SearchItem.Artist -> item.artist.subscriberCount.orEmpty()
-                            is SearchItem.Playlist -> item.playlist.author?.name.orEmpty()
-                        })
-                        return when {
-                            title == normalizedQuery -> 1000
-                            title.startsWith(normalizedQuery) -> 800
-                            normalizedQuery.isNotBlank() && title.contains(normalizedQuery) -> 600
-                            normalizedQuery.isNotBlank() && detail.contains(normalizedQuery) -> 300
-                            else -> 0
+                        filter to async(Dispatchers.IO) {
+                            search(normalizedQuery, filter).getOrNull()?.items.orEmpty()
                         }
                     }
 
-                    val top = candidates.maxWithOrNull(
-                        compareBy<SearchItem> { score(it) }
-                            .thenBy { if (it is SearchItem.Song) 1 else 0 }
-                    )
-                    val topKey = top?.let(::searchItemKey)
-                    val visibleSections = sections.mapNotNull { section ->
-                        val remaining = section.items.filterNot { searchItemKey(it) == topKey }
-                        remaining.takeIf { it.isNotEmpty() }?.let { section.copy(items = it) }
+                    val results = requests.map { (filter, deferred) -> filter to deferred.await() }
+                    val card = cardRequest.await()
+                    if (results.all { it.second.isEmpty() } && card == null) {
+                        throw IllegalStateException("No results were returned for this search.")
                     }
-                    val allItems = visibleSections.flatMap { it.items }
-                        .ifEmpty { candidates.filterNot { searchItemKey(it) == topKey } }
-                    SearchResult(
-                        items = allItems,
-                        continuation = null,
-                        topResult = top,
-                        sections = visibleSections
-                    )
+
+                    val ranked = SearchRank.rank(normalizedQuery, results, card)
+                    ranked
                 }
             }
         }
