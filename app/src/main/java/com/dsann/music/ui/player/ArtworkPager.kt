@@ -2,6 +2,9 @@ package com.dsann.music.ui.player
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RectangleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -29,6 +32,7 @@ import coil.request.ImageRequest
 import com.dsann.music.R
 import com.dsann.music.model.SongItem
 import com.dsann.music.viewmodel.PlayerSharedViewModel
+import com.dsann.music.ui.theme.observeKey
 
 @Composable
 fun ArtworkPager(
@@ -40,6 +44,17 @@ fun ArtworkPager(
     modifier: Modifier = Modifier,
     userScrollEnabled: Boolean = true
 ) {
+    val artworkShapeName by context
+        .getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+        .observeKey("player_artwork_shape", "Rounded")
+    val artworkShape = remember(artworkShapeName) {
+        when (artworkShapeName) {
+            "Square" -> RectangleShape
+            "Circle" -> CircleShape
+            else -> RoundedCornerShape(24.dp)
+        }
+    }
+
     val pagerState = rememberPagerState(
         initialPage = currentSongIndex.coerceAtLeast(0)
     ) {
@@ -101,13 +116,14 @@ fun ArtworkPager(
                                 isError = true
                             }
                         },
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().clip(artworkShape),
                         contentScale = ContentScale.Crop
                     )
                 } else {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
+                            .clip(artworkShape)
                             .background(
                                 Brush.verticalGradient(
                                     colors = listOf(
