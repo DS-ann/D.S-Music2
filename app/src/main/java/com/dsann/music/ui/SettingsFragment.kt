@@ -364,7 +364,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val playerArtworkShape: StateFlow<String> = _playerArtworkShape.asStateFlow()
 
     fun setPlayerArtworkShape(shape: String) {
-        val safeShape = shape.takeIf { it in listOf("Rounded", "Square", "Circle") } ?: "Rounded"
+        val safeShape = shape.takeIf {
+            it in listOf("Rounded", "Square", "Circle", "Squircle", "Flower", "Cookie", "Arch", "Slanted")
+        } ?: "Rounded"
         _playerArtworkShape.value = safeShape
         prefs.edit { putString(KEY_PLAYER_ARTWORK_SHAPE, safeShape) }
     }
