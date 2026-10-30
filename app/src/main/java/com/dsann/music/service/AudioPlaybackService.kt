@@ -987,6 +987,14 @@ class AudioPlaybackService : MediaSessionService() {
                 updateMediaSessionCustomLayout()
             }
         }
+
+        // The service can begin playback before the Activity binds its ViewModel (for example,
+        // after a notification/widget action). Resume cover/lyrics preparation when it binds.
+        if (player.isPlaying) {
+            cacheAssetsSongId = null
+            ensureCurrentTrackCacheAssets()
+            startCurrentTrackCache()
+        }
     }
 
     @JvmOverloads
@@ -1463,7 +1471,7 @@ class AudioPlaybackService : MediaSessionService() {
                 }
 
                 val writer = CacheWriter(
-                    createCacheDataSourceFactory(applicationContext).createDataSource(),
+                    createCacheDataSourceFactory(applicationContext).createDataSourceForDownloading(),
                     DataSpec.Builder().setUri(uri).setKey(cacheKey).build(),
                     null,
                     null
