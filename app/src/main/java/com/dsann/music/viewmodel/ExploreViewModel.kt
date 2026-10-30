@@ -230,10 +230,11 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     fun setSearchQuery(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
-        if (query.length >= 2) {
+        if (query.isNotBlank()) {
             fetchSuggestions(query)
         } else {
-            _uiState.update { it.copy(suggestions = emptyList()) }
+            suggestJob?.cancel()
+            _uiState.update { it.copy(suggestions = emptyList(), suggestionItems = emptyList()) }
         }
     }
 
@@ -263,7 +264,12 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 if (trimmedQuery.isNotEmpty()) {
                     addToSearchHistory(trimmedQuery)
                 }
-                val result = YouTubeMusic.search(trimmedQuery, _uiState.value.searchFilter)
+                val activeFilter = _uiState.value.searchFilter
+                val result = if (activeFilter == null) {
+                    YouTubeMusic.searchTop(trimmedQuery)
+                } else {
+                    YouTubeMusic.search(trimmedQuery, activeFilter)
+                }
                 result.onSuccess { searchResult ->
                     // Filter duplicates to prevent duplicate keys in lazy lists
                     val seenIds = mutableSetOf<String>()
@@ -277,7 +283,33 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                         val isNotInterested = item is SearchItem.Song && _uiState.value.notInterestedIds.contains(item.song.videoId)
                         !isNotInterested && seenIds.add(id)
                     }
-                    _uiState.update { it.copy(searchResults = uniqueItems) }
+                    val visibleTop = searchResult.topResult?.let { top ->
+                        val topId = when (top) {
+                            is SearchItem.Song -> "song:" + top.song.videoId
+                            is SearchItem.Album -> "album:" + top.album.browseId
+                            is SearchItem.Artist -> "artist:" + top.artist.browseId
+                            is SearchItem.Playlist -> "playlist:" + top.playlist.playlistId
+                        }
+                        if (top is SearchItem.Song && _uiState.value.notInterestedIds.contains(top.song.videoId)) null
+                        else top.takeIf { uniqueItems.none { item ->
+                            when (item) {
+                                is SearchItem.Song -> "song:" + item.song.videoId
+                                is SearchItem.Album -> "album:" + item.album.browseId
+                                is SearchItem.Artist -> "artist:" + item.artist.browseId
+                                is SearchItem.Playlist -> "playlist:" + item.playlist.playlistId
+                            } == topId
+                        } }
+                    } ?: searchResult.topResult
+
+                    _uiState.update {
+                        it.copy(
+                            searchResults = uniqueItems,
+                            searchTopResult = visibleTop,
+                            searchSections = searchResult.sections,
+                            suggestions = emptyList(),
+                            suggestionItems = emptyList()
+                        )
+                    }
                     searchContinuation = searchResult.continuation
                     // Only warm visible artwork and the first likely playback target. Larger prefetch
                     // bursts compete with scrolling and playback on low-RAM/older Android devices.
@@ -356,14 +388,21 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         if (!explorePageActive) return
         suggestJob?.cancel()
         suggestJob = viewModelScope.launch {
-            delay(300.milliseconds) // Debounce
+            delay(300.milliseconds)
             try {
-                val result = YouTubeMusic.searchSuggestions(query)
+                val result = YouTubeMusic.searchSuggestionsWithItems(query)
                 result.onSuccess { suggestions ->
-                    _uiState.update { it.copy(suggestions = suggestions.take(8)) }
+                    _uiState.update {
+                        if (it.searchQuery != query) it
+                        else it.copy(
+                            suggestions = suggestions.queries.take(8),
+                            suggestionItems = suggestions.items.take(3)
+                        )
+                    }
                 }
-            } catch (_: Exception) {
-                // Silently ignore suggestion errors
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                // Suggestions are supplementary; the submitted query remains searchable.
             }
         }
     }
@@ -374,6 +413,9 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 searchQuery = "",
                 searchResults = emptyList(),
                 suggestions = emptyList(),
+                suggestionItems = emptyList(),
+                searchTopResult = null,
+                searchSections = emptyList(),
                 searchFilter = null
             )
         }
@@ -863,6 +905,9 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 detailStack = emptyList(),
                 searchQuery = "",
                 searchResults = emptyList(),
+                suggestionItems = emptyList(),
+                searchTopResult = null,
+                searchSections = emptyList(),
                 isSearching = false
             )
         }
@@ -1161,7 +1206,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 data class ExploreUiState(
     val searchQuery: String = "",
     val searchResults: List<SearchItem> = emptyList(),
+    val searchTopResult: SearchItem? = null,
+    val searchSections: List<com.dsann.music.data.innertube.SearchResultSection> = emptyList(),
     val suggestions: List<String> = emptyList(),
+    val suggestionItems: List<SearchItem> = emptyList(),
     val isSearching: Boolean = false,
     val homeSections: List<HomeSection> = emptyList(),
     val isLoadingHome: Boolean = false,
