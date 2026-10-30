@@ -149,7 +149,7 @@ internal object DesktopYouTubeMusic {
                         ?.joinToString("") { it.asJsonObject.get("text")?.stringOrNull().orEmpty() }
                         ?.trim().orEmpty()
                     val duration = renderer.path("lengthText.runs.0.text")?.stringOrNull()
-                    val thumbnail = highResThumbnail(renderer.path("thumbnail.thumbnails")?.asJsonArray)
+                    val thumbnail = DesktopSearchParser.highResThumbnail(renderer.path("thumbnail.thumbnails")?.asJsonArray)
                     OnlineSong(
                         videoId = id,
                         title = title,
@@ -476,7 +476,7 @@ private object DesktopSearchParser {
         return found
     }
 
-    private fun highResThumbnail(thumbnails: JsonArray?): String? {
+    fun highResThumbnail(thumbnails: JsonArray?): String? {
         val url = thumbnails?.lastOrNull()?.asJsonObjectOrNull()?.get("url")?.stringOrNull() ?: return null
         var result = if (url.startsWith("//")) "https:$url" else url
         if (result.contains("=w") && result.contains("-h")) {
