@@ -4,7 +4,9 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -58,6 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
@@ -83,6 +86,98 @@ import com.dsann.music.data.innertube.YouTubeMusic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
+
+@Composable
+private fun PlayerVisualizer(
+    style: String,
+    isPlaying: Boolean,
+    color: Color
+) {
+    val phase = remember { Animatable(0f) }
+    LaunchedEffect(style, isPlaying) {
+        if (!isPlaying || style == "Off") {
+            phase.snapTo(0f)
+        } else {
+            while (true) {
+                phase.animateTo(1f, animationSpec = tween(900, easing = LinearEasing))
+                phase.snapTo(0f)
+            }
+        }
+    }
+    androidx.compose.foundation.Canvas(
+        modifier = Modifier.fillMaxWidth().height(if (style == "Ring") 30.dp else 24.dp)
+    ) {
+        val phaseValue = phase.value
+        val centerY = size.height / 2f
+        when (style) {
+            "Bars" -> {
+                val count = 32
+                val gap = 3.dp.toPx()
+                val barWidth = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
+                repeat(count) { index ->
+                    val wave = kotlin.math.abs(kotlin.math.sin(index * 0.72f + phaseValue * 6.28f))
+                    val height = size.height * (0.18f + wave * if (isPlaying) 0.78f else 0.16f)
+                    val x = index * (barWidth + gap)
+                    drawRoundRect(
+                        color.copy(alpha = 0.35f + wave * 0.55f),
+                        topLeft = androidx.compose.ui.geometry.Offset(x, centerY - height / 2f),
+                        size = androidx.compose.ui.geometry.Size(barWidth, height),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f)
+                    )
+                }
+            }
+            "Wave" -> {
+                val path = androidx.compose.ui.graphics.Path()
+                val points = 70
+                repeat(points + 1) { index ->
+                    val x = size.width * index / points
+                    val y = centerY + kotlin.math.sin(index * 0.24f + phaseValue * 6.28f) * size.height * (if (isPlaying) 0.32f else 0.08f)
+                    if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                drawPath(
+                    path,
+                    color.copy(alpha = 0.85f),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                )
+            }
+            "Ring" -> {
+                val radius = size.height * (0.28f + phaseValue * 0.11f)
+                drawCircle(
+                    color.copy(alpha = if (isPlaying) 0.85f else 0.35f),
+                    radius = radius,
+                    center = androidx.compose.ui.geometry.Offset(size.width / 2f, centerY),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx())
+                )
+                drawCircle(
+                    color.copy(alpha = 0.18f),
+                    radius = radius + 5.dp.toPx(),
+                    center = androidx.compose.ui.geometry.Offset(size.width / 2f, centerY),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+                )
+            }
+            "Pulse" -> {
+                val width = size.width * (0.25f + phaseValue * 0.65f)
+                drawRoundRect(
+                    color.copy(alpha = 0.25f),
+                    topLeft = androidx.compose.ui.geometry.Offset(0f, centerY - 3.dp.toPx()),
+                    size = androidx.compose.ui.geometry.Size(width, 6.dp.toPx()),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())
+                )
+            }
+            "Glow" -> {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        listOf(color.copy(alpha = 0.5f), color.copy(alpha = 0.02f), Color.Transparent),
+                        center = androidx.compose.ui.geometry.Offset(size.width / 2f, centerY),
+                        radius = size.height * (0.25f + phaseValue * 0.5f)
+                    ),
+                    radius = size.height,
+                    center = androidx.compose.ui.geometry.Offset(size.width / 2f, centerY)
+                )
+            }
+        }
+    }
+}
 
 /**
  * Stateful wrapper for the FullPlayer UI component.
@@ -489,16 +584,23 @@ fun FullPlayer(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Premium YT Music style horizontal control chips row
+            if (visualizerStyle != "Off") {
+                PlayerVisualizer(
+                    style = visualizerStyle,
+                    isPlaying = uiState.isPlaying,
+                    color = dynamicAccentColor
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
+            // Reorderable action chips. The selected order is saved by Customize.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .layout { measurable, constraints ->
                         val pad = 20.dp.roundToPx()
                         val placeable = measurable.measure(
-                            constraints.copy(
-                                maxWidth = constraints.maxWidth + 2 * pad
-                            )
+                            constraints.copy(maxWidth = constraints.maxWidth + 2 * pad)
                         )
                         layout(placeable.width - 2 * pad, placeable.height) {
                             placeable.place(-pad, 0)
@@ -510,102 +612,132 @@ fun FullPlayer(
             ) {
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Like/dislike controls are removed from the player.
-
-                // Interactive Lyrics Chip inside the same row
-                PillChip(
-                    icon = painterResource(id = R.drawable.ic_lyrics),
-                    label = "Lyrics",
-                    isSelected = isLyricsModeEnabled,
-                    onClick = {
-                        onLyricsModeChanged(true)
-                        if (currentSongId != null && lastLyricsFetchSongId != currentSongId && !hasLyrics && !isLyricsLoading) {
-                            lastLyricsFetchSongId = currentSongId
-                            onFetchLyrics()
-                        }
-                    },
-                    contentColor = contentColor,
-                    accentColor = dynamicAccentColor,
-                    isDark = isDark,
-                    modifier = Modifier.onGloballyPositioned { coordinates ->
-                        val position = coordinates.positionInRoot()
-                        lyricsButtonCenterInRoot = Offset(
-                            x = position.x + coordinates.size.width / 2f,
-                            y = position.y + coordinates.size.height / 2f
-                        )
-                    }
-                )
-
-
-
-                if (!uiState.currentSong?.videoId.isNullOrBlank()) {
-                    PillChip(
-                        icon = painterResource(id = R.drawable.ic_youtube),
-                        label = if (isVideoMode) "Audio" else "Video",
-                        isSelected = isVideoMode,
-                        onClick = { audioService?.setVideoMode(!isVideoMode) },
-                        contentColor = contentColor,
-                        accentColor = dynamicAccentColor,
-                        isDark = isDark
-                    )
-                }
-
-                PillChip(
-                    icon = painterResource(id = R.drawable.ic_share),
-                    label = "Share",
-                    onClick = {
-                        val shareIntent = Intent().apply {
-                            action = Intent.ACTION_SEND
-                            putExtra(Intent.EXTRA_TEXT, "Listening on SpatialFlow Check out : https://music.youtube.com/watch?v=${uiState.currentSong?.videoId}")
-                            type = "text/plain"
-                        }
-                        context.startActivity(Intent.createChooser(shareIntent, "Share Track"))
-                    },
-                    contentColor = contentColor,
-                    accentColor = dynamicAccentColor,
-                    isDark = isDark
-                )
-
+                val songForActions = uiState.currentSong
                 val realDownloaded = uiState.isCurrentSongDownloaded
                 val realDownloadProgress = uiState.currentSongDownloadProgress
-                val currentSongForDownload = uiState.currentSong
                 val isDownloading = realDownloadProgress != null ||
-                    com.dsann.music.util.SongDownloader.isDownloading(currentSongForDownload?.videoId)
+                    com.dsann.music.util.SongDownloader.isDownloading(songForActions?.videoId)
 
-                val downloadLabel = when {
-                    isDownloading -> "Cancel download"
-                    realDownloaded -> "Downloaded"
-                    else -> "Download"
-                }
-                val downloadIcon: Any = when {
-                    isDownloading -> painterResource(id = R.drawable.ic_close)
-                    realDownloaded -> painterResource(id = R.drawable.ic_downloaded)
-                    else -> painterResource(id = R.drawable.ic_download)
-                }
-                PillChip(
-                    icon = downloadIcon,
-                    label = downloadLabel,
-                    isSelected = realDownloaded || isDownloading,
-                    progress = if (isDownloading) (realDownloadProgress ?: 0) / 100f else null,
-                    onClick = {
-                        val currentSong = uiState.currentSong
-                        if (currentSong != null) {
-                            // Use the download manager's live task map: the Compose state can
-                            // lag behind the user's tap by one frame, especially during startup.
-                            if (com.dsann.music.util.SongDownloader.isDownloading(currentSong.videoId)) {
-                                com.dsann.music.util.SongDownloader.cancelDownload(context, currentSong)
-                            } else {
-                                // The downloaded-state flow may still contain the previous track's
-                                // value immediately after a song change. Start the action regardless;
-                                // SongDownloader verifies the actual file state off the UI thread.
-                                com.dsann.music.util.SongDownloader.downloadSong(context, currentSong)
+                val orderedButtons = if (playerLayout == "Minimal") playerButtons.take(3) else playerButtons
+                orderedButtons.forEach { action ->
+                    when (action) {
+                        "lyrics" -> PillChip(
+                            icon = painterResource(id = R.drawable.ic_lyrics),
+                            label = "Lyrics",
+                            isSelected = isLyricsModeEnabled,
+                            onClick = {
+                                onLyricsModeChanged(true)
+                                if (currentSongId != null && lastLyricsFetchSongId != currentSongId && !hasLyrics && !isLyricsLoading) {
+                                    lastLyricsFetchSongId = currentSongId
+                                    onFetchLyrics()
+                                }
+                            },
+                            contentColor = contentColor,
+                            accentColor = dynamicAccentColor,
+                            isDark = isDark,
+                            modifier = Modifier.onGloballyPositioned { coordinates ->
+                                val position = coordinates.positionInRoot()
+                                lyricsButtonCenterInRoot = Offset(
+                                    x = position.x + coordinates.size.width / 2f,
+                                    y = position.y + coordinates.size.height / 2f
+                                )
                             }
+                        )
+                        "video" -> if (!songForActions?.videoId.isNullOrBlank()) {
+                            PillChip(
+                                icon = painterResource(id = R.drawable.ic_youtube),
+                                label = if (isVideoMode) "Audio" else "Video",
+                                isSelected = isVideoMode,
+                                onClick = { audioService?.setVideoMode(!isVideoMode) },
+                                contentColor = contentColor,
+                                accentColor = dynamicAccentColor,
+                                isDark = isDark
+                            )
                         }
-                    },
-                    contentColor = contentColor,
-                    accentColor = dynamicAccentColor,
-                    isDark = isDark
-                )
+                        "queue" -> PillChip(
+                            icon = painterResource(id = R.drawable.ic_keyboard_arrow_down),
+                            label = "Up next",
+                            isSelected = isQueueExpanded,
+                            onClick = { viewModel.setQueueExpanded(true) },
+                            contentColor = contentColor,
+                            accentColor = dynamicAccentColor,
+                            isDark = isDark
+                        )
+                        "share" -> PillChip(
+                            icon = painterResource(id = R.drawable.ic_share),
+                            label = "Share",
+                            onClick = {
+                                val shareIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    putExtra(Intent.EXTRA_TEXT, "Listening on SpatialFlow. Check out: https://music.youtube.com/watch?v=${songForActions?.videoId.orEmpty()}")
+                                    type = "text/plain"
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, "Share Track"))
+                            },
+                            contentColor = contentColor,
+                            accentColor = dynamicAccentColor,
+                            isDark = isDark
+                        )
+                        "download" -> {
+                            val downloadLabel = when {
+                                isDownloading -> "Cancel download"
+                                realDownloaded -> "Downloaded"
+                                else -> "Download"
+                            }
+                            val downloadIcon: Any = when {
+                                isDownloading -> painterResource(id = R.drawable.ic_close)
+                                realDownloaded -> painterResource(id = R.drawable.ic_downloaded)
+                                else -> painterResource(id = R.drawable.ic_download)
+                            }
+                            PillChip(
+                                icon = downloadIcon,
+                                label = downloadLabel,
+                                isSelected = realDownloaded || isDownloading,
+                                progress = if (isDownloading) (realDownloadProgress ?: 0) / 100f else null,
+                                onClick = {
+                                    val currentSong = songForActions
+                                    if (currentSong != null) {
+                                        if (com.dsann.music.util.SongDownloader.isDownloading(currentSong.videoId)) {
+                                            com.dsann.music.util.SongDownloader.cancelDownload(context, currentSong)
+                                        } else {
+                                            com.dsann.music.util.SongDownloader.downloadSong(context, currentSong)
+                                        }
+                                    }
+                                },
+                                contentColor = contentColor,
+                                accentColor = dynamicAccentColor,
+                                isDark = isDark
+                            )
+                        }
+                        "like" -> PillChip(
+                            icon = if (uiState.isCurrentSongFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            label = "Like",
+                            isSelected = uiState.isCurrentSongFavorite,
+                            onClick = onFavoriteClick,
+                            contentColor = contentColor,
+                            accentColor = dynamicAccentColor,
+                            isDark = isDark
+                        )
+                        "dislike" -> PillChip(
+                            icon = Icons.Default.ThumbDown,
+                            label = "Not for me",
+                            isSelected = uiState.isCurrentSongDisliked,
+                            onClick = onDislikeClick,
+                            contentColor = contentColor,
+                            accentColor = dynamicAccentColor,
+                            isDark = isDark
+                        )
+                        "sleep" -> PillChip(
+                            icon = Icons.Default.NightsStay,
+                            label = "Sleep timer",
+                            isSelected = sleepTimerEndTime != null,
+                            onClick = { showSleepTimerDialog = true },
+                            contentColor = contentColor,
+                            accentColor = dynamicAccentColor,
+                            isDark = isDark
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.width(12.dp))
             }
@@ -621,7 +753,10 @@ fun FullPlayer(
                 dynamicAccentColor = dynamicAccentColor,
                 contentColor = contentColor,
                 contentSecondary = contentSecondary,
-                isDark = isDark
+                isDark = isDark,
+                scrubberStyle = scrubberStyle,
+                scrubberColor = scrubberColor,
+                playerTimes = playerTimes
             )
 
             Spacer(modifier = Modifier.height(16.dp))
