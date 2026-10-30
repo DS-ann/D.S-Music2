@@ -13,6 +13,7 @@ import androidx.core.content.edit
 import androidx.core.graphics.ColorUtils
 import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.palette.graphics.Palette
 import coil.imageLoader
 import coil.request.ImageRequest
@@ -419,7 +420,7 @@ class PlayerSharedViewModel @Inject constructor(
         if (autoplayFetchingVideoId == videoId && autoplayFetchJob?.isActive == true) {
             return autoplayFetchJob
         }
-        if (videoId in autoplayFetchedVideoIds) return autoplayFetchJob
+        if (videoId in autoplayFetchedVideoIds) return null
         autoplayFetchingVideoId = videoId
         val requestJob = viewModelScope.launch {
             try {
