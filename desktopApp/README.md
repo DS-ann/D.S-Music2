@@ -1,6 +1,6 @@
-# SpatialFlow for Windows
+# D.S Music for Windows
 
-This module is the Windows desktop application in the same repository as the Android phone app. The Windows branch is kept current with the Android `master` source snapshot; Android platform code remains under `app/`, while Windows-specific adapters and UI remain under `desktopApp/`.
+This module is the Windows desktop application in the same repository as the Android phone app. The Windows branch contains a native Windows desktop implementation, synchronized with shared D.S Music features where platform equivalents exist; Android platform code remains under `app/`, while Windows-specific adapters and UI remain under `desktopApp/`.
 
 ## Build on Windows
 
@@ -26,4 +26,4 @@ The installer is written under `desktopApp/build/compose/binaries/main/exe/`.
 - Local music folder selection, recursive scan, local search and playback.
 - YouTube Music search adapted from the current phone search pipeline: mixed results, category-specific result shelves, best-match selection, live search, podcast shows and episode/video result typing.
 
-Online result playback, Android Media3 cache migration, lyrics provider/cache integration, account/session features, and phone-only widgets/services still require Windows-specific implementations. Android code is synchronized into this branch, but Android-only classes are not loaded into the Windows JVM.
+Windows uses its own Java Sound and JavaFX playback, Windows storage and Compose Desktop UI. Android-only services and widgets are not copied into the Windows JVM; equivalent features are implemented using Windows-native components.
