@@ -1,0 +1,48 @@
+name: Build SpatialFlow Windows Desktop
+
+on:
+  push:
+    branches: [windows-desktop]
+  pull_request:
+    branches: [windows-desktop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spatialflow-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    name: Compile and package Windows app
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Compile and create Windows installer
+        shell: pwsh
+        run: .\gradlew.bat --no-daemon :desktopApp:compileKotlin :desktopApp:packageExe
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: SpatialFlow-Windows
+          path: desktopApp/build/compose/binaries/main/exe/*.exe
+          if-no-files-found: error
+          retention-days: 14
