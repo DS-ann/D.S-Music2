@@ -468,6 +468,7 @@ class AudioPlaybackService : MediaSessionService() {
     private var playbackRecoveryStage = 0
     private var isRecoveringPlaybackError = false
     private var isFetchingRelatedProactively = false
+    private var isResolvingVideoMode = false
 
     private lateinit var telemetryManager: com.dsann.music.data.innertube.YouTubeTelemetryManager
 
@@ -1248,7 +1249,8 @@ class AudioPlaybackService : MediaSessionService() {
         // Shuffle-aware next index prediction
         val nextIndex = vm.getNextSongIndex() 
         if (nextIndex < 0 || nextIndex >= songs.size) {
-            // Queue is ending! Proactively fetch related songs to enable infinite loop if current is online!
+            // Keep the existing radio extension, but respect the listener's Autoplay setting.
+            if (!isAutoplayEnabled()) return
             val currentSong = vm.currentSong.value
             if (currentSong != null && !currentSong.videoId.isNullOrEmpty()) {
                 fetchAndAppendRelatedSongsProactively(currentSong.videoId!!)
@@ -1326,7 +1328,7 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     private fun fetchAndAppendRelatedSongsProactively(videoId: String) {
-        if (isFetchingRelatedProactively) return
+        if (!isAutoplayEnabled() || isFetchingRelatedProactively) return
         isFetchingRelatedProactively = true
         
         serviceScope.launch(Dispatchers.IO) {
@@ -1347,7 +1349,9 @@ class AudioPlaybackService : MediaSessionService() {
                                         onlineSong.durationMs,
                                         onlineSong.thumbnailUrl,
                                         onlineSong.artistId
-                                    )
+                                    ).apply {
+                                        isAutoplayRecommendation = true
+                                    }
                                 }.filter { it.id !in existingIds }
                                 
                                 if (newSongs.isNotEmpty()) {
@@ -2430,6 +2434,58 @@ class AudioPlaybackService : MediaSessionService() {
             if (com.dsann.music.ui.SettingsViewModel.KEY_VOLUME_NORMALIZATION_ENABLED == key || 
                 com.dsann.music.ui.SettingsViewModel.KEY_TARGET_LUFS == key) {
                 }
+        }
+    }
+
+    private fun isAutoplayEnabled(): Boolean =
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("autoplay_enabled", true)
+
+    /**
+     * Switch the current YouTube Music track between its audio stream and a compatible
+     * muxed video+audio stream. The same ExoPlayer and queue item remain in use.
+     */
+    fun setVideoMode(enabled: Boolean) {
+        val vm = viewModel ?: return
+        val song = vm.currentSong.value ?: return
+        val videoId = song.videoId?.takeIf { it.isNotBlank() } ?: run {
+            com.dsann.music.ui.SnackbarController.showMessage("No online video is available for this track.")
+            return
+        }
+        if (!isPlayerInitialized || isResolvingVideoMode) return
+
+        if (!enabled) {
+            if (!vm.isVideoMode.value) return
+            val position = player.currentPosition.coerceAtLeast(0L)
+            vm.setVideoModeState(false)
+            loadAndPlay("innertube://$videoId".toUri(), position)
+            return
+        }
+
+        if (vm.isVideoMode.value) return
+        val songId = song.id
+        val position = player.currentPosition.coerceAtLeast(0L)
+        isResolvingVideoMode = true
+        vm.setLoading(true)
+        serviceScope.launch {
+            val videoUrl = withContext(Dispatchers.IO) {
+                com.dsann.music.data.innertube.NewPipeStreamExtractor.getVideoStreamUrl(videoId)
+            }
+            isResolvingVideoMode = false
+
+            if (viewModel?.currentSong?.value?.id != songId) {
+                vm.setLoading(false)
+                return@launch
+            }
+            if (videoUrl.isNullOrBlank()) {
+                vm.setLoading(false)
+                com.dsann.music.ui.SnackbarController.showMessage(
+                    "No compatible video stream is available for this track. Audio playback is unchanged."
+                )
+                return@launch
+            }
+
+            vm.setVideoModeState(true)
+            loadAndPlay(videoUrl.toUri(), position)
         }
     }
 
