@@ -748,6 +748,10 @@ fun PlayerBottomSheetCompose(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val context = LocalContext.current
         val density = LocalDensity.current
+        val configuration = LocalConfiguration.current
+        val useNavigationRail = configuration.screenWidthDp >= 600
+        val useWidePlayer = configuration.screenWidthDp >= 840 ||
+            (useNavigationRail && configuration.screenWidthDp > configuration.screenHeightDp)
         val scope = rememberCoroutineScope()
         val playerPreferences = remember(context) {
             context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
@@ -927,9 +931,11 @@ fun PlayerBottomSheetCompose(
         
         // Zero-Recomposition logic: calculating layout targets inside derivedStateOf
         // This ensures the composable body doesn't re-run for every pixel of nav bar scroll
-        val sheetCollapsedTargetYState = remember(screenHeightPx, density) {
+        val sheetCollapsedTargetYState = remember(screenHeightPx, density, useNavigationRail) {
             derivedStateOf {
-                val bottomNavHeightPx = if (dynamicBottomNavHeightState.value > 0f) {
+                val bottomNavHeightPx = if (useNavigationRail) {
+                    0f
+                } else if (dynamicBottomNavHeightState.value > 0f) {
                     dynamicBottomNavHeightState.value
                 } else {
                     with(density) { 75.dp.toPx() }
@@ -937,13 +943,22 @@ fun PlayerBottomSheetCompose(
                 val miniPlayerHeightPx = with(density) { MiniPlayerHeight.toPx() }
                 
                 // Dynamically adjust gap: 12dp when BottomNav is visible, 8dp when hidden
-                val bottomNavVisibilityFraction = (bottomNavTranslationYState.value / (if (bottomNavHeightPx > 0) bottomNavHeightPx else 1f)).coerceIn(0f, 1f)
-                val currentBottomGapPx = with(density) { 
-                    lerp(12.dp, 8.dp, bottomNavVisibilityFraction).toPx() 
+                val bottomNavVisibilityFraction = if (useNavigationRail) {
+                    1f
+                } else {
+                    (bottomNavTranslationYState.value / (if (bottomNavHeightPx > 0) bottomNavHeightPx else 1f)).coerceIn(0f, 1f)
+                }
+                val currentBottomGapPx = with(density) {
+                    if (useNavigationRail) 8.dp.toPx()
+                    else lerp(12.dp, 8.dp, bottomNavVisibilityFraction).toPx()
                 }
                 
                 // Ensure the mini player stops at the bottom margin and doesn't follow the nav bar into the abyss
-                val effectiveBottomNavHeight = (bottomNavHeightPx - bottomNavTranslationYState.value).coerceAtLeast(0f)
+                val effectiveBottomNavHeight = if (useNavigationRail) {
+                    0f
+                } else {
+                    (bottomNavHeightPx - bottomNavTranslationYState.value).coerceAtLeast(0f)
+                }
                 screenHeightPx - miniPlayerHeightPx - effectiveBottomNavHeight - currentBottomGapPx
             }
         }
@@ -1074,12 +1089,16 @@ fun PlayerBottomSheetCompose(
             animationSpec: AnimationSpec<Float>? = null,
             initialVelocity: Float = 0f
         ) {
-            val expectedBottomNavHeight = if (dynamicBottomNavHeightState.value > 0f) {
+            val expectedBottomNavHeight = if (useNavigationRail) {
+                0f
+            } else if (dynamicBottomNavHeightState.value > 0f) {
                 dynamicBottomNavHeightState.value
             } else {
                 with(density) { 75.dp.toPx() }
             }
-            val expectedBottomGapPx = with(density) { 12.dp.toPx() }
+            val expectedBottomGapPx = with(density) {
+                (if (useNavigationRail) 8.dp else 12.dp).toPx()
+            }
             val miniPlayerHeightPx = with(density) { MiniPlayerHeight.toPx() }
             val destY = if (targetExpanded) {
                 0f
@@ -1146,7 +1165,10 @@ fun PlayerBottomSheetCompose(
             containerHeight = containerHeight,
             currentSheetTranslationY = currentSheetTranslationY,
             sheetCollapsedTargetYProvider = { sheetCollapsedTargetYState.value },
-            isNavBarHiddenProvider = { (bottomNavTranslationYState.value / (if (dynamicBottomNavHeightState.value > 0) dynamicBottomNavHeightState.value else 1f)) > 0.5f },
+            isNavBarHiddenProvider = {
+                if (useNavigationRail) playerContentExpansionFraction.value > 0.5f
+                else (bottomNavTranslationYState.value / (if (dynamicBottomNavHeightState.value > 0) dynamicBottomNavHeightState.value else 1f)) > 0.5f
+            },
             navBarCornerRadiusDp = 32.dp
         )
 
@@ -1327,15 +1349,19 @@ fun PlayerBottomSheetCompose(
 
                     // Integrated shared artwork layer. In lyrics mode the same ArtworkPager
                     // moves into the app bar as a compact thumbnail instead of being hidden.
-                    val screenWidth = LocalConfiguration.current.screenWidthDp
+                    val screenWidth = configuration.screenWidthDp
                     val albumArtScale = when (playerLayout) {
-            "Cover" -> 0.98f
-            "Minimal" -> 0.68f
-            "Lyrics" -> 0.78f
-            "Vinyl", "Cassette" -> 0.82f
-            else -> 0.9f
-        }
-        val albumArtSizeDp = (screenWidth * albumArtScale).dp
+                        "Cover" -> 0.98f
+                        "Minimal" -> 0.68f
+                        "Lyrics" -> 0.78f
+                        "Vinyl", "Cassette" -> 0.82f
+                        else -> 0.9f
+                    }
+                    val albumArtSizeDp = if (useWidePlayer) {
+                        minOf(containerHeight * 0.50f, screenWidth.dp * 0.42f)
+                    } else {
+                        (screenWidth * albumArtScale).dp
+                    }
                     val statusBarTopPx = WindowInsets.statusBars.getTop(density).toFloat()
 
                     Box(
@@ -1354,11 +1380,21 @@ fun PlayerBottomSheetCompose(
 
                                 // Position relative to the Surface top-left
                                 val xStartPx = startPaddingPx + 16.dp.toPx()
-                                val xEndPx = (with(density) { screenWidth.dp.toPx() } - fullSizePx) / 2f
+                                val xEndPx = if (useWidePlayer) {
+                                    with(density) {
+                                        (20.dp + (maxWidth - 40.dp) * 0.54f / 2f - albumArtSizeDp / 2f).toPx()
+                                    }
+                                } else {
+                                    (with(density) { screenWidth.dp.toPx() } - fullSizePx) / 2f
+                                }
 
                                 val yStartPx = 16.dp.toPx()
-                                val minTopOffsetDp = with(density) { statusBarTopPx.toDp() } + 68.dp // Removed 16.dp extra gap
-                                val topOffsetDp = ((containerHeight - albumArtSizeDp) / 2f - 220.dp).coerceAtLeast(minTopOffsetDp)
+                                val minTopOffsetDp = with(density) { statusBarTopPx.toDp() } + 68.dp
+                                val topOffsetDp = if (useWidePlayer) {
+                                    minTopOffsetDp
+                                } else {
+                                    ((containerHeight - albumArtSizeDp) / 2f - 220.dp).coerceAtLeast(minTopOffsetDp)
+                                }
                                 val yEndPx = with(density) { topOffsetDp.toPx() }
 
                                 val normalX = androidx.compose.ui.util.lerp(xStartPx, xEndPx, t)
