@@ -42,6 +42,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
@@ -190,10 +192,14 @@ class MainActivity : AppCompatActivity() {
                 val isPlayerExpanded by playerViewModel.isPlayerExpanded.collectAsStateWithLifecycle()
 
                 var editingSong by remember { mutableStateOf<SongItem?>(null) }
+                val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+                // Match Prism's wide-window breakpoint: phones in landscape and tablets use a side rail.
+                val useNavigationRail = configuration.screenWidthDp >= 600
 
                 Scaffold(
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     bottomBar = {
+                        if (!useNavigationRail) {
                         val navBackStackEntry by currentNavController.currentBackStackEntryAsState()
                         val currentDestination = navBackStackEntry?.destination
 
@@ -278,6 +284,7 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
                         }
+                        }
                     }
                 ) { paddingValues ->
                     val navBackStackEntry by currentNavController.currentBackStackEntryAsState()
@@ -286,11 +293,23 @@ class MainActivity : AppCompatActivity() {
                         exploreViewModel.setExplorePageActive(currentDestination?.route == "explore")
                     }
                     val showBottomBar = currentDestination?.route in listOf("explore", "library", "local_music", "settings")
+                    val showNavigationRail = useNavigationRail && showBottomBar && isBottomNavVisible
+                    val railInsetState = animateDpAsState(
+                        targetValue = if (showNavigationRail) 88.dp else 0.dp,
+                        animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
+                        label = "NavigationRailInset"
+                    )
+                    val railInset = railInsetState.value
 
                     val playerExpansionFractionState = playerViewModel.playerExpansionFraction.collectAsState()
+                    val playerSheetStartInset = androidx.compose.ui.unit.lerp(
+                        railInset,
+                        0.dp,
+                        playerExpansionFractionState.value.coerceIn(0f, 1f)
+                    )
 
                     // Base padding target not considering expansion
-                    val baseTargetPadding = if (showBottomBar && isBottomNavVisible) {
+                    val baseTargetPadding = if (!useNavigationRail && showBottomBar && isBottomNavVisible) {
                         paddingValues.calculateBottomPadding()
                     } else {
                         0.dp
@@ -315,7 +334,7 @@ class MainActivity : AppCompatActivity() {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(bottom = finalPadding.coerceAtLeast(0.dp))
+                                .padding(start = railInset, bottom = finalPadding.coerceAtLeast(0.dp))
                         ) {
                             val routeIndices = remember {
                                 mapOf(
@@ -479,9 +498,57 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
 
+                        if (showNavigationRail) {
+                            val railIconSize by animateDpAsState(
+                                if (dynamicNavStyle) 34.dp else 26.dp,
+                                label = "RailIconSize"
+                            )
+                            NavigationRail(
+                                modifier = Modifier
+                                    .align(androidx.compose.ui.Alignment.CenterStart)
+                                    .padding(start = 8.dp),
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            ) {
+                                val items = listOf(
+                                    Triple("explore", "Explore", R.drawable.ic_explore),
+                                    Triple("library", "Library", R.drawable.ic_library_music),
+                                    Triple("local_music", "Local Music", R.drawable.ic_music_note),
+                                    Triple("settings", "Settings", R.drawable.ic_settings)
+                                )
+                                items.forEach { (route, label, iconResId) ->
+                                    val selected = currentDestination?.route == route
+                                    NavigationRailItem(
+                                        selected = selected,
+                                        onClick = {
+                                            if (!selected) {
+                                                currentNavController.navigate(route) {
+                                                    popUpTo(currentNavController.graph.findStartDestination().id) {
+                                                        saveState = true
+                                                    }
+                                                    launchSingleTop = true
+                                                    restoreState = true
+                                                }
+                                            }
+                                        },
+                                        icon = {
+                                            Icon(
+                                                painter = painterResource(id = iconResId),
+                                                contentDescription = label,
+                                                modifier = Modifier.size(railIconSize)
+                                            )
+                                        },
+                                        label = if (hideNavLabels) null else { { Text(label) } },
+                                        alwaysShowLabel = !hideNavLabels
+                                    )
+                                }
+                            }
+                        }
+
                         PlayerBottomSheetCompose(
                             activity = this@MainActivity,
-                            viewModel = playerViewModel
+                            viewModel = playerViewModel,
+                            modifier = Modifier.fillMaxSize().padding(start = playerSheetStartInset)
                         )
                         AudioFormatChoiceDialogHost()
                     }
