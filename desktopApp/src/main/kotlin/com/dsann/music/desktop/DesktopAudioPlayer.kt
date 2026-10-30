@@ -104,7 +104,7 @@ internal class DesktopAudioPlayer : AutoCloseable {
         ).apply { isDaemon = true; start() }
     }
 
-    fun playUrl(url: String, knownDurationMs: Long = 0L, startPositionMs: Long = 0L) {
+    fun playUrl(url: String, knownDurationMs: Long = 0L, startPositionMs: Long = 0L, autoPlay: Boolean = true) {
         stop()
         val token = generation.incrementAndGet()
         currentFile = null
@@ -136,7 +136,15 @@ internal class DesktopAudioPlayer : AutoCloseable {
                         durationMillis = mediaDuration.toMillis().toLong()
                     }
                     if (startPositionMs > 0L) created.seek(Duration.millis(startPositionMs.toDouble()))
-                    created.play()
+                    if (autoPlay) {
+                        created.play()
+                        paused = false
+                        isPaused = false
+                    } else {
+                        created.pause()
+                        paused = true
+                        isPaused = true
+                    }
                 }
                 created.setOnError {
                     if (token == generation.get()) {
