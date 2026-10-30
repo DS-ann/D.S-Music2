@@ -1183,7 +1183,7 @@ fun PlayerBottomSheetCompose(
                             // outside graphicsLayer, taps on the old 90%-screen layout bounds could
                             // open lyrics even when the visible cover was elsewhere/smaller.
                             .clickable(
-                                enabled = !isVideoMode,
+                                enabled = !isVideoMode || playerContentExpansionFraction.value <= 0.95f,
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
                             ) {
