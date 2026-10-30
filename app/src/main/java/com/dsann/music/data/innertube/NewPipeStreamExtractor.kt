@@ -15,6 +15,15 @@ import kotlin.math.abs
  * Optimized Local YouTube stream extraction using NewPipe Extractor.
  * Implements multi-level caching, request deduplication, batching, and preference caching.
  */
+data class VideoStreamOption(
+    val url: String,
+    val resolution: String,
+    val height: Int,
+    val mimeType: String?
+) {
+    val label: String get() = if (height > 0) "${height}p" else resolution.ifBlank { "Unknown quality" }
+}
+
 object NewPipeStreamExtractor {
 
     private const val TAG = "NewPipeExtractor"
@@ -390,16 +399,30 @@ object NewPipeStreamExtractor {
      * deliberately excluded: this player mode uses one Media3 item and must keep its audio track.
      * The existing StreamInfo cache is reused so entering video mode does not repeat extraction.
      */
-    suspend fun getVideoStreamUrl(videoId: String?): String? = withContext(Dispatchers.IO) {
-        if (videoId.isNullOrBlank()) return@withContext null
-        val info = fetchStreamInfo(videoId) ?: return@withContext null
+    suspend fun getVideoStreamOptions(videoId: String?): List<VideoStreamOption> = withContext(Dispatchers.IO) {
+        if (videoId.isNullOrBlank()) return@withContext emptyList()
+        val info = fetchStreamInfo(videoId) ?: return@withContext emptyList()
         info.videoStreams
+            .asSequence()
             .filterNot { it.isVideoOnly }
-            .maxByOrNull { stream ->
-                stream.resolution.filter { it.isDigit() }.toIntOrNull() ?: 0
+            .filter { it.content.startsWith("http", ignoreCase = true) }
+            .map { stream ->
+                val resolution = stream.resolution
+                VideoStreamOption(
+                    url = stream.content,
+                    resolution = resolution,
+                    height = resolution.filter { it.isDigit() }.toIntOrNull() ?: 0,
+                    mimeType = stream.format?.mimeType?.substringBefore(';')?.trim()
+                )
             }
-            ?.content
+            .filter { it.height > 0 }
+            .distinctBy { it.height }
+            .sortedByDescending { it.height }
+            .toList()
     }
+
+    suspend fun getVideoStreamUrl(videoId: String?): String? =
+        getVideoStreamOptions(videoId).firstOrNull()?.url
 
     /**
      * Resolve a conservative recovery stream after the preferred stream failed in Media3.
