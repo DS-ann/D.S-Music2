@@ -9,6 +9,7 @@ import com.dsann.music.data.innertube.SearchFilter
 import com.dsann.music.data.innertube.SearchItem
 import com.dsann.music.data.innertube.SearchResult
 import com.dsann.music.data.innertube.SearchResultSection
+import com.dsann.music.data.innertube.SearchRank
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
