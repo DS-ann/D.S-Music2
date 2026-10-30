@@ -162,6 +162,9 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     var targetBitrate by remember { mutableStateOf(preferences.getInt("target_bitrate", 256)) }
     var autoplayEnabled by remember { mutableStateOf(preferences.getBoolean("autoplay_enabled", true)) }
     var appearancePreset by remember { mutableStateOf(preferences.get("appearance_preset", "Ocean")) }
+    var miniPlayerStyle by remember { mutableStateOf(preferences.get("mini_player_style", "Card")) }
+    var miniPlayerBackground by remember { mutableStateOf(preferences.get("mini_player_background", "Dark")) }
+    var desktopLyricsSize by remember { mutableStateOf(preferences.get("desktop_lyrics_size", "Standard")) }
     var videoMode by remember { mutableStateOf(false) }
     var videoSwitching by remember { mutableStateOf(false) }
     var videoFullscreen by remember { mutableStateOf(false) }
@@ -1528,7 +1531,11 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                                     Text(
                                                         line.text,
                                                         color = if (index == activeLine) accentColor else Color(0xFFE8EEF7),
-                                                        fontSize = if (index == activeLine) 21.sp else 17.sp,
+                                                        fontSize = (if (index == activeLine) 21.sp else 17.sp) * when (desktopLyricsSize) {
+                                                            "Small" -> 0.85f
+                                                            "Large" -> 1.18f
+                                                            else -> 1f
+                                                        },
                                                         fontWeight = if (index == activeLine) FontWeight.Bold else FontWeight.Normal,
                                                         modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp)
                                                     )
@@ -1577,6 +1584,61 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                                     ),
                                                     shape = RoundedCornerShape(12.dp)
                                                 ) { Text(if (appearancePreset == preset) "✓ $preset" else preset) }
+                                            }
+                                        }
+                                    }
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("Mini player layout", fontWeight = FontWeight.SemiBold)
+                                        Text("Choose the compact Windows player presentation.", color = mutedText, fontSize = 11.sp)
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            listOf("Card", "Flat", "Compact").forEach { style ->
+                                                Button(
+                                                    onClick = {
+                                                        miniPlayerStyle = style
+                                                        preferences.put("mini_player_style", style)
+                                                        runCatching { preferences.flush() }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        backgroundColor = if (miniPlayerStyle == style) accentColor else Color(0xFF263545),
+                                                        contentColor = if (miniPlayerStyle == style) Color(0xFF0B1420) else Color.White
+                                                    )
+                                                ) { Text(style) }
+                                            }
+                                        }
+                                    }
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("Mini player background", fontWeight = FontWeight.SemiBold)
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            listOf("Dark", "Accent", "Black").forEach { choice ->
+                                                Button(
+                                                    onClick = {
+                                                        miniPlayerBackground = choice
+                                                        preferences.put("mini_player_background", choice)
+                                                        runCatching { preferences.flush() }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        backgroundColor = if (miniPlayerBackground == choice) accentColor else Color(0xFF263545),
+                                                        contentColor = if (miniPlayerBackground == choice) Color(0xFF0B1420) else Color.White
+                                                    )
+                                                ) { Text(choice) }
+                                            }
+                                        }
+                                    }
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("Lyrics text size", fontWeight = FontWeight.SemiBold)
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            listOf("Small", "Standard", "Large").forEach { size ->
+                                                Button(
+                                                    onClick = {
+                                                        desktopLyricsSize = size
+                                                        preferences.put("desktop_lyrics_size", size)
+                                                        runCatching { preferences.flush() }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        backgroundColor = if (desktopLyricsSize == size) accentColor else Color(0xFF263545),
+                                                        contentColor = if (desktopLyricsSize == size) Color(0xFF0B1420) else Color.White
+                                                    )
+                                                ) { Text(size) }
                                             }
                                         }
                                     }
@@ -1636,6 +1698,9 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                         title = nowPlayingTitle,
                         artist = nowPlayingArtist,
                         hasTrack = hasNowPlaying,
+                        miniPlayerStyle = miniPlayerStyle,
+                        miniPlayerBackground = miniPlayerBackground,
+                        accentColor = accentColor,
                         isPlaying = playing,
                         isPaused = paused,
                         positionMs = positionMs,
@@ -1773,6 +1838,9 @@ private fun MiniPlayer(
     title: String,
     artist: String,
     hasTrack: Boolean,
+    miniPlayerStyle: String,
+    miniPlayerBackground: String,
+    accentColor: Color,
     isPlaying: Boolean,
     isPaused: Boolean,
     positionMs: Long,
@@ -1788,11 +1856,24 @@ private fun MiniPlayer(
     var sliderPosition by remember(title, positionMs) { mutableStateOf(positionMs.toFloat()) }
     val maxPosition = durationMs.coerceAtLeast(1L).toFloat()
 
+    val backgroundColor = when (miniPlayerBackground) {
+        "Accent" -> accentColor.copy(alpha = 0.24f)
+        "Black" -> Color.Black
+        else -> Color(0xFF111923)
+    }
+    val compact = miniPlayerStyle == "Compact"
+    val verticalPadding = when (miniPlayerStyle) {
+        "Compact" -> 7.dp
+        "Flat" -> 8.dp
+        else -> 12.dp
+    }
+    val horizontalPadding = if (compact) 14.dp else 24.dp
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF111923))
-            .padding(horizontal = 24.dp, vertical = 12.dp)
+            .background(if (miniPlayerStyle == "Flat") Color.Transparent else backgroundColor)
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
