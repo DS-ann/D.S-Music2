@@ -91,7 +91,8 @@ import kotlinx.coroutines.delay
 private fun PlayerVisualizer(
     style: String,
     isPlaying: Boolean,
-    color: Color
+    color: Color,
+    colorMode: String = "Accent"
 ) {
     val phase = remember { Animatable(0f) }
     LaunchedEffect(style, isPlaying) {
@@ -129,8 +130,11 @@ private fun PlayerVisualizer(
                     val wave = kotlin.math.abs(kotlin.math.sin(index * 0.72f + phaseValue * 6.28f))
                     val height = size.height * (0.18f + wave * if (isPlaying) 0.78f else 0.16f)
                     val x = index * (barWidth + gap)
+                    val barColor = if (colorMode == "Spectrum") {
+                        Color.hsv((index * 360f / count + phaseValue * 140f) % 360f, 0.78f, 0.96f)
+                    } else color
                     drawRoundRect(
-                        color.copy(alpha = 0.35f + wave * 0.55f),
+                        barColor.copy(alpha = 0.35f + wave * 0.55f),
                         topLeft = androidx.compose.ui.geometry.Offset(x, centerY - height / 2f),
                         size = androidx.compose.ui.geometry.Size(barWidth, height),
                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f)
@@ -378,6 +382,10 @@ fun FullPlayerScreen(
     val scrubberColor by customizeViewModel.scrubberColor.collectAsStateWithLifecycle()
     val visualizerStyle by customizeViewModel.visualizerStyle.collectAsStateWithLifecycle()
     val playerBackgroundStyle by customizeViewModel.playerBackgroundStyle.collectAsStateWithLifecycle()
+    val playerButtonStyle by customizeViewModel.playerButtonStyle.collectAsStateWithLifecycle()
+    val scrubberThickness by customizeViewModel.scrubberThickness.collectAsStateWithLifecycle()
+    val scrubberThumbStyle by customizeViewModel.scrubberThumbStyle.collectAsStateWithLifecycle()
+    val visualizerColor by customizeViewModel.visualizerColor.collectAsStateWithLifecycle()
 
     LaunchedEffect(playerLayout, uiState.currentSong?.id) {
         if (playerLayout == "Lyrics" && uiState.currentSong != null && !isLyricsModeEnabled) {
@@ -413,6 +421,10 @@ fun FullPlayerScreen(
         scrubberColor = scrubberColor,
         visualizerStyle = visualizerStyle,
         playerBackgroundStyle = playerBackgroundStyle,
+        playerButtonStyle = playerButtonStyle,
+        scrubberThickness = scrubberThickness,
+        scrubberThumbStyle = scrubberThumbStyle,
+        visualizerColor = visualizerColor,
         onProviderSelected = { viewModel.selectLyricsProvider(it) },
         currentPositionProvider = currentPositionProvider,
         onCollapse = onCollapse,
@@ -496,6 +508,10 @@ fun FullPlayer(
     scrubberColor: String = "Accent",
     visualizerStyle: String = "Off",
     playerBackgroundStyle: String = "Artwork",
+    playerButtonStyle: String = "Pill",
+    scrubberThickness: Float = 1f,
+    scrubberThumbStyle: String = "Auto",
+    visualizerColor: String = "Accent",
     onProviderSelected: (String) -> Unit,
     onArtistClick: (String?, String) -> Unit = { _, _ -> },
     dragModifier: Modifier = Modifier,
@@ -752,7 +768,12 @@ fun FullPlayer(
                 PlayerVisualizer(
                     style = visualizerStyle,
                     isPlaying = uiState.isPlaying,
-                    color = dynamicAccentColor
+                    color = when (visualizerColor) {
+                        "White" -> Color.White
+                        "Cover" -> Color(uiState.playerBackgroundColor)
+                        else -> dynamicAccentColor
+                    },
+                    colorMode = visualizerColor
                 )
                 Spacer(modifier = Modifier.height(10.dp))
             }
@@ -786,6 +807,7 @@ fun FullPlayer(
                 orderedButtons.forEach { action ->
                     when (action) {
                         "lyrics" -> PillChip(
+                            style = playerButtonStyle,
                             icon = painterResource(id = R.drawable.ic_lyrics),
                             label = "Lyrics",
                             isSelected = isLyricsModeEnabled,
@@ -809,6 +831,7 @@ fun FullPlayer(
                         )
                         "video" -> if (!songForActions?.videoId.isNullOrBlank()) {
                             PillChip(
+                            style = playerButtonStyle,
                                 icon = painterResource(id = R.drawable.ic_youtube),
                                 label = if (isVideoMode) "Audio" else "Video",
                                 isSelected = isVideoMode,
@@ -819,6 +842,7 @@ fun FullPlayer(
                             )
                         }
                         "queue" -> PillChip(
+                            style = playerButtonStyle,
                             icon = painterResource(id = R.drawable.ic_keyboard_arrow_down),
                             label = "Up next",
                             isSelected = isQueueExpanded,
@@ -828,6 +852,7 @@ fun FullPlayer(
                             isDark = isDark
                         )
                         "share" -> PillChip(
+                            style = playerButtonStyle,
                             icon = painterResource(id = R.drawable.ic_share),
                             label = "Share",
                             onClick = {
@@ -854,6 +879,7 @@ fun FullPlayer(
                                 else -> painterResource(id = R.drawable.ic_download)
                             }
                             PillChip(
+                            style = playerButtonStyle,
                                 icon = downloadIcon,
                                 label = downloadLabel,
                                 isSelected = realDownloaded || isDownloading,
@@ -874,6 +900,7 @@ fun FullPlayer(
                             )
                         }
                         "like" -> PillChip(
+                            style = playerButtonStyle,
                             icon = if (uiState.isCurrentSongFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             label = "Like",
                             isSelected = uiState.isCurrentSongFavorite,
@@ -883,6 +910,7 @@ fun FullPlayer(
                             isDark = isDark
                         )
                         "dislike" -> PillChip(
+                            style = playerButtonStyle,
                             icon = Icons.Default.ThumbDown,
                             label = "Not for me",
                             isSelected = uiState.isCurrentSongDisliked,
@@ -892,6 +920,7 @@ fun FullPlayer(
                             isDark = isDark
                         )
                         "sleep" -> PillChip(
+                            style = playerButtonStyle,
                             icon = Icons.Default.NightsStay,
                             label = "Sleep timer",
                             isSelected = sleepTimerEndTime != null,
@@ -920,7 +949,9 @@ fun FullPlayer(
                 isDark = isDark,
                 scrubberStyle = scrubberStyle,
                 scrubberColor = scrubberColor,
-                playerTimes = playerTimes
+                playerTimes = playerTimes,
+                scrubberThickness = scrubberThickness,
+                scrubberThumbStyle = scrubberThumbStyle
             )
 
             Spacer(modifier = Modifier.height(16.dp))
