@@ -1346,7 +1346,7 @@ fun ExploreScreen(
 
                             CreditsTextSection(
                                 title = "Produced by",
-                                content = listOf(if (contributors.size > 1) contributors.last() else "SpatialFlow Engine")
+                                content = listOf(if (contributors.size > 1) contributors.last() else "D.S Music Engine")
                             )
 
                             CreditsTextSection(
