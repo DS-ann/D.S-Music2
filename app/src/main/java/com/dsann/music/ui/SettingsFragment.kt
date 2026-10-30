@@ -994,6 +994,16 @@ fun SettingsScreenContent(
     val playerArtworkShape by viewModel.playerArtworkShape.collectAsStateWithLifecycle()
     val playerBackgroundStyle by viewModel.playerBackgroundStyle.collectAsStateWithLifecycle()
     val miniPlayerStyle by viewModel.miniPlayerStyle.collectAsStateWithLifecycle()
+    val playerLayout by viewModel.playerLayout.collectAsStateWithLifecycle()
+    val playerButtons by viewModel.playerButtons.collectAsStateWithLifecycle()
+    val playerTitleAlign by viewModel.playerTitleAlign.collectAsStateWithLifecycle()
+    val playerTitleSize by viewModel.playerTitleSize.collectAsStateWithLifecycle()
+    val playerTitleWeight by viewModel.playerTitleWeight.collectAsStateWithLifecycle()
+    val playerTitleScroll by viewModel.playerTitleScroll.collectAsStateWithLifecycle()
+    val playerTimes by viewModel.playerTimes.collectAsStateWithLifecycle()
+    val scrubberStyle by viewModel.scrubberStyle.collectAsStateWithLifecycle()
+    val scrubberColor by viewModel.scrubberColor.collectAsStateWithLifecycle()
+    val visualizerStyle by viewModel.visualizerStyle.collectAsStateWithLifecycle()
     val lyricsTextSize by viewModel.lyricsTextSize.collectAsStateWithLifecycle()
     val lyricsAlignment by viewModel.lyricsAlignment.collectAsStateWithLifecycle()
     val lyricsFontFamily by viewModel.lyricsFontFamily.collectAsStateWithLifecycle()
@@ -1194,7 +1204,28 @@ fun SettingsScreenContent(
                 hideNavLabels = hideNavLabels,
                 onHideNavLabelsChange = { viewModel.setHideNavLabels(it) },
                 dynamicNavStyle = dynamicNavStyle,
-                onDynamicNavStyleChange = { viewModel.setDynamicNavStyle(it) }
+                onDynamicNavStyleChange = { viewModel.setDynamicNavStyle(it) },
+                playerLayout = playerLayout,
+                onPlayerLayoutChange = { viewModel.setPlayerLayout(it) },
+                playerButtons = playerButtons,
+                onPlayerButtonsChange = { viewModel.setPlayerButtons(it) },
+                onMovePlayerButton = { from, to -> viewModel.movePlayerButton(from, to) },
+                playerTitleAlign = playerTitleAlign,
+                onPlayerTitleAlignChange = { viewModel.setPlayerTitleAlign(it) },
+                playerTitleSize = playerTitleSize,
+                onPlayerTitleSizeChange = { viewModel.setPlayerTitleSize(it) },
+                playerTitleWeight = playerTitleWeight,
+                onPlayerTitleWeightChange = { viewModel.setPlayerTitleWeight(it) },
+                playerTitleScroll = playerTitleScroll,
+                onPlayerTitleScrollChange = { viewModel.setPlayerTitleScroll(it) },
+                playerTimes = playerTimes,
+                onPlayerTimesChange = { viewModel.setPlayerTimes(it) },
+                scrubberStyle = scrubberStyle,
+                onScrubberStyleChange = { viewModel.setScrubberStyle(it) },
+                scrubberColor = scrubberColor,
+                onScrubberColorChange = { viewModel.setScrubberColor(it) },
+                visualizerStyle = visualizerStyle,
+                onVisualizerStyleChange = { viewModel.setVisualizerStyle(it) }
             )
         }
         composable(SettingsRoute.Controls.route) {
@@ -2195,7 +2226,28 @@ private fun AppearanceScreen(
     hideNavLabels: Boolean,
     onHideNavLabelsChange: (Boolean) -> Unit,
     dynamicNavStyle: Boolean,
-    onDynamicNavStyleChange: (Boolean) -> Unit
+    onDynamicNavStyleChange: (Boolean) -> Unit,
+    playerLayout: String,
+    onPlayerLayoutChange: (String) -> Unit,
+    playerButtons: List<String>,
+    onPlayerButtonsChange: (List<String>) -> Unit,
+    onMovePlayerButton: (Int, Int) -> Unit,
+    playerTitleAlign: String,
+    onPlayerTitleAlignChange: (String) -> Unit,
+    playerTitleSize: String,
+    onPlayerTitleSizeChange: (String) -> Unit,
+    playerTitleWeight: String,
+    onPlayerTitleWeightChange: (String) -> Unit,
+    playerTitleScroll: Boolean,
+    onPlayerTitleScrollChange: (Boolean) -> Unit,
+    playerTimes: String,
+    onPlayerTimesChange: (String) -> Unit,
+    scrubberStyle: String,
+    onScrubberStyleChange: (String) -> Unit,
+    scrubberColor: String,
+    onScrubberColorChange: (String) -> Unit,
+    visualizerStyle: String,
+    onVisualizerStyleChange: (String) -> Unit
 ) {
     Scaffold(
         topBar = { SettingsDetailTopBar("Customize") { navController.popBackStack() } }
@@ -2241,21 +2293,120 @@ private fun AppearanceScreen(
                 )
             })
 
-            SettingsHeader("Player")
+            SettingsHeader("Player layout")
+            SettingsGroupCard(listOf {
+                SettingsChoiceRow(
+                    title = "Layout preset",
+                    description = "Standard keeps the balanced player; Cover enlarges artwork; Lyrics opens lyrics; Minimal reduces artwork; Vinyl and Cassette change the artwork presentation.",
+                    selected = playerLayout,
+                    options = listOf("Standard", "Cover", "Lyrics", "Minimal", "Vinyl", "Cassette"),
+                    onSelected = onPlayerLayoutChange
+                )
+            })
+
+            SettingsHeader("Player buttons")
+            PlayerButtonsSettings(
+                selected = playerButtons,
+                onSelectionChanged = onPlayerButtonsChange,
+                onMove = onMovePlayerButton
+            )
+
+            SettingsHeader("Title and times")
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
-                        title = "Player background",
-                        description = "Artwork follows the current album cover. Theme uses your app colors. Black uses a plain black player background.",
+                        title = "Title alignment",
+                        description = "Align the title to the artwork's left edge or center it.",
+                        selected = playerTitleAlign,
+                        options = listOf("Left", "Centered"),
+                        onSelected = onPlayerTitleAlignChange
+                    )
+                },
+                {
+                    SettingsChoiceRow(
+                        title = "Title size",
+                        description = "Adjust the song title scale independently.",
+                        selected = playerTitleSize,
+                        options = listOf("Small", "Medium", "Large"),
+                        onSelected = onPlayerTitleSizeChange
+                    )
+                },
+                {
+                    SettingsChoiceRow(
+                        title = "Title weight",
+                        description = "Choose light, regular or bold lettering.",
+                        selected = playerTitleWeight,
+                        options = listOf("Light", "Regular", "Bold"),
+                        onSelected = onPlayerTitleWeightChange
+                    )
+                },
+                {
+                    ToggleSettingRow(
+                        title = "Scrolling titles",
+                        description = "Long titles scroll instead of ending in an ellipsis.",
+                        checked = playerTitleScroll,
+                        onCheckedChange = onPlayerTitleScrollChange
+                    )
+                },
+                {
+                    SettingsChoiceRow(
+                        title = "Time labels",
+                        description = "Display elapsed time, remaining time, both or neither.",
+                        selected = playerTimes,
+                        options = listOf("Both", "Elapsed", "Time left", "None"),
+                        onSelected = onPlayerTimesChange
+                    )
+                }
+            ))
+
+            SettingsHeader("Progress bar")
+            SettingsGroupCard(listOf(
+                {
+                    SettingsChoiceRow(
+                        title = "Progress style",
+                        description = "Choose a fine line, a thicker line, a thumb or the animated waveform.",
+                        selected = scrubberStyle,
+                        options = listOf("Hairline", "Bold", "Thumb", "Waveform"),
+                        onSelected = onScrubberStyleChange
+                    )
+                },
+                {
+                    SettingsChoiceRow(
+                        title = "Progress color",
+                        description = "Use the accent color, white or the cover-derived color.",
+                        selected = scrubberColor,
+                        options = listOf("Accent", "White", "Cover"),
+                        onSelected = onScrubberColorChange
+                    )
+                }
+            ))
+
+            SettingsHeader("Visualizer")
+            SettingsGroupCard(listOf {
+                SettingsChoiceRow(
+                    title = "Player animation",
+                    description = "Playback-state animation only. It does not use the microphone or record audio. Off uses the least resources.",
+                    selected = visualizerStyle,
+                    options = listOf("Off", "Bars", "Wave", "Ring", "Pulse", "Glow"),
+                    onSelected = onVisualizerStyleChange
+                )
+            })
+
+            SettingsHeader("Player appearance")
+            SettingsGroupCard(listOf(
+                {
+                    SettingsChoiceRow(
+                        title = "Background treatment",
+                        description = "Artwork, theme, black or a soft gradient based on the current cover.",
                         selected = playerBackgroundStyle,
-                        options = listOf("Artwork", "Theme", "Black"),
+                        options = listOf("Artwork", "Theme", "Black", "Gradient"),
                         onSelected = onPlayerBackgroundStyleChange
                     )
                 },
                 {
                     SettingsChoiceRow(
                         title = "Mini player style",
-                        description = "Card adds a floating surface, Flat removes the card elevation, and Compact uses a smaller rounded shape.",
+                        description = "Card, flat or compact mini-player surfaces.",
                         selected = miniPlayerStyle,
                         options = listOf("Card", "Flat", "Compact"),
                         onSelected = onMiniPlayerStyleChange
@@ -2264,7 +2415,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Player artwork shape",
-                        description = "Choose rounded, square or circular album artwork in the full player.",
+                        description = "Rounded, square or circular album artwork.",
                         selected = playerArtworkShape,
                         options = listOf("Rounded", "Square", "Circle"),
                         onSelected = onPlayerArtworkShapeChange
@@ -2320,6 +2471,83 @@ private fun AppearanceScreen(
                 add { DynamicNavStyleRow(dynamicNavStyle, onDynamicNavStyleChange) }
             })
         }
+    }
+}
+
+private val playerButtonNames = linkedMapOf(
+    "lyrics" to "Lyrics",
+    "video" to "Video",
+    "queue" to "Up next",
+    "share" to "Share",
+    "download" to "Download",
+    "like" to "Like",
+    "dislike" to "Not for me",
+    "sleep" to "Sleep timer"
+)
+
+@Composable
+private fun PlayerButtonsSettings(
+    selected: List<String>,
+    onSelectionChanged: (List<String>) -> Unit,
+    onMove: (Int, Int) -> Unit
+) {
+    SettingsGroupCard(listOf {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                "Choose 3 to 6 actions and arrange their order in the player.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            playerButtonNames.forEach { (key, label) ->
+                val checked = key in selected
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.Checkbox(
+                        checked = checked,
+                        enabled = checked || selected.size < 6,
+                        onCheckedChange = { enabled ->
+                            val updated = if (enabled) selected + key else selected - key
+                            if (updated.size >= 3) onSelectionChanged(updated)
+                        }
+                    )
+                    Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    val index = selected.indexOf(key)
+                    if (index >= 0) {
+                        TextButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) { Text("↑") }
+                        TextButton(onClick = { onMove(index, index + 1) }, enabled = index < selected.lastIndex) { Text("↓") }
+                    }
+                }
+            }
+            Text(
+                "${selected.size}/6 selected",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.labelSmall
+            )
+            TextButton(onClick = {
+                onSelectionChanged(listOf("lyrics", "video", "queue", "share", "download"))
+            }) { Text("Restore default buttons") }
+        }
+    })
+}
+
+@Composable
+private fun ToggleSettingRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
