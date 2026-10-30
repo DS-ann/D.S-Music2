@@ -87,7 +87,7 @@ internal object DesktopLyricsRepository {
             .header("X-YouTube-Client-Name", "67")
             .header("X-YouTube-Client-Version", "1.20260531.05.00")
             .build()
-        http.newCall(request).execute().use { response ->
+        return http.newCall(request).execute().use { response ->
             check(response.isSuccessful) { "YouTube lyrics request returned HTTP ${response.code}." }
             JsonParser.parseString(response.body?.string().orEmpty()).asJsonObject
         }
