@@ -2056,7 +2056,7 @@ private fun OnlinePlaylistCard(
     playlist: OnlinePlaylist,
     asList: Boolean = false,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: (() -> Unit)? = null
 ) {
     if (asList) {
         ListItem(
@@ -2084,12 +2084,14 @@ private fun OnlinePlaylistCard(
                 }
             },
             trailingContent = {
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Delete YouTube Music playlist",
-                        tint = MaterialTheme.colorScheme.error
-                    )
+                if (onDelete != null) {
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete YouTube Music playlist",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             },
             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -2138,18 +2140,20 @@ private fun OnlinePlaylistCard(
                         )
                     }
                 }
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(5.dp)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f), CircleShape)
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Delete YouTube Music playlist",
-                        tint = MaterialTheme.colorScheme.error
-                    )
+                if (onDelete != null) {
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(5.dp)
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f), CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete YouTube Music playlist",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
             Column(modifier = Modifier.padding(12.dp)) {
