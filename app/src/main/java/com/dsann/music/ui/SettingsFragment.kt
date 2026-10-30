@@ -319,6 +319,46 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putString(KEY_PLAYER_ARTWORK_SHAPE, safeShape) }
     }
 
+    private val _playerBackgroundStyle = MutableStateFlow(
+        prefs.getString("player_background_style", "Artwork") ?: "Artwork"
+    )
+    val playerBackgroundStyle: StateFlow<String> = _playerBackgroundStyle.asStateFlow()
+    fun setPlayerBackgroundStyle(value: String) {
+        val safe = value.takeIf { it in listOf("Artwork", "Theme", "Black") } ?: "Artwork"
+        _playerBackgroundStyle.value = safe
+        prefs.edit { putString("player_background_style", safe) }
+    }
+
+    private val _lyricsTextSize = MutableStateFlow(
+        prefs.getString("lyrics_text_size", "Standard") ?: "Standard"
+    )
+    val lyricsTextSize: StateFlow<String> = _lyricsTextSize.asStateFlow()
+    fun setLyricsTextSize(value: String) {
+        val safe = value.takeIf { it in listOf("Small", "Standard", "Large") } ?: "Standard"
+        _lyricsTextSize.value = safe
+        prefs.edit { putString("lyrics_text_size", safe) }
+    }
+
+    private val _lyricsAlignment = MutableStateFlow(
+        prefs.getString("lyrics_alignment", "Original") ?: "Original"
+    )
+    val lyricsAlignment: StateFlow<String> = _lyricsAlignment.asStateFlow()
+    fun setLyricsAlignment(value: String) {
+        val safe = value.takeIf { it in listOf("Original", "Left", "Center") } ?: "Original"
+        _lyricsAlignment.value = safe
+        prefs.edit { putString("lyrics_alignment", safe) }
+    }
+
+    private val _uiDensity = MutableStateFlow(
+        prefs.getString("ui_density", "Comfortable") ?: "Comfortable"
+    )
+    val uiDensity: StateFlow<String> = _uiDensity.asStateFlow()
+    fun setUiDensity(value: String) {
+        val safe = value.takeIf { it in listOf("Compact", "Comfortable", "Large") } ?: "Comfortable"
+        _uiDensity.value = safe
+        prefs.edit { putString("ui_density", safe) }
+    }
+
     // ── Ignore Short Audio ──────────────────────────────────────────────────
     private val _ignoreShortAudio = MutableStateFlow(prefs.getBoolean(KEY_IGNORE_SHORT_AUDIO, false))
     val ignoreShortAudio: StateFlow<Boolean> = _ignoreShortAudio.asStateFlow()
@@ -797,6 +837,10 @@ fun SettingsScreenContent(
     val dynamicAlbumTheme by viewModel.dynamicAlbumTheme.collectAsStateWithLifecycle()
     val appearancePreset by viewModel.appearancePreset.collectAsStateWithLifecycle()
     val playerArtworkShape by viewModel.playerArtworkShape.collectAsStateWithLifecycle()
+    val playerBackgroundStyle by viewModel.playerBackgroundStyle.collectAsStateWithLifecycle()
+    val lyricsTextSize by viewModel.lyricsTextSize.collectAsStateWithLifecycle()
+    val lyricsAlignment by viewModel.lyricsAlignment.collectAsStateWithLifecycle()
+    val uiDensity by viewModel.uiDensity.collectAsStateWithLifecycle()
     val autoplayEnabled by viewModel.autoplayEnabled.collectAsStateWithLifecycle()
     val hideNavLabels by viewModel.hideNavLabels.collectAsStateWithLifecycle()
     val dynamicNavStyle by viewModel.dynamicNavStyle.collectAsStateWithLifecycle()
@@ -976,6 +1020,14 @@ fun SettingsScreenContent(
                 onAppearancePresetChange = { viewModel.setAppearancePreset(it) },
                 playerArtworkShape = playerArtworkShape,
                 onPlayerArtworkShapeChange = { viewModel.setPlayerArtworkShape(it) },
+                playerBackgroundStyle = playerBackgroundStyle,
+                onPlayerBackgroundStyleChange = { viewModel.setPlayerBackgroundStyle(it) },
+                lyricsTextSize = lyricsTextSize,
+                onLyricsTextSizeChange = { viewModel.setLyricsTextSize(it) },
+                lyricsAlignment = lyricsAlignment,
+                onLyricsAlignmentChange = { viewModel.setLyricsAlignment(it) },
+                uiDensity = uiDensity,
+                onUiDensityChange = { viewModel.setUiDensity(it) },
                 hideNavLabels = hideNavLabels,
                 onHideNavLabelsChange = { viewModel.setHideNavLabels(it) },
                 dynamicNavStyle = dynamicNavStyle,
@@ -1963,13 +2015,21 @@ private fun AppearanceScreen(
     onAppearancePresetChange: (String) -> Unit,
     playerArtworkShape: String,
     onPlayerArtworkShapeChange: (String) -> Unit,
+    playerBackgroundStyle: String,
+    onPlayerBackgroundStyleChange: (String) -> Unit,
+    lyricsTextSize: String,
+    onLyricsTextSizeChange: (String) -> Unit,
+    lyricsAlignment: String,
+    onLyricsAlignmentChange: (String) -> Unit,
+    uiDensity: String,
+    onUiDensityChange: (String) -> Unit,
     hideNavLabels: Boolean,
     onHideNavLabelsChange: (Boolean) -> Unit,
     dynamicNavStyle: Boolean,
     onDynamicNavStyleChange: (Boolean) -> Unit
 ) {
     Scaffold(
-        topBar = { SettingsDetailTopBar("Appearance") { navController.popBackStack() } }
+        topBar = { SettingsDetailTopBar("Customize") { navController.popBackStack() } }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -1979,30 +2039,46 @@ private fun AppearanceScreen(
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 120.dp)
         ) {
-            SettingsHeader(stringResource(R.string.settings_header_general))
+            Text(
+                "Make SpatialFlow look and feel the way you want. Each group changes a different part of the app.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+            )
+
+            SettingsHeader("Theme")
             SettingsGroupCard(buildList {
                 add { ThemeRow(darkMode, onDarkModeChange) }
-                if (darkMode) {
-                    add { AmoledBlackRow(amoledBlack, onAmoledBlackChange) }
-                }
+                if (darkMode) add { AmoledBlackRow(amoledBlack, onAmoledBlackChange) }
                 add { DynamicAlbumThemeRow(dynamicAlbumTheme, onDynamicAlbumThemeChange) }
             })
 
-            SettingsHeader("Personalization")
+            SettingsHeader("Colors")
+            SettingsGroupCard(listOf {
+                SettingsChoiceRow(
+                    title = "Accent palette",
+                    description = "Choose the app-wide accent. Dynamic colors can still tint the interface from the current artwork.",
+                    selected = appearancePreset,
+                    options = listOf("Ocean", "Violet", "Emerald", "Amber", "Rose", "Monochrome"),
+                    onSelected = onAppearancePresetChange
+                )
+            })
+
+            SettingsHeader("Player")
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
-                        title = "Accent palette",
-                        description = "Choose the app-wide accent color. Album-art colors can still override it when Dynamic colors is on.",
-                        selected = appearancePreset,
-                        options = listOf("Ocean", "Violet", "Emerald", "Amber", "Rose", "Monochrome"),
-                        onSelected = onAppearancePresetChange
+                        title = "Player background",
+                        description = "Artwork follows the current album cover. Theme uses your app colors. Black uses a plain black player background.",
+                        selected = playerBackgroundStyle,
+                        options = listOf("Artwork", "Theme", "Black"),
+                        onSelected = onPlayerBackgroundStyleChange
                     )
                 },
                 {
                     SettingsChoiceRow(
                         title = "Player artwork shape",
-                        description = "Change the corners of the large player artwork.",
+                        description = "Choose rounded, square or circular album artwork in the full player.",
                         selected = playerArtworkShape,
                         options = listOf("Rounded", "Square", "Circle"),
                         onSelected = onPlayerArtworkShapeChange
@@ -2010,7 +2086,40 @@ private fun AppearanceScreen(
                 }
             ))
 
-            SettingsHeader("Navigation Bar")
+            SettingsHeader("Lyrics")
+            SettingsGroupCard(listOf(
+                {
+                    SettingsChoiceRow(
+                        title = "Lyrics text size",
+                        description = "Change the size of synced and plain lyric lines.",
+                        selected = lyricsTextSize,
+                        options = listOf("Small", "Standard", "Large"),
+                        onSelected = onLyricsTextSizeChange
+                    )
+                },
+                {
+                    SettingsChoiceRow(
+                        title = "Lyrics alignment",
+                        description = "Keep each line's original alignment, or align all lyric lines to the left or center.",
+                        selected = lyricsAlignment,
+                        options = listOf("Original", "Left", "Center"),
+                        onSelected = onLyricsAlignmentChange
+                    )
+                }
+            ))
+
+            SettingsHeader("Typography & Layout")
+            SettingsGroupCard(listOf {
+                SettingsChoiceRow(
+                    title = "Interface density",
+                    description = "Compact fits more content. Large increases the app's text scale and touch-target spacing.",
+                    selected = uiDensity,
+                    options = listOf("Compact", "Comfortable", "Large"),
+                    onSelected = onUiDensityChange
+                )
+            })
+
+            SettingsHeader("Navigation")
             SettingsGroupCard(buildList {
                 add { HideNavLabelsRow(hideNavLabels, onHideNavLabelsChange) }
                 add { DynamicNavStyleRow(dynamicNavStyle, onDynamicNavStyleChange) }
