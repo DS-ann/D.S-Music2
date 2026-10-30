@@ -364,7 +364,13 @@ fun FullPlayer(
         }
     }
 
-    val backgroundBrush = remember(uiState.playerBackgroundColor, isDark, playerBackgroundStyle) {
+    val themePlayerBackground = MaterialTheme.colorScheme.background
+    val backgroundBrush = remember(
+        uiState.playerBackgroundColor,
+        isDark,
+        playerBackgroundStyle,
+        themePlayerBackground
+    ) {
         val playerColor = Color(uiState.playerBackgroundColor)
         val finalColor = deriveArtworkSurfaceColor(
             sourceColor = playerColor,
@@ -375,13 +381,13 @@ fun FullPlayer(
             lightSaturationRange = 0.30f..0.48f
         )
         when (playerBackgroundStyle) {
-            "Theme" -> androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.background)
+            "Theme" -> androidx.compose.ui.graphics.SolidColor(themePlayerBackground)
             "Black" -> androidx.compose.ui.graphics.SolidColor(Color.Black)
             "Gradient" -> Brush.linearGradient(
                 listOf(
                     finalColor,
                     finalColor.copy(alpha = if (isDark) 0.55f else 0.72f),
-                    MaterialTheme.colorScheme.background
+                    themePlayerBackground
                 )
             )
             else -> androidx.compose.ui.graphics.SolidColor(finalColor)
@@ -668,7 +674,7 @@ fun FullPlayer(
                             label = "Share",
                             onClick = {
                                 val shareIntent = Intent().apply {
-                                    action = Intent.ACTION_SEND
+                                    this.action = Intent.ACTION_SEND
                                     putExtra(Intent.EXTRA_TEXT, "Listening on SpatialFlow. Check out: https://music.youtube.com/watch?v=${songForActions?.videoId.orEmpty()}")
                                     type = "text/plain"
                                 }
