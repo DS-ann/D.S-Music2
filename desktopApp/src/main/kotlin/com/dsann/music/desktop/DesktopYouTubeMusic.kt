@@ -388,7 +388,7 @@ internal object DesktopYouTubeMusic {
             .header("X-YouTube-Client-Version", CLIENT_VERSION)
             .withSession("https://music.youtube.com")
             .build()
-        http.newCall(request).execute().use { response ->
+        return http.newCall(request).execute().use { response ->
             val raw = response.body?.string().orEmpty()
             check(response.isSuccessful) { "YouTube Music request returned HTTP ${response.code}." }
             JsonParser.parseString(raw).asJsonObject
@@ -637,7 +637,7 @@ private object DesktopSearchParser {
             )
         }
         val chips = json.path("contents.singleColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.header.chipCloudRenderer.chips")
-            ?.asJsonArray.orEmpty()
+            ?.asJsonArray ?: JsonArray()
         val moods = chips.mapNotNull { chip ->
             chip.path("chipCloudChipRenderer.text.runs.0.text")?.stringOrNull()
         }.filter { it.isNotBlank() }
