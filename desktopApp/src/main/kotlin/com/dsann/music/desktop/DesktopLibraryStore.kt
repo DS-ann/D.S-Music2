@@ -29,7 +29,24 @@ internal object DesktopLibraryStore {
     private val gson = Gson()
     val root: File by lazy {
         val roaming = System.getenv("APPDATA")?.takeIf { it.isNotBlank() }
-        File(roaming ?: System.getProperty("user.home"), "SpatialFlow").apply { mkdirs() }
+        val profileRoot = File(roaming ?: System.getProperty("user.home"))
+        val legacyRoot = File(profileRoot, "SpatialFlow")
+        val currentRoot = File(profileRoot, "D.S Music")
+        currentRoot.mkdirs()
+        // Preserve existing Windows downloads, playlists, favourites and cache metadata
+        // when upgrading from SpatialFlow. Copy only missing entries; never overwrite data.
+        if (legacyRoot.isDirectory) {
+            legacyRoot.listFiles()?.forEach { oldEntry ->
+                val newEntry = File(currentRoot, oldEntry.name)
+                if (!newEntry.exists()) {
+                    runCatching {
+                        if (oldEntry.isDirectory) oldEntry.copyRecursively(newEntry, overwrite = false)
+                        else oldEntry.copyTo(newEntry, overwrite = false)
+                    }
+                }
+            }
+        }
+        currentRoot
     }
     val downloadsDirectory: File get() = File(root, "Downloads").apply { mkdirs() }
     val cacheDirectory: File get() = File(root, "Cache").apply { mkdirs() }
