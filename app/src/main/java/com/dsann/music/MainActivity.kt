@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -66,6 +67,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -304,8 +306,14 @@ class MainActivity : AppCompatActivity() {
                     val showBottomBar = currentDestination?.route in listOf("explore", "library", "local_music", "settings")
                     // Keep the rail persistent in wide layouts; scroll-driven bottom-bar hiding is phone-only.
                     val showNavigationRail = useNavigationRail && showBottomBar
+                    val layoutDirection = LocalLayoutDirection.current
+                    val railSystemInset = WindowInsets.displayCutout
+                        .union(WindowInsets.navigationBars)
+                        .asPaddingValues()
+                        .calculateStartPadding(layoutDirection)
+                    val railStartPadding = railSystemInset + 12.dp
                     val railInsetState = animateDpAsState(
-                        targetValue = if (showNavigationRail) 88.dp else 0.dp,
+                        targetValue = if (showNavigationRail) railSystemInset + 88.dp else 0.dp,
                         animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
                         label = "NavigationRailInset"
                     )
@@ -516,7 +524,7 @@ class MainActivity : AppCompatActivity() {
                             Surface(
                                 modifier = Modifier
                                     .align(Alignment.CenterStart)
-                                    .padding(start = 12.dp)
+                                    .padding(start = railStartPadding)
                                     .width(76.dp),
                                 shape = RoundedCornerShape(38.dp),
                                 color = MaterialTheme.colorScheme.surfaceContainer,
