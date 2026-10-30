@@ -198,10 +198,15 @@ object SongDownloader {
                 }
                 while (cursor.moveToNext()) {
                     val location = if (locationColumn >= 0) cursor.getString(locationColumn).orEmpty() else ""
+                    val normalizedLocation = location.replace('\\', '/').lowercase()
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        if (!location.replace('\\', '/').lowercase().contains("spatialflow/")) continue
+                        if (!normalizedLocation.contains("spatialflow/") &&
+                            !normalizedLocation.contains("d.s music/")
+                        ) continue
                     } else {
-                        if (!location.replace('\\', '/').lowercase().contains("/spatialflow/")) continue
+                        if (!normalizedLocation.contains("/spatialflow/") &&
+                            !normalizedLocation.contains("/d.s music/")
+                        ) continue
                     }
                     return@use ContentUris.withAppendedId(
                         MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
@@ -217,12 +222,13 @@ object SongDownloader {
     }
 
     private fun findLegacyDownloadedFile(filename: String): Uri? {
-        val directory = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-            "SpatialFlow"
-        )
-        val file = File(directory, filename)
-        return if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && file.isFile) Uri.fromFile(file) else null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return null
+        val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val file = listOf("D.S Music", "SpatialFlow")
+            .asSequence()
+            .map { folder -> File(File(downloads, folder), filename) }
+            .firstOrNull { it.isFile }
+        return file?.let(Uri::fromFile)
     }
 
     private fun isUriReadable(context: Context, uri: Uri): Boolean = try {
@@ -662,7 +668,7 @@ object SongDownloader {
             }
 
             val sourceComment = if (fromCache) {
-                "Exported from SpatialFlow cached audio (video ID: $videoId)"
+                "Exported from D.S Music cached audio (video ID: $videoId)"
             } else {
                 "Downloaded from YouTube Music (video ID: $videoId)"
             }
@@ -1106,13 +1112,11 @@ object SongDownloader {
                 .replace(Regex("[^a-zA-Z0-9._\\s()\\[\\]-]"), "_")
         }
 
-        // 1. Check legacy direct file paths on Android versions before scoped storage.
+        // 1. Check both the current folder and the old folder on Android versions before scoped storage.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            val downloadsDir = File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                "SpatialFlow"
-            )
-            if (cleanNames.any { File(downloadsDir, it).isFile }) return true
+            val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val appFolders = listOf("D.S Music", "SpatialFlow").map { File(downloads, it) }
+            if (cleanNames.any { name -> appFolders.any { folder -> File(folder, name).isFile } }) return true
         }
 
         // 2. Match every container the downloader can create. Previously only .mp3 was
