@@ -107,7 +107,7 @@ internal class DesktopAudioPlayer : AutoCloseable {
 
         worker = Thread(
             { runPlayback(file, startPositionMs.coerceAtLeast(0L), token) },
-            "SpatialFlow-Audio"
+            "D.S-Music-Audio"
         ).apply { isDaemon = true; start() }
     }
 
