@@ -1,6 +1,7 @@
 package com.dsann.music.desktop
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,6 +53,8 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import java.io.File
 import java.awt.EventQueue
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.nio.file.Files
 import java.util.Locale
 import java.util.prefs.Preferences
@@ -162,6 +165,18 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     var targetBitrate by remember { mutableStateOf(preferences.getInt("target_bitrate", 256)) }
     var autoplayEnabled by remember { mutableStateOf(preferences.getBoolean("autoplay_enabled", true)) }
     var appearancePreset by remember { mutableStateOf(preferences.get("appearance_preset", "Ocean")) }
+    var desktopPlayerLayout by remember { mutableStateOf(preferences.get("desktop_player_layout", "Standard")) }
+    var desktopTitleAlign by remember { mutableStateOf(preferences.get("desktop_title_align", "Left")) }
+    var desktopTitleSize by remember { mutableStateOf(preferences.get("desktop_title_size", "Medium")) }
+    var desktopTimes by remember { mutableStateOf(preferences.get("desktop_player_times", "Both")) }
+    var desktopScrubberStyle by remember { mutableStateOf(preferences.get("desktop_scrubber_style", "Standard")) }
+    var desktopVisualizer by remember { mutableStateOf(preferences.get("desktop_visualizer", "Off")) }
+    var desktopButtons by remember {
+        mutableStateOf(
+            preferences.get("desktop_player_buttons", "lyrics,video,share")
+                .split(",").filter { it in setOf("lyrics", "video", "share") }.distinct().ifEmpty { listOf("lyrics", "video", "share") }
+        )
+    }
     var miniPlayerStyle by remember { mutableStateOf(preferences.get("mini_player_style", "Card")) }
     var miniPlayerBackground by remember { mutableStateOf(preferences.get("mini_player_background", "Dark")) }
     var desktopLyricsSize by remember { mutableStateOf(preferences.get("desktop_lyrics_size", "Standard")) }
@@ -1608,6 +1623,156 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                         }
                                     }
                                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("Player layout", fontWeight = FontWeight.SemiBold)
+                                        Text("Choose how the Windows player presents the current track.", color = mutedText, fontSize = 11.sp)
+                                        LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                            items(listOf("Standard", "Cover", "Minimal", "Vinyl", "Cassette")) { option ->
+                                                Button(
+                                                    onClick = {
+                                                        desktopPlayerLayout = option
+                                                        preferences.put("desktop_player_layout", option)
+                                                        runCatching { preferences.flush() }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        backgroundColor = if (desktopPlayerLayout == option) accentColor else Color(0xFF263545),
+                                                        contentColor = if (desktopPlayerLayout == option) Color(0xFF0B1420) else Color.White
+                                                    )
+                                                ) { Text(option) }
+                                            }
+                                        }
+                                    }
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("Player action buttons", fontWeight = FontWeight.SemiBold)
+                                        Text("Select and arrange the extra actions shown beside transport controls.", color = mutedText, fontSize = 11.sp)
+                                        listOf("lyrics" to "Lyrics", "video" to "Video", "share" to "Copy link").forEach { (key, label) ->
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Button(
+                                                    onClick = {
+                                                        val next = if (key in desktopButtons) desktopButtons - key else (desktopButtons + key).take(3)
+                                                        desktopButtons = if (next.isEmpty()) listOf("lyrics") else next
+                                                        preferences.put("desktop_player_buttons", desktopButtons.joinToString(","))
+                                                        runCatching { preferences.flush() }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        backgroundColor = if (key in desktopButtons) accentColor else Color(0xFF263545),
+                                                        contentColor = if (key in desktopButtons) Color(0xFF0B1420) else Color.White
+                                                    )
+                                                ) { Text(if (key in desktopButtons) "✓ $label" else "+ $label") }
+                                                val index = desktopButtons.indexOf(key)
+                                                if (index > 0) {
+                                                    Spacer(Modifier.width(4.dp))
+                                                    Button(
+                                                        onClick = {
+                                                            val mutable = desktopButtons.toMutableList()
+                                                            val moved = mutable.removeAt(index)
+                                                            mutable.add(index - 1, moved)
+                                                            desktopButtons = mutable
+                                                            preferences.put("desktop_player_buttons", mutable.joinToString(","))
+                                                            runCatching { preferences.flush() }
+                                                        },
+                                                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545))
+                                                    ) { Text("↑") }
+                                                }
+                                                if (index in 0 until desktopButtons.lastIndex) {
+                                                    Spacer(Modifier.width(4.dp))
+                                                    Button(
+                                                        onClick = {
+                                                            val mutable = desktopButtons.toMutableList()
+                                                            val moved = mutable.removeAt(index)
+                                                            mutable.add(index + 1, moved)
+                                                            desktopButtons = mutable
+                                                            preferences.put("desktop_player_buttons", mutable.joinToString(","))
+                                                            runCatching { preferences.flush() }
+                                                        },
+                                                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545))
+                                                    ) { Text("↓") }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("Title and time display", fontWeight = FontWeight.SemiBold)
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            listOf("Left", "Centered").forEach { option ->
+                                                Button(
+                                                    onClick = {
+                                                        desktopTitleAlign = option
+                                                        preferences.put("desktop_title_align", option)
+                                                        runCatching { preferences.flush() }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        backgroundColor = if (desktopTitleAlign == option) accentColor else Color(0xFF263545),
+                                                        contentColor = if (desktopTitleAlign == option) Color(0xFF0B1420) else Color.White
+                                                    )
+                                                ) { Text(option) }
+                                            }
+                                        }
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            listOf("Small", "Medium", "Large").forEach { option ->
+                                                Button(
+                                                    onClick = {
+                                                        desktopTitleSize = option
+                                                        preferences.put("desktop_title_size", option)
+                                                        runCatching { preferences.flush() }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        backgroundColor = if (desktopTitleSize == option) accentColor else Color(0xFF263545),
+                                                        contentColor = if (desktopTitleSize == option) Color(0xFF0B1420) else Color.White
+                                                    )
+                                                ) { Text(option) }
+                                            }
+                                        }
+                                        LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                            items(listOf("Both", "Elapsed", "Time left", "None")) { option ->
+                                                Button(
+                                                    onClick = {
+                                                        desktopTimes = option
+                                                        preferences.put("desktop_player_times", option)
+                                                        runCatching { preferences.flush() }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        backgroundColor = if (desktopTimes == option) accentColor else Color(0xFF263545),
+                                                        contentColor = if (desktopTimes == option) Color(0xFF0B1420) else Color.White
+                                                    )
+                                                ) { Text(option) }
+                                            }
+                                        }
+                                    }
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("Progress and animation", fontWeight = FontWeight.SemiBold)
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            listOf("Hairline", "Standard", "Bold").forEach { option ->
+                                                Button(
+                                                    onClick = {
+                                                        desktopScrubberStyle = option
+                                                        preferences.put("desktop_scrubber_style", option)
+                                                        runCatching { preferences.flush() }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        backgroundColor = if (desktopScrubberStyle == option) accentColor else Color(0xFF263545),
+                                                        contentColor = if (desktopScrubberStyle == option) Color(0xFF0B1420) else Color.White
+                                                    )
+                                                ) { Text(option) }
+                                            }
+                                        }
+                                        LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                            items(listOf("Off", "Bars", "Wave", "Ring", "Pulse", "Glow")) { option ->
+                                                Button(
+                                                    onClick = {
+                                                        desktopVisualizer = option
+                                                        preferences.put("desktop_visualizer", option)
+                                                        runCatching { preferences.flush() }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        backgroundColor = if (desktopVisualizer == option) accentColor else Color(0xFF263545),
+                                                        contentColor = if (desktopVisualizer == option) Color(0xFF0B1420) else Color.White
+                                                    )
+                                                ) { Text(option) }
+                                            }
+                                        }
+                                        Text("Animation follows playback state; no microphone is accessed.", color = mutedText, fontSize = 10.sp)
+                                    }
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Text("Mini player layout", fontWeight = FontWeight.SemiBold)
                                         Text("Choose the compact Windows player presentation.", color = mutedText, fontSize = 11.sp)
                                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1720,6 +1885,13 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                         hasTrack = hasNowPlaying,
                         miniPlayerStyle = miniPlayerStyle,
                         miniPlayerBackground = miniPlayerBackground,
+                        playerLayout = desktopPlayerLayout,
+                        titleAlign = desktopTitleAlign,
+                        titleSize = desktopTitleSize,
+                        playerTimes = desktopTimes,
+                        scrubberStyle = desktopScrubberStyle,
+                        visualizerStyle = desktopVisualizer,
+                        playerButtons = desktopButtons,
                         accentColor = accentColor,
                         isPlaying = playing,
                         isPaused = paused,
@@ -1728,6 +1900,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                         onPrevious = { playRelative(-1) },
                         onNext = { playRelative(1) },
                         onLyrics = { section = "Lyrics" },
+                        videoId = currentOnlineSong?.videoId,
                         onVideoToggle = if (currentOnlineSong != null) ::toggleVideoMode else null,
                         videoMode = videoMode,
                         onPlayPause = {
@@ -1854,12 +2027,63 @@ private fun TrackRow(track: DesktopTrack, selected: Boolean, onClick: () -> Unit
 }
 
 @Composable
+private fun DesktopMiniPlayerVisualizer(style: String, isPlaying: Boolean, color: Color) {
+    val transition = rememberInfiniteTransition(label = "desktop-player-visualizer")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "desktop-player-visualizer-phase"
+    )
+    Canvas(Modifier.fillMaxWidth().height(18.dp).padding(horizontal = 10.dp)) {
+        val amplitude = if (isPlaying) phase else 0.12f
+        when (style) {
+            "Bars" -> {
+                val count = 30
+                val gap = 3.dp.toPx()
+                val width = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
+                repeat(count) { index ->
+                    val wave = kotlin.math.abs(kotlin.math.sin(index * 0.65f + phase * 6.28f))
+                    val height = size.height * (0.1f + wave * amplitude)
+                    drawRoundRect(
+                        color.copy(alpha = 0.35f + wave * 0.5f),
+                        topLeft = androidx.compose.ui.geometry.Offset(index * (width + gap), (size.height - height) / 2f),
+                        size = androidx.compose.ui.geometry.Size(width, height),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(width / 2f)
+                    )
+                }
+            }
+            "Wave", "Pulse", "Ring", "Glow" -> {
+                val height = size.height * (if (isPlaying) 0.5f + phase * 0.45f else 0.2f)
+                drawRoundRect(
+                    Brush.horizontalGradient(listOf(Color.Transparent, color.copy(alpha = 0.65f), Color.Transparent)),
+                    topLeft = androidx.compose.ui.geometry.Offset(0f, (size.height - height) / 2f),
+                    size = androidx.compose.ui.geometry.Size(size.width, height),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(height / 2f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun MiniPlayer(
     title: String,
     artist: String,
     hasTrack: Boolean,
     miniPlayerStyle: String,
     miniPlayerBackground: String,
+    playerLayout: String,
+    titleAlign: String,
+    titleSize: String,
+    playerTimes: String,
+    scrubberStyle: String,
+    visualizerStyle: String,
+    playerButtons: List<String>,
+    videoId: String?,
     accentColor: Color,
     isPlaying: Boolean,
     isPaused: Boolean,
@@ -1896,9 +2120,24 @@ private fun MiniPlayer(
             .padding(horizontal = horizontalPadding, vertical = verticalPadding)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(title.ifBlank { "Nothing playing" }, maxLines = 1, fontWeight = FontWeight.SemiBold)
-                Text(artist.ifBlank { "Choose a song from Explore or Library" }, maxLines = 1, color = mutedText, fontSize = 11.sp)
+            Column(
+                Modifier.weight(1f),
+                horizontalAlignment = if (titleAlign == "Centered") Alignment.CenterHorizontally else Alignment.Start
+            ) {
+                Text(
+                    title.ifBlank { "Nothing playing" },
+                    maxLines = 1,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = when (titleSize) { "Small" -> 12.sp; "Large" -> 19.sp; else -> 15.sp },
+                    textAlign = if (titleAlign == "Centered") androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start
+                )
+                Text(
+                    artist.ifBlank { "Choose a song from Explore or Library" },
+                    maxLines = 1,
+                    color = mutedText,
+                    fontSize = 11.sp,
+                    textAlign = if (titleAlign == "Centered") androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start
+                )
             }
             Button(
                 onClick = onPrevious,
@@ -1923,37 +2162,63 @@ private fun MiniPlayer(
                 elevation = ButtonDefaults.elevation(0.dp)
             ) { Text("▶|") }
             Spacer(Modifier.width(8.dp))
-            Button(
-                onClick = onLyrics,
-                enabled = hasTrack,
-                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545)),
-                elevation = ButtonDefaults.elevation(0.dp)
-            ) { Text("Lyrics") }
-            if (onVideoToggle != null) {
+            playerButtons.forEach { action ->
+                when (action) {
+                    "lyrics" -> Button(
+                        onClick = onLyrics,
+                        enabled = hasTrack,
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545)),
+                        elevation = ButtonDefaults.elevation(0.dp)
+                    ) { Text("Lyrics") }
+                    "video" -> if (onVideoToggle != null) Button(
+                        onClick = onVideoToggle,
+                        enabled = hasTrack,
+                        colors = ButtonDefaults.buttonColors(
+                            backgroundColor = if (videoMode) accentColor else Color(0xFF263545),
+                            contentColor = if (videoMode) Color(0xFF0B1420) else Color.White
+                        ),
+                        elevation = ButtonDefaults.elevation(0.dp)
+                    ) { Text(if (videoMode) "Audio" else "Video") }
+                    "share" -> Button(
+                        onClick = {
+                            val url = videoId?.takeIf { it.isNotBlank() }?.let { "https://music.youtube.com/watch?v=$it" }.orEmpty()
+                            runCatching {
+                                Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(url), null)
+                            }
+                        },
+                        enabled = hasTrack,
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545)),
+                        elevation = ButtonDefaults.elevation(0.dp)
+                    ) { Text("Copy link") }
+                }
                 Spacer(Modifier.width(8.dp))
-                Button(
-                    onClick = onVideoToggle,
-                    enabled = hasTrack,
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = if (videoMode) accentColor else Color(0xFF263545),
-                        contentColor = if (videoMode) Color(0xFF0B1420) else Color.White
-                    ),
-                    elevation = ButtonDefaults.elevation(0.dp)
-                ) { Text(if (videoMode) "Audio" else "Video") }
             }
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(formatTime(positionMs), color = mutedText, fontSize = 10.sp)
+            if (playerTimes == "Both" || playerTimes == "Elapsed") {
+                Text(formatTime(positionMs), color = mutedText, fontSize = 10.sp)
+            }
             Slider(
                 value = sliderPosition.coerceIn(0f, maxPosition),
                 onValueChange = { sliderPosition = it },
                 onValueChangeFinished = { onSeek(sliderPosition.toLong()) },
                 enabled = hasTrack && durationMs > 0L,
                 valueRange = 0f..maxPosition,
-                modifier = Modifier.weight(1f).padding(horizontal = 10.dp)
+                modifier = Modifier.weight(1f)
+                    .height(when (scrubberStyle) { "Hairline" -> 18.dp; "Bold" -> 30.dp; else -> 24.dp })
+                    .padding(horizontal = 10.dp)
             )
-            Text(formatTime(durationMs), color = mutedText, fontSize = 10.sp)
+            if (playerTimes == "Both" || playerTimes == "Time left") {
+                Text(
+                    if (playerTimes == "Time left") "-${formatTime((durationMs - positionMs).coerceAtLeast(0L))}" else formatTime(durationMs),
+                    color = mutedText,
+                    fontSize = 10.sp
+                )
+            }
+        }
+        if (visualizerStyle != "Off") {
+            DesktopMiniPlayerVisualizer(visualizerStyle, isPlaying, accentColor)
         }
     }
 }
