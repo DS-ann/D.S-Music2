@@ -63,7 +63,7 @@ fun <T> SharedPreferences.observeKey(key: String, defaultValue: T): State<T> {
 }
 
 /**
- * SpatialFlow's root composable theme.
+ * D.S Music's root composable theme.
  *
  * @param darkTheme       Whether to use dark mode colors.
  * @param content         The composable content.
