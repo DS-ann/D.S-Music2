@@ -10,6 +10,7 @@ import org.schabi.newpipe.extractor.downloader.Request
 import org.schabi.newpipe.extractor.downloader.Response
 import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.StreamInfo
+import org.schabi.newpipe.extractor.stream.StreamType
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.Locale
@@ -32,7 +33,9 @@ internal data class DesktopVideoOption(
     val bitrateKbps: Int,
     val sizeBytes: Long?,
     val audioUrl: String? = null,
-    val audioMimeType: String? = null
+    val audioMimeType: String? = null,
+    val videoTitle: String? = null,
+    val videoUploader: String? = null
 ) {
     val usesSeparateAudio: Boolean get() = !audioUrl.isNullOrBlank()
 }
@@ -151,6 +154,12 @@ internal object DesktopNewPipeExtractor {
                 ServiceList.YouTube,
                 "https://www.youtube.com/watch?v=$videoId"
             )
+            if (info.streamType == StreamType.AUDIO_STREAM ||
+                info.streamType == StreamType.AUDIO_LIVE_STREAM ||
+                info.streamType == StreamType.POST_LIVE_AUDIO_STREAM
+            ) {
+                return@withContext emptyList()
+            }
 
             val muxed = info.videoStreams
                 .asSequence()
@@ -165,7 +174,9 @@ internal object DesktopNewPipeExtractor {
                         height = height,
                         mimeType = mime,
                         bitrateKbps = (stream.getBitrate() / 1000).takeIf { it > 0 } ?: 0,
-                        sizeBytes = stream.itagItem?.contentLength?.takeIf { it > 0L }
+                        sizeBytes = stream.itagItem?.contentLength?.takeIf { it > 0L },
+                        videoTitle = info.name,
+                        videoUploader = info.uploaderName
                     )
                 }
                 .toList()
@@ -201,7 +212,9 @@ internal object DesktopNewPipeExtractor {
                         bitrateKbps = (stream.getBitrate() / 1000).takeIf { it > 0 } ?: 0,
                         sizeBytes = stream.itagItem?.contentLength?.takeIf { it > 0L },
                         audioUrl = audio.content,
-                        audioMimeType = audio.format?.mimeType?.substringBefore(';')?.trim()
+                        audioMimeType = audio.format?.mimeType?.substringBefore(';')?.trim(),
+                        videoTitle = info.name,
+                        videoUploader = info.uploaderName
                     )
                 }
                 .toList()
