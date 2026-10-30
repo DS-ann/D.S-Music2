@@ -634,7 +634,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                                             OnlineResultRow(
                                                                 item = top,
                                                                 featured = true,
-                                                                isFavorite = (top as? SearchItem.Song)?.song?.videoId in favoriteIds,
+                                                                isFavorite = ((top as? SearchItem.Song)?.song?.videoId?.let { it in favoriteIds } == true),
                                                                 isDownloading = (top as? SearchItem.Song)?.song?.videoId == downloadingVideoId,
                                                                 onClick = { openOnlineItem(top) },
                                                                 onFavorite = { (top as? SearchItem.Song)?.song?.let(::toggleFavorite) },
@@ -648,7 +648,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                                     item(key = "mixed-result-$index") {
                                                         OnlineResultRow(
                                                             item = resultItem,
-                                                            isFavorite = (resultItem as? SearchItem.Song)?.song?.videoId in favoriteIds,
+                                                            isFavorite = ((resultItem as? SearchItem.Song)?.song?.videoId?.let { it in favoriteIds } == true),
                                                             isDownloading = (resultItem as? SearchItem.Song)?.song?.videoId == downloadingVideoId,
                                                             onClick = { openOnlineItem(resultItem) },
                                                             onFavorite = { (resultItem as? SearchItem.Song)?.song?.let(::toggleFavorite) },
@@ -671,7 +671,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                                         val resultItem = resultSection.items[index]
                                                         OnlineResultRow(
                                                             item = resultItem,
-                                                            isFavorite = (resultItem as? SearchItem.Song)?.song?.videoId in favoriteIds,
+                                                            isFavorite = ((resultItem as? SearchItem.Song)?.song?.videoId?.let { it in favoriteIds } == true),
                                                             isDownloading = (resultItem as? SearchItem.Song)?.song?.videoId == downloadingVideoId,
                                                             onClick = { openOnlineItem(resultItem) },
                                                             onFavorite = { (resultItem as? SearchItem.Song)?.song?.let(::toggleFavorite) },
@@ -701,7 +701,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                                 val item = collectionItems[index]
                                                 OnlineResultRow(
                                                     item = item,
-                                                    isFavorite = (item as? SearchItem.Song)?.song?.videoId in favoriteIds,
+                                                    isFavorite = ((item as? SearchItem.Song)?.song?.videoId?.let { it in favoriteIds } == true),
                                                     isDownloading = (item as? SearchItem.Song)?.song?.videoId == downloadingVideoId,
                                                     onClick = { playCollectionItem(item) },
                                                     onFavorite = { (item as? SearchItem.Song)?.song?.let(::toggleFavorite) },
@@ -724,7 +724,14 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                             onClick = { playSavedSong(saved) },
                                             onRemove = {
                                                 DesktopLibraryStore.setFavorite(
-                                                    OnlineSong(saved.videoId, saved.title, saved.artist, saved.album, saved.durationMs, saved.thumbnailUrl),
+                                                    OnlineSong(
+                                                        videoId = saved.videoId,
+                                                        title = saved.title,
+                                                        artist = saved.artist,
+                                                        albumName = saved.album,
+                                                        durationMs = saved.durationMs,
+                                                        thumbnailUrl = saved.thumbnailUrl
+                                                    ),
                                                     false
                                                 )
                                                 refreshSavedLists()
