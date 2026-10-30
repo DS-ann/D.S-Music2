@@ -421,8 +421,12 @@ object NewPipeStreamExtractor {
             .toList()
     }
 
+    /**
+     * Data-saver default for mode switches. Keep the full option list available to the player
+     * so the user can explicitly choose a higher resolution from the in-video quality menu.
+     */
     suspend fun getVideoStreamUrl(videoId: String?): String? =
-        getVideoStreamOptions(videoId).firstOrNull()?.url
+        getVideoStreamOptions(videoId).lastOrNull()?.url
 
     /**
      * Resolve a conservative recovery stream after the preferred stream failed in Media3.
