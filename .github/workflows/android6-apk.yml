@@ -1,10 +1,10 @@
-name: Build and upload SpatialFlow Android 6+ APK
+name: Build and upload D.S Music Android 6+ APK
 
 on:
   workflow_call:
     inputs:
       source_ref:
-        description: SpatialFlow branch, tag, or commit to build
+        description: D.S Music branch, tag, or commit to build
         required: false
         type: string
         default: master
@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: SpatialFlow branch, tag, or commit to build
+        description: D.S Music branch, tag, or commit to build
         required: true
         type: string
         default: master
@@ -31,7 +31,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: spatialflow-arm64-apk-${{ github.ref }}
+  group: dsmusic-arm64-apk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -43,7 +43,7 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v7
         with:
-          repository: DS-ann/SpatialFlow
+          repository: DS-ann/D.S-Music2
           ref: ${{ inputs.source_ref || github.ref_name }}
 
       - name: Set up JDK 17
@@ -81,7 +81,7 @@ jobs:
           : "${SIGNING_KEYSTORE_PASSWORD:?Missing the release keystore password secret}"
           : "${SIGNING_KEY_ALIAS:?Missing the release key alias secret}"
           : "${SIGNING_KEY_PASSWORD:?Missing the release key password secret}"
-          KEYSTORE="$RUNNER_TEMP/spatialflow-release-keystore"
+          KEYSTORE="$RUNNER_TEMP/dsmusic-release-keystore"
           printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
           chmod 600 "$KEYSTORE"
           keytool -list -storetype PKCS12 -keystore "$KEYSTORE" -storepass "$SIGNING_KEYSTORE_PASSWORD" -alias "$SIGNING_KEY_ALIAS" >/dev/null
@@ -89,7 +89,7 @@ jobs:
 
           BUILD_DIR="app/build/outputs/apk/release"
           SOURCE_APK="$BUILD_DIR/app-arm64-v8a-release-unsigned.apk"
-          ALIGNED_APK="$RUNNER_TEMP/SpatialFlow-arm64-v8a-aligned.apk"
+          ALIGNED_APK="$RUNNER_TEMP/D.S-Music-arm64-v8a-aligned.apk"
           OUTPUT_APK="$BUILD_DIR/dsmusic.apk"
           OUTPUT_ZIP="$BUILD_DIR/dsmusic.zip"
           ZIPALIGN="$ANDROID_HOME/build-tools/37.0.0/zipalign"
