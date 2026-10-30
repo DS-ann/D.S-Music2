@@ -345,12 +345,11 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
             currentOnlineSong = null
             currentSavedSong = song
             selectedIndex = -1
-            player.play(audioFile)
+            player.play(audioFile, 0L, song.durationMs)
             val lyricFile = song.lyricsPath?.let(::File)
             if (lyricFile != null && lyricFile.isFile) {
                 val raw = lyricFile.readText()
-                val lines = DesktopLyricsRepository.fetch(song.title, song.artist, song.durationMs)
-                lyricsData = lines ?: DesktopLyrics(raw, "Offline lyrics", raw.contains("[00:"), emptyList())
+                lyricsData = DesktopLyricsRepository.parseOffline(raw)
                 section = "Lyrics"
             } else {
                 loadLyrics(song.title, song.artist, song.durationMs, song.videoId, song.album)
