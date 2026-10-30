@@ -2428,6 +2428,72 @@ class AudioPlaybackService : MediaSessionService() {
         getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("autoplay_enabled", true)
 
     /**
+     * Load a progressive/muxed video stream with an explicit video MIME type. Signed
+     * videoplayback URLs have no useful extension, so the generic audio URL loader may
+     * initialize the first stream incorrectly; this path mirrors the later quality reload.
+     */
+    private fun loadVideoWithMuxedStream(
+        videoUrl: String,
+        startPositionMs: Long,
+        autoPlay: Boolean,
+        videoMimeType: String?
+    ) {
+        if (!isPlayerInitialized || videoUrl.isBlank()) return
+        val song = viewModel?.currentSong?.value
+        val videoUri = videoUrl.toUri()
+
+        cancelCurrentTrackCache()
+        cacheAssetsSongId = null
+        player.pause()
+        player.stop()
+        player.clearMediaItems()
+
+        if (isCrossfading) {
+            nextPlayer?.stop()
+            nextPlayer?.release()
+            nextPlayer = null
+            crossfadeAnimator?.cancel()
+            crossfadeAnimator = null
+            isCrossfading = false
+            crossfadeNextSongStarted = false
+        }
+
+        currentSourceUri = videoUri
+        originalSourceUri = song?.videoId?.let { "innertube://$it".toUri() } ?: videoUri
+        isNextSongPreCached = false
+        pendingSeekPos = -1L
+        shouldAutoPlay = false
+        viewModel?.setLoading(true)
+
+        try {
+            val mediaItem = buildMediaItem(videoUri).buildUpon()
+                .setMimeType(videoMimeType?.takeIf { it.isNotBlank() } ?: "video/mp4")
+                .build()
+            val sourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(
+                createCacheDataSourceFactory(applicationContext)
+            )
+            val source = sourceFactory.createMediaSource(mediaItem)
+
+            player.volume = currentBaseVolume.coerceIn(0f, 1f)
+            player.setMediaSource(source, startPositionMs.coerceAtLeast(0L))
+            player.prepare()
+            if (autoPlay) {
+                player.play()
+                isPausedByFocusLoss = false
+            }
+            Log.d(
+                TAG,
+                "Loaded muxed video stream: mime=${videoMimeType ?: "video/mp4"}, " +
+                    "start=${startPositionMs}ms autoPlay=${autoPlay}"
+            )
+        } catch (error: Exception) {
+            viewModel?.setLoading(false)
+            Log.e(TAG, "Could not load muxed video stream", error)
+            throw error
+        }
+    }
+
+    /**
      * Play YouTube's adaptive DASH video-only and audio-only streams as one synchronized
      * Media3 item. This fallback is required for videos where YouTube no longer supplies
      * progressive/muxed streams.
@@ -2559,12 +2625,18 @@ class AudioPlaybackService : MediaSessionService() {
                     vm.setLoading(false)
                     if (wasPlaying) player.play()
                     com.dsann.music.ui.SnackbarController.showMessage(
-                        "YouTube did not provide a compatible video stream for this track."
+                        "No video available for this track."
                     )
                     return@launch
                 }
 
                 vm.setVideoModeState(true)
+                vm.setVideoPlaybackMetadata(
+                    com.dsann.music.viewmodel.VideoPlaybackMetadata(
+                        title = videoOption.videoTitle?.takeIf { it.isNotBlank() } ?: song.title,
+                        uploader = videoOption.videoUploader?.takeIf { it.isNotBlank() } ?: song.artist
+                    )
+                )
                 if (videoOption.usesSeparateAudio) {
                     loadVideoWithSeparateAudio(
                         videoUrl = videoOption.url,
@@ -2574,10 +2646,13 @@ class AudioPlaybackService : MediaSessionService() {
                         videoMimeType = videoOption.mimeType,
                         audioMimeType = videoOption.audioMimeType
                     )
-                } else if (wasPlaying) {
-                    loadAndPlay(videoOption.url.toUri(), position)
                 } else {
-                    loadAudio(videoOption.url.toUri(), position)
+                    loadVideoWithMuxedStream(
+                        videoUrl = videoOption.url,
+                        startPositionMs = position,
+                        autoPlay = wasPlaying,
+                        videoMimeType = videoOption.mimeType
+                    )
                 }
             } catch (error: Exception) {
                 vm.setLoading(false)
@@ -2619,10 +2694,13 @@ class AudioPlaybackService : MediaSessionService() {
                 videoMimeType = videoMimeType,
                 audioMimeType = audioMimeType
             )
-        } else if (wasPlaying) {
-            loadAndPlay(streamUrl.toUri(), position)
         } else {
-            loadAudio(streamUrl.toUri(), position)
+            loadVideoWithMuxedStream(
+                videoUrl = streamUrl,
+                startPositionMs = position,
+                autoPlay = wasPlaying,
+                videoMimeType = videoMimeType
+            )
         }
     }
 
