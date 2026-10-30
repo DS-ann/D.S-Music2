@@ -143,7 +143,10 @@ data class ArtistPage(
 data class PlaylistPage(
     val playlist: OnlinePlaylist,
     val songs: List<OnlineSong>,
-    val continuation: String? = null
+    val continuation: String? = null,
+    val description: String? = null,
+    val isOwned: Boolean = false,
+    val privacy: String? = null
 )
 
 /** Search filter types */
