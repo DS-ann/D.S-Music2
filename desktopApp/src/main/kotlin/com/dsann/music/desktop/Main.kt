@@ -479,7 +479,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                 } else {
                     val options = DesktopNewPipeExtractor.getVideoOptions(song.videoId)
                     val selected = options.lastOrNull()
-                        ?: error("No compatible muxed video stream is available for this track.")
+                        ?: error("No video available for this track.")
                     if (selected.usesSeparateAudio) {
                         player.playVideoAndAudio(
                             videoUrl = selected.url,
@@ -508,7 +508,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                 statusMessage = error.message ?: if (wasVideo) {
                     "Could not restore audio playback."
                 } else {
-                    "No compatible muxed video stream is available for this track."
+                    "No video available for this track."
                 }
             } finally {
                 videoSwitching = false
