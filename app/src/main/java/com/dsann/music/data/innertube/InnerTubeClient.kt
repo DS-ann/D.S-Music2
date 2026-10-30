@@ -225,6 +225,23 @@ object InnerTubeClient {
     }
 
     /**
+     * Search regular YouTube for broadcasts that are live now. YouTube Music's search endpoint
+     * does not expose a Live filter, so this uses the standard WEB client and its Live-only params.
+     */
+    suspend fun liveSearch(query: String, continuation: String? = null): JsonObject = withContext(Dispatchers.IO) {
+        val body = JsonObject().apply {
+            add("context", webContext())
+            if (continuation != null) {
+                addProperty("continuation", continuation)
+            } else {
+                addProperty("query", query)
+                addProperty("params", "EgJAAQ==")
+            }
+        }
+        post("$YOUTUBE_BASE_URL/search", body, ClientType.WEB)
+    }
+
+    /**
      * Get search suggestions
      */
     suspend fun searchSuggestions(query: String): JsonObject = withContext(Dispatchers.IO) {
