@@ -24,8 +24,18 @@ internal data class DesktopResolvedStream(
     val sizeBytes: Long?
 )
 
+internal data class DesktopVideoOption(
+    val url: String,
+    val label: String,
+    val height: Int,
+    val mimeType: String,
+    val bitrateKbps: Int,
+    val sizeBytes: Long?
+)
+
 internal object DesktopNewPipeExtractor {
     private val cache = ConcurrentHashMap<String, Pair<DesktopResolvedStream, Long>>()
+    private val videoOptionsCache = ConcurrentHashMap<String, Pair<List<DesktopVideoOption>, Long>>()
     private val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -122,31 +132,68 @@ internal object DesktopNewPipeExtractor {
     }
 
     /**
-     * Resolve a muxed video+audio stream. Video-only DASH tracks are excluded because the desktop
-     * player keeps one JavaFX MediaPlayer for synchronized picture and sound.
+     * Returns all available muxed video+audio formats. Video-only DASH tracks are excluded
+     * because the desktop player keeps one MediaPlayer for synchronized picture and sound.
      */
-    suspend fun resolveVideo(videoId: String): DesktopResolvedStream =
+    suspend fun getVideoOptions(videoId: String): List<DesktopVideoOption> =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val cached = videoOptionsCache[videoId]
+            if (cached != null && System.currentTimeMillis() - cached.second < CACHE_TTL_MS) {
+                return@withContext cached.first
+            }
             ensureInitialized()
             val info = StreamInfo.getInfo(
                 ServiceList.YouTube,
                 "https://www.youtube.com/watch?v=$videoId"
             )
-            val selected = info.videoStreams
+            val options = info.videoStreams
+                .asSequence()
                 .filter { !it.isVideoOnly() && it.content.startsWith("http", true) }
-                .maxByOrNull { stream ->
-                    stream.getResolution().filter { it.isDigit() }.toIntOrNull() ?: 0
-                } ?: error("YouTube did not provide a muxed video+audio stream for this track.")
-
-            DesktopResolvedStream(
-                url = selected.content,
-                mimeType = selected.format?.mimeType?.substringBefore(';')?.trim().orEmpty(),
-                codec = selected.getCodec(),
-                bitrateKbps = (selected.getBitrate() / 1000).takeIf { it > 0 } ?: 0,
-                durationMs = info.duration * 1000L,
-                sizeBytes = selected.itagItem?.contentLength?.takeIf { it > 0L }
-            )
+                .mapNotNull { stream ->
+                    val resolution = stream.getResolution()
+                    val height = resolution.filter { it.isDigit() }.toIntOrNull() ?: return@mapNotNull null
+                    val mime = stream.format?.mimeType?.substringBefore(';')?.trim().orEmpty()
+                    DesktopVideoOption(
+                        url = stream.content,
+                        label = "${height}p",
+                        height = height,
+                        mimeType = mime,
+                        bitrateKbps = (stream.getBitrate() / 1000).takeIf { it > 0 } ?: 0,
+                        sizeBytes = stream.itagItem?.contentLength?.takeIf { it > 0L }
+                    )
+                }
+                .groupBy { it.height }
+                .mapNotNull { (_, sameHeight) -> sameHeight.maxByOrNull { it.bitrateKbps } }
+                .sortedByDescending { it.height }
+                .toList()
+            videoOptionsCache[videoId] = options to System.currentTimeMillis()
+            options
         }
+
+    /**
+     * Resolve the chosen muxed format. With no height preference the highest available
+     * resolution is selected, matching the phone app's default quality.
+     */
+    suspend fun resolveVideo(videoId: String, targetHeight: Int? = null): DesktopResolvedStream {
+        val options = getVideoOptions(videoId)
+        val selected = if (targetHeight == null || targetHeight <= 0) {
+            options.firstOrNull()
+        } else {
+            options.minByOrNull { kotlin.math.abs(it.height - targetHeight) }
+        } ?: error("YouTube did not provide a muxed video+audio stream for this track.")
+        val durationMs = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            ensureInitialized()
+            StreamInfo.getInfo(ServiceList.YouTube, "https://www.youtube.com/watch?v=$videoId").duration * 1000L
+        }
+        return DesktopResolvedStream(
+            url = selected.url,
+            mimeType = selected.mimeType,
+            codec = null,
+            bitrateKbps = selected.bitrateKbps,
+            durationMs = durationMs,
+            sizeBytes = selected.sizeBytes
+        )
+    }
 
     fun invalidate(videoId: String) {
         cache.remove(videoId)
