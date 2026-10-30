@@ -58,6 +58,7 @@ fun WavyMusicSlider(
     hideInactiveTrackPortion: Boolean = true,
     isPlaying: Boolean = true,
     thumbLineHeightWhenInteracting: Dp = 20.dp,
+    thumbStyle: String = "Auto",
     isWaveEligible: Boolean = true,
     semanticsLabel: String? = null,
     semanticsProgressStep: Float = 0.01f
@@ -310,15 +311,38 @@ fun WavyMusicSlider(
                         val thumbCurrentWidthPx = fastLerp(thumbRadiusPx * 2f, trackHeightPx * 1.2f, thumbInteractionFraction)
                         val thumbCurrentHeightPx = fastLerp(thumbRadiusPx * 2f, thumbLineHeightPxInternal, thumbInteractionFraction)
 
-                        drawRoundRect(
-                            color = thumbColor,
-                            topLeft = Offset(
-                                currentThumbCenterX - thumbCurrentWidthPx / 2f,
-                                localCenterY - thumbCurrentHeightPx / 2f
-                            ),
-                            size = Size(thumbCurrentWidthPx, thumbCurrentHeightPx),
-                            cornerRadius = CornerRadius(thumbCurrentWidthPx / 2f)
-                        )
+                        when (thumbStyle) {
+                            "None" -> Unit
+                            "Ring" -> drawCircle(
+                                color = thumbColor,
+                                radius = (thumbRadiusPx - trackHeightPx / 2f).coerceAtLeast(1f),
+                                center = Offset(currentThumbCenterX, localCenterY),
+                                style = Stroke(width = trackHeightPx.coerceAtLeast(1.5f))
+                            )
+                            "Line" -> drawRoundRect(
+                                color = thumbColor,
+                                topLeft = Offset(
+                                    currentThumbCenterX - (trackHeightPx * 1.5f) / 2f,
+                                    localCenterY - thumbLineHeightPxInternal / 2f
+                                ),
+                                size = Size(trackHeightPx * 1.5f, thumbLineHeightPxInternal),
+                                cornerRadius = CornerRadius(trackHeightPx)
+                            )
+                            "Dot" -> drawCircle(
+                                color = thumbColor,
+                                radius = thumbRadiusPx,
+                                center = Offset(currentThumbCenterX, localCenterY)
+                            )
+                            else -> drawRoundRect(
+                                color = thumbColor,
+                                topLeft = Offset(
+                                    currentThumbCenterX - thumbCurrentWidthPx / 2f,
+                                    localCenterY - thumbCurrentHeightPx / 2f
+                                ),
+                                size = Size(thumbCurrentWidthPx, thumbCurrentHeightPx),
+                                cornerRadius = CornerRadius(thumbCurrentWidthPx / 2f)
+                            )
+                        }
                     }
                 }
         )
