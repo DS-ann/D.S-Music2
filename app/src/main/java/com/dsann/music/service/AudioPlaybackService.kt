@@ -2656,6 +2656,7 @@ class AudioPlaybackService : MediaSessionService() {
                 }
             } catch (error: Exception) {
                 vm.setLoading(false)
+                vm.setVideoModeState(false)
                 if (viewModel?.currentSong?.value?.id == songId && wasPlaying) player.play()
                 Log.w(TAG, "Video mode switch failed for $videoId", error)
                 com.dsann.music.ui.SnackbarController.showMessage(
