@@ -302,7 +302,8 @@ class MainActivity : AppCompatActivity() {
                         exploreViewModel.setExplorePageActive(currentDestination?.route == "explore")
                     }
                     val showBottomBar = currentDestination?.route in listOf("explore", "library", "local_music", "settings")
-                    val showNavigationRail = useNavigationRail && showBottomBar && isBottomNavVisible
+                    // Keep the rail persistent in wide layouts; scroll-driven bottom-bar hiding is phone-only.
+                    val showNavigationRail = useNavigationRail && showBottomBar
                     val railInsetState = animateDpAsState(
                         targetValue = if (showNavigationRail) 88.dp else 0.dp,
                         animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
