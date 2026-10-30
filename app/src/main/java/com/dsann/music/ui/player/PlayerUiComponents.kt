@@ -182,6 +182,7 @@ internal fun PillChip(
     isDark: Boolean,
     isSelected: Boolean = false,
     progress: Float? = null,
+    style: String = "Pill",
     modifier: Modifier = Modifier
 ) {
     val backgroundColor = if (isSelected) {
@@ -192,6 +193,12 @@ internal fun PillChip(
     
     val tintColor = if (isSelected) accentColor else contentColor.copy(alpha = 0.8f)
     val progressColor = accentColor.copy(alpha = if (isDark) 0.35f else 0.25f)
+    val minimal = style == "Minimal"
+    val chipShape = when (style) {
+        "Rounded" -> RoundedCornerShape(12.dp)
+        "Minimal" -> RoundedCornerShape(10.dp)
+        else -> CircleShape
+    }
     
     val animatedFill by animateFloatAsState(
         targetValue = progress ?: 0f,
@@ -201,9 +208,9 @@ internal fun PillChip(
     
     Box(
         modifier = modifier
-            .height(36.dp)
-            .clip(CircleShape)
-            .background(backgroundColor)
+            .height(if (minimal) 34.dp else 36.dp)
+            .clip(chipShape)
+            .background(if (minimal) Color.Transparent else backgroundColor)
             .drawBehind {
                 if (progress != null && progress > 0f) {
                     drawRect(
@@ -216,7 +223,7 @@ internal fun PillChip(
         contentAlignment = Alignment.CenterStart
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp),
+            modifier = Modifier.padding(horizontal = if (minimal) 8.dp else 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
@@ -238,13 +245,15 @@ internal fun PillChip(
                     )
                 }
             }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 12.sp,
-                color = tintColor
-            )
+            if (!minimal) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                    color = tintColor
+                )
+            }
         }
     }
 }
@@ -262,6 +271,8 @@ internal fun WavySliderWithLabels(
     scrubberStyle: String = "Waveform",
     scrubberColor: String = "Accent",
     playerTimes: String = "Both",
+    scrubberThickness: Float = 1f,
+    scrubberThumbStyle: String = "Auto",
     modifier: Modifier = Modifier
 ) {
     var isScrubbing by remember { mutableStateOf(false) }
@@ -286,7 +297,7 @@ internal fun WavySliderWithLabels(
             "Hairline" -> 2.dp
             "Bold" -> 6.dp
             else -> 4.dp
-        }
+        } * scrubberThickness.coerceIn(0.6f, 2f)
         val waveEnabled = scrubberStyle == "Waveform"
         WavyMusicSlider(
             value = if (isScrubbing) sliderScrubPos else progressRatio,
@@ -303,7 +314,12 @@ internal fun WavySliderWithLabels(
             thumbColor = contentColor,
             isPlaying = isPlaying,
             trackHeight = thickness,
-            thumbRadius = if (scrubberStyle == "Thumb") 7.dp else 3.dp,
+            thumbRadius = when (scrubberThumbStyle) {
+                "Dot", "Ring" -> 7.dp
+                "None" -> 2.dp
+                else -> if (scrubberStyle == "Thumb") 7.dp else 3.dp
+            },
+            thumbStyle = scrubberThumbStyle,
             waveAmplitudeWhenPlaying = if (waveEnabled) 6.dp else 0.dp,
             waveLength = 48.dp,
             isWaveEligible = waveEnabled,
