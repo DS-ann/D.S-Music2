@@ -16,6 +16,10 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -66,8 +70,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dsann.music.MainActivity
+import com.dsann.music.ui.SettingsViewModel
 import com.dsann.music.R
 import com.dsann.music.data.lyrics.LyricLine
 import com.dsann.music.data.lyrics.LyricsResult
@@ -106,6 +112,25 @@ fun FullPlayerScreen(
     val currentPositionProvider: () -> Int = remember(currentPositionState) {
         { currentPositionState.value }
     }
+    val customizeViewModel: SettingsViewModel =
+        androidx.lifecycle.viewmodel.compose.viewModel(viewModelStoreOwner = activity)
+    val playerLayout by customizeViewModel.playerLayout.collectAsStateWithLifecycle()
+    val playerButtons by customizeViewModel.playerButtons.collectAsStateWithLifecycle()
+    val playerTitleAlign by customizeViewModel.playerTitleAlign.collectAsStateWithLifecycle()
+    val playerTitleSize by customizeViewModel.playerTitleSize.collectAsStateWithLifecycle()
+    val playerTitleWeight by customizeViewModel.playerTitleWeight.collectAsStateWithLifecycle()
+    val playerTitleScroll by customizeViewModel.playerTitleScroll.collectAsStateWithLifecycle()
+    val playerTimes by customizeViewModel.playerTimes.collectAsStateWithLifecycle()
+    val scrubberStyle by customizeViewModel.scrubberStyle.collectAsStateWithLifecycle()
+    val scrubberColor by customizeViewModel.scrubberColor.collectAsStateWithLifecycle()
+    val visualizerStyle by customizeViewModel.visualizerStyle.collectAsStateWithLifecycle()
+    val playerBackgroundStyle by customizeViewModel.playerBackgroundStyle.collectAsStateWithLifecycle()
+
+    LaunchedEffect(playerLayout, uiState.currentSong?.id) {
+        if (playerLayout == "Lyrics" && uiState.currentSong != null && !isLyricsModeEnabled) {
+            viewModel.setLyricsModeEnabled(true)
+        }
+    }
 
     // Handle back button when lyrics mode is enabled
     BackHandler(enabled = isLyricsModeEnabled) {
@@ -124,6 +149,17 @@ fun FullPlayerScreen(
         lyricsError = lyricsError,
         providerResults = providerResults,
         selectedProvider = selectedProvider,
+        playerLayout = playerLayout,
+        playerButtons = playerButtons,
+        playerTitleAlign = playerTitleAlign,
+        playerTitleSize = playerTitleSize,
+        playerTitleWeight = playerTitleWeight,
+        playerTitleScroll = playerTitleScroll,
+        playerTimes = playerTimes,
+        scrubberStyle = scrubberStyle,
+        scrubberColor = scrubberColor,
+        visualizerStyle = visualizerStyle,
+        playerBackgroundStyle = playerBackgroundStyle,
         onProviderSelected = { viewModel.selectLyricsProvider(it) },
         currentPositionProvider = currentPositionProvider,
         onCollapse = onCollapse,
@@ -196,6 +232,17 @@ fun FullPlayer(
     onDislikeClick: () -> Unit,
     providerResults: Map<String, LyricsResult>,
     selectedProvider: String?,
+    playerLayout: String = "Standard",
+    playerButtons: List<String> = listOf("lyrics", "video", "queue", "share", "download"),
+    playerTitleAlign: String = "Left",
+    playerTitleSize: String = "Medium",
+    playerTitleWeight: String = "Bold",
+    playerTitleScroll: Boolean = true,
+    playerTimes: String = "Both",
+    scrubberStyle: String = "Waveform",
+    scrubberColor: String = "Accent",
+    visualizerStyle: String = "Off",
+    playerBackgroundStyle: String = "Artwork",
     onProviderSelected: (String) -> Unit,
     onArtistClick: (String?, String) -> Unit = { _, _ -> },
     dragModifier: Modifier = Modifier,
@@ -222,7 +269,7 @@ fun FullPlayer(
         }
     }
 
-    val backgroundBrush = remember(uiState.playerBackgroundColor, isDark) {
+    val backgroundBrush = remember(uiState.playerBackgroundColor, isDark, playerBackgroundStyle) {
         val playerColor = Color(uiState.playerBackgroundColor)
         val finalColor = deriveArtworkSurfaceColor(
             sourceColor = playerColor,
@@ -232,7 +279,18 @@ fun FullPlayer(
             darkSaturationRange = 0.32f..0.54f,
             lightSaturationRange = 0.30f..0.48f
         )
-        androidx.compose.ui.graphics.SolidColor(finalColor)
+        when (playerBackgroundStyle) {
+            "Theme" -> androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.background)
+            "Black" -> androidx.compose.ui.graphics.SolidColor(Color.Black)
+            "Gradient" -> Brush.linearGradient(
+                listOf(
+                    finalColor,
+                    finalColor.copy(alpha = if (isDark) 0.55f else 0.72f),
+                    MaterialTheme.colorScheme.background
+                )
+            )
+            else -> androidx.compose.ui.graphics.SolidColor(finalColor)
+        }
     }
 
     val hasLyrics = !syncedLyrics.isNullOrEmpty() || !plainLyrics.isNullOrBlank()
@@ -298,7 +356,14 @@ fun FullPlayer(
         val configuration = LocalConfiguration.current
         val screenWidth = configuration.screenWidthDp.dp
         val screenHeight = configuration.screenHeightDp.dp
-        val albumArtSize = screenWidth * 0.9f
+        val artScale = when (playerLayout) {
+            "Cover" -> 0.98f
+            "Minimal" -> 0.68f
+            "Lyrics" -> 0.78f
+            "Vinyl", "Cassette" -> 0.82f
+            else -> 0.9f
+        }
+        val albumArtSize = screenWidth * artScale
 
         val density = androidx.compose.ui.platform.LocalDensity.current
         val statusBarTopDp = with(density) { androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(this).toDp() }
@@ -370,15 +435,28 @@ fun FullPlayer(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = if (playerTitleAlign == "Centered") Alignment.CenterHorizontally else Alignment.Start
                 ) {
+                    val titleSize = when (playerTitleSize) {
+                        "Small" -> 23.sp
+                        "Large" -> 34.sp
+                        else -> 29.sp
+                    }
+                    val titleWeight = when (playerTitleWeight) {
+                        "Light" -> FontWeight.Light
+                        "Regular" -> FontWeight.Normal
+                        else -> FontWeight.Bold
+                    }
                     Text(
                         text = uiState.currentSong?.title ?: "Unknown Title",
                         style = MaterialTheme.typography.headlineMediumEmphasized,
-                        fontWeight = FontWeight.Bold,
+                        fontSize = titleSize,
+                        fontWeight = titleWeight,
                         color = contentColor,
                         maxLines = 1,
-                        modifier = Modifier.basicMarqueeWithFadedEdges()
+                        textAlign = if (playerTitleAlign == "Centered") androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
+                        modifier = if (playerTitleScroll) Modifier.basicMarqueeWithFadedEdges() else Modifier
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -386,8 +464,8 @@ fun FullPlayer(
                         style = MaterialTheme.typography.bodyMedium,
                         color = contentSecondary,
                         maxLines = 1,
-                        modifier = Modifier
-                            .basicMarqueeWithFadedEdges()
+                        textAlign = if (playerTitleAlign == "Centered") androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
+                        modifier = (if (playerTitleScroll) Modifier.basicMarqueeWithFadedEdges() else Modifier)
                             .clickable {
                                 val song = uiState.currentSong
                                 if (song != null) {
