@@ -79,7 +79,8 @@ internal object DesktopNewPipeExtractor {
     }
 
     suspend fun resolve(videoId: String, targetBitrateKbps: Int = 256, preferredFormat: String = "m4a"): DesktopResolvedStream {
-        val cached = cache[videoId]
+        val cacheKey = "$videoId#${preferredFormat.lowercase(Locale.ROOT)}#$targetBitrateKbps"
+        val cached = cache[cacheKey]
         if (cached != null && System.currentTimeMillis() - cached.second < CACHE_TTL_MS) {
             return cached.first
         }
@@ -126,7 +127,7 @@ internal object DesktopNewPipeExtractor {
                 durationMs = info.duration * 1000L,
                 sizeBytes = selected.itagItem?.contentLength?.takeIf { it > 0L }
             )
-            cache[videoId] = result to System.currentTimeMillis()
+            cache[cacheKey] = result to System.currentTimeMillis()
             result
         }
     }
@@ -171,13 +172,13 @@ internal object DesktopNewPipeExtractor {
         }
 
     /**
-     * Resolve the chosen muxed format. With no height preference the highest available
-     * resolution is selected, matching the phone app's default quality.
+     * Resolve the chosen muxed format. An unspecified preference uses the lowest available
+     * resolution to minimize data usage; the player exposes manual quality choices in-video.
      */
     suspend fun resolveVideo(videoId: String, targetHeight: Int? = null): DesktopResolvedStream {
         val options = getVideoOptions(videoId)
         val selected = if (targetHeight == null || targetHeight <= 0) {
-            options.firstOrNull()
+            options.lastOrNull()
         } else {
             options.minByOrNull { kotlin.math.abs(it.height - targetHeight) }
         } ?: error("YouTube did not provide a muxed video+audio stream for this track.")
@@ -196,7 +197,8 @@ internal object DesktopNewPipeExtractor {
     }
 
     fun invalidate(videoId: String) {
-        cache.remove(videoId)
+        cache.keys.removeIf { it.startsWith("$videoId#") }
+        videoOptionsCache.remove(videoId)
     }
 
     private const val CACHE_TTL_MS = 20 * 60 * 1000L
