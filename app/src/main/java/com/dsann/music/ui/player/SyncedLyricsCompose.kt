@@ -73,6 +73,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -142,6 +143,7 @@ internal fun SyncedLyricsCompose(
     }
     val lyricsTextSize by appearancePreferences.observeKey("lyrics_text_size", "Standard")
     val lyricsAlignment by appearancePreferences.observeKey("lyrics_alignment", "Original")
+    val lyricsFontFamily by appearancePreferences.observeKey("lyrics_font_family", "Rounded")
     val lyricsScale = when (lyricsTextSize) {
         "Small" -> 0.85f
         "Large" -> 1.18f
@@ -307,6 +309,7 @@ internal fun SyncedLyricsCompose(
                             accentColor = dynamicAccentColor,
                             textScale = lyricsScale,
                             alignment = lyricsAlignment,
+                            fontFamilyChoice = lyricsFontFamily,
                             onClick = {
                                 onSeekTo(
                                     line.startTimeMs.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
@@ -346,6 +349,7 @@ private fun LyricLineItem(
     accentColor: Color,
     textScale: Float,
     alignment: String,
+    fontFamilyChoice: String,
     onClick: () -> Unit
 ) {
     val isKaraoke = line.isWordByWord && line.words.isNotEmpty()
@@ -393,6 +397,12 @@ private fun LyricLineItem(
         if (hasValidMainContent) bracketMatch!!.groups[2]?.range?.first ?: -1 else -1
     }
 
+    val lyricFontFamily = when (fontFamilyChoice) {
+        "Sans" -> FontFamily.SansSerif
+        "Serif" -> FontFamily.Serif
+        "Mono" -> FontFamily.Monospace
+        else -> GoogleSansFlexNonRounded
+    }
     val dimColor = contentColor.copy(alpha = 0.35f)
     val litColor = contentColor
 
@@ -430,7 +440,7 @@ private fun LyricLineItem(
         else -> if (line.isRightAligned) TextAlign.End else TextAlign.Start
     }
     val mainTextStyle = MaterialTheme.typography.headlineMedium.copy(
-        fontFamily = GoogleSansFlexNonRounded,
+        fontFamily = lyricFontFamily,
         fontSize = 38.sp * textScale,
         fontWeight = FontWeight.Bold,
         lineHeight = 50.sp * textScale,
