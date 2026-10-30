@@ -88,7 +88,8 @@
                     android:id="@+id/widget_play_pause"
                     android:layout_width="60dp"
                     android:layout_height="60dp"
-                    android:layout_marginHorizontal="12dp"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginEnd="12dp"
                     android:background="@android:color/transparent"
                     android:scaleType="fitCenter"
                     android:src="@drawable/ic_play" />
@@ -121,7 +122,8 @@
                 android:alpha="0.7"
                 android:maxLines="4"
                 android:gravity="start"
-                android:layout_marginHorizontal="8dp" />
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp" />
         </LinearLayout>
 
     </ViewFlipper>
