@@ -46,10 +46,12 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import java.io.File
+import java.awt.EventQueue
 import java.nio.file.Files
 import java.util.Locale
 import java.util.prefs.Preferences
 import com.dsann.music.data.innertube.SearchFilter
+import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.SearchItem
 import com.dsann.music.data.innertube.SearchResult
 import kotlinx.coroutines.launch
@@ -121,9 +123,34 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     var onlineResult by remember { mutableStateOf<SearchResult?>(null) }
     var onlineSearching by remember { mutableStateOf(false) }
     var onlineError by remember { mutableStateOf("") }
+    var currentOnlineSong by remember { mutableStateOf<OnlineSong?>(null) }
+    var currentSavedSong by remember { mutableStateOf<DesktopSavedSong?>(null) }
+    var onlineQueue by remember { mutableStateOf<List<OnlineSong>>(emptyList()) }
+    var onlineQueueIndex by remember { mutableStateOf(-1) }
+    var lyricsData by remember { mutableStateOf<DesktopLyrics?>(null) }
+    var lyricsLoading by remember { mutableStateOf(false) }
+    var lyricsError by remember { mutableStateOf("") }
+    var downloadingVideoId by remember { mutableStateOf<String?>(null) }
+    var downloadProgress by remember { mutableStateOf(0) }
+    var downloadMessage by remember { mutableStateOf("") }
+    var downloads by remember { mutableStateOf(DesktopLibraryStore.downloads()) }
+    var cacheEntries by remember { mutableStateOf(DesktopLibraryStore.cache()) }
+    var favoriteSongs by remember { mutableStateOf(DesktopLibraryStore.favoriteSongs()) }
+    var favoriteIds by remember { mutableStateOf(favoriteSongs.map { it.videoId }.toSet()) }
+    var playlists by remember { mutableStateOf(DesktopLibraryStore.playlists()) }
+    var playlistTitle by remember { mutableStateOf("") }
+    var selectedPlaylistId by remember { mutableStateOf<String?>(null) }
+    var collectionTitle by remember { mutableStateOf("") }
+    var collectionItems by remember { mutableStateOf<List<SearchItem>>(emptyList()) }
+    var collectionLoading by remember { mutableStateOf(false) }
+    var playbackFormat by remember { mutableStateOf(preferences.get("playback_format", "m4a")) }
+    var targetBitrate by remember { mutableStateOf(preferences.getInt("target_bitrate", 256)) }
     val coroutineScope = rememberCoroutineScope()
 
     val currentTrack = tracks.getOrNull(selectedIndex)
+    val nowPlayingTitle = currentOnlineSong?.title ?: currentSavedSong?.title ?: currentTrack?.title.orEmpty()
+    val nowPlayingArtist = currentOnlineSong?.artist ?: currentSavedSong?.artist ?: currentTrack?.artist.orEmpty()
+    val hasNowPlaying = nowPlayingTitle.isNotBlank()
     val visibleTracks = remember(tracks, search) {
         val query = search.trim()
         if (query.isEmpty()) tracks
@@ -191,6 +218,167 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
         }
     }
 
+    fun refreshSavedLists() {
+        downloads = DesktopLibraryStore.downloads()
+        cacheEntries = DesktopLibraryStore.cache()
+        favoriteSongs = DesktopLibraryStore.favoriteSongs()
+        favoriteIds = favoriteSongs.map { it.videoId }.toSet()
+        playlists = DesktopLibraryStore.playlists()
+    }
+
+    fun loadLyrics(title: String, artist: String, durationMs: Long, videoId: String? = null, album: String? = null) {
+        lyricsData = null
+        lyricsError = ""
+        lyricsLoading = true
+        coroutineScope.launch {
+            try {
+                lyricsData = DesktopLyricsRepository.fetch(title, artist, durationMs, videoId, album)
+                if (lyricsData == null) lyricsError = "No lyrics were found for this track."
+            } catch (error: Exception) {
+                lyricsError = error.message ?: "Could not load lyrics."
+            } finally {
+                lyricsLoading = false
+            }
+        }
+    }
+
+    fun playOnlineSong(song: OnlineSong, queue: List<OnlineSong>? = null) {
+        if (queue != null) onlineQueue = queue
+        if (onlineQueue.isEmpty()) onlineQueue = listOf(song)
+        onlineQueueIndex = onlineQueue.indexOfFirst { it.videoId == song.videoId }.takeIf { it >= 0 } ?: 0
+        currentOnlineSong = song
+        currentSavedSong = null
+        selectedIndex = -1
+        statusMessage = "Resolving audio stream…"
+        section = "Explore"
+
+        coroutineScope.launch {
+            try {
+                val stream = DesktopNewPipeExtractor.resolve(song.videoId, targetBitrate, playbackFormat)
+                player.playUrl(stream.url, song.durationMs.takeIf { it > 0L } ?: stream.durationMs)
+                statusMessage = ""
+            } catch (error: Exception) {
+                statusMessage = error.message ?: "Could not resolve this YouTube Music stream."
+            }
+        }
+        loadLyrics(song.title, song.artist, song.durationMs, song.videoId, song.albumName)
+    }
+
+    fun openCollection(browseId: String, title: String) {
+        collectionTitle = title
+        collectionItems = emptyList()
+        collectionLoading = true
+        section = "Collection"
+        coroutineScope.launch {
+            try {
+                collectionItems = DesktopYouTubeMusic.browse(browseId)
+                val queue = collectionItems.filterIsInstance<SearchItem.Song>().map { it.song }
+                if (queue.isNotEmpty()) onlineQueue = queue
+            } catch (error: Exception) {
+                statusMessage = error.message ?: "Could not open this collection."
+            } finally {
+                collectionLoading = false
+            }
+        }
+    }
+
+    fun openOnlineItem(item: SearchItem) {
+        when (item) {
+            is SearchItem.Song -> {
+                val queue = buildList {
+                    onlineResult?.topResult?.let { if (it is SearchItem.Song) add(it.song) }
+                    onlineResult?.sections.orEmpty().forEach { section ->
+                        section.items.filterIsInstance<SearchItem.Song>().forEach { add(it.song) }
+                    }
+                    onlineResult?.items.orEmpty().filterIsInstance<SearchItem.Song>().forEach { add(it.song) }
+                }.distinctBy { it.videoId }.ifEmpty { listOf(item.song) }
+                playOnlineSong(item.song, queue)
+            }
+            is SearchItem.Album -> openCollection(item.album.browseId, item.album.title)
+            is SearchItem.Artist -> openCollection(item.artist.browseId, item.artist.title)
+            is SearchItem.Playlist -> openCollection(item.playlist.playlistId, item.playlist.title)
+        }
+    }
+
+    fun toggleFavorite(song: OnlineSong) {
+        DesktopLibraryStore.setFavorite(song, song.videoId !in favoriteIds)
+        refreshSavedLists()
+    }
+
+    fun addSongToPlaylist(song: OnlineSong) {
+        var target = playlists.firstOrNull()
+        if (target == null) {
+            target = DesktopLibraryStore.createPlaylist("My playlist")
+        }
+        DesktopLibraryStore.addToPlaylist(target.id, song)
+        refreshSavedLists()
+        downloadMessage = "Added to ${target.title}."
+    }
+
+    fun startDownload(song: OnlineSong) {
+        if (downloadingVideoId != null) return
+        downloadingVideoId = song.videoId
+        downloadProgress = 0
+        downloadMessage = "Preparing download…"
+        coroutineScope.launch {
+            try {
+                DesktopDownloadManager.download(song, targetBitrate, playbackFormat) { value ->
+                    EventQueue.invokeLater { downloadProgress = value }
+                }
+                refreshSavedLists()
+                downloadMessage = if (cacheEntries.any { it.videoId == song.videoId }) {
+                    "Downloaded with cover and lyrics; added to offline cache."
+                } else {
+                    "Downloaded. A complete cache entry needs both cover art and lyrics."
+                }
+            } catch (error: Exception) {
+                downloadMessage = error.message ?: "Download failed."
+            } finally {
+                downloadingVideoId = null
+            }
+        }
+    }
+
+    fun playSavedSong(song: DesktopSavedSong) {
+        val audioFile = song.audioPath.takeIf { it.isNotBlank() }?.let(::File)
+        if (audioFile != null && audioFile.isFile) {
+            currentOnlineSong = null
+            currentSavedSong = song
+            selectedIndex = -1
+            player.play(audioFile)
+            val lyricFile = song.lyricsPath?.let(::File)
+            if (lyricFile != null && lyricFile.isFile) {
+                val raw = lyricFile.readText()
+                val lines = DesktopLyricsRepository.fetch(song.title, song.artist, song.durationMs)
+                lyricsData = lines ?: DesktopLyrics(raw, "Offline lyrics", raw.contains("[00:"), emptyList())
+                section = "Lyrics"
+            } else {
+                loadLyrics(song.title, song.artist, song.durationMs, song.videoId, song.album)
+            }
+            return
+        }
+        playOnlineSong(
+            OnlineSong(
+                videoId = song.videoId,
+                title = song.title,
+                artist = song.artist,
+                albumName = song.album,
+                durationMs = song.durationMs,
+                thumbnailUrl = song.thumbnailUrl
+            )
+        )
+    }
+
+    fun playCollectionItem(item: SearchItem) {
+        when (item) {
+            is SearchItem.Song -> playOnlineSong(
+                item.song,
+                collectionItems.filterIsInstance<SearchItem.Song>().map { it.song }
+            )
+            else -> openOnlineItem(item)
+        }
+    }
+
     fun chooseMusicFolder() {
         val chooser = JFileChooser()
         chooser.dialogTitle = "Choose your music folder"
@@ -210,15 +398,26 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
 
     fun playTrack(track: DesktopTrack) {
         selectedIndex = tracks.indexOf(track)
+        currentOnlineSong = null
+        currentSavedSong = null
         statusMessage = ""
         player.play(track.file)
+        loadLyrics(track.title, track.artist, player.durationMillis)
     }
 
     fun playRelative(direction: Int) {
+        if (currentOnlineSong != null && onlineQueue.isNotEmpty()) {
+            val next = (onlineQueueIndex + direction + onlineQueue.size) % onlineQueue.size
+            playOnlineSong(onlineQueue[next])
+            return
+        }
         if (tracks.isEmpty()) return
         val base = selectedIndex.takeIf { it >= 0 } ?: 0
         selectedIndex = (base + direction + tracks.size) % tracks.size
+        currentOnlineSong = null
+        currentSavedSong = null
         player.play(tracks[selectedIndex].file)
+        loadLyrics(tracks[selectedIndex].title, tracks[selectedIndex].artist, player.durationMillis)
         statusMessage = ""
     }
 
