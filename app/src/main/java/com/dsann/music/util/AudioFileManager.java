@@ -65,16 +65,16 @@ public class AudioFileManager {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // Android 10+ - Create temp file in cache for FFmpeg processing
-            File tempDir = new File(context.getCacheDir(), "SpatialFlow_output");
+            File tempDir = new File(context.getCacheDir(), "D.S-Music_output");
             if (!tempDir.exists()) tempDir.mkdirs();
 
             File tempFile = new File(tempDir, cleanName);
             Log.d(TAG, "Temp output file for processing: " + tempFile.getAbsolutePath());
             return tempFile;
         } else {
-            // Android 9 and below - Direct file access to Downloads/SpatialFlow
+            // Android 9 and below - Direct file access to Downloads/D.S Music
             File downloadsDir = new File(Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_DOWNLOADS), "SpatialFlow");
+                    Environment.DIRECTORY_DOWNLOADS), "D.S Music");
             if (!downloadsDir.exists()) downloadsDir.mkdirs();
 
             File outputFile = new File(downloadsDir, cleanName);
@@ -149,7 +149,7 @@ public class AudioFileManager {
         else if (lowerFileName.endsWith(".wav")) mimeType = "audio/wav";
         else mimeType = "application/octet-stream";
         values.put(MediaStore.Audio.Media.MIME_TYPE, mimeType);
-        values.put(MediaStore.Audio.Media.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/SpatialFlow/");
+        values.put(MediaStore.Audio.Media.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/D.S Music/");
         values.put(MediaStore.Audio.Media.IS_PENDING, 1);
 
         ContentResolver resolver = context.getContentResolver();
@@ -183,7 +183,7 @@ public class AudioFileManager {
             if (resolver.update(itemUri, ready, null, null) <= 0) {
                 throw new IOException("Could not publish the completed audio file");
             }
-            Log.d(TAG, "File copied to MediaStore successfully: Music/SpatialFlow/" + sourceFile.getName());
+            Log.d(TAG, "File copied to MediaStore successfully: Music/D.S Music/" + sourceFile.getName());
             return true;
         } catch (Exception e) {
             try {
