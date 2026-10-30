@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -82,6 +83,7 @@ import com.dsann.music.data.lyrics.LyricWord
 import com.dsann.music.data.lyrics.LyricsResult
 import com.dsann.music.model.SongItem
 import com.dsann.music.ui.theme.GoogleSansFlexNonRounded
+import com.dsann.music.ui.theme.observeKey
 
 // ════════════════════════════════════════════════════════════════════════════════
 // ─ Data Classes & Constants
@@ -134,6 +136,17 @@ internal fun SyncedLyricsCompose(
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
+    val context = LocalContext.current
+    val appearancePreferences = remember(context) {
+        context.getSharedPreferences("AppSettings", android.content.Context.MODE_PRIVATE)
+    }
+    val lyricsTextSize by appearancePreferences.observeKey("lyrics_text_size", "Standard")
+    val lyricsAlignment by appearancePreferences.observeKey("lyrics_alignment", "Original")
+    val lyricsScale = when (lyricsTextSize) {
+        "Small" -> 0.85f
+        "Large" -> 1.18f
+        else -> 1f
+    }
 
     val currentView = LocalView.current
     DisposableEffect(currentView) {
@@ -292,6 +305,8 @@ internal fun SyncedLyricsCompose(
                             },
                             contentColor = contentColor,
                             accentColor = dynamicAccentColor,
+                            textScale = lyricsScale,
+                            alignment = lyricsAlignment,
                             onClick = {
                                 onSeekTo(
                                     line.startTimeMs.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
@@ -329,6 +344,8 @@ private fun LyricLineItem(
     lineEndMs: Long,
     contentColor: Color,
     accentColor: Color,
+    textScale: Float,
+    alignment: String,
     onClick: () -> Unit
 ) {
     val isKaraoke = line.isWordByWord && line.words.isNotEmpty()
@@ -407,21 +424,26 @@ private fun LyricLineItem(
             translationY = driftDp * density
         }
 
+    val lineAlignment = when (alignment) {
+        "Left" -> TextAlign.Start
+        "Center" -> TextAlign.Center
+        else -> if (line.isRightAligned) TextAlign.End else TextAlign.Start
+    }
     val mainTextStyle = MaterialTheme.typography.headlineMedium.copy(
         fontFamily = GoogleSansFlexNonRounded,
-        fontSize = 38.sp,
+        fontSize = 38.sp * textScale,
         fontWeight = FontWeight.Bold,
-        lineHeight = 50.sp,
-        textAlign = if (line.isRightAligned) TextAlign.End else TextAlign.Start,
+        lineHeight = 50.sp * textScale,
+        textAlign = lineAlignment,
         platformStyle = PlatformTextStyle(includeFontPadding = true)
     )
 
     val bracketTextStyle = MaterialTheme.typography.bodyLarge.copy(
         fontFamily = GoogleSansFlexNonRounded,
-        fontSize = 20.sp,
+        fontSize = 20.sp * textScale,
         fontWeight = FontWeight.Medium,
-        lineHeight = 28.sp,
-        textAlign = if (line.isRightAligned) TextAlign.End else TextAlign.Start,
+        lineHeight = 28.sp * textScale,
+        textAlign = lineAlignment,
         platformStyle = PlatformTextStyle(includeFontPadding = true)
     )
 
