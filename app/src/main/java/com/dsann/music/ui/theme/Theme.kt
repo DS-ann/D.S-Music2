@@ -15,6 +15,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
@@ -24,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowCompat.getInsetsController
@@ -81,6 +83,13 @@ fun SpatialFlowTheme(
     val amoledEnabled by prefs.observeKey("amoled_black", false)
     val albumArtThemeEnabled by prefs.observeKey("dynamic_album_theme", false)
     val appearancePreset by prefs.observeKey("appearance_preset", "Ocean")
+    val uiDensity by prefs.observeKey("ui_density", "Comfortable")
+    val baseDensity = LocalDensity.current
+    val fontScale = when (uiDensity) {
+        "Compact" -> 0.92f
+        "Large" -> 1.08f
+        else -> 1f
+    }
 
     val colorScheme = remember(darkTheme, amoledEnabled, albumArtThemeEnabled, dynamicAlbumColor, appearancePreset) {
         val baseScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -280,12 +289,18 @@ fun SpatialFlowTheme(
         }
     }
 
-    MaterialExpressiveTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        motionScheme = MotionScheme.expressive(),
-        content = content
-    )
+    CompositionLocalProvider(
+        LocalDensity provides baseDensity.copy(
+            fontScale = (baseDensity.fontScale * fontScale).coerceIn(0.8f, 1.25f)
+        )
+    ) {
+        MaterialExpressiveTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            motionScheme = MotionScheme.expressive(),
+            content = content
+        )
+    }
 }
 
 
