@@ -353,7 +353,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val appearancePreset: StateFlow<String> = _appearancePreset.asStateFlow()
 
     fun setAppearancePreset(preset: String) {
-        val safePreset = preset.takeIf { it in listOf("Ocean", "Violet", "Emerald", "Amber", "Rose", "Monochrome") } ?: "Ocean"
+        val safePreset = preset.takeIf {
+            it in listOf("Ocean", "Violet", "Emerald", "Amber", "Rose", "Monochrome", "Crimson", "Teal", "Cyan", "Indigo", "Lime", "Graphite")
+        } ?: "Ocean"
         _appearancePreset.value = safePreset
         prefs.edit { putString(KEY_APPEARANCE_PRESET, safePreset) }
     }
@@ -2375,7 +2377,7 @@ private fun AppearanceScreen(
                     title = "Accent palette",
                     description = "Choose the app-wide accent. Dynamic colors can still tint the interface from the current artwork.",
                     selected = appearancePreset,
-                    options = listOf("Ocean", "Violet", "Emerald", "Amber", "Rose", "Monochrome"),
+                    options = listOf("Ocean", "Violet", "Emerald", "Amber", "Rose", "Monochrome", "Crimson", "Teal", "Cyan", "Indigo", "Lime", "Graphite"),
                     onSelected = onAppearancePresetChange
                 )
             })
