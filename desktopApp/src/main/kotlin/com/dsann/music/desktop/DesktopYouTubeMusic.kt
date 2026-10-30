@@ -521,6 +521,109 @@ private object DesktopSearchParser {
         return SearchResult(items.distinctBy(::simpleKey), continuation)
     }
 
+    /** Parse the single Top result card from YouTube Music's unfiltered search. */
+    fun parseTopCard(json: JsonObject): SearchItem? {
+        val card = findObjects(json, "musicCardShelfRenderer").firstOrNull() ?: return null
+        return runCatching {
+            val titleRun = card.path("title.runs.0")?.asJsonObject ?: return@runCatching null
+            val title = card.path("title.runs.0.text")?.stringOrNull()
+                ?: card.path("title.simpleText")?.stringOrNull()
+                ?: return@runCatching null
+            if (title.isBlank()) return@runCatching null
+
+            val runs = card.path("subtitle.runs")?.asJsonArray ?: JsonArray()
+            val details = runs.mapNotNull { it.asJsonObjectOrNull()?.get("text")?.stringOrNull() }
+            val subtitle = details.joinToString("")
+            val thumbnail = highResThumbnail(
+                card.path("thumbnail.musicThumbnailRenderer.thumbnail.thumbnails")?.asJsonArray
+            )
+            val navigation = titleRun.getAsJsonObject("navigationEndpoint")
+                ?: card.getAsJsonObject("onTap")
+                ?: return@runCatching null
+            val watch = navigation.getAsJsonObject("watchEndpoint")
+
+            if (watch != null) {
+                val videoId = watch.get("videoId")?.stringOrNull() ?: return@runCatching null
+                val videoType = watch.path(
+                    "watchEndpointMusicSupportedConfigs.watchEndpointMusicConfig.musicVideoType"
+                )?.stringOrNull()
+                if (videoType == "MUSIC_VIDEO_TYPE_PODCAST_EPISODE") return@runCatching null
+
+                val artistRun = runs.firstOrNull { run ->
+                    run.asJsonObjectOrNull()?.path(
+                        "navigationEndpoint.browseEndpoint.browseEndpointContextSupportedConfigs.browseEndpointContextMusicConfig.pageType"
+                    )?.stringOrNull() in setOf("MUSIC_PAGE_TYPE_ARTIST", "MUSIC_PAGE_TYPE_USER_CHANNEL")
+                }?.asJsonObjectOrNull()
+                val albumRun = runs.firstOrNull { run ->
+                    run.asJsonObjectOrNull()?.path(
+                        "navigationEndpoint.browseEndpoint.browseEndpointContextSupportedConfigs.browseEndpointContextMusicConfig.pageType"
+                    )?.stringOrNull() == "MUSIC_PAGE_TYPE_ALBUM"
+                }?.asJsonObjectOrNull()
+                val duration = details.lastOrNull { it.matches(Regex("(\\d+:)?\\d+:\\d+")) }
+                val artist = artistRun?.get("text")?.stringOrNull()
+                    ?: details.firstOrNull { it.isNotBlank() && !it.matches(Regex("(\\d+:)?\\d+:\\d+")) }
+                    ?: "Unknown Artist"
+
+                SearchItem.Song(
+                    OnlineSong(
+                        videoId = videoId,
+                        title = title,
+                        artist = artist,
+                        artistId = artistRun?.path("navigationEndpoint.browseEndpoint.browseId")?.stringOrNull(),
+                        albumName = albumRun?.get("text")?.stringOrNull(),
+                        albumId = albumRun?.path("navigationEndpoint.browseEndpoint.browseId")?.stringOrNull(),
+                        duration = duration,
+                        durationMs = parseDuration(duration),
+                        thumbnailUrl = thumbnail,
+                        isVideo = !videoType.isNullOrBlank() && videoType != "MUSIC_VIDEO_TYPE_ATV"
+                    )
+                )
+            } else {
+                val browse = navigation.getAsJsonObject("browseEndpoint") ?: return@runCatching null
+                val browseId = browse.get("browseId")?.stringOrNull() ?: return@runCatching null
+                val pageType = browse.path(
+                    "browseEndpointContextSupportedConfigs.browseEndpointContextMusicConfig.pageType"
+                )?.stringOrNull()
+                val parts = subtitle.split(" • ").map { it.trim() }
+                when (pageType) {
+                    "MUSIC_PAGE_TYPE_ALBUM" -> SearchItem.Album(
+                        OnlineAlbum(
+                            browseId = browseId,
+                            title = title,
+                            artists = listOfNotNull(parts.drop(1).firstOrNull()?.takeIf { it.isNotBlank() }?.let(::OnlineArtistRef)),
+                            year = parts.lastOrNull()?.toIntOrNull(),
+                            thumbnailUrl = thumbnail
+                        )
+                    )
+                    "MUSIC_PAGE_TYPE_ARTIST", "MUSIC_PAGE_TYPE_USER_CHANNEL" -> SearchItem.Artist(
+                        OnlineArtist(browseId, title, thumbnail, subscriberCount = subtitle)
+                    )
+                    "MUSIC_PAGE_TYPE_PLAYLIST" -> SearchItem.Playlist(
+                        OnlinePlaylist(browseId.removePrefix("VL"), title, thumbnailUrl = thumbnail, songCount = parts.lastOrNull())
+                    )
+                    else -> when {
+                        browseId.startsWith("UC") -> SearchItem.Artist(
+                            OnlineArtist(browseId, title, thumbnail, subscriberCount = subtitle)
+                        )
+                        browseId.startsWith("VL") || browseId.startsWith("PL") -> SearchItem.Playlist(
+                            OnlinePlaylist(browseId.removePrefix("VL"), title, thumbnailUrl = thumbnail, songCount = parts.lastOrNull())
+                        )
+                        browseId.startsWith("MPREb") -> SearchItem.Album(
+                            OnlineAlbum(
+                                browseId = browseId,
+                                title = title,
+                                artists = listOfNotNull(parts.drop(1).firstOrNull()?.takeIf { it.isNotBlank() }?.let(::OnlineArtistRef)),
+                                year = parts.lastOrNull()?.toIntOrNull(),
+                                thumbnailUrl = thumbnail
+                            )
+                        )
+                        else -> null
+                    }
+                }
+            }
+        }.getOrNull()
+    }
+
     private fun parseMusicItem(item: JsonObject): SearchItem? {
         val renderer = item.getAsJsonObject("musicResponsiveListItemRenderer")
             ?: item.getAsJsonObject("musicTwoRowItemRenderer")
