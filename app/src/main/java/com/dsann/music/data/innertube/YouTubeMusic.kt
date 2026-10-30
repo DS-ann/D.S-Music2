@@ -1182,6 +1182,7 @@ object YouTubeMusic {
 
     @JvmStatic
     fun fetchAndAppendRelatedSongs(viewModel: com.dsann.music.viewmodel.PlayerSharedViewModel, videoId: String) {
+        if (!viewModel.isAutoplayEnabled()) return
         kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
             try {
                 val result = relatedSongs(videoId)
@@ -1195,7 +1196,9 @@ object YouTubeMusic {
                             onlineSong.durationMs,
                             onlineSong.thumbnailUrl,
                             onlineSong.artistId
-                        )
+                        ).apply {
+                            isAutoplayRecommendation = true
+                        }
                         viewModel.addToQueue(songItem)
                     }
                     Log.d(TAG, "Successfully auto-appended ${related.size} related songs to queue.")
