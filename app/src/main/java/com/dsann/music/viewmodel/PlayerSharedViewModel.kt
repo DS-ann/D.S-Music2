@@ -109,6 +109,14 @@ class PlayerSharedViewModel @Inject constructor(
         val peakMoodDescription: String
     )
 
+    // Raw chronological history powers the period-based Replay tab. The recap
+    // aggregate remains available for lightweight summary consumers.
+    val listeningHistoryEventsFlow = playlistDao.getAllHistoryEventsFlow().stateIn(
+        bgScope,
+        SharingStarted.WhileSubscribed(5000),
+        emptyList()
+    )
+
     // Reactive flow that live-aggregates history records
     val listeningRecapFlow = playlistDao.getAllHistoryEventsFlow().map { events ->
         if (events.isEmpty()) return@map null
