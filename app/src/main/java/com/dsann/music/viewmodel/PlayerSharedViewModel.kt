@@ -1692,23 +1692,14 @@ class PlayerSharedViewModel @Inject constructor(
 
     fun reorderQueue(fromIndex: Int, toIndex: Int) {
         val songs = _songList.value
-        if (fromIndex !in songs.indices || toIndex !in songs.indices) return
+        val newList = com.dsann.music.util.OrderUtils.move(songs, fromIndex, toIndex)
+        if (newList === songs) return
 
-        val newList = ArrayList(songs)
-        val moved = newList.removeAt(fromIndex)
-        newList.add(toIndex, moved)
-
-        when (val currentIdx = _currentSongIndex.value) {
-            fromIndex -> {
-                _currentSongIndex.value = toIndex
-            }
-            in (fromIndex + 1)..toIndex -> {
-                _currentSongIndex.value = currentIdx - 1
-            }
-            in toIndex..<fromIndex -> {
-                _currentSongIndex.value = currentIdx + 1
-            }
-        }
+        _currentSongIndex.value = com.dsann.music.util.OrderUtils.moveIndex(
+            currentIndex = _currentSongIndex.value,
+            fromIndex = fromIndex,
+            toIndex = toIndex
+        )
         _songList.value = newList
         audioService?.refreshNativeQueue()
     }
