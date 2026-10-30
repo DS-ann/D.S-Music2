@@ -697,14 +697,9 @@ object YouTubeMusic {
             val browseId = if (isPodcast) playlistId else "VL$playlistId"
             val response = InnerTubeClient.browse(browseId = browseId)
 
-            val header = response.path(
-                "contents.twoColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.contents.0.musicResponsiveHeaderRenderer"
-            )?.asJsonObject
+            val header = InnerTubeParser.findFirstObject(response, "musicResponsiveHeaderRenderer")
                 ?: response.path(
                     "contents.twoColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.contents.0.musicEditablePlaylistDetailHeaderRenderer.header.musicResponsiveHeaderRenderer"
-                )?.asJsonObject
-                ?: response.path(
-                    "contents.singleColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.contents.0.musicResponsiveHeaderRenderer"
                 )?.asJsonObject
                 ?: response.path(
                     "contents.singleColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.contents.0.musicEditablePlaylistDetailHeaderRenderer.header.musicResponsiveHeaderRenderer"
@@ -786,6 +781,10 @@ object YouTubeMusic {
                 currentContinuation = response.path(
                     "contents.singleColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.contents.0.musicPlaylistShelfRenderer.continuations.0.nextContinuationData.continuation"
                 )?.asString
+            }
+            if (currentContinuation == null && isPodcast) {
+                currentContinuation = InnerTubeParser.findFirstObject(response, "musicShelfRenderer")
+                    ?.path("continuations.0.nextContinuationData.continuation")?.asString
             }
 
             PlaylistPage(
