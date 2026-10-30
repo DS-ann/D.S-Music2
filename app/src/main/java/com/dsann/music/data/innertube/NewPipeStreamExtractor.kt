@@ -425,8 +425,21 @@ object NewPipeStreamExtractor {
      * Data-saver default for mode switches. Keep the full option list available to the player
      * so the user can explicitly choose a higher resolution from the in-video quality menu.
      */
+    /**
+     * Prefer the lowest-data MP4 muxed stream. Android's Media3 decoder support is broader
+     * for H.264/AAC MP4 than WebM/VP9, especially on Android 6 devices. If YouTube has no
+     * MP4 muxed stream, fall back to the lowest available muxed option.
+     */
+    fun dataSaverVideoOption(options: List<VideoStreamOption>): VideoStreamOption? =
+        options.filter { it.mimeType?.contains("video/mp4", ignoreCase = true) == true }
+            .minByOrNull { it.height }
+            ?: options.minByOrNull { it.height }
+
+    suspend fun getDataSaverVideoOption(videoId: String?): VideoStreamOption? =
+        dataSaverVideoOption(getVideoStreamOptions(videoId))
+
     suspend fun getVideoStreamUrl(videoId: String?): String? =
-        getVideoStreamOptions(videoId).lastOrNull()?.url
+        getDataSaverVideoOption(videoId)?.url
 
     /**
      * Resolve a conservative recovery stream after the preferred stream failed in Media3.
