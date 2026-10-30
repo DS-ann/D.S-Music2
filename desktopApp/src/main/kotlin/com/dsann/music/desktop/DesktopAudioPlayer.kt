@@ -177,41 +177,43 @@ internal class DesktopAudioPlayer : AutoCloseable {
             }
 
             try {
-                video = MediaPlayer(Media(videoUrl))
-                audio = MediaPlayer(Media(audioUrl))
-                remotePlayer = video
-                remoteAudioPlayer = audio
+                val videoPlayer = MediaPlayer(Media(videoUrl))
+                val audioPlayer = MediaPlayer(Media(audioUrl))
+                video = videoPlayer
+                audio = audioPlayer
+                remotePlayer = videoPlayer
+                remoteAudioPlayer = audioPlayer
 
                 // The video-only stream has no soundtrack; the paired audio player supplies it.
-                video.volume = 0.0
-                audio.volume = 1.0
+                videoPlayer.volume = 0.0
+                audioPlayer.volume = 1.0
 
-                video.currentTimeProperty().addListener { _, _, newTime ->
+                videoPlayer.currentTimeProperty().addListener { _, _, newTime ->
                     if (token == generation.get() && newTime != null && newTime.toMillis().isFinite()) {
                         positionMillis = newTime.toMillis().toLong().coerceAtLeast(0L)
                     }
                 }
-                video.setOnReady {
+                videoPlayer.setOnReady {
                     if (token == generation.get()) {
                         videoReady = true
                         startWhenReady()
                     }
                 }
-                audio.setOnReady {
+                audioPlayer.setOnReady {
                     if (token == generation.get()) {
                         audioReady = true
                         startWhenReady()
                     }
                 }
-                video.setOnError {
-                    fail(video.error?.message ?: "Windows could not decode the selected video stream.")
+                videoPlayer.setOnError {
+                    fail(videoPlayer.error?.message ?: "Windows could not decode the selected video stream.")
                 }
-                audio.setOnError {
-                    fail(audio.error?.message ?: "Windows could not decode the paired audio stream.")
+                audioPlayer.setOnError {
+                    fail(audioPlayer.error?.message ?: "Windows could not decode the paired audio stream.")
                 }
-                video.setOnEndOfMedia {
+                videoPlayer.setOnEndOfMedia {
                     if (token == generation.get()) {
-                        runCatching { audio.stop() }
+                        runCatching { audioPlayer.stop() }
                         positionMillis = durationMillis
                         isPlaying = false
                         paused = true
