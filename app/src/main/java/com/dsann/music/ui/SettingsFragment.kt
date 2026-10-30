@@ -473,6 +473,39 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putString("player_visualizer", safe) }
     }
 
+    // Additional Prism-style player customisation.
+    private val _playerButtonStyle = MutableStateFlow(prefs.getString("player_button_style", "Pill") ?: "Pill")
+    val playerButtonStyle: StateFlow<String> = _playerButtonStyle.asStateFlow()
+    fun setPlayerButtonStyle(value: String) {
+        val safe = value.takeIf { it in listOf("Pill", "Rounded", "Minimal") } ?: "Pill"
+        _playerButtonStyle.value = safe
+        prefs.edit { putString("player_button_style", safe) }
+    }
+
+    private val _scrubberThickness = MutableStateFlow(prefs.getFloat("scrubber_thickness", 1f).coerceIn(0.6f, 2f))
+    val scrubberThickness: StateFlow<Float> = _scrubberThickness.asStateFlow()
+    fun setScrubberThickness(value: Float) {
+        val safe = value.coerceIn(0.6f, 2f)
+        _scrubberThickness.value = safe
+        prefs.edit { putFloat("scrubber_thickness", safe) }
+    }
+
+    private val _scrubberThumbStyle = MutableStateFlow(prefs.getString("scrubber_thumb_style", "Auto") ?: "Auto")
+    val scrubberThumbStyle: StateFlow<String> = _scrubberThumbStyle.asStateFlow()
+    fun setScrubberThumbStyle(value: String) {
+        val safe = value.takeIf { it in listOf("Auto", "Dot", "Line", "Ring", "None") } ?: "Auto"
+        _scrubberThumbStyle.value = safe
+        prefs.edit { putString("scrubber_thumb_style", safe) }
+    }
+
+    private val _visualizerColor = MutableStateFlow(prefs.getString("visualizer_color", "Accent") ?: "Accent")
+    val visualizerColor: StateFlow<String> = _visualizerColor.asStateFlow()
+    fun setVisualizerColor(value: String) {
+        val safe = value.takeIf { it in listOf("Accent", "White", "Cover", "Spectrum") } ?: "Accent"
+        _visualizerColor.value = safe
+        prefs.edit { putString("visualizer_color", safe) }
+    }
+
     private val _lyricsTextSize = MutableStateFlow(
         prefs.getString("lyrics_text_size", "Standard") ?: "Standard"
     )
@@ -1004,6 +1037,10 @@ fun SettingsScreenContent(
     val scrubberStyle by viewModel.scrubberStyle.collectAsStateWithLifecycle()
     val scrubberColor by viewModel.scrubberColor.collectAsStateWithLifecycle()
     val visualizerStyle by viewModel.visualizerStyle.collectAsStateWithLifecycle()
+    val playerButtonStyle by viewModel.playerButtonStyle.collectAsStateWithLifecycle()
+    val scrubberThickness by viewModel.scrubberThickness.collectAsStateWithLifecycle()
+    val scrubberThumbStyle by viewModel.scrubberThumbStyle.collectAsStateWithLifecycle()
+    val visualizerColor by viewModel.visualizerColor.collectAsStateWithLifecycle()
     val lyricsTextSize by viewModel.lyricsTextSize.collectAsStateWithLifecycle()
     val lyricsAlignment by viewModel.lyricsAlignment.collectAsStateWithLifecycle()
     val lyricsFontFamily by viewModel.lyricsFontFamily.collectAsStateWithLifecycle()
@@ -1225,7 +1262,15 @@ fun SettingsScreenContent(
                 scrubberColor = scrubberColor,
                 onScrubberColorChange = { viewModel.setScrubberColor(it) },
                 visualizerStyle = visualizerStyle,
-                onVisualizerStyleChange = { viewModel.setVisualizerStyle(it) }
+                onVisualizerStyleChange = { viewModel.setVisualizerStyle(it) },
+                playerButtonStyle = playerButtonStyle,
+                onPlayerButtonStyleChange = { viewModel.setPlayerButtonStyle(it) },
+                scrubberThickness = scrubberThickness,
+                onScrubberThicknessChange = { viewModel.setScrubberThickness(it) },
+                scrubberThumbStyle = scrubberThumbStyle,
+                onScrubberThumbStyleChange = { viewModel.setScrubberThumbStyle(it) },
+                visualizerColor = visualizerColor,
+                onVisualizerColorChange = { viewModel.setVisualizerColor(it) }
             )
         }
         composable(SettingsRoute.Controls.route) {
@@ -2247,7 +2292,15 @@ private fun AppearanceScreen(
     scrubberColor: String,
     onScrubberColorChange: (String) -> Unit,
     visualizerStyle: String,
-    onVisualizerStyleChange: (String) -> Unit
+    onVisualizerStyleChange: (String) -> Unit,
+    playerButtonStyle: String,
+    onPlayerButtonStyleChange: (String) -> Unit,
+    scrubberThickness: Float,
+    onScrubberThicknessChange: (Float) -> Unit,
+    scrubberThumbStyle: String,
+    onScrubberThumbStyleChange: (String) -> Unit,
+    visualizerColor: String,
+    onVisualizerColorChange: (String) -> Unit
 ) {
     Scaffold(
         topBar = { SettingsDetailTopBar("Customize") { navController.popBackStack() } }
@@ -2305,6 +2358,15 @@ private fun AppearanceScreen(
             })
 
             SettingsHeader("Player buttons")
+            SettingsGroupCard(listOf {
+                SettingsChoiceRow(
+                    title = "Button presentation",
+                    description = "Choose capsule buttons, soft rounded buttons or a compact icon-first row.",
+                    selected = playerButtonStyle,
+                    options = listOf("Pill", "Rounded", "Minimal"),
+                    onSelected = onPlayerButtonStyleChange
+                )
+            })
             PlayerButtonsSettings(
                 selected = playerButtons,
                 onSelectionChanged = onPlayerButtonsChange,
@@ -2378,6 +2440,25 @@ private fun AppearanceScreen(
                         options = listOf("Accent", "White", "Cover"),
                         onSelected = onScrubberColorChange
                     )
+                },
+                {
+                    SettingsChoiceRow(
+                        title = "Thumb style",
+                        description = "Choose a dot, line, ring, automatic thumb or no thumb.",
+                        selected = scrubberThumbStyle,
+                        options = listOf("Auto", "Dot", "Line", "Ring", "None"),
+                        onSelected = onScrubberThumbStyleChange
+                    )
+                },
+                {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text("Track thickness: " + scrubberThickness.toString() + "×")
+                        Slider(
+                            value = scrubberThickness,
+                            onValueChange = onScrubberThicknessChange,
+                            valueRange = 0.6f..2f
+                        )
+                    }
                 }
             ))
 
@@ -2389,6 +2470,15 @@ private fun AppearanceScreen(
                     selected = visualizerStyle,
                     options = listOf("Off", "Bars", "Wave", "Ring", "Pulse", "Glow"),
                     onSelected = onVisualizerStyleChange
+                )
+            })
+            SettingsGroupCard(listOf {
+                SettingsChoiceRow(
+                    title = "Visualizer color",
+                    description = "Match the accent, use white, follow the artwork or cycle through a spectrum.",
+                    selected = visualizerColor,
+                    options = listOf("Accent", "White", "Cover", "Spectrum"),
+                    onSelected = onVisualizerColorChange
                 )
             })
 
