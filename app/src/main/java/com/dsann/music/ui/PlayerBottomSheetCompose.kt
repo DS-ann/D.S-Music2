@@ -770,7 +770,7 @@ fun PlayerBottomSheetCompose(
                     val options = com.dsann.music.data.innertube.NewPipeStreamExtractor
                         .getVideoStreamOptions(videoId)
                     videoQualityOptions = options
-                    selectedVideoQuality = options.firstOrNull()?.label
+                    selectedVideoQuality = options.lastOrNull()?.label
                 } catch (_: Exception) {
                     videoQualityOptions = emptyList()
                 } finally {
