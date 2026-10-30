@@ -681,11 +681,10 @@ object InnerTubeClient {
             addProperty("title", title)
             addProperty("description", description)
             addProperty("privacyStatus", privacyStatus)
-            if (videoIds.isNotEmpty()) {
-                val arr = com.google.gson.JsonArray()
-                videoIds.forEach { arr.add(it) }
-                add("videoIds", arr)
-            }
+            // Prism sends videoIds even for an empty playlist; keep the request shape identical.
+            val arr = com.google.gson.JsonArray()
+            videoIds.forEach { arr.add(it) }
+            add("videoIds", arr)
         }
         post("$BASE_URL/playlist/create", body, ClientType.WEB_REMIX)
     }
@@ -710,6 +709,7 @@ object InnerTubeClient {
             val action = JsonObject().apply {
                 addProperty("action", "ACTION_ADD_VIDEO")
                 addProperty("addedVideoId", videoId)
+                addProperty("dedupeOption", "DEDUPE_OPTION_SKIP")
             }
             actions.add(action)
         }
