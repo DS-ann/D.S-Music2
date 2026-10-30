@@ -92,10 +92,22 @@ object YouTubeMusic {
                 } else {
                     InnerTubeParser.parseSearchResponse(response)
                 }
-                if (parsed.items.isEmpty()) {
+                val typedItems = when (filter) {
+                    SearchFilter.VIDEOS -> parsed.items.map { item ->
+                        if (item is SearchItem.Song) SearchItem.Song(item.song.copy(isVideo = true)) else item
+                    }
+                    SearchFilter.EPISODES -> parsed.items.map { item ->
+                        if (item is SearchItem.Song) SearchItem.Song(item.song.copy(isEpisode = true)) else item
+                    }
+                    SearchFilter.PODCASTS -> parsed.items.map { item ->
+                        if (item is SearchItem.Playlist) SearchItem.Playlist(item.playlist.copy(isPodcast = true)) else item
+                    }
+                    else -> parsed.items
+                }
+                if (typedItems.isEmpty()) {
                     Log.w(TAG, "Search returned a response but no parsed items for query: $query filter=$filter")
                 }
-                parsed
+                parsed.copy(items = typedItems)
             }
         }
     }
@@ -158,7 +170,8 @@ object YouTubeMusic {
                         val remaining = section.items.filterNot { searchItemKey(it) == topKey }
                         remaining.takeIf { it.isNotEmpty() }?.let { section.copy(items = it) }
                     }
-                    val allItems = visibleSections.flatMap { it.items }.ifEmpty { candidates }
+                    val allItems = visibleSections.flatMap { it.items }
+                        .ifEmpty { candidates.filterNot { searchItemKey(it) == topKey } }
                     SearchResult(
                         items = allItems,
                         continuation = null,
@@ -186,11 +199,18 @@ object YouTubeMusic {
     /**
      * Load more search results using continuation token.
      */
-    suspend fun searchContinuation(continuation: String): Result<SearchResult> = withContext(Dispatchers.IO) {
+    suspend fun searchContinuation(
+        continuation: String,
+        filter: SearchFilter? = null
+    ): Result<SearchResult> = withContext(Dispatchers.IO) {
         runCatching {
-            kotlinx.coroutines.withTimeout(7000L.milliseconds) {
-                val response = InnerTubeClient.search("", continuation = continuation)
-                InnerTubeParser.parseSearchResponse(response)
+            kotlinx.coroutines.withTimeout(9000L.milliseconds) {
+                if (filter == SearchFilter.LIVE) {
+                    InnerTubeParser.parseLiveSearchResponse(InnerTubeClient.liveSearch("", continuation))
+                } else {
+                    val response = InnerTubeClient.search("", filter?.value, continuation)
+                    InnerTubeParser.parseSearchResponse(response)
+                }
             }
         }
     }
