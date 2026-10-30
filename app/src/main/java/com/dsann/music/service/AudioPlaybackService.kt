@@ -1396,6 +1396,7 @@ class AudioPlaybackService : MediaSessionService() {
     @OptIn(UnstableApi::class)
     private fun startCurrentTrackCache() {
         if (!isPlayerInitialized || !player.isPlaying) return
+        if (viewModel?.isVideoMode?.value == true) return
         if (!getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .getBoolean(KEY_MEDIA_CACHE_ENABLED, true)
         ) return
@@ -2427,6 +2428,87 @@ class AudioPlaybackService : MediaSessionService() {
         getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("autoplay_enabled", true)
 
     /**
+     * Play YouTube's adaptive DASH video-only and audio-only streams as one synchronized
+     * Media3 item. This fallback is required for videos where YouTube no longer supplies
+     * progressive/muxed streams.
+     */
+    private fun loadVideoWithSeparateAudio(
+        videoUrl: String,
+        audioUrl: String,
+        startPositionMs: Long,
+        autoPlay: Boolean,
+        videoMimeType: String? = null,
+        audioMimeType: String? = null
+    ) {
+        if (!isPlayerInitialized || videoUrl.isBlank() || audioUrl.isBlank()) return
+        val song = viewModel?.currentSong?.value
+        val songId = song?.id?.toString().orEmpty()
+        val videoUri = videoUrl.toUri()
+        val audioUri = audioUrl.toUri()
+
+        cancelCurrentTrackCache()
+        cacheAssetsSongId = null
+        player.pause()
+        player.stop()
+        player.clearMediaItems()
+
+        if (isCrossfading) {
+            nextPlayer?.stop()
+            nextPlayer?.release()
+            nextPlayer = null
+            crossfadeAnimator?.cancel()
+            crossfadeAnimator = null
+            isCrossfading = false
+            crossfadeNextSongStarted = false
+        }
+
+        currentSourceUri = videoUri
+        originalSourceUri = song?.videoId?.let { "innertube://$it".toUri() } ?: videoUri
+        isNextSongPreCached = false
+        pendingSeekPos = -1L
+        shouldAutoPlay = false
+        viewModel?.setLoading(true)
+
+        try {
+            val videoItem = buildMediaItem(videoUri).buildUpon()
+                .setMimeType(videoMimeType?.takeIf { it.isNotBlank() } ?: "video/mp4")
+                .build()
+            val audioItem = MediaItem.Builder()
+                .setUri(audioUri)
+                .setMediaId("$songId-audio")
+                .setMimeType(audioMimeType?.takeIf { it.isNotBlank() } ?: "audio/mp4")
+                .build()
+
+            val dataSourceFactory = createCacheDataSourceFactory(applicationContext)
+            val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(dataSourceFactory)
+            val videoSource = mediaSourceFactory.createMediaSource(videoItem)
+            val audioSource = mediaSourceFactory.createMediaSource(audioItem)
+            val mergedSource = androidx.media3.exoplayer.source.MergingMediaSource(
+                true,
+                videoSource,
+                audioSource
+            )
+
+            player.volume = currentBaseVolume.coerceIn(0f, 1f)
+            player.setMediaSource(mergedSource, startPositionMs.coerceAtLeast(0L))
+            player.prepare()
+            if (autoPlay) {
+                player.play()
+                isPausedByFocusLoss = false
+            }
+            Log.d(
+                TAG,
+                "Loaded adaptive video/audio pair: video=${videoMimeType ?: "video/mp4"}, " +
+                    "audio=${audioMimeType ?: "audio/mp4"}, start=${startPositionMs}ms"
+            )
+        } catch (error: Exception) {
+            viewModel?.setLoading(false)
+            Log.e(TAG, "Could not merge YouTube video/audio streams", error)
+            throw error
+        }
+    }
+
+    /**
      * Switch the current YouTube Music track between its audio stream and a compatible
      * muxed video+audio stream. The same ExoPlayer and queue item remain in use.
      */
@@ -2465,28 +2547,37 @@ class AudioPlaybackService : MediaSessionService() {
         player.pause()
         serviceScope.launch {
             try {
-                val videoUrl = withContext(Dispatchers.IO) {
-                    com.dsann.music.data.innertube.NewPipeStreamExtractor.getVideoStreamUrl(videoId)
+                val videoOption = withContext(Dispatchers.IO) {
+                    com.dsann.music.data.innertube.NewPipeStreamExtractor.getDataSaverVideoOption(videoId)
                 }
 
                 if (viewModel?.currentSong?.value?.id != songId) {
                     vm.setLoading(false)
                     return@launch
                 }
-                if (videoUrl.isNullOrBlank()) {
+                if (videoOption == null) {
                     vm.setLoading(false)
                     if (wasPlaying) player.play()
                     com.dsann.music.ui.SnackbarController.showMessage(
-                        "No compatible video stream is available for this track. Audio playback is unchanged."
+                        "YouTube did not provide a compatible video stream for this track."
                     )
                     return@launch
                 }
 
                 vm.setVideoModeState(true)
-                if (wasPlaying) {
-                    loadAndPlay(videoUrl.toUri(), position)
+                if (videoOption.usesSeparateAudio) {
+                    loadVideoWithSeparateAudio(
+                        videoUrl = videoOption.url,
+                        audioUrl = videoOption.audioUrl.orEmpty(),
+                        startPositionMs = position,
+                        autoPlay = wasPlaying,
+                        videoMimeType = videoOption.mimeType,
+                        audioMimeType = videoOption.audioMimeType
+                    )
+                } else if (wasPlaying) {
+                    loadAndPlay(videoOption.url.toUri(), position)
                 } else {
-                    loadAudio(videoUrl.toUri(), position)
+                    loadAudio(videoOption.url.toUri(), position)
                 }
             } catch (error: Exception) {
                 vm.setLoading(false)
@@ -2505,17 +2596,30 @@ class AudioPlaybackService : MediaSessionService() {
      * Switch video quality without changing the queue item or playback timestamp.
      * The URL is a muxed audio+video stream selected from the available NewPipe formats.
      */
-    fun setVideoStreamQuality(streamUrl: String) {
+    fun setVideoStreamQuality(
+        streamUrl: String,
+        audioUrl: String? = null,
+        videoMimeType: String? = null,
+        audioMimeType: String? = null
+    ) {
         val vm = viewModel ?: return
         if (!isPlayerInitialized || !vm.isVideoMode.value || streamUrl.isBlank()) return
         val song = vm.currentSong.value ?: return
         if (song.videoId.isNullOrBlank()) return
         val position = captureVideoModePosition(vm)
         val wasPlaying = player.isPlaying
-        // A quality swap is another stream replacement: pause first so the old resolution
-        // does not continue consuming network while the new one begins.
+        // Stop the old resolution before loading the new one to avoid overlapping network use.
         player.pause()
-        if (wasPlaying) {
+        if (!audioUrl.isNullOrBlank()) {
+            loadVideoWithSeparateAudio(
+                videoUrl = streamUrl,
+                audioUrl = audioUrl,
+                startPositionMs = position,
+                autoPlay = wasPlaying,
+                videoMimeType = videoMimeType,
+                audioMimeType = audioMimeType
+            )
+        } else if (wasPlaying) {
             loadAndPlay(streamUrl.toUri(), position)
         } else {
             loadAudio(streamUrl.toUri(), position)
