@@ -3214,14 +3214,18 @@ private fun isSpatialFlowDownloadedSong(song: SongItem): Boolean =
 
 private fun isSpatialFlowDownloadedLocation(relativePathValue: String?, rawPath: String?): Boolean {
     val relativePath = relativePathValue.orEmpty().trim('/').lowercase(java.util.Locale.ROOT)
-    if (
-        relativePath == "music/spatialflow" || relativePath.startsWith("music/spatialflow/") ||
-        relativePath == "download/spatialflow" || relativePath.startsWith("download/spatialflow/") ||
-        relativePath == "downloads/spatialflow" || relativePath.startsWith("downloads/spatialflow/")
-    ) return true
+    val appFolders = listOf(
+        "music/d.s music", "download/d.s music", "downloads/d.s music",
+        // Keep recognising files downloaded by earlier SpatialFlow builds.
+        "music/spatialflow", "download/spatialflow", "downloads/spatialflow"
+    )
+    if (appFolders.any { relativePath == it || relativePath.startsWith("$it/") }) return true
 
     val path = rawPath.orEmpty().replace('\\', '/').lowercase(java.util.Locale.ROOT)
-    return path.contains("/music/spatialflow/") ||
+    return path.contains("/music/d.s music/") ||
+        path.contains("/download/d.s music/") ||
+        path.contains("/downloads/d.s music/") ||
+        path.contains("/music/spatialflow/") ||
         path.contains("/download/spatialflow/") ||
         path.contains("/downloads/spatialflow/")
 }
