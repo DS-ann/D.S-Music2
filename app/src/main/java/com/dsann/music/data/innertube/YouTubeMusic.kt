@@ -686,6 +686,10 @@ object YouTubeMusic {
             val browseId = if (isPodcast) playlistId else "VL$playlistId"
             val response = InnerTubeClient.browse(browseId = browseId)
 
+            val editableHeader = InnerTubeParser.findFirstObject(response, "musicEditablePlaylistDetailHeaderRenderer")
+            val editHeader = editableHeader?.let {
+                InnerTubeParser.findFirstObject(it, "musicPlaylistEditHeaderRenderer")
+            }
             val header = InnerTubeParser.findFirstObject(response, "musicResponsiveHeaderRenderer")
                 ?: response.path(
                     "contents.twoColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.contents.0.musicEditablePlaylistDetailHeaderRenderer.header.musicResponsiveHeaderRenderer"
@@ -776,9 +780,19 @@ object YouTubeMusic {
                     ?.path("continuations.0.nextContinuationData.continuation")?.asString
             }
 
+            val descriptionText = header?.path("description.runs")?.asJsonArray
+                ?.joinToString("") { run ->
+                    run.takeIf { it.isJsonObject }?.asJsonObject?.get("text")?.asString.orEmpty()
+                }?.takeIf { it.isNotBlank() }
+                ?: header?.path("description.simpleText")?.asString
+                ?: header?.path("description.text")?.asString
+            val editable = editableHeader != null && !InnerTubeClient.cookie.isNullOrBlank()
+            val privacy = editHeader?.get("privacy")?.asString
+                ?: editableHeader?.path("privacy")?.asString
+
             PlaylistPage(
                 playlist = OnlinePlaylist(
-                    playlistId = playlistId,
+                    playlistId = playlistId.removePrefix("VL"),
                     title = title,
                     author = author,
                     songCount = songCount ?: "${songs.size} songs",
@@ -786,7 +800,10 @@ object YouTubeMusic {
                     isPodcast = isPodcast
                 ),
                 songs = songs.distinctBy { it.videoId },
-                continuation = currentContinuation
+                continuation = currentContinuation,
+                description = descriptionText,
+                isOwned = editable,
+                privacy = privacy
             )
         }
     }
@@ -872,6 +889,22 @@ object YouTubeMusic {
         runCatching {
             val response = InnerTubeClient.createPlaylist(title, description, privacyStatus, videoIds)
             response.get("playlistId")?.asString ?: throw IllegalStateException("Failed to create playlist")
+        }
+    }
+
+    /**
+     * Edit title, description and visibility of a playlist owned by the connected account.
+     */
+    suspend fun editPlaylist(
+        playlistId: String,
+        title: String? = null,
+        description: String? = null,
+        privacyStatus: String? = null
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            check(!InnerTubeClient.cookie.isNullOrBlank()) { "Connect your YouTube Music account first." }
+            InnerTubeClient.editPlaylist(playlistId, title, description, privacyStatus)
+            Unit
         }
     }
 
