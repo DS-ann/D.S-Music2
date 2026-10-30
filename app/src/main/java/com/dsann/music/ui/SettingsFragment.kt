@@ -1803,6 +1803,7 @@ private fun SettingsChoiceRow(
     onSelected: (String) -> Unit
 ) {
     ListItem(
+        onClick = {},
         content = {
             Column {
                 Text(title, style = MaterialTheme.typography.bodyLarge)
