@@ -273,7 +273,8 @@ internal object DesktopYouTubeMusic {
             addProperty("title", title.trim())
             addProperty("description", description)
             addProperty("privacyStatus", privacy)
-            if (videoIds.isNotEmpty()) add("videoIds", JsonArray().apply { videoIds.forEach(::add) })
+            // Prism always sends the videoIds array, including for an empty new playlist.
+            add("videoIds", JsonArray().apply { videoIds.forEach(::add) })
         }
         val response = postInnerTube("$MUSIC_BASE/playlist/create", body)
         response.get("playlistId")?.stringOrNull()
@@ -288,6 +289,7 @@ internal object DesktopYouTubeMusic {
                     add(JsonObject().apply {
                         addProperty("action", "ACTION_ADD_VIDEO")
                         addProperty("addedVideoId", id)
+                        addProperty("dedupeOption", "DEDUPE_OPTION_SKIP")
                     })
                 }
             }
