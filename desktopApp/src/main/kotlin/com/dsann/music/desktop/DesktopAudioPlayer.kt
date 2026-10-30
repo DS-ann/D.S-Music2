@@ -43,14 +43,20 @@ internal class DesktopAudioPlayer : AutoCloseable {
     @Volatile var errorMessage: String? = null
         private set
 
-    fun play(file: File, startPositionMs: Long = 0L) {
+    fun play(file: File, startPositionMs: Long = 0L, knownDurationMs: Long = 0L) {
+        val extension = file.extension.lowercase()
+        if (extension in setOf("m4a", "aac", "mp4")) {
+            playUrl(file.toURI().toString(), knownDurationMs, startPositionMs)
+            currentFile = file
+            return
+        }
         stop()
         val token = generation.incrementAndGet()
         currentFile = file
         currentUrl = null
         remoteMode = false
         positionMillis = startPositionMs.coerceAtLeast(0L)
-        durationMillis = readDuration(file)
+        durationMillis = knownDurationMs.takeIf { it > 0L } ?: readDuration(file)
         errorMessage = null
         paused = false
         isPaused = false
