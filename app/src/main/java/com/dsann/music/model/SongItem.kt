@@ -26,6 +26,8 @@ data class SongItem(
     @JvmField var isCachedTrack: Boolean = false
     /** True when an online track is currently being served by a downloaded MediaStore/file URI. */
     @JvmField var isDownloadedOffline: Boolean = false
+    /** True for queue entries inserted automatically by radio/autoplay, not by the listener. */
+    @JvmField var isAutoplayRecommendation: Boolean = false
 
     private var uriString: String? = null
 
@@ -131,6 +133,7 @@ data class SongItem(
             contentUri = uri
             isCachedTrack = cached
             isDownloadedOffline = downloaded
+            isAutoplayRecommendation = this@SongItem.isAutoplayRecommendation
         }
     }
 
