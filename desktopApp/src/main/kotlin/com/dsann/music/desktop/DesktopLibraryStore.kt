@@ -121,6 +121,18 @@ internal object DesktopLibraryStore {
     }
 
     @Synchronized
+    fun removeFromPlaylist(playlistId: String, videoId: String) {
+        val updated = playlists().map { playlist ->
+            if (playlist.id != playlistId) playlist
+            else playlist.copy(
+                songIds = playlist.songIds.filterNot { it == videoId },
+                songs = playlist.songs.filterNot { it.videoId == videoId }
+            )
+        }
+        playlistsFile.writeText(gson.toJson(updated))
+    }
+
+    @Synchronized
     fun deletePlaylist(playlistId: String) {
         playlistsFile.writeText(gson.toJson(playlists().filterNot { it.id == playlistId }))
     }
