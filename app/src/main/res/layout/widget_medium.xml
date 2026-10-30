@@ -153,7 +153,7 @@
         android:layout_marginStart="12dp"
         android:src="@drawable/ic_launcher_foreground"
         android:alpha="0.9"
-        android:contentDescription="SpatialFlow Logo" />
+        android:contentDescription="D.S Music logo" />
 
     <!-- Lyrics Toggle Top Right - Moved to TOP Z-order to prevent clicks being intercepted -->
     <ImageButton
