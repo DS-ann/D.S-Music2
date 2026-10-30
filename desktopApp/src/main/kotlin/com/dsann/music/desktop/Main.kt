@@ -47,10 +47,12 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import java.io.File
 import java.awt.EventQueue
+import java.awt.EventQueue
 import java.nio.file.Files
 import java.util.Locale
 import java.util.prefs.Preferences
 import com.dsann.music.data.innertube.SearchFilter
+import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.SearchItem
 import com.dsann.music.data.innertube.SearchResult
@@ -462,7 +464,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
 
                     Spacer(Modifier.height(20.dp))
                     Text("YOUR SPACE", color = mutedText, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    listOf("Explore", "Library", "Cache", "Settings").forEach { item ->
+                    listOf("Explore", "Library", "Playlists", "Favorites", "Downloads", "Cache", "Lyrics", "Settings").forEach { item ->
                         SidebarItem(
                             label = item,
                             selected = section == item,
@@ -495,6 +497,11 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                     when (section) {
                                         "Explore" -> "Explore"
                                         "Cache" -> "Offline cache"
+                                        "Downloads" -> "Downloads"
+                                        "Favorites" -> "Favorites"
+                                        "Playlists" -> "Playlists"
+                                        "Lyrics" -> "Lyrics"
+                                        "Collection" -> collectionTitle
                                         "Settings" -> "Settings"
                                         else -> "Your library"
                                     },
@@ -503,9 +510,14 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                 )
                                 Text(
                                     when (section) {
-                                        "Explore" -> "Search YouTube Music using the current phone app's result categories."
-                                        "Cache" -> "Offline downloads and cache management are not migrated yet."
-                                        "Settings" -> "Desktop library and playback preferences."
+                                        "Explore" -> "Search, browse and play music from YouTube Music."
+                                        "Cache" -> "Offline songs with cover art and saved lyrics."
+                                        "Downloads" -> "Downloaded audio files on this PC."
+                                        "Favorites" -> "Your saved songs."
+                                        "Playlists" -> "Create and manage desktop playlists."
+                                        "Lyrics" -> "Synchronized and plain lyrics for the current track."
+                                        "Collection" -> "Browse and play tracks in this collection."
+                                        "Settings" -> "Playback format, audio quality and library storage."
                                         else -> "Your local music, in one place."
                                     },
                                     color = mutedText,
@@ -619,10 +631,30 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                                     item(key = "top-result") {
                                                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                                             Text("TOP RESULT", color = accentColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                                            OnlineResultRow(top, featured = true) {
-                                                                statusMessage = "Selected online result. Windows stream extraction and playback are the next platform adapter to port."
-                                                            }
+                                                            OnlineResultRow(
+                                                                item = top,
+                                                                featured = true,
+                                                                isFavorite = (top as? SearchItem.Song)?.song?.videoId in favoriteIds,
+                                                                isDownloading = (top as? SearchItem.Song)?.song?.videoId == downloadingVideoId,
+                                                                onClick = { openOnlineItem(top) },
+                                                                onFavorite = { (top as? SearchItem.Song)?.song?.let(::toggleFavorite) },
+                                                                onDownload = { (top as? SearchItem.Song)?.song?.let(::startDownload) },
+                                                                onAddToPlaylist = { (top as? SearchItem.Song)?.song?.let(::addSongToPlaylist) }
+                                                            )
                                                         }
+                                                    }
+                                                }
+                                                onlineResult?.items.orEmpty().forEachIndexed { index, resultItem ->
+                                                    item(key = "mixed-result-$index") {
+                                                        OnlineResultRow(
+                                                            item = resultItem,
+                                                            isFavorite = (resultItem as? SearchItem.Song)?.song?.videoId in favoriteIds,
+                                                            isDownloading = (resultItem as? SearchItem.Song)?.song?.videoId == downloadingVideoId,
+                                                            onClick = { openOnlineItem(resultItem) },
+                                                            onFavorite = { (resultItem as? SearchItem.Song)?.song?.let(::toggleFavorite) },
+                                                            onDownload = { (resultItem as? SearchItem.Song)?.song?.let(::startDownload) },
+                                                            onAddToPlaylist = { (resultItem as? SearchItem.Song)?.song?.let(::addSongToPlaylist) }
+                                                        )
                                                     }
                                                 }
                                                 onlineResult?.sections.orEmpty().forEach { resultSection ->
@@ -637,9 +669,15 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                                     }
                                                     items(resultSection.items.size) { index ->
                                                         val resultItem = resultSection.items[index]
-                                                        OnlineResultRow(resultItem) {
-                                                            statusMessage = "Selected online result. Windows stream extraction and playback are the next platform adapter to port."
-                                                        }
+                                                        OnlineResultRow(
+                                                            item = resultItem,
+                                                            isFavorite = (resultItem as? SearchItem.Song)?.song?.videoId in favoriteIds,
+                                                            isDownloading = (resultItem as? SearchItem.Song)?.song?.videoId == downloadingVideoId,
+                                                            onClick = { openOnlineItem(resultItem) },
+                                                            onFavorite = { (resultItem as? SearchItem.Song)?.song?.let(::toggleFavorite) },
+                                                            onDownload = { (resultItem as? SearchItem.Song)?.song?.let(::startDownload) },
+                                                            onAddToPlaylist = { (resultItem as? SearchItem.Song)?.song?.let(::addSongToPlaylist) }
+                                                        )
                                                     }
                                                 }
                                             }
@@ -648,26 +686,223 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                 }
                             }
 
-                            "Cache" -> {
-                                FeaturePanel(
-                                    title = "Offline cache migration is pending",
-                                    body = "The Android cache is owned by Media3 and Android app storage. Windows needs its own download location, cache index and offline queue. This page is reserved for that implementation; it does not pretend Android cache files are already available on this PC.",
-                                    footnote = "Your Android cache and downloads have not been changed."
-                                )
+                            "Collection" -> {
+                                Column(Modifier.fillMaxSize()) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Button(onClick = { section = "Explore" }) { Text("Back to Explore") }
+                                        Text(collectionTitle, modifier = Modifier.padding(start = 12.dp), fontWeight = FontWeight.SemiBold)
+                                    }
+                                    Spacer(Modifier.height(12.dp))
+                                    when {
+                                        collectionLoading -> EmptyPanel("Loading collection…", "Fetching tracks from YouTube Music.")
+                                        collectionItems.isEmpty() -> EmptyPanel("No tracks found", "This collection did not return playable song rows.")
+                                        else -> LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                            items(collectionItems.size) { index ->
+                                                val item = collectionItems[index]
+                                                OnlineResultRow(
+                                                    item = item,
+                                                    isFavorite = (item as? SearchItem.Song)?.song?.videoId in favoriteIds,
+                                                    isDownloading = (item as? SearchItem.Song)?.song?.videoId == downloadingVideoId,
+                                                    onClick = { playCollectionItem(item) },
+                                                    onFavorite = { (item as? SearchItem.Song)?.song?.let(::toggleFavorite) },
+                                                    onDownload = { (item as? SearchItem.Song)?.song?.let(::startDownload) },
+                                                    onAddToPlaylist = { (item as? SearchItem.Song)?.song?.let(::addSongToPlaylist) }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
 
-                            else -> {
+                            "Favorites" -> {
+                                if (favoriteSongs.isEmpty()) EmptyPanel("No favorites yet", "Use the heart button on an online song to save it here.")
+                                else LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                    items(favoriteSongs, key = { it.videoId }) { saved ->
+                                        SavedTrackRow(
+                                            song = saved,
+                                            label = if (saved.audioPath.isNotBlank() && File(saved.audioPath).isFile) "DOWNLOADED" else "ONLINE",
+                                            onClick = { playSavedSong(saved) },
+                                            onRemove = {
+                                                DesktopLibraryStore.setFavorite(
+                                                    OnlineSong(saved.videoId, saved.title, saved.artist, saved.album, saved.durationMs, saved.thumbnailUrl),
+                                                    false
+                                                )
+                                                refreshSavedLists()
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            "Downloads" -> {
+                                Column(Modifier.fillMaxSize()) {
+                                    if (downloadMessage.isNotBlank()) {
+                                        Text(downloadMessage, color = mutedText, fontSize = 12.sp)
+                                        if (downloadingVideoId != null) LinearProgressIndicator(downloadProgress / 100f, Modifier.fillMaxWidth())
+                                        Spacer(Modifier.height(10.dp))
+                                    }
+                                    if (downloads.isEmpty()) EmptyPanel("No downloads", "Use the download arrow beside an online song to save it to this PC.")
+                                    else LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                        items(downloads, key = { it.videoId }) { saved ->
+                                            SavedTrackRow(
+                                                song = saved,
+                                                label = if (cacheEntries.any { it.videoId == saved.videoId }) "CACHED" else "DOWNLOADED",
+                                                onClick = { playSavedSong(saved) },
+                                                onRemove = {
+                                                    DesktopLibraryStore.removeDownload(saved.videoId)
+                                                    refreshSavedLists()
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            "Cache" -> {
+                                if (cacheEntries.isEmpty()) EmptyPanel("Cache is empty", "A song is added here only when its audio, cover art and lyrics are all saved.")
+                                else LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                    items(cacheEntries, key = { it.videoId }) { saved ->
+                                        SavedTrackRow(
+                                            song = saved,
+                                            label = "OFFLINE READY",
+                                            onClick = { playSavedSong(saved) },
+                                            onRemove = {
+                                                DesktopLibraryStore.removeDownload(saved.videoId)
+                                                refreshSavedLists()
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            "Playlists" -> {
+                                Column(Modifier.fillMaxSize()) {
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        OutlinedTextField(
+                                            value = playlistTitle,
+                                            onValueChange = { playlistTitle = it },
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true,
+                                            label = { Text("New playlist name") }
+                                        )
+                                        Button(
+                                            onClick = {
+                                                runCatching { DesktopLibraryStore.createPlaylist(playlistTitle) }
+                                                    .onSuccess { playlistTitle = ""; refreshSavedLists(); selectedPlaylistId = it.id }
+                                                    .onFailure { downloadMessage = it.message.orEmpty() }
+                                            },
+                                            enabled = playlistTitle.isNotBlank()
+                                        ) { Text("Create") }
+                                    }
+                                    Spacer(Modifier.height(12.dp))
+                                    if (playlists.isEmpty()) EmptyPanel("No playlists", "Create a playlist, then use the plus button on a search result to add songs.")
+                                    else LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                                        items(playlists, key = { it.id }) { playlist ->
+                                            Column(
+                                                Modifier.fillMaxWidth()
+                                                    .clip(RoundedCornerShape(14.dp))
+                                                    .background(if (selectedPlaylistId == playlist.id) Color(0xFF1D3045) else panelBackground)
+                                                    .padding(12.dp)
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Column(Modifier.weight(1f).clickable { selectedPlaylistId = playlist.id }) {
+                                                        Text(playlist.title, fontWeight = FontWeight.SemiBold)
+                                                        Text("${playlist.songs.size} songs", color = mutedText, fontSize = 11.sp)
+                                                    }
+                                                    Button(onClick = { selectedPlaylistId = playlist.id }) { Text("Open") }
+                                                    Spacer(Modifier.width(6.dp))
+                                                    Button(onClick = {
+                                                        DesktopLibraryStore.deletePlaylist(playlist.id)
+                                                        if (selectedPlaylistId == playlist.id) selectedPlaylistId = null
+                                                        refreshSavedLists()
+                                                    }) { Text("Delete") }
+                                                }
+                                                if (selectedPlaylistId == playlist.id) {
+                                                    playlist.songs.forEach { saved ->
+                                                        SavedTrackRow(
+                                                            song = saved,
+                                                            label = "PLAYLIST",
+                                                            onClick = { playSavedSong(saved) },
+                                                            onRemove = { downloadMessage = "Playlist item removal is not yet available." }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            "Lyrics" -> {
+                                Column(Modifier.fillMaxSize()) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(nowPlayingTitle.ifBlank { "No track selected" }, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                            Text(nowPlayingArtist, color = mutedText, fontSize = 12.sp)
+                                        }
+                                        Button(
+                                            onClick = {
+                                                currentOnlineSong?.let { loadLyrics(it.title, it.artist, it.durationMs, it.videoId, it.albumName) }
+                                                    ?: currentSavedSong?.let { loadLyrics(it.title, it.artist, it.durationMs, it.videoId, it.album) }
+                                                    ?: currentTrack?.let { loadLyrics(it.title, it.artist, player.durationMillis) }
+                                            },
+                                            enabled = hasNowPlaying && !lyricsLoading
+                                        ) { Text("Refresh lyrics") }
+                                    }
+                                    Spacer(Modifier.height(12.dp))
+                                    when {
+                                        lyricsLoading -> EmptyPanel("Loading lyrics…", "Checking YouTube Music and LRCLIB.")
+                                        lyricsError.isNotBlank() -> EmptyPanel("Lyrics unavailable", lyricsError)
+                                        lyricsData == null -> EmptyPanel("No lyrics loaded", "Play a song or refresh lyrics to look up the current track.")
+                                        else -> {
+                                            Text("${lyricsData!!.provider} • ${if (lyricsData!!.synced) "Synced" else "Plain"}", color = mutedText, fontSize = 11.sp)
+                                            val activeLine = if (lyricsData!!.synced) lyricsData!!.lines.indexOfLast { it.startMs <= positionMs } else -1
+                                            LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                                items(lyricsData!!.lines.size) { index ->
+                                                    val line = lyricsData!!.lines[index]
+                                                    Text(
+                                                        line.text,
+                                                        color = if (index == activeLine) accentColor else Color(0xFFE8EEF7),
+                                                        fontSize = if (index == activeLine) 21.sp else 17.sp,
+                                                        fontWeight = if (index == activeLine) FontWeight.Bold else FontWeight.Normal,
+                                                        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            "Settings" -> {
                                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                                     FeaturePanel(
                                         title = "Music folder",
                                         body = folderPath.ifBlank { "No folder selected." },
                                         footnote = "The selected folder is saved in the current Windows user profile."
                                     )
-                                    FeaturePanel(
-                                        title = "Local playback formats in this first build",
-                                        body = "MP3, OGG, WAV, AIFF and AU. M4A/AAC, FLAC, Opus and WebM need the wider desktop decoder integration and are not enabled in this initial port.",
-                                        footnote = "The Android format selector and Android audio effects are not copied into Windows settings yet."
-                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text("Preferred playback format", fontWeight = FontWeight.SemiBold)
+                                            Text("AAC/M4A is preferred for Windows playback; unavailable streams fall back to a supported audio stream.", color = mutedText, fontSize = 11.sp)
+                                        }
+                                        Button(onClick = {
+                                            playbackFormat = if (playbackFormat == "m4a") "auto" else "m4a"
+                                            preferences.put("playback_format", playbackFormat)
+                                        }) { Text(playbackFormat.uppercase(Locale.ROOT)) }
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text("Playback and download bitrate", fontWeight = FontWeight.SemiBold)
+                                            Text("Target quality for stream selection and saved downloads.", color = mutedText, fontSize = 11.sp)
+                                        }
+                                        Button(onClick = {
+                                            val options = listOf(64, 96, 128, 160, 192, 256, 320)
+                                            targetBitrate = options[(options.indexOf(targetBitrate).coerceAtLeast(0) + 1) % options.size]
+                                            preferences.putInt("target_bitrate", targetBitrate)
+                                        }) { Text("${targetBitrate} kbps") }
+                                    }
+                                    Text("Files are stored in ${DesktopLibraryStore.root.absolutePath}", color = mutedText, fontSize = 11.sp)
                                 }
                             }
                         }
@@ -678,21 +913,23 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                     }
 
                     MiniPlayer(
-                        track = currentTrack,
+                        title = nowPlayingTitle,
+                        artist = nowPlayingArtist,
+                        hasTrack = hasNowPlaying,
                         isPlaying = playing,
                         isPaused = paused,
                         positionMs = positionMs,
                         durationMs = durationMs,
                         onPrevious = { playRelative(-1) },
                         onNext = { playRelative(1) },
+                        onLyrics = { section = "Lyrics" },
                         onPlayPause = {
                             when {
                                 player.isPlaying -> player.togglePlayback()
-                                currentTrack != null -> player.play(currentTrack.file)
-                                tracks.isNotEmpty() -> {
-                                    selectedIndex = 0
-                                    player.play(tracks[0].file)
-                                }
+                                currentOnlineSong != null -> playOnlineSong(currentOnlineSong!!)
+                                currentSavedSong != null -> playSavedSong(currentSavedSong!!)
+                                currentTrack != null -> playTrack(currentTrack)
+                                tracks.isNotEmpty() -> playTrack(tracks.first())
                             }
                         },
                         onSeek = { player.seekTo(it) }
@@ -721,7 +958,11 @@ private fun SidebarItem(label: String, selected: Boolean, onClick: () -> Unit) {
                 when (label) {
                     "Explore" -> "⌕"
                     "Library" -> "♫"
+                    "Playlists" -> "≡"
+                    "Favorites" -> "♥"
+                    "Downloads" -> "↓"
                     "Cache" -> "▣"
+                    "Lyrics" -> "♪"
                     else -> "⚙"
                 },
                 color = if (selected) accentColor else mutedText,
@@ -803,17 +1044,20 @@ private fun TrackRow(track: DesktopTrack, selected: Boolean, onClick: () -> Unit
 
 @Composable
 private fun MiniPlayer(
-    track: DesktopTrack?,
+    title: String,
+    artist: String,
+    hasTrack: Boolean,
     isPlaying: Boolean,
     isPaused: Boolean,
     positionMs: Long,
     durationMs: Long,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
+    onLyrics: () -> Unit,
     onPlayPause: () -> Unit,
     onSeek: (Long) -> Unit
 ) {
-    var sliderPosition by remember(track, positionMs) { mutableStateOf(positionMs.toFloat()) }
+    var sliderPosition by remember(title, positionMs) { mutableStateOf(positionMs.toFloat()) }
     val maxPosition = durationMs.coerceAtLeast(1L).toFloat()
 
     Column(
@@ -824,19 +1068,19 @@ private fun MiniPlayer(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(track?.title ?: "Nothing playing", maxLines = 1, fontWeight = FontWeight.SemiBold)
-                Text(track?.artist ?: "Choose a song from your library", maxLines = 1, color = mutedText, fontSize = 11.sp)
+                Text(title.ifBlank { "Nothing playing" }, maxLines = 1, fontWeight = FontWeight.SemiBold)
+                Text(artist.ifBlank { "Choose a song from Explore or Library" }, maxLines = 1, color = mutedText, fontSize = 11.sp)
             }
             Button(
                 onClick = onPrevious,
-                enabled = track != null,
+                enabled = hasTrack,
                 colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545)),
                 elevation = ButtonDefaults.elevation(0.dp)
             ) { Text("◀") }
             Spacer(Modifier.width(8.dp))
             Button(
                 onClick = onPlayPause,
-                enabled = track != null,
+                enabled = hasTrack,
                 colors = ButtonDefaults.buttonColors(backgroundColor = accentColor, contentColor = Color(0xFF0B1420)),
                 elevation = ButtonDefaults.elevation(0.dp)
             ) {
@@ -845,10 +1089,17 @@ private fun MiniPlayer(
             Spacer(Modifier.width(8.dp))
             Button(
                 onClick = onNext,
-                enabled = track != null,
+                enabled = hasTrack,
                 colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545)),
                 elevation = ButtonDefaults.elevation(0.dp)
             ) { Text("▶|") }
+            Spacer(Modifier.width(8.dp))
+            Button(
+                onClick = onLyrics,
+                enabled = hasTrack,
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545)),
+                elevation = ButtonDefaults.elevation(0.dp)
+            ) { Text("Lyrics") }
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -857,7 +1108,7 @@ private fun MiniPlayer(
                 value = sliderPosition.coerceIn(0f, maxPosition),
                 onValueChange = { sliderPosition = it },
                 onValueChangeFinished = { onSeek(sliderPosition.toLong()) },
-                enabled = track != null && durationMs > 0L,
+                enabled = hasTrack && durationMs > 0L,
                 valueRange = 0f..maxPosition,
                 modifier = Modifier.weight(1f).padding(horizontal = 10.dp)
             )
@@ -866,9 +1117,42 @@ private fun MiniPlayer(
     }
 }
 
+@Composable
+private fun SavedTrackRow(
+    song: DesktopSavedSong,
+    label: String,
+    onClick: () -> Unit,
+    onRemove: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).clickable(onClick = onClick),
+        color = Color(0xFF111923),
+        shape = RoundedCornerShape(13.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(42.dp).clip(RoundedCornerShape(11.dp)).background(Color(0xFF253343)),
+                contentAlignment = Alignment.Center
+            ) { Text("♫", color = accentColor, fontSize = 19.sp) }
+            Column(Modifier.weight(1f).padding(start = 13.dp)) {
+                Text(song.title, maxLines = 1, fontWeight = FontWeight.Medium)
+                Text(song.artist, maxLines = 1, color = mutedText, fontSize = 11.sp)
+            }
+            Text(label, color = accentColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = onRemove, colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545))) {
+                Text("Remove")
+            }
+        }
+    }
+}
+
 private fun scanMusicFolder(folder: File): List<DesktopTrack> {
     require(folder.exists() && folder.isDirectory) { "The selected music folder no longer exists." }
-    val supported = setOf("mp3", "ogg", "wav", "aif", "aiff", "au")
+    val supported = setOf("mp3", "m4a", "aac", "ogg", "wav", "aif", "aiff", "au")
     return Files.walk(folder.toPath()).use { paths ->
         paths
             .filter { Files.isRegularFile(it) }
