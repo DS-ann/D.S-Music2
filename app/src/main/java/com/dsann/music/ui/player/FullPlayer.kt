@@ -369,10 +369,14 @@ private fun LandscapePlayerDetailsPane(
     onPlayQueueItem: (Int) -> Unit
 ) {
     var showQueue by remember { mutableStateOf(false) }
-    LaunchedEffect(showQueue, currentSong?.id, syncedLyrics, plainLyrics, isLyricsLoading, lyricsError) {
-        if (!showQueue && syncedLyrics.isNullOrEmpty() && plainLyrics.isNullOrBlank() &&
-            !isLyricsLoading && lyricsError == null && currentSong != null
+    var lastAutoRequestedLyricsSongId by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(showQueue, currentSong?.id) {
+        val songId = currentSong?.id ?: return@LaunchedEffect
+        if (!showQueue && lastAutoRequestedLyricsSongId != songId &&
+            syncedLyrics.isNullOrEmpty() && plainLyrics.isNullOrBlank() && !isLyricsLoading
         ) {
+            // Request at most once automatically per track; the visible retry button handles failures.
+            lastAutoRequestedLyricsSongId = songId
             onFetchLyrics()
         }
     }
