@@ -16,7 +16,11 @@ data class OnlineSong(
     val duration: String? = null,       // "3:45" formatted
     val durationMs: Long = 0,           // milliseconds
     val thumbnailUrl: String? = null,
-    val isExplicit: Boolean = false
+    val isExplicit: Boolean = false,
+    val isVideo: Boolean = false,
+    val isEpisode: Boolean = false,
+    val isLive: Boolean = false,
+    val podcastId: String? = null
 )
 
 /** Represents an online album */
@@ -53,7 +57,8 @@ data class OnlinePlaylist(
     val title: String,
     val author: OnlineArtistRef? = null,
     val songCount: String? = null,
-    val thumbnailUrl: String? = null
+    val thumbnailUrl: String? = null,
+    val isPodcast: Boolean = false
 )
 
 /** Union type for search results */
@@ -65,9 +70,22 @@ sealed class SearchItem {
 }
 
 /** Search result container */
+data class SearchResultSection(
+    val filter: SearchFilter,
+    val items: List<SearchItem>
+)
+
+/** The combined result set shown by the Top results view. */
 data class SearchResult(
     val items: List<SearchItem>,
-    val continuation: String? = null
+    val continuation: String? = null,
+    val topResult: SearchItem? = null,
+    val sections: List<SearchResultSection> = emptyList()
+)
+
+data class SearchSuggestions(
+    val queries: List<String>,
+    val items: List<SearchItem>
 )
 
 /** Stream URL data extracted from player response. bitrate is always in bits per second. */
@@ -129,11 +147,16 @@ data class PlaylistPage(
 )
 
 /** Search filter types */
-enum class SearchFilter(val value: String) {
-    SONGS("EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D"),
-    ALBUMS("EgWKAQIYAWoKEAkQChAFEAMQBA%3D%3D"),
-    ARTISTS("EgWKAQIgAWoKEAkQChAFEAMQBA%3D%3D"),
-    PLAYLISTS("EgeKAQQoAEABagwQDhAKEAMQBRAJEAQ%3D"),
+enum class SearchFilter(val label: String, val value: String?) {
+    SONGS("Songs", "EgWKAQIIAWoMEA4QChADEAQQCRAF"),
+    VIDEOS("Videos", "EgWKAQIQAWoMEA4QChADEAQQCRAF"),
+    ALBUMS("Albums", "EgWKAQIYAWoMEA4QChADEAQQCRAF"),
+    ARTISTS("Artists", "EgWKAQIgAWoMEA4QChADEAQQCRAF"),
+    FEATURED_PLAYLISTS("Featured playlists", "EgeKAQQoADgBagwQDhAKEAMQBBAJEAU="),
+    PLAYLISTS("Community playlists", "EgeKAQQoAEABagwQDhAKEAMQBBAJEAU="),
+    PODCASTS("Podcasts", "EgWKAQJQAWoMEA4QChADEAQQCRAF"),
+    EPISODES("Episodes", "EgWKAQJIAWoMEA4QChADEAQQCRAF"),
+    LIVE("Live", null)
 }
 
 /** Represents a user profile */
