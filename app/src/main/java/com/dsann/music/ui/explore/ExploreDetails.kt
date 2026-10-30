@@ -153,7 +153,11 @@ fun PlaylistDetailView(
         isLandscape = isLandscape,
         thumbnailUrl = playlistPage.playlist.thumbnailUrl,
         title = playlistPage.playlist.title,
-        subtitle = "Curated Playlist • ${playlistPage.songs.size} items",
+        subtitle = if (playlistPage.playlist.isPodcast) {
+            "Podcast • ${playlistPage.songs.size} episodes"
+        } else {
+            "Curated Playlist • ${playlistPage.songs.size} items"
+        },
         sharedElementKey = playlistPage.playlist.playlistId,
         onBack = onBack,
         headerActions = {
