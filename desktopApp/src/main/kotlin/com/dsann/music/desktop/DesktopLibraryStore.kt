@@ -36,6 +36,7 @@ internal object DesktopLibraryStore {
     private val playlistsFile get() = File(root, "playlists.json")
     private val downloadsFile get() = File(root, "downloads.json")
     private val cacheFile get() = File(root, "cache.json")
+    private val favoriteSongsFile get() = File(root, "favorite-songs.json")
 
     @Synchronized
     fun favorites(): Set<String> = readSet(favoritesFile)
@@ -45,6 +46,34 @@ internal object DesktopLibraryStore {
         val values = favorites().toMutableSet()
         if (enabled) values.add(videoId) else values.remove(videoId)
         favoritesFile.writeText(gson.toJson(values))
+    }
+
+    @Synchronized
+    fun favoriteSongs(): List<DesktopSavedSong> = readSongs(favoriteSongsFile)
+
+    @Synchronized
+    fun setFavorite(song: com.dsann.music.data.innertube.OnlineSong, enabled: Boolean) {
+        val current = favoriteSongs().filterNot { it.videoId == song.videoId }.toMutableList()
+        if (enabled) {
+            current.add(
+                DesktopSavedSong(
+                    videoId = song.videoId,
+                    title = song.title,
+                    artist = song.artist,
+                    album = song.albumName.orEmpty(),
+                    durationMs = song.durationMs,
+                    thumbnailUrl = song.thumbnailUrl,
+                    audioPath = ""
+                )
+            )
+        }
+        favoriteSongsFile.writeText(gson.toJson(current.sortedBy { it.title.lowercase() }))
+    }
+
+    @Synchronized
+    fun removeDownload(videoId: String) {
+        downloadsFile.writeText(gson.toJson(downloads().filterNot { it.videoId == videoId }))
+        cacheFile.writeText(gson.toJson(readSongs(cacheFile).filterNot { it.videoId == videoId }))
     }
 
     @Synchronized
