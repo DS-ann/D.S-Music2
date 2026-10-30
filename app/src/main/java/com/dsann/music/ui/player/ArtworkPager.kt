@@ -54,9 +54,15 @@ fun ArtworkPager(
         when (playerLayout) {
             "Vinyl" -> CircleShape
             "Cassette" -> RoundedCornerShape(14.dp)
-            "Cover" -> RoundedCornerShape(8.dp)
-            "Minimal" -> RoundedCornerShape(18.dp)
-            else -> DsmCoverShapes.of(artworkShapeName, 24.dp)
+            else -> {
+                val cornerRadius = when (playerLayout) {
+                    "Cover" -> 8.dp
+                    "Minimal" -> 18.dp
+                    else -> 24.dp
+                }
+                // Keep the artwork-shape preference active for Standard, Cover and Minimal.
+                DsmCoverShapes.of(artworkShapeName, cornerRadius)
+            }
         }
     }
 
