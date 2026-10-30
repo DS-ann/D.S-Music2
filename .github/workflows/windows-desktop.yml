@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: spatialflow-windows-${{ github.ref }}
+  group: dsmusic-windows-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
