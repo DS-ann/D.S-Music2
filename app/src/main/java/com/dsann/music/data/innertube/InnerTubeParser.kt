@@ -83,6 +83,136 @@ object InnerTubeParser {
         )
     }
 
+    fun parseSearchSuggestions(json: JsonObject): SearchSuggestions {
+        val queries = findObjects(json, "searchSuggestionRenderer").mapNotNull { renderer ->
+            renderer.path("suggestion.runs")?.takeIf { it.isJsonArray }?.asJsonArray
+                ?.joinToString("") { run -> run.asJsonObject.get("text")?.asString.orEmpty() }
+                ?.takeIf { it.isNotBlank() }
+        }.distinct()
+
+        val items = findObjects(json, "musicResponsiveListItemRenderer").mapNotNull { renderer ->
+            parseSearchItem(JsonObject().apply { add("musicResponsiveListItemRenderer", renderer) })
+        }.distinctBy { searchItemKey(it) }.take(4)
+
+        return SearchSuggestions(queries, items)
+    }
+
+    fun parseLiveSearchResponse(json: JsonObject): SearchResult {
+        val songs = findObjects(json, "videoRenderer").mapNotNull { renderer ->
+            runCatching {
+                val videoId = renderer.get("videoId")?.asString ?: return@runCatching null
+                if (renderer.get("upcomingEventData") != null) return@runCatching null
+
+                val badges = renderer.getAsJsonArray("badges")?.mapNotNull { badge ->
+                    badge.asJsonObject.path("metadataBadgeRenderer.style")?.asString
+                }.orEmpty()
+                val overlays = renderer.getAsJsonArray("thumbnailOverlays")?.mapNotNull { overlay ->
+                    overlay.asJsonObject.path("thumbnailOverlayTimeStatusRenderer.style")?.asString
+                }.orEmpty()
+                val watching = renderer.path("viewCountText.simpleText")?.asString
+                    ?.contains("watching", ignoreCase = true) == true
+                val isLive = badges.any { it.contains("LIVE_NOW") } || "LIVE" in overlays ||
+                    (renderer.get("lengthText") == null && watching)
+                if (!isLive) return@runCatching null
+
+                val title = renderer.path("title.runs.0.text")?.asString
+                    ?: renderer.path("title.simpleText")?.asString
+                    ?: return@runCatching null
+                val artist = renderer.path("ownerText.runs.0.text")?.asString
+                    ?: renderer.path("longBylineText.runs.0.text")?.asString
+                    ?: renderer.path("shortBylineText.runs.0.text")?.asString
+                    ?: "Live"
+                val thumbnail = getHighResThumbnailUrl(
+                    renderer.path("thumbnail.thumbnails")?.asJsonArray?.lastOrNull()
+                        ?.asJsonObject?.get("url")?.asString
+                ) ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+
+                OnlineSong(
+                    videoId = videoId,
+                    title = title,
+                    artist = artist,
+                    thumbnailUrl = thumbnail,
+                    isVideo = true,
+                    isLive = true
+                )
+            }.getOrNull()
+        }.distinctBy { it.videoId }
+
+        val continuation = findObjects(json, "continuationItemRenderer").firstOrNull()
+            ?.path("continuationEndpoint.continuationCommand.token")?.asString
+        return SearchResult(songs.map { SearchItem.Song(it) }, continuation)
+    }
+
+    fun parsePodcastEpisodes(json: JsonObject): List<OnlineSong> {
+        return findObjects(json, "musicMultiRowListItemRenderer").mapNotNull { renderer ->
+            runCatching {
+                val watch = renderer.path("onTap.watchEndpoint")?.asJsonObject
+                    ?: renderer.path("overlay.musicItemThumbnailOverlayRenderer.content.musicPlayButtonRenderer.playNavigationEndpoint.watchEndpoint")?.asJsonObject
+                    ?: return@runCatching null
+                val videoId = watch.get("videoId")?.asString ?: return@runCatching null
+                val title = renderer.path("title.runs.0.text")?.asString
+                    ?: renderer.path("title.simpleText")?.asString
+                    ?: return@runCatching null
+                val secondRuns = renderer.path("secondTitle.runs")?.asJsonArray
+                val showRun = secondRuns?.firstOrNull { run ->
+                    val browse = run.asJsonObject.path("navigationEndpoint.browseEndpoint")
+                    browse?.path("browseEndpointContextSupportedConfigs.browseEndpointContextMusicConfig.pageType")?.asString ==
+                        "MUSIC_PAGE_TYPE_PODCAST_SHOW_DETAIL_PAGE"
+                }
+                val showName = showRun?.asJsonObject?.get("text")?.asString
+                    ?: renderer.path("secondTitle.simpleText")?.asString
+                    ?: "Podcast"
+                val podcastId = showRun?.asJsonObject
+                    ?.path("navigationEndpoint.browseEndpoint.browseId")?.asString
+                    ?: renderer.path("onTap.watchEndpoint.playlistId")?.asString
+                val thumbnailUrl = getHighResThumbnailUrl(
+                    renderer.path("thumbnail.musicThumbnailRenderer.thumbnail.thumbnails")?.asJsonArray
+                        ?.lastOrNull()?.asJsonObject?.get("url")?.asString
+                )
+                val subtitleText = renderer.path("subtitle.runs")?.asJsonArray
+                    ?.joinToString("") { it.asJsonObject.get("text")?.asString.orEmpty() }.orEmpty()
+                val duration = Regex("(?:\\d+\\s*hr\\s*)?\\d+\\s*min|(?:\\d+:)?\\d+:\\d+")
+                    .find(subtitleText)?.value
+
+                OnlineSong(
+                    videoId = videoId,
+                    title = title,
+                    artist = showName,
+                    duration = duration,
+                    durationMs = parseDuration(duration),
+                    thumbnailUrl = thumbnailUrl,
+                    isEpisode = true,
+                    podcastId = podcastId
+                )
+            }.getOrNull()
+        }.distinctBy { it.videoId }
+    }
+
+    private fun searchItemKey(item: SearchItem): String = when (item) {
+        is SearchItem.Song -> "song:" + item.song.videoId
+        is SearchItem.Album -> "album:" + item.album.browseId
+        is SearchItem.Artist -> "artist:" + item.artist.browseId
+        is SearchItem.Playlist -> "playlist:" + item.playlist.playlistId
+    }
+
+    private fun findObjects(root: JsonElement?, key: String): List<JsonObject> {
+        val found = ArrayList<JsonObject>()
+        fun visit(node: JsonElement?) {
+            when {
+                node == null || node.isJsonNull -> Unit
+                node.isJsonObject -> {
+                    val obj = node.asJsonObject
+                    val target = obj.get(key)
+                    if (target != null && target.isJsonObject) found.add(target.asJsonObject)
+                    obj.entrySet().forEach { visit(it.value) }
+                }
+                node.isJsonArray -> node.asJsonArray.forEach { visit(it) }
+            }
+        }
+        visit(root)
+        return found
+    }
+
     fun parseSearchResponse(json: JsonObject): SearchResult {
         val items = mutableListOf<SearchItem>()
         var continuation: String? = null
@@ -224,6 +354,17 @@ object InnerTubeParser {
                     }
                     
                     val thumbnail = parseThumbnail(renderer)
+                    val musicVideoType = watchEndpoint.path(
+                        "watchEndpointMusicSupportedConfigs.watchEndpointMusicConfig.musicVideoType"
+                    )?.asString
+                    val podcastRun = subtitleRuns?.firstOrNull { run ->
+                        val pageType = run.asJsonObject.path(
+                            "navigationEndpoint.browseEndpoint.browseEndpointContextSupportedConfigs.browseEndpointContextMusicConfig.pageType"
+                        )?.asString
+                        pageType == "MUSIC_PAGE_TYPE_PODCAST_SHOW_DETAIL_PAGE"
+                    }
+                    val podcastId = podcastRun?.asJsonObject
+                        ?.path("navigationEndpoint.browseEndpoint.browseId")?.asString
 
                     SearchItem.Song(OnlineSong(
                         videoId = videoId,
@@ -234,7 +375,10 @@ object InnerTubeParser {
                         albumId = parsedAlbumId,
                         duration = durationText.trim().takeIf { it.isNotEmpty() },
                         durationMs = parseDuration(durationText.trim()),
-                        thumbnailUrl = thumbnail
+                        thumbnailUrl = thumbnail,
+                        isVideo = !musicVideoType.isNullOrBlank() && musicVideoType != "MUSIC_VIDEO_TYPE_ATV",
+                        isEpisode = musicVideoType == "MUSIC_VIDEO_TYPE_PODCAST_EPISODE",
+                        podcastId = podcastId
                     ))
                 }
                 // Album or Artist (has browseEndpoint)
@@ -274,6 +418,15 @@ object InnerTubeParser {
                                 title = title,
                                 thumbnailUrl = thumbnail,
                                 songCount = subtitle.split(" • ").lastOrNull()
+                            ))
+                        }
+                        "MUSIC_PAGE_TYPE_PODCAST_SHOW_DETAIL_PAGE" -> {
+                            SearchItem.Playlist(OnlinePlaylist(
+                                playlistId = browseId,
+                                title = title,
+                                author = OnlineArtistRef(subtitle.split(" • ").drop(1).firstOrNull().orEmpty()),
+                                thumbnailUrl = thumbnail,
+                                isPodcast = true
                             ))
                         }
                         else -> {
