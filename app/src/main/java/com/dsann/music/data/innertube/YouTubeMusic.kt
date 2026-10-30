@@ -693,7 +693,9 @@ object YouTubeMusic {
      */
     suspend fun playlist(playlistId: String): Result<PlaylistPage> = withContext(Dispatchers.IO) {
         runCatching {
-            val response = InnerTubeClient.browse(browseId = "VL$playlistId")
+            val isPodcast = playlistId.startsWith("MPSP")
+            val browseId = if (isPodcast) playlistId else "VL$playlistId"
+            val response = InnerTubeClient.browse(browseId = browseId)
 
             val header = response.path(
                 "contents.twoColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.contents.0.musicResponsiveHeaderRenderer"
@@ -733,7 +735,17 @@ object YouTubeMusic {
             }
 
             val songs = mutableListOf<OnlineSong>()
-            songContents?.forEach { item ->
+            if (isPodcast) {
+                songs.addAll(InnerTubeParser.parsePodcastEpisodes(response))
+                if (songs.isEmpty()) {
+                    songs.addAll(
+                        InnerTubeParser.parseSearchResponse(response).items
+                            .filterIsInstance<SearchItem.Song>()
+                            .map { it.song }
+                            .filter { it.isEpisode }
+                    )
+                }
+            } else songContents?.forEach { item ->
                 val obj = item.takeIf { it.isJsonObject }?.asJsonObject ?: return@forEach
                 val renderer = obj.getAsJsonObject("musicResponsiveListItemRenderer") ?: return@forEach
                 val flexColumns = renderer.getAsJsonArray("flexColumns")
@@ -782,9 +794,10 @@ object YouTubeMusic {
                     title = title,
                     author = author,
                     songCount = songCount ?: "${songs.size} songs",
-                    thumbnailUrl = thumbnail
+                    thumbnailUrl = thumbnail,
+                    isPodcast = isPodcast
                 ),
-                songs = songs,
+                songs = songs.distinctBy { it.videoId },
                 continuation = currentContinuation
             )
         }
