@@ -229,7 +229,9 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     // ========== Search Methods ==========
 
     fun setSearchQuery(query: String) {
-        _uiState.update { it.copy(searchQuery = query) }
+        _uiState.update {
+            it.copy(searchQuery = query, suggestions = emptyList(), suggestionItems = emptyList())
+        }
         if (query.isNotBlank()) {
             fetchSuggestions(query)
         } else {
@@ -255,7 +257,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 searchQuery = query,
                 isSearching = true,
                 suggestions = emptyList(),
-                searchResults = emptyList()
+                suggestionItems = emptyList(),
+                searchResults = emptyList(),
+                searchTopResult = null,
+                searchSections = emptyList()
             )
         }
 
@@ -283,29 +288,34 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                         val isNotInterested = item is SearchItem.Song && _uiState.value.notInterestedIds.contains(item.song.videoId)
                         !isNotInterested && seenIds.add(id)
                     }
-                    val visibleTop = searchResult.topResult?.let { top ->
-                        val topId = when (top) {
-                            is SearchItem.Song -> "song:" + top.song.videoId
-                            is SearchItem.Album -> "album:" + top.album.browseId
-                            is SearchItem.Artist -> "artist:" + top.artist.browseId
-                            is SearchItem.Playlist -> "playlist:" + top.playlist.playlistId
+                    val visibleTop = searchResult.topResult?.takeUnless { top ->
+                        top is SearchItem.Song && _uiState.value.notInterestedIds.contains(top.song.videoId)
+                    }
+                    val visibleSections = searchResult.sections.mapNotNull { section ->
+                        val visibleItems = section.items.filterNot { item ->
+                            item is SearchItem.Song && _uiState.value.notInterestedIds.contains(item.song.videoId)
                         }
-                        if (top is SearchItem.Song && _uiState.value.notInterestedIds.contains(top.song.videoId)) null
-                        else top.takeIf { uniqueItems.none { item ->
-                            when (item) {
-                                is SearchItem.Song -> "song:" + item.song.videoId
-                                is SearchItem.Album -> "album:" + item.album.browseId
-                                is SearchItem.Artist -> "artist:" + item.artist.browseId
-                                is SearchItem.Playlist -> "playlist:" + item.playlist.playlistId
-                            } == topId
-                        } }
-                    } ?: searchResult.topResult
+                        visibleItems.takeIf { it.isNotEmpty() }?.let { section.copy(items = it) }
+                    }
+                    val visibleResults = uniqueItems.filterNot { item ->
+                        visibleTop != null && when {
+                            item is SearchItem.Song && visibleTop is SearchItem.Song ->
+                                item.song.videoId == visibleTop.song.videoId
+                            item is SearchItem.Album && visibleTop is SearchItem.Album ->
+                                item.album.browseId == visibleTop.album.browseId
+                            item is SearchItem.Artist && visibleTop is SearchItem.Artist ->
+                                item.artist.browseId == visibleTop.artist.browseId
+                            item is SearchItem.Playlist && visibleTop is SearchItem.Playlist ->
+                                item.playlist.playlistId == visibleTop.playlist.playlistId
+                            else -> false
+                        }
+                    }
 
                     _uiState.update {
                         it.copy(
-                            searchResults = uniqueItems,
+                            searchResults = visibleResults,
                             searchTopResult = visibleTop,
-                            searchSections = searchResult.sections,
+                            searchSections = visibleSections,
                             suggestions = emptyList(),
                             suggestionItems = emptyList()
                         )
