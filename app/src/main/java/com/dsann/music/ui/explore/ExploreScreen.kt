@@ -591,6 +591,14 @@ fun ExploreScreen(
                                                 viewModel.startRadio(
                                                     videoId
                                                 )
+                                            },
+                                            onPlaylistSaved = { title, description, privacy ->
+                                                viewModel.updatePlaylistDetails(
+                                                    detail.playlist.playlistId,
+                                                    title,
+                                                    description,
+                                                    privacy
+                                                )
                                             }
                                         )
                                     }
