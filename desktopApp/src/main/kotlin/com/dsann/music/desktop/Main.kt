@@ -47,12 +47,10 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import java.io.File
 import java.awt.EventQueue
-import java.awt.EventQueue
 import java.nio.file.Files
 import java.util.Locale
 import java.util.prefs.Preferences
 import com.dsann.music.data.innertube.SearchFilter
-import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.SearchItem
 import com.dsann.music.data.innertube.SearchResult
@@ -636,6 +634,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                                                 featured = true,
                                                                 isFavorite = ((top as? SearchItem.Song)?.song?.videoId?.let { it in favoriteIds } == true),
                                                                 isDownloading = (top as? SearchItem.Song)?.song?.videoId == downloadingVideoId,
+                                                                downloadProgress = downloadProgress,
                                                                 onClick = { openOnlineItem(top) },
                                                                 onFavorite = { (top as? SearchItem.Song)?.song?.let(::toggleFavorite) },
                                                                 onDownload = { (top as? SearchItem.Song)?.song?.let(::startDownload) },
@@ -650,6 +649,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                                             item = resultItem,
                                                             isFavorite = ((resultItem as? SearchItem.Song)?.song?.videoId?.let { it in favoriteIds } == true),
                                                             isDownloading = (resultItem as? SearchItem.Song)?.song?.videoId == downloadingVideoId,
+                                                            downloadProgress = downloadProgress,
                                                             onClick = { openOnlineItem(resultItem) },
                                                             onFavorite = { (resultItem as? SearchItem.Song)?.song?.let(::toggleFavorite) },
                                                             onDownload = { (resultItem as? SearchItem.Song)?.song?.let(::startDownload) },
@@ -673,6 +673,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                                             item = resultItem,
                                                             isFavorite = ((resultItem as? SearchItem.Song)?.song?.videoId?.let { it in favoriteIds } == true),
                                                             isDownloading = (resultItem as? SearchItem.Song)?.song?.videoId == downloadingVideoId,
+                                                            downloadProgress = downloadProgress,
                                                             onClick = { openOnlineItem(resultItem) },
                                                             onFavorite = { (resultItem as? SearchItem.Song)?.song?.let(::toggleFavorite) },
                                                             onDownload = { (resultItem as? SearchItem.Song)?.song?.let(::startDownload) },
@@ -703,6 +704,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                                     item = item,
                                                     isFavorite = ((item as? SearchItem.Song)?.song?.videoId?.let { it in favoriteIds } == true),
                                                     isDownloading = (item as? SearchItem.Song)?.song?.videoId == downloadingVideoId,
+                                                    downloadProgress = downloadProgress,
                                                     onClick = { playCollectionItem(item) },
                                                     onFavorite = { (item as? SearchItem.Song)?.song?.let(::toggleFavorite) },
                                                     onDownload = { (item as? SearchItem.Song)?.song?.let(::startDownload) },
@@ -1185,6 +1187,7 @@ private fun OnlineResultRow(
     featured: Boolean = false,
     isFavorite: Boolean = false,
     isDownloading: Boolean = false,
+    downloadProgress: Int = 0,
     onClick: () -> Unit,
     onFavorite: () -> Unit = {},
     onDownload: () -> Unit = {},
