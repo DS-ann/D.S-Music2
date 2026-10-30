@@ -369,6 +369,13 @@ private fun LandscapePlayerDetailsPane(
     onPlayQueueItem: (Int) -> Unit
 ) {
     var showQueue by remember { mutableStateOf(false) }
+    LaunchedEffect(showQueue, currentSong?.id, syncedLyrics, plainLyrics, isLyricsLoading, lyricsError) {
+        if (!showQueue && syncedLyrics.isNullOrEmpty() && plainLyrics.isNullOrBlank() &&
+            !isLyricsLoading && lyricsError == null && currentSong != null
+        ) {
+            onFetchLyrics()
+        }
+    }
     val panelShape = RoundedCornerShape(24.dp)
 
     Column(
