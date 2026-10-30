@@ -57,6 +57,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -721,10 +722,14 @@ fun rememberDragDropState(
     onMove: (Int, Int) -> Unit
 ): DragDropState {
     val scope = rememberCoroutineScope()
-    val state = remember(lazyListState) {
-        DragDropState(lazyListState, scope, onMove)
+    // Keep the active move callback fresh while preserving drag state across recompositions.
+    // Capturing onMove inside remember(lazyListState) can retain an obsolete callback.
+    val currentOnMove = rememberUpdatedState(onMove)
+    return remember(lazyListState) {
+        DragDropState(lazyListState, scope) { from, to ->
+            currentOnMove.value(from, to)
+        }
     }
-    return state
 }
 
 fun Modifier.dragContainer(dragDropState: DragDropState, enabled: Boolean): Modifier {
