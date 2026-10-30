@@ -49,6 +49,11 @@ import java.io.File
 import java.nio.file.Files
 import java.util.Locale
 import java.util.prefs.Preferences
+import com.dsann.music.data.innertube.SearchFilter
+import com.dsann.music.data.innertube.SearchItem
+import com.dsann.music.data.innertube.SearchResult
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.rememberCoroutineScope
 import javax.swing.JFileChooser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -112,6 +117,11 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     var playing by remember { mutableStateOf(false) }
     var paused by remember { mutableStateOf(true) }
     var seekValue by remember { mutableStateOf(0f) }
+    var onlineQuery by remember { mutableStateOf("") }
+    var onlineResult by remember { mutableStateOf<SearchResult?>(null) }
+    var onlineSearching by remember { mutableStateOf(false) }
+    var onlineError by remember { mutableStateOf("") }
+    val coroutineScope = rememberCoroutineScope()
 
     val currentTrack = tracks.getOrNull(selectedIndex)
     val visibleTracks = remember(tracks, search) {
@@ -161,6 +171,23 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
             paused = player.isPaused
             player.errorMessage?.let { statusMessage = it }
             delay(200)
+        }
+    }
+
+    fun searchOnline() {
+        val query = onlineQuery.trim()
+        if (query.isEmpty() || onlineSearching) return
+        onlineSearching = true
+        onlineError = ""
+        onlineResult = null
+        coroutineScope.launch {
+            try {
+                onlineResult = DesktopYouTubeMusic.searchTop(query)
+            } catch (error: Exception) {
+                onlineError = error.message ?: "YouTube Music search failed."
+            } finally {
+                onlineSearching = false
+            }
         }
     }
 
@@ -247,7 +274,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                     Spacer(Modifier.weight(1f))
                     Divider(color = Color(0xFF263241))
                     Text("Windows desktop preview", color = mutedText, fontSize = 11.sp)
-                    Text("Android app source remains unchanged.", color = mutedText, fontSize = 10.sp)
+                    Text("Phone source synchronized", color = mutedText, fontSize = 10.sp)
                 }
 
                 Column(
@@ -278,7 +305,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                 )
                                 Text(
                                     when (section) {
-                                        "Explore" -> "Online discovery will be connected in the next porting stage."
+                                        "Explore" -> "Search YouTube Music using the current phone app's result categories."
                                         "Cache" -> "Offline downloads and cache management are not migrated yet."
                                         "Settings" -> "Desktop library and playback preferences."
                                         else -> "Your local music, in one place."
@@ -352,11 +379,75 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                             }
 
                             "Explore" -> {
-                                FeaturePanel(
-                                    title = "Online music is a separate desktop integration",
-                                    body = "The Android Explore screen depends on Android-bound InnerTube and NewPipe setup, account storage and Media3 playback. Those pieces are not being copied blindly into a Windows process. The desktop stream client will be connected after the platform-neutral network and playback layers are separated.",
-                                    footnote = "For now, import a local folder from Library to play music on this PC."
-                                )
+                                Column(Modifier.fillMaxSize()) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        OutlinedTextField(
+                                            value = onlineQuery,
+                                            onValueChange = { onlineQuery = it },
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true,
+                                            placeholder = { Text("Search songs, albums, artists, playlists or podcasts") },
+                                            label = { Text("YouTube Music") }
+                                        )
+                                        Button(
+                                            onClick = ::searchOnline,
+                                            enabled = onlineQuery.isNotBlank() && !onlineSearching,
+                                            colors = ButtonDefaults.buttonColors(
+                                                backgroundColor = accentColor,
+                                                contentColor = Color(0xFF0B1420)
+                                            )
+                                        ) {
+                                            Text(if (onlineSearching) "Searching…" else "Search")
+                                        }
+                                    }
+                                    Spacer(Modifier.height(16.dp))
+                                    when {
+                                        onlineSearching -> EmptyPanel("Searching YouTube Music…", "Phone-style top results are collected from separate result categories.")
+                                        onlineError.isNotBlank() -> EmptyPanel("Search failed", onlineError)
+                                        onlineResult == null -> EmptyPanel(
+                                            "Explore music",
+                                            "Search YouTube Music. Results are grouped into songs, videos, albums, artists, playlists, podcasts and episodes."
+                                        )
+                                        else -> {
+                                            LazyColumn(
+                                                modifier = Modifier.fillMaxSize(),
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                onlineResult?.topResult?.let { top ->
+                                                    item(key = "top-result") {
+                                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                            Text("TOP RESULT", color = accentColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                            OnlineResultRow(top, featured = true) {
+                                                                statusMessage = "Selected online result. Windows stream extraction and playback are the next platform adapter to port."
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                onlineResult?.sections.orEmpty().forEach { resultSection ->
+                                                    item(key = "section-${resultSection.filter.name}") {
+                                                        Text(
+                                                            resultSection.filter.label.uppercase(Locale.ROOT),
+                                                            color = mutedText,
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            modifier = Modifier.padding(top = 10.dp, start = 4.dp)
+                                                        )
+                                                    }
+                                                    items(resultSection.items.size) { index ->
+                                                        val resultItem = resultSection.items[index]
+                                                        OnlineResultRow(resultItem) {
+                                                            statusMessage = "Selected online result. Windows stream extraction and playback are the next platform adapter to port."
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
 
                             "Cache" -> {
@@ -596,4 +687,64 @@ private fun formatTime(milliseconds: Long): String {
     val minutes = seconds / 60L
     val remainingSeconds = seconds % 60L
     return String.format(Locale.ROOT, "%d:%02d", minutes, remainingSeconds)
+}
+
+
+@Composable
+private fun OnlineResultRow(
+    item: SearchItem,
+    featured: Boolean = false,
+    onClick: () -> Unit
+) {
+    val title = DesktopYouTubeMusic.itemTitle(item)
+    val subtitle = DesktopYouTubeMusic.itemSubtitle(item)
+    val type = when (item) {
+        is SearchItem.Song -> when {
+            item.song.isLive -> "LIVE"
+            item.song.isEpisode -> "EPISODE"
+            item.song.isVideo -> "VIDEO"
+            else -> "SONG"
+        }
+        is SearchItem.Album -> "ALBUM"
+        is SearchItem.Artist -> "ARTIST"
+        is SearchItem.Playlist -> if (item.playlist.isPodcast) "PODCAST" else "PLAYLIST"
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick),
+        color = if (featured) Color(0xFF1E344B) else Color(0xFF111923),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = if (featured) 16.dp else 11.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(if (featured) 52.dp else 42.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF263B52)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    when (item) {
+                        is SearchItem.Song -> "♫"
+                        is SearchItem.Album -> "▣"
+                        is SearchItem.Artist -> "◉"
+                        is SearchItem.Playlist -> "≡"
+                    },
+                    color = accentColor,
+                    fontSize = 19.sp
+                )
+            }
+            Column(Modifier.weight(1f).padding(start = 13.dp)) {
+                Text(title, maxLines = 1, fontWeight = FontWeight.SemiBold)
+                Text(subtitle, maxLines = 1, color = mutedText, fontSize = 11.sp)
+            }
+            Text(type, color = accentColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        }
+    }
 }
