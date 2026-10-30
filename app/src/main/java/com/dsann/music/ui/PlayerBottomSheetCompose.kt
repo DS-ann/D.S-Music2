@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -925,6 +926,7 @@ fun PlayerBottomSheetCompose(
 
         // Sliding Layout States
         val containerHeight = with(density) { maxHeight.toPx().toDp() }
+        val containerWidthDp = maxWidth
         val screenHeightPx = with(density) { containerHeight.toPx() }
         val systemNavigationBottomPx = WindowInsets.navigationBars.getBottom(density).toFloat()
         val bottomNavTranslationYState = viewModel.bottomNavTranslationY.collectAsStateWithLifecycle()
@@ -1387,7 +1389,7 @@ fun PlayerBottomSheetCompose(
                                 val xStartPx = startPaddingPx + 16.dp.toPx()
                                 val xEndPx = if (useWidePlayer) {
                                     with(density) {
-                                        (20.dp + (maxWidth - 60.dp) * 0.54f / 2f - albumArtSizeDp / 2f).toPx()
+                                        (20.dp + (containerWidthDp - 60.dp) * 0.54f / 2f - albumArtSizeDp / 2f).toPx()
                                     }
                                 } else {
                                     (with(density) { screenWidth.dp.toPx() } - fullSizePx) / 2f
@@ -1752,10 +1754,10 @@ private fun MiniPlayerContentInternal(
 
     val isDark = isSystemInDarkTheme()
     val context = LocalContext.current
-    val miniPlayerProgressStyle by remember(context) {
+    val playerPreferences = remember(context) {
         context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
-            .observeKey("mini_player_progress", "Ring")
     }
+    val miniPlayerProgressStyle by playerPreferences.observeKey("mini_player_progress", "Ring")
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val contentColor = if (isDark) Color.White else Color(0xFF1C1B1F)
     val contentSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1C1B1F).copy(alpha = 0.6f)
