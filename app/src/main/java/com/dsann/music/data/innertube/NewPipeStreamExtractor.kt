@@ -386,6 +386,22 @@ object NewPipeStreamExtractor {
     }
 
     /**
+     * Resolve a muxed video+audio stream for the current song. Separate video-only streams are
+     * deliberately excluded: this player mode uses one Media3 item and must keep its audio track.
+     * The existing StreamInfo cache is reused so entering video mode does not repeat extraction.
+     */
+    suspend fun getVideoStreamUrl(videoId: String?): String? = withContext(Dispatchers.IO) {
+        if (videoId.isNullOrBlank()) return@withContext null
+        val info = fetchStreamInfo(videoId) ?: return@withContext null
+        info.videoStreams
+            .filterNot { it.isVideoOnly }
+            .maxByOrNull { stream ->
+                stream.resolution.filter { it.isDigit() }.toIntOrNull() ?: 0
+            }
+            ?.content
+    }
+
+    /**
      * Resolve a conservative recovery stream after the preferred stream failed in Media3.
      * Prefer AAC in an MP4 container for broad decoder compatibility, especially on Android 6;
      * if YouTube offers no AAC audio-only stream, use the lowest-bitrate audio-only stream.
