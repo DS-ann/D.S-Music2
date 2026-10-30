@@ -869,6 +869,28 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun updatePlaylistDetails(
+        playlistId: String,
+        title: String,
+        description: String,
+        privacy: String
+    ) {
+        _uiState.update { state ->
+            val page = state.playlistDetail
+            if (page?.playlist?.playlistId != playlistId) {
+                state
+            } else {
+                state.copy(
+                    playlistDetail = page.copy(
+                        playlist = page.playlist.copy(title = title),
+                        description = description.takeIf { it.isNotBlank() },
+                        privacy = privacy
+                    )
+                )
+            }
+        }
+    }
+
     fun loadSectionDetails(browseId: String, params: String?, fallbackTitle: String = "Section") {
         _uiState.update { it.copy(isLoadingDetail = true) }
         detailLoadJob?.cancel()
