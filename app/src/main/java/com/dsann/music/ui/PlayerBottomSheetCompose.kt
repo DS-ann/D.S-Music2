@@ -753,6 +753,7 @@ fun PlayerBottomSheetCompose(
             context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
         }
         val playerBackgroundStyle by playerPreferences.observeKey("player_background_style", "Artwork")
+        val playerLayout by playerPreferences.observeKey("player_layout", "Standard")
         val miniPlayerStyle by playerPreferences.observeKey("mini_player_style", "Card")
         
         // Playback state observers combined into stable UI model
@@ -808,6 +809,11 @@ fun PlayerBottomSheetCompose(
             when (playerBackgroundStyle) {
                 "Theme" -> themePlayerSurface
                 "Black" -> Color.Black
+                "Gradient" -> {
+                    val base = Color(playerBackgroundColor)
+                    if (isDark) androidx.compose.ui.graphics.lerp(base, Color.Black, 0.26f)
+                    else androidx.compose.ui.graphics.lerp(base, themePlayerSurface, 0.28f)
+                }
                 else -> {
                     val baseColor = Color(playerBackgroundColor)
                     val hsl = FloatArray(3)
@@ -1310,7 +1316,14 @@ fun PlayerBottomSheetCompose(
                     // Integrated shared artwork layer. In lyrics mode the same ArtworkPager
                     // moves into the app bar as a compact thumbnail instead of being hidden.
                     val screenWidth = LocalConfiguration.current.screenWidthDp
-                    val albumArtSizeDp = (screenWidth * 0.9f).dp
+                    val albumArtScale = when (playerLayout) {
+            "Cover" -> 0.98f
+            "Minimal" -> 0.68f
+            "Lyrics" -> 0.78f
+            "Vinyl", "Cassette" -> 0.82f
+            else -> 0.9f
+        }
+        val albumArtSizeDp = (screenWidth * albumArtScale).dp
                     val statusBarTopPx = WindowInsets.statusBars.getTop(density).toFloat()
 
                     Box(
