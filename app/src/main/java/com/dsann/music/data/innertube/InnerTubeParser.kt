@@ -85,8 +85,9 @@ object InnerTubeParser {
 
     fun parseSearchSuggestions(json: JsonObject): SearchSuggestions {
         val queries = findObjects(json, "searchSuggestionRenderer").mapNotNull { renderer ->
-            renderer.path("suggestion.runs")?.takeIf { it.isJsonArray }?.asJsonArray
+            (renderer.path("suggestion.runs")?.takeIf { it.isJsonArray }?.asJsonArray
                 ?.joinToString("") { run -> run.asJsonObject.get("text")?.asString.orEmpty() }
+                ?: renderer.path("suggestion.simpleText")?.asString)
                 ?.takeIf { it.isNotBlank() }
         }.distinct()
 
@@ -459,6 +460,15 @@ object InnerTubeParser {
                                         artists = listOf(OnlineArtistRef(artistName)),
                                         thumbnailUrl = thumbnail,
                                         year = subtitle.split(" • ").lastOrNull()?.toIntOrNull()
+                                    ))
+                                }
+                                browseId.startsWith("MPSP") -> {
+                                    SearchItem.Playlist(OnlinePlaylist(
+                                        playlistId = browseId,
+                                        title = title,
+                                        author = OnlineArtistRef(subtitle.split(" • ").drop(1).firstOrNull().orEmpty()),
+                                        thumbnailUrl = thumbnail,
+                                        isPodcast = true
                                     ))
                                 }
                                 else -> null
