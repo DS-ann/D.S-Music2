@@ -90,12 +90,23 @@ fun ArtworkPager(
             val rawUri = song.getAlbumArtUri()
             val videoId = song.videoId
 
-            val artworkUrl = if (rawUri != null && rawUri.toString().isNotEmpty()) {
-                SongItem.enhanceThumbnailUrl(rawUri.toString())
-            } else if (!videoId.isNullOrEmpty()) {
-                "https://img.youtube.com/vi/$videoId/hqdefault.jpg"
-            } else {
-                null
+            val artworkUrl = remember(rawUri, videoId) {
+                if (rawUri != null && rawUri.toString().isNotEmpty()) {
+                    SongItem.enhanceThumbnailUrl(rawUri.toString())
+                } else if (!videoId.isNullOrEmpty()) {
+                    "https://img.youtube.com/vi/$videoId/hqdefault.jpg"
+                } else {
+                    null
+                }
+            }
+            val imageRequest = remember(context, artworkUrl) {
+                artworkUrl?.let {
+                    ImageRequest.Builder(context)
+                        .data(it.toUri())
+                        .crossfade(true)
+                        .precision(coil.size.Precision.EXACT)
+                        .build()
+                }
             }
 
             var isError by remember(artworkUrl) { mutableStateOf(false) }
@@ -107,11 +118,7 @@ fun ArtworkPager(
             ) {
                 if (!artworkUrl.isNullOrEmpty() && !isError) {
                     AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(artworkUrl.toUri())
-                            .crossfade(true)
-                            .precision(coil.size.Precision.EXACT)
-                            .build(),
+                        model = imageRequest,
                         contentDescription = null,
                         onState = { state ->
                             if (state is AsyncImagePainter.State.Error) {
