@@ -210,7 +210,8 @@ object InnerTubeClient {
     suspend fun search(
         query: String,
         filter: String? = null,
-        continuation: String? = null
+        continuation: String? = null,
+        anonymous: Boolean = false
     ): JsonObject = withContext(Dispatchers.IO) {
         val body = JsonObject().apply {
             add("context", webRemixContext())
@@ -221,14 +222,18 @@ object InnerTubeClient {
                 filter?.let { addProperty("params", it) }
             }
         }
-        post("$BASE_URL/search", body, ClientType.WEB_REMIX)
+        post("$BASE_URL/search", body, ClientType.WEB_REMIX, anonymous = anonymous)
     }
 
     /**
      * Search regular YouTube for broadcasts that are live now. YouTube Music's search endpoint
      * does not expose a Live filter, so this uses the standard WEB client and its Live-only params.
      */
-    suspend fun liveSearch(query: String, continuation: String? = null): JsonObject = withContext(Dispatchers.IO) {
+    suspend fun liveSearch(
+        query: String,
+        continuation: String? = null,
+        anonymous: Boolean = false
+    ): JsonObject = withContext(Dispatchers.IO) {
         val body = JsonObject().apply {
             add("context", webContext())
             if (continuation != null) {
@@ -238,7 +243,7 @@ object InnerTubeClient {
                 addProperty("params", "EgJAAQ==")
             }
         }
-        post("$YOUTUBE_BASE_URL/search", body, ClientType.WEB)
+        post("$YOUTUBE_BASE_URL/search", body, ClientType.WEB, anonymous = anonymous)
     }
 
     /**
@@ -569,7 +574,12 @@ object InnerTubeClient {
 
     // ========== HTTP Layer ==========
  
-    private suspend fun post(url: String, body: JsonObject, clientType: ClientType): JsonObject = withContext(Dispatchers.IO) {
+    private suspend fun post(
+        url: String,
+        body: JsonObject,
+        clientType: ClientType,
+        anonymous: Boolean = false
+    ): JsonObject = withContext(Dispatchers.IO) {
         val mediaType = JSON_MEDIA_TYPE.toMediaType()
         val requestBody = gson.toJson(body).toRequestBody(mediaType)
  
@@ -579,7 +589,11 @@ object InnerTubeClient {
  
         val isYoutube = url.contains("www.youtube.com")
         buildHeaders(clientType, isYoutube).forEach { (key, value) ->
-            requestBuilder.header(key, value)
+            // Search should behave like Prism's signed-out requests: it must not be biased by
+            // account search history or change the user's YouTube search history.
+            if (!anonymous || (key != "Cookie" && key != "Authorization")) {
+                requestBuilder.header(key, value)
+            }
         }
  
         val request = requestBuilder.build()
