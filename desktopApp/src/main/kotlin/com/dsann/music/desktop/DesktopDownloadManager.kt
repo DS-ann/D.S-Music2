@@ -20,9 +20,10 @@ internal object DesktopDownloadManager {
     suspend fun download(
         song: com.dsann.music.data.innertube.OnlineSong,
         targetBitrateKbps: Int = 256,
+        preferredFormat: String = "m4a",
         onProgress: (Int) -> Unit
     ): DesktopSavedSong = withContext(Dispatchers.IO) {
-        val stream = DesktopNewPipeExtractor.resolve(song.videoId, targetBitrateKbps)
+        val stream = DesktopNewPipeExtractor.resolve(song.videoId, targetBitrateKbps, preferredFormat)
         val extension = extensionFor(stream.mimeType)
         val base = safeFileName("${song.artist} - ${song.title}").ifBlank { song.videoId }
         val target = File(DesktopLibraryStore.downloadsDirectory, "$base.$extension")
