@@ -926,6 +926,7 @@ fun PlayerBottomSheetCompose(
         // Sliding Layout States
         val containerHeight = with(density) { maxHeight.toPx().toDp() }
         val screenHeightPx = with(density) { containerHeight.toPx() }
+        val systemNavigationBottomPx = WindowInsets.navigationBars.getBottom(density).toFloat()
         val bottomNavTranslationYState = viewModel.bottomNavTranslationY.collectAsStateWithLifecycle()
         val dynamicBottomNavHeightState = viewModel.bottomNavHeight.collectAsStateWithLifecycle()
         
@@ -959,7 +960,8 @@ fun PlayerBottomSheetCompose(
                 } else {
                     (bottomNavHeightPx - bottomNavTranslationYState.value).coerceAtLeast(0f)
                 }
-                screenHeightPx - miniPlayerHeightPx - effectiveBottomNavHeight - currentBottomGapPx
+                screenHeightPx - miniPlayerHeightPx - effectiveBottomNavHeight - currentBottomGapPx -
+                    (if (useNavigationRail) systemNavigationBottomPx else 0f)
             }
         }
 
@@ -1103,11 +1105,13 @@ fun PlayerBottomSheetCompose(
             val destY = if (targetExpanded) {
                 0f
             } else {
-                screenHeightPx - miniPlayerHeightPx - expectedBottomNavHeight - expectedBottomGapPx
+                screenHeightPx - miniPlayerHeightPx - expectedBottomNavHeight - expectedBottomGapPx -
+                    (if (useNavigationRail) systemNavigationBottomPx else 0f)
             }
             val destFraction = if (targetExpanded) 1f else 0f
 
-            val collapsedY = screenHeightPx - miniPlayerHeightPx - expectedBottomNavHeight - expectedBottomGapPx
+            val collapsedY = screenHeightPx - miniPlayerHeightPx - expectedBottomNavHeight - expectedBottomGapPx -
+                (if (useNavigationRail) systemNavigationBottomPx else 0f)
             val totalDistance = collapsedY
             val initialFractionVelocity = if (totalDistance > 0f) {
                 -initialVelocity / totalDistance
@@ -1382,7 +1386,7 @@ fun PlayerBottomSheetCompose(
                                 val xStartPx = startPaddingPx + 16.dp.toPx()
                                 val xEndPx = if (useWidePlayer) {
                                     with(density) {
-                                        (20.dp + (maxWidth - 40.dp) * 0.54f / 2f - albumArtSizeDp / 2f).toPx()
+                                        (20.dp + (maxWidth - 60.dp) * 0.54f / 2f - albumArtSizeDp / 2f).toPx()
                                     }
                                 } else {
                                     (with(density) { screenWidth.dp.toPx() } - fullSizePx) / 2f
