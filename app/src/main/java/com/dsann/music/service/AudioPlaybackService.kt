@@ -1869,7 +1869,7 @@ class AudioPlaybackService : MediaSessionService() {
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
                 .take(4)
-                .joinToString("\\n")
+                .joinToString("\n")
             val text = timedLine?.takeIf { it.isNotBlank() }
                 ?: plain.ifBlank { fallbackText.orEmpty() }
             if (text.isNotBlank()) {
