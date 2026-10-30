@@ -98,6 +98,7 @@ import com.dsann.music.R
 import com.dsann.music.model.PlayerGestureAction
 import com.dsann.music.model.SongItem
 import com.dsann.music.ui.player.ArtworkPager
+import com.dsann.music.ui.player.DsmCoverShapes
 import com.dsann.music.ui.player.FullPlayerScreen
 import com.dsann.music.ui.player.PlayerUiState
 import com.dsann.music.ui.theme.observeKey
@@ -759,6 +760,10 @@ fun PlayerBottomSheetCompose(
         }
         val playerBackgroundStyle by playerPreferences.observeKey("player_background_style", "Artwork")
         val playerLayout by playerPreferences.observeKey("player_layout", "Standard")
+        val playerArtworkShapeName by playerPreferences.observeKey("player_artwork_shape", "Rounded")
+        val playerArtworkShape = remember(playerLayout, playerArtworkShapeName) {
+            DsmCoverShapes.forPlayerLayout(playerLayout, playerArtworkShapeName)
+        }
         val miniPlayerStyle by playerPreferences.observeKey("mini_player_style", "Card")
         
         // Playback state observers combined into stable UI model
@@ -1407,11 +1412,12 @@ fun PlayerBottomSheetCompose(
                         else -> 0.9f
                     }
                     val albumArtSizeDp = if (useWidePlayer) {
-                        if (configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+                        val baseSize = if (configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
                             minOf(containerHeight * 0.28f, screenWidth.dp * 0.30f)
                         } else {
                             minOf(containerHeight * 0.50f, screenWidth.dp * 0.42f)
                         }
+                        baseSize * (albumArtScale / 0.9f)
                     } else {
                         (screenWidth * albumArtScale).dp
                     }
@@ -1452,7 +1458,6 @@ fun PlayerBottomSheetCompose(
 
                                 val normalX = androidx.compose.ui.util.lerp(xStartPx, xEndPx, t)
                                 val normalY = androidx.compose.ui.util.lerp(yStartPx, yEndPx, t)
-                                val normalCornerRadius = androidx.compose.ui.util.lerp(fullSizePx / 2f, 16.dp.toPx(), t)
                                 val normalShadow = androidx.compose.ui.util.lerp(0f, 16.dp.toPx(), t)
 
                                 val appBarThumbSizePx = 44.dp.toPx()
@@ -1468,8 +1473,10 @@ fun PlayerBottomSheetCompose(
                                 translationY = androidx.compose.ui.util.lerp(normalY, appBarY, lyricsT)
                                 transformOrigin = TransformOrigin(0f, 0f)
 
-                                val cornerRadius = androidx.compose.ui.util.lerp(normalCornerRadius, 10.dp.toPx(), lyricsT)
-                                shape = RoundedCornerShape(cornerRadius)
+                                // Keep the selected artwork outline on the shared cover;
+                                // a second forced rounded clip made custom shapes disagree
+                                // with the visible mini-player progress.
+                                shape = playerArtworkShape
                                 clip = true
                                 shadowElevation = androidx.compose.ui.util.lerp(normalShadow, 6.dp.toPx(), lyricsT)
                                 alpha = artworkAlpha
@@ -1680,6 +1687,12 @@ fun PlayerBottomSheetCompose(
                                 userScrollEnabled = playerContentExpansionFraction.value > 0.95f && !isLyricsModeEnabled && !isQueueExpanded,
                                 modifier = Modifier.fillMaxSize()
                             )
+                            MiniPlayerArtworkProgressOverlay(
+                                viewModel = viewModel,
+                                accentColor = baseAccentColor,
+                                expansionFraction = playerContentExpansionFraction.value,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
                     }
                 }
@@ -1799,11 +1812,6 @@ private fun MiniPlayerContentInternal(
 ) {
 
     val isDark = isSystemInDarkTheme()
-    val context = LocalContext.current
-    val playerPreferences = remember(context) {
-        context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
-    }
-    val miniPlayerProgressStyle by playerPreferences.observeKey("mini_player_progress", "Ring")
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val contentColor = if (isDark) Color.White else Color(0xFF1C1B1F)
     val contentSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1C1B1F).copy(alpha = 0.6f)
@@ -1816,83 +1824,9 @@ private fun MiniPlayerContentInternal(
             .padding(start = 10.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Morphing Art Space
-        Box(
-            modifier = Modifier.size(60.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
-            val duration by viewModel.duration.collectAsStateWithLifecycle()
-
-            val progressAnimatable = remember { Animatable(0f) }
-            LaunchedEffect(currentPosition, duration) {
-                val target = if (duration > 0) (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
-                progressAnimatable.animateTo(
-                    targetValue = target,
-                    animationSpec = tween(durationMillis = 350, easing = LinearEasing)
-                )
-            }
-
-            val amplitudeAnimatable = remember { Animatable(if (isPlaying) 1f else 0f) }
-            LaunchedEffect(isPlaying, miniPlayerProgressStyle) {
-                if (miniPlayerProgressStyle == "Ring") {
-                    amplitudeAnimatable.animateTo(
-                        targetValue = if (isPlaying) 1f else 0f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow
-                        )
-                    )
-                } else {
-                    amplitudeAnimatable.snapTo(0f)
-                }
-            }
-
-            when (miniPlayerProgressStyle) {
-                "None" -> Unit
-                "Line", "Fill" -> {
-                    val trackHeight = if (miniPlayerProgressStyle == "Line") 2.dp else 5.dp
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp)
-                            .height(trackHeight)
-                            .background(
-                                accentColor.copy(alpha = if (miniPlayerProgressStyle == "Line") 0.20f else 0.12f),
-                                CircleShape
-                            )
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(progressAnimatable.value)
-                                .fillMaxSize()
-                                .background(accentColor, CircleShape)
-                        )
-                    }
-                }
-                else -> CircularWavyProgressIndicator(
-                    progress = { progressAnimatable.value },
-                    modifier = Modifier.size(58.dp),
-                    color = accentColor,
-                    trackColor = accentColor.copy(alpha = 0.25f),
-                    waveSpeed = WavyProgressIndicatorDefaults.CircularWavelength * 0.4f,
-                    amplitude = { amplitudeAnimatable.value },
-                    stroke = androidx.compose.ui.graphics.drawscope.Stroke(
-                        width = with(LocalDensity.current) { 6.dp.toPx() },
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round
-                    ),
-                    trackStroke = androidx.compose.ui.graphics.drawscope.Stroke(
-                        width = with(LocalDensity.current) { 6.dp.toPx() },
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round
-                    )
-                )
-            }
-
-            Box(modifier = Modifier.size(48.dp)) {
-                // Placeholder Box for structure: AsyncImage is managed globally via parent's floating shared element!
-            }
-        }
+        // Reserves the same 60dp artwork slot used by the shared transformed cover.
+        // Progress is painted above that cover so both always share coordinates and clipping.
+        Box(modifier = Modifier.size(60.dp))
 
         Spacer(modifier = Modifier.width(20.dp))
 
@@ -1958,6 +1892,129 @@ private fun MiniPlayerContentInternal(
                     tint = contentColor,
                     modifier = Modifier.size(24.dp)
                 )
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun MiniPlayerArtworkProgressOverlay(
+    viewModel: PlayerSharedViewModel,
+    accentColor: Color,
+    expansionFraction: Float,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val preferences = remember(context) {
+        context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+    }
+    val style by preferences.observeKey("mini_player_progress", "Ring")
+    if (style == "None") return
+
+    val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
+    val duration by viewModel.duration.collectAsStateWithLifecycle()
+    val targetProgress = if (duration > 0) {
+        (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+    val progress by animateFloatAsState(
+        targetValue = targetProgress,
+        animationSpec = tween(durationMillis = 350, easing = LinearEasing),
+        label = "MiniArtworkProgress"
+    )
+    val miniAlpha = (1f - expansionFraction * 2f).coerceIn(0f, 1f)
+
+    androidx.compose.foundation.Canvas(
+        modifier = modifier.graphicsLayer { alpha = miniAlpha }
+    ) {
+        val side = size.minDimension
+        if (side <= 0f) return@Canvas
+
+        when (style) {
+            "Ring" -> {
+                val strokeWidth = (side * 0.052f).coerceAtLeast(1f)
+                val inset = strokeWidth / 2f + side * 0.012f
+                val ringSize = (side - inset * 2f).coerceAtLeast(1f)
+                val ringTopLeft = androidx.compose.ui.geometry.Offset(inset, inset)
+                val ringDimensions = androidx.compose.ui.geometry.Size(ringSize, ringSize)
+                val ringStroke = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = strokeWidth,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+                drawArc(
+                    color = accentColor.copy(alpha = 0.28f),
+                    startAngle = -90f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    topLeft = ringTopLeft,
+                    size = ringDimensions,
+                    style = ringStroke
+                )
+                if (progress > 0f) {
+                    drawArc(
+                        color = accentColor,
+                        startAngle = -90f,
+                        sweepAngle = 360f * progress,
+                        useCenter = false,
+                        topLeft = ringTopLeft,
+                        size = ringDimensions,
+                        style = ringStroke
+                    )
+                }
+            }
+            "Line" -> {
+                val startX = side * 0.08f
+                val endX = size.width - startX
+                val y = size.height * 0.91f
+                val thickness = (side * 0.028f).coerceAtLeast(1f)
+                drawLine(
+                    color = accentColor.copy(alpha = 0.28f),
+                    start = androidx.compose.ui.geometry.Offset(startX, y),
+                    end = androidx.compose.ui.geometry.Offset(endX, y),
+                    strokeWidth = thickness,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+                if (progress > 0f) {
+                    drawLine(
+                        color = accentColor,
+                        start = androidx.compose.ui.geometry.Offset(startX, y),
+                        end = androidx.compose.ui.geometry.Offset(startX + (endX - startX) * progress, y),
+                        strokeWidth = thickness,
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                }
+            }
+            "Fill" -> {
+                val fillHeight = size.height * progress
+                if (fillHeight > 0f) {
+                    val top = size.height - fillHeight
+                    clipRect(
+                        left = 0f,
+                        top = top,
+                        right = size.width,
+                        bottom = size.height
+                    ) {
+                        drawRect(
+                            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                colors = listOf(
+                                    accentColor.copy(alpha = 0.10f),
+                                    accentColor.copy(alpha = 0.48f)
+                                ),
+                                startY = top,
+                                endY = size.height
+                            ),
+                            size = size
+                        )
+                    }
+                    drawLine(
+                        color = accentColor.copy(alpha = 0.9f),
+                        start = androidx.compose.ui.geometry.Offset(0f, top),
+                        end = androidx.compose.ui.geometry.Offset(size.width, top),
+                        strokeWidth = (side * 0.018f).coerceAtLeast(1f)
+                    )
+                }
             }
         }
     }

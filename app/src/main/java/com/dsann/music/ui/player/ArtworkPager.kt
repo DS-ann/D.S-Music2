@@ -51,19 +51,7 @@ fun ArtworkPager(
         .getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
         .observeKey("player_layout", "Standard")
     val artworkShape = remember(artworkShapeName, playerLayout) {
-        when (playerLayout) {
-            "Vinyl" -> CircleShape
-            "Cassette" -> RoundedCornerShape(14.dp)
-            else -> {
-                val cornerRadius = when (playerLayout) {
-                    "Cover" -> 8.dp
-                    "Minimal" -> 18.dp
-                    else -> 24.dp
-                }
-                // Keep the artwork-shape preference active for Standard, Cover and Minimal.
-                DsmCoverShapes.of(artworkShapeName, cornerRadius)
-            }
-        }
+        DsmCoverShapes.forPlayerLayout(playerLayout, artworkShapeName)
     }
 
     val pagerState = rememberPagerState(

@@ -194,10 +194,21 @@ internal fun PillChip(
     val tintColor = if (isSelected) accentColor else contentColor.copy(alpha = 0.8f)
     val progressColor = accentColor.copy(alpha = if (isDark) 0.35f else 0.25f)
     val minimal = style == "Minimal"
+    val rounded = style == "Rounded"
     val chipShape = when (style) {
         "Rounded" -> RoundedCornerShape(12.dp)
         "Minimal" -> RoundedCornerShape(10.dp)
         else -> CircleShape
+    }
+    val chipHeight = when {
+        minimal -> 34.dp
+        rounded -> 40.dp
+        else -> 36.dp
+    }
+    val chipBackground = when {
+        minimal -> Color.Transparent
+        rounded -> contentColor.copy(alpha = if (isDark) 0.035f else 0.025f)
+        else -> backgroundColor
     }
     
     val animatedFill by animateFloatAsState(
@@ -208,9 +219,9 @@ internal fun PillChip(
     
     Box(
         modifier = modifier
-            .height(if (minimal) 34.dp else 36.dp)
+            .height(chipHeight)
             .clip(chipShape)
-            .background(if (minimal) Color.Transparent else backgroundColor)
+            .background(chipBackground)
             .drawBehind {
                 if (progress != null && progress > 0f) {
                     drawRect(
@@ -218,12 +229,27 @@ internal fun PillChip(
                         size = size.copy(width = size.width * animatedFill)
                     )
                 }
+                if (rounded) {
+                    drawRoundRect(
+                        color = (if (isSelected) accentColor else contentColor).copy(
+                            alpha = if (isSelected) 0.78f else 0.28f
+                        ),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx()),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+                    )
+                }
             }
             .clickable(onClick = onClick),
         contentAlignment = Alignment.CenterStart
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = if (minimal) 8.dp else 14.dp),
+            modifier = Modifier.padding(
+                horizontal = when {
+                    minimal -> 8.dp
+                    rounded -> 12.dp
+                    else -> 14.dp
+                }
+            ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
@@ -273,6 +299,7 @@ internal fun WavySliderWithLabels(
     playerTimes: String = "Both",
     scrubberThickness: Float = 1f,
     scrubberThumbStyle: String = "Auto",
+    coverDerivedColor: Color = dynamicAccentColor,
     modifier: Modifier = Modifier
 ) {
     var isScrubbing by remember { mutableStateOf(false) }
@@ -298,7 +325,7 @@ internal fun WavySliderWithLabels(
     ) {
         val activeColor = when (scrubberColor) {
             "White" -> Color.White
-            "Cover" -> dynamicAccentColor.copy(alpha = 0.92f)
+            "Cover" -> coverDerivedColor
             else -> dynamicAccentColor
         }
         val thickness = when (scrubberStyle) {

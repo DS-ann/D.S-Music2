@@ -32,6 +32,14 @@ internal object DsmCoverShapes {
         else -> RoundedCornerShape(rounded)
     }
 
+    fun forPlayerLayout(playerLayout: String, artworkShapeName: String): Shape = when (playerLayout) {
+        "Vinyl" -> CircleShape
+        "Cassette" -> RoundedCornerShape(14.dp)
+        "Cover" -> of(artworkShapeName, 8.dp)
+        "Minimal" -> of(artworkShapeName, 18.dp)
+        else -> of(artworkShapeName, 24.dp)
+    }
+
     private val Square = GenericShape { size, _ ->
         moveTo(0f, 0f)
         lineTo(size.width, 0f)

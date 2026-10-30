@@ -126,6 +126,12 @@ private fun PlayerVisualizer(
         val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
         val centerY = center.y
 
+        fun spectrumColor(position: Float): Color {
+            if (colorMode != "Spectrum") return color
+            val hue = (position.coerceIn(0f, 1f) * 300f + phaseValue * 70f) % 360f
+            return Color.hsv(hue, 0.78f, 0.96f)
+        }
+
         when (style) {
             // Keep the compact bar style as-is; it is already the strongest visual.
             "Bars" -> {
@@ -182,7 +188,13 @@ private fun PlayerVisualizer(
                     }
                     drawPath(
                         path = path,
-                        color = color.copy(alpha = if (layer == 0) 0.92f else 0.30f),
+                        brush = Brush.horizontalGradient(
+                            colors = List(13) { index ->
+                                spectrumColor(index / 12f).copy(
+                                    alpha = if (layer == 0) 0.92f else 0.30f
+                                )
+                            }
+                        ),
                         style = androidx.compose.ui.graphics.drawscope.Stroke(
                             width = if (layer == 0) 1.8.dp.toPx() else 1.dp.toPx(),
                             cap = androidx.compose.ui.graphics.StrokeCap.Round
@@ -219,7 +231,7 @@ private fun PlayerVisualizer(
                         center.y + kotlin.math.sin(angle) * (innerRadius + tickLength)
                     )
                     drawLine(
-                        color.copy(alpha = 0.32f + activity * 0.55f),
+                        spectrumColor(index / (tickCount - 1).toFloat()).copy(alpha = 0.32f + activity * 0.55f),
                         start = start,
                         end = end,
                         strokeWidth = 1.2.dp.toPx(),
@@ -234,7 +246,7 @@ private fun PlayerVisualizer(
                     center.y - arcRadius
                 )
                 drawArc(
-                    color = color.copy(alpha = if (isPlaying) 0.82f else 0.30f),
+                    color = spectrumColor(0.28f).copy(alpha = if (isPlaying) 0.82f else 0.30f),
                     startAngle = -105f + phaseValue * 82f,
                     sweepAngle = 126f + kotlin.math.sin(phaseAngle) * 16f,
                     useCenter = false,
@@ -246,7 +258,7 @@ private fun PlayerVisualizer(
                     )
                 )
                 drawArc(
-                    color = color.copy(alpha = 0.38f),
+                    color = spectrumColor(0.76f).copy(alpha = 0.38f),
                     startAngle = 72f - phaseValue * 58f,
                     sweepAngle = 68f + kotlin.math.sin(phaseAngle + 1.2f) * 12f,
                     useCenter = false,
@@ -276,7 +288,7 @@ private fun PlayerVisualizer(
                     val width = size.width * (0.28f + index * 0.16f + wave * 0.07f)
                     val height = size.height * (0.24f + index * 0.22f)
                     drawRoundRect(
-                        color = color.copy(
+                        color = spectrumColor(index / 2f).copy(
                             alpha = if (isPlaying) 0.18f + wave * 0.22f else 0.10f
                         ),
                         topLeft = androidx.compose.ui.geometry.Offset(
@@ -291,7 +303,7 @@ private fun PlayerVisualizer(
                     )
                 }
                 drawCircle(
-                    color.copy(alpha = if (isPlaying) 0.92f else 0.38f),
+                    spectrumColor(0.5f).copy(alpha = if (isPlaying) 0.92f else 0.38f),
                     radius = 1.8.dp.toPx(),
                     center = center
                 )
@@ -323,11 +335,12 @@ private fun PlayerVisualizer(
                         0f
                     })
                     val intensity = if (isPlaying) 0.30f else 0.10f
+                    val glowColor = spectrumColor(anchor)
                     drawOval(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                color.copy(alpha = intensity),
-                                color.copy(alpha = intensity * 0.38f),
+                                glowColor.copy(alpha = intensity),
+                                glowColor.copy(alpha = intensity * 0.38f),
                                 Color.Transparent
                             ),
                             center = glowCenter,
@@ -847,11 +860,12 @@ fun FullPlayer(
         val compactLandscape = useWidePlayer &&
             configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val albumArtSize = if (useWidePlayer) {
-            if (compactLandscape) {
+            val baseSize = if (compactLandscape) {
                 minOf(screenHeight * 0.28f, screenWidth * 0.30f)
             } else {
                 minOf(screenHeight * 0.50f, screenWidth * 0.42f)
             }
+            baseSize * (artScale / 0.9f)
         } else {
             screenWidth * artScale
         }
@@ -1024,11 +1038,12 @@ fun FullPlayer(
                     com.dsann.music.util.SongDownloader.isDownloading(songForActions?.videoId)
 
                 val orderedButtons = if (playerLayout == "Minimal") playerButtons.take(3) else playerButtons
-                // The audio/video switch is a playback mode control, not a cosmetic action.
-                // Keep it available in Minimal mode even when it falls outside the first three
-                // user-ordered buttons.
+                // Video is a playback-mode control. Keep it visible while video is active,
+                // and keep it available in Minimal mode even when it is outside the first three
+                // user-selected actions.
+                val showVideoSwitch = isVideoMode || !songForActions?.videoId.isNullOrBlank()
                 val playerButtonsWithVideo = if (
-                    !songForActions?.videoId.isNullOrBlank() && "video" !in orderedButtons
+                    showVideoSwitch && "video" !in orderedButtons
                 ) orderedButtons + "video" else orderedButtons
                 playerButtonsWithVideo.forEach { action ->
                     when (action) {
@@ -1055,7 +1070,7 @@ fun FullPlayer(
                                 )
                             }
                         )
-                        "video" -> if (!songForActions?.videoId.isNullOrBlank()) {
+                        "video" -> if (showVideoSwitch) {
                             PillChip(
                             style = playerButtonStyle,
                                 icon = painterResource(id = R.drawable.ic_youtube),
@@ -1177,7 +1192,8 @@ fun FullPlayer(
                 scrubberColor = scrubberColor,
                 playerTimes = playerTimes,
                 scrubberThickness = scrubberThickness,
-                scrubberThumbStyle = scrubberThumbStyle
+                scrubberThumbStyle = scrubberThumbStyle,
+                coverDerivedColor = Color(uiState.playerBackgroundColor)
             )
 
             Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 16.dp))
