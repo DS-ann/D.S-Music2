@@ -121,6 +121,33 @@ internal object DesktopNewPipeExtractor {
         }
     }
 
+    /**
+     * Resolve a muxed video+audio stream. Video-only DASH tracks are excluded because the desktop
+     * player keeps one JavaFX MediaPlayer for synchronized picture and sound.
+     */
+    suspend fun resolveVideo(videoId: String): DesktopResolvedStream =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            ensureInitialized()
+            val info = StreamInfo.getInfo(
+                ServiceList.YouTube,
+                "https://www.youtube.com/watch?v=$videoId"
+            )
+            val selected = info.videoStreams
+                .filter { !it.isVideoOnly() && it.content.startsWith("http", true) }
+                .maxByOrNull { stream ->
+                    stream.getResolution().filter { it.isDigit() }.toIntOrNull() ?: 0
+                } ?: error("YouTube did not provide a muxed video+audio stream for this track.")
+
+            DesktopResolvedStream(
+                url = selected.content,
+                mimeType = selected.format?.mimeType?.substringBefore(';')?.trim().orEmpty(),
+                codec = selected.getCodec(),
+                bitrateKbps = (selected.getBitrate() / 1000).takeIf { it > 0 } ?: 0,
+                durationMs = info.duration * 1000L,
+                sizeBytes = selected.itagItem?.contentLength?.takeIf { it > 0L }
+            )
+        }
+
     fun invalidate(videoId: String) {
         cache.remove(videoId)
     }

@@ -27,6 +27,13 @@ internal class DesktopAudioPlayer : AutoCloseable {
     @Volatile private var paused = true
     @Volatile private var remoteMode = false
     @Volatile private var remotePlayer: MediaPlayer? = null
+    @Volatile private var onPlaybackCompleted: (() -> Unit)? = null
+
+    fun setOnPlaybackCompleted(callback: (() -> Unit)?) {
+        onPlaybackCompleted = callback
+    }
+
+    fun getRemoteMediaPlayer(): MediaPlayer? = remotePlayer
 
     @Volatile var currentFile: File? = null
         private set
@@ -111,6 +118,7 @@ internal class DesktopAudioPlayer : AutoCloseable {
                         isPlaying = false
                         paused = true
                         isPaused = true
+                        onPlaybackCompleted?.invoke()
                     }
                 }
             } catch (error: Exception) {
@@ -202,6 +210,7 @@ internal class DesktopAudioPlayer : AutoCloseable {
 
     private fun runPlayback(file: File, startPositionMs: Long, token: Long) {
         var localLine: SourceDataLine? = null
+        var reachedEnd = false
         try {
             AudioSystem.getAudioInputStream(file).use { encoded ->
                 val sourceFormat = encoded.format
@@ -228,7 +237,10 @@ internal class DesktopAudioPlayer : AutoCloseable {
                         awaitResume(token)
                         if (token != generation.get()) break
                         val count = pcm.read(buffer)
-                        if (count < 0) break
+                        if (count < 0) {
+                            reachedEnd = true
+                            break
+                        }
                         var offset = 0
                         while (offset < count && token == generation.get()) {
                             awaitResume(token)
@@ -257,6 +269,7 @@ internal class DesktopAudioPlayer : AutoCloseable {
                 isPlaying = false
                 paused = true
                 isPaused = true
+                if (reachedEnd) onPlaybackCompleted?.invoke()
             }
         }
     }

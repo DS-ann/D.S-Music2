@@ -34,9 +34,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.awt.SwingPanel
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -64,7 +66,16 @@ import kotlinx.coroutines.withContext
 private val pageBackground = Color(0xFF0B0F15)
 private val sidebarBackground = Color(0xFF101720)
 private val panelBackground = Color(0xFF151E29)
-private val accentColor = Color(0xFF9ABEFF)
+private var accentColor by mutableStateOf(Color(0xFF9ABEFF))
+
+private fun desktopAccentFor(preset: String): Color = when (preset) {
+    "Violet" -> Color(0xFFB69CFF)
+    "Emerald" -> Color(0xFF62C9A2)
+    "Amber" -> Color(0xFFFFC36F)
+    "Rose" -> Color(0xFFFF8FA3)
+    "Monochrome" -> Color(0xFFC9CDD4)
+    else -> Color(0xFF6FA8FF)
+}
 private val mutedText = Color(0xFF9AA8B8)
 
 private data class DesktopTrack(val file: File) {
@@ -145,10 +156,20 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     var collectionLoading by remember { mutableStateOf(false) }
     var playbackFormat by remember { mutableStateOf(preferences.get("playback_format", "m4a")) }
     var targetBitrate by remember { mutableStateOf(preferences.getInt("target_bitrate", 256)) }
+    var autoplayEnabled by remember { mutableStateOf(preferences.getBoolean("autoplay_enabled", true)) }
+    var appearancePreset by remember { mutableStateOf(preferences.get("appearance_preset", "Ocean")) }
+    var videoMode by remember { mutableStateOf(false) }
+    val videoSurface = remember { DesktopVideoSurface() }
     val coroutineScope = rememberCoroutineScope()
 
     val currentTrack = tracks.getOrNull(selectedIndex)
     val nowPlayingTitle = currentOnlineSong?.title ?: currentSavedSong?.title ?: currentTrack?.title.orEmpty()
+
+    LaunchedEffect(appearancePreset) {
+        accentColor = desktopAccentFor(appearancePreset)
+        preferences.put("appearance_preset", appearancePreset)
+        runCatching { preferences.flush() }
+    }
     val nowPlayingArtist = currentOnlineSong?.artist ?: currentSavedSong?.artist ?: currentTrack?.artist.orEmpty()
     val hasNowPlaying = nowPlayingTitle.isNotBlank()
     val visibleTracks = remember(tracks, search) {
@@ -243,6 +264,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     }
 
     fun playOnlineSong(song: OnlineSong, queue: List<OnlineSong>? = null) {
+        videoMode = false
         if (queue != null) onlineQueue = queue
         if (onlineQueue.isEmpty()) onlineQueue = listOf(song)
         onlineQueueIndex = onlineQueue.indexOfFirst { it.videoId == song.videoId }.takeIf { it >= 0 } ?: 0
@@ -262,6 +284,35 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
             }
         }
         loadLyrics(song.title, song.artist, song.durationMs, song.videoId, song.albumName)
+    }
+
+    fun toggleVideoMode() {
+        val song = currentOnlineSong ?: return
+        val resumePosition = positionMs.coerceAtLeast(0L)
+        val wasVideo = videoMode
+        statusMessage = if (wasVideo) "Switching to audio…" else "Resolving video stream…"
+        coroutineScope.launch {
+            try {
+                val stream = if (wasVideo) {
+                    DesktopNewPipeExtractor.resolve(song.videoId, targetBitrate, playbackFormat)
+                } else {
+                    DesktopNewPipeExtractor.resolveVideo(song.videoId)
+                }
+                player.playUrl(
+                    stream.url,
+                    song.durationMs.takeIf { it > 0L } ?: stream.durationMs,
+                    resumePosition
+                )
+                videoMode = !wasVideo
+                statusMessage = ""
+            } catch (error: Exception) {
+                statusMessage = error.message ?: if (wasVideo) {
+                    "Could not restore audio playback."
+                } else {
+                    "No compatible muxed video stream is available for this track."
+                }
+            }
+        }
     }
 
     fun openCollection(browseId: String, title: String) {
@@ -396,6 +447,7 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     }
 
     fun playTrack(track: DesktopTrack) {
+        videoMode = false
         selectedIndex = tracks.indexOf(track)
         currentOnlineSong = null
         currentSavedSong = null
@@ -418,6 +470,51 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
         player.play(tracks[selectedIndex].file)
         loadLyrics(tracks[selectedIndex].title, tracks[selectedIndex].artist, player.durationMillis)
         statusMessage = ""
+    }
+
+    val autoplayState = rememberUpdatedState(autoplayEnabled)
+    val currentOnlineSongState = rememberUpdatedState(currentOnlineSong)
+    val onlineQueueState = rememberUpdatedState(onlineQueue)
+    val onlineQueueIndexState = rememberUpdatedState(onlineQueueIndex)
+    val currentTrackState = rememberUpdatedState(currentTrack)
+    val tracksState = rememberUpdatedState(tracks)
+    val selectedIndexState = rememberUpdatedState(selectedIndex)
+
+    DisposableEffect(player) {
+        player.setOnPlaybackCompleted {
+            coroutineScope.launch {
+                if (!autoplayState.value) return@launch
+                val onlineSong = currentOnlineSongState.value
+                if (onlineSong != null) {
+                    val queue = onlineQueueState.value
+                    val nextIndex = onlineQueueIndexState.value + 1
+                    if (nextIndex in queue.indices) {
+                        playOnlineSong(queue[nextIndex], queue)
+                    } else {
+                        statusMessage = "Finding similar tracks…"
+                        val related = runCatching {
+                            DesktopYouTubeMusic.relatedSongs(onlineSong.videoId)
+                        }.getOrElse { emptyList() }
+                        val existingIds = queue.map { it.videoId }.toSet() + onlineSong.videoId
+                        val suggestions = related.filterNot { it.videoId in existingIds }
+                        if (suggestions.isNotEmpty()) {
+                            val expandedQueue = queue + suggestions
+                            onlineQueue = expandedQueue
+                            playOnlineSong(suggestions.first(), expandedQueue)
+                        } else {
+                            statusMessage = "No further related tracks were returned."
+                        }
+                    }
+                } else if (currentTrackState.value != null) {
+                    val currentTracks = tracksState.value
+                    if (currentTracks.isNotEmpty()) {
+                        val next = (selectedIndexState.value + 1) % currentTracks.size
+                        playTrack(currentTracks[next])
+                    }
+                }
+            }
+        }
+        onDispose { player.setOnPlaybackCompleted(null) }
     }
 
     MaterialTheme(
@@ -538,6 +635,15 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                         }
 
                         Spacer(Modifier.height(22.dp))
+
+                        if (videoMode && currentOnlineSong != null) {
+                            SwingPanel(
+                                factory = { videoSurface },
+                                update = { it.attach(player.getRemoteMediaPlayer()) },
+                                modifier = Modifier.fillMaxWidth().height(300.dp)
+                            )
+                            Spacer(Modifier.height(14.dp))
+                        }
 
                         when (section) {
                             "Library" -> {
@@ -892,6 +998,37 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                                     )
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Column(Modifier.weight(1f)) {
+                                            Text("Autoplay", fontWeight = FontWeight.SemiBold)
+                                            Text(
+                                                "Continue with related YouTube Music tracks, or the next local-library track, when playback ends.",
+                                                color = mutedText,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                        Button(onClick = {
+                                            autoplayEnabled = !autoplayEnabled
+                                            preferences.putBoolean("autoplay_enabled", autoplayEnabled)
+                                            runCatching { preferences.flush() }
+                                        }) { Text(if (autoplayEnabled) "On" else "Off") }
+                                    }
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("Appearance palette", fontWeight = FontWeight.SemiBold)
+                                        Text("Choose the accent used by the Windows player and controls.", color = mutedText, fontSize = 11.sp)
+                                        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                            listOf("Ocean", "Violet", "Emerald", "Amber", "Rose", "Monochrome").forEach { preset ->
+                                                Button(
+                                                    onClick = { appearancePreset = preset },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        backgroundColor = desktopAccentFor(preset),
+                                                        contentColor = Color(0xFF0B1420)
+                                                    ),
+                                                    shape = RoundedCornerShape(12.dp)
+                                                ) { Text(if (appearancePreset == preset) "✓ $preset" else preset) }
+                                            }
+                                        }
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
                                             Text("Preferred playback format", fontWeight = FontWeight.SemiBold)
                                             Text("AAC/M4A is preferred for Windows playback; unavailable streams fall back to a supported audio stream.", color = mutedText, fontSize = 11.sp)
                                         }
@@ -932,6 +1069,8 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                         onPrevious = { playRelative(-1) },
                         onNext = { playRelative(1) },
                         onLyrics = { section = "Lyrics" },
+                        onVideoToggle = if (currentOnlineSong != null) ::toggleVideoMode else null,
+                        videoMode = videoMode,
                         onPlayPause = {
                             when {
                                 player.isPlaying -> player.togglePlayback()
@@ -1063,6 +1202,8 @@ private fun MiniPlayer(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onLyrics: () -> Unit,
+    onVideoToggle: (() -> Unit)?,
+    videoMode: Boolean,
     onPlayPause: () -> Unit,
     onSeek: (Long) -> Unit
 ) {
@@ -1109,6 +1250,18 @@ private fun MiniPlayer(
                 colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF263545)),
                 elevation = ButtonDefaults.elevation(0.dp)
             ) { Text("Lyrics") }
+            if (onVideoToggle != null) {
+                Spacer(Modifier.width(8.dp))
+                Button(
+                    onClick = onVideoToggle,
+                    enabled = hasTrack,
+                    colors = ButtonDefaults.buttonColors(
+                        backgroundColor = if (videoMode) accentColor else Color(0xFF263545),
+                        contentColor = if (videoMode) Color(0xFF0B1420) else Color.White
+                    ),
+                    elevation = ButtonDefaults.elevation(0.dp)
+                ) { Text(if (videoMode) "Audio" else "Video") }
+            }
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {

@@ -108,6 +108,73 @@ internal object DesktopYouTubeMusic {
         }
     }
 
+    /** Fetch the current YouTube Music watch-next queue for related autoplay tracks. */
+    suspend fun relatedSongs(videoId: String): List<OnlineSong> = withContext(Dispatchers.IO) {
+        val client = JsonObject().apply {
+            addProperty("clientName", "WEB_REMIX")
+            addProperty("clientVersion", CLIENT_VERSION)
+            addProperty("hl", Locale.getDefault().language.ifBlank { "en" })
+            addProperty("gl", Locale.getDefault().country.ifBlank { "US" })
+        }
+        val body = JsonObject().apply {
+            add("context", JsonObject().apply { add("client", client) })
+            addProperty("videoId", videoId)
+        }
+        val request = Request.Builder()
+            .url("$MUSIC_BASE/next?key=$API_KEY&prettyPrint=false")
+            .post(JsonParserBody.encode(body))
+            .header("Content-Type", "application/json; charset=utf-8")
+            .header("Origin", "https://music.youtube.com")
+            .header("Referer", "https://music.youtube.com/")
+            .header("User-Agent", USER_AGENT)
+            .header("X-YouTube-Client-Name", "67")
+            .header("X-YouTube-Client-Version", CLIENT_VERSION)
+            .build()
+
+        http.newCall(request).execute().use { response ->
+            val text = response.body?.string().orEmpty()
+            check(response.isSuccessful) { "YouTube radio returned HTTP ${response.code}." }
+            val json = JsonParser.parseString(text).asJsonObject
+            val panel = json.path(
+                "contents.singleColumnMusicWatchNextResultsRenderer.tabbedRenderer.watchNextTabbedResultsRenderer.tabs.0.tabRenderer.content.musicQueueRenderer.content.playlistPanelRenderer.contents"
+            )?.asJsonArray ?: JsonArray()
+            panel.mapNotNull { content ->
+                runCatching {
+                    val renderer = content.asJsonObject.getAsJsonObject("playlistPanelVideoRenderer")
+                        ?: return@runCatching null
+                    val id = renderer.get("videoId")?.stringOrNull() ?: return@runCatching null
+                    val title = renderer.path("title.runs.0.text")?.stringOrNull()
+                        ?: return@runCatching null
+                    val artist = renderer.path("shortBylineText.runs")?.asJsonArray
+                        ?.joinToString("") { it.asJsonObject.get("text")?.stringOrNull().orEmpty() }
+                        ?.trim().orEmpty()
+                    val duration = renderer.path("lengthText.runs.0.text")?.stringOrNull()
+                    val thumbnail = highResThumbnail(renderer.path("thumbnail.thumbnails")?.asJsonArray)
+                    OnlineSong(
+                        videoId = id,
+                        title = title,
+                        artist = artist,
+                        duration = duration,
+                        durationMs = parseDurationLabel(duration),
+                        thumbnailUrl = thumbnail
+                    )
+                }.getOrNull()
+            }.distinctBy { it.videoId }
+        }
+    }
+
+    private fun parseDurationLabel(value: String?): Long {
+        if (value.isNullOrBlank()) return 0L
+        val parts = value.split(":").mapNotNull { it.toLongOrNull() }
+        if (parts.size !in 2..3) return 0L
+        val seconds = if (parts.size == 3) {
+            parts[0] * 3600L + parts[1] * 60L + parts[2]
+        } else {
+            parts[0] * 60L + parts[1]
+        }
+        return seconds * 1000L
+    }
+
     suspend fun browse(browseId: String): List<SearchItem> = withContext(Dispatchers.IO) {
         val normalizedId = when {
             browseId.startsWith("VL") || browseId.startsWith("MPSP") ||
