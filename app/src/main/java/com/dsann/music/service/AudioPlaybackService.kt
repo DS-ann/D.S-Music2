@@ -445,6 +445,12 @@ class AudioPlaybackService : MediaSessionService() {
     private var currentSourceUri: Uri? = null
     private var originalSourceUri: Uri? = null
     private var isNextSongPreCached = false
+
+    // Complete the active remote track in SimpleCache, not just ExoPlayer's short playback buffer.
+    private var fullTrackCacheJob: Job? = null
+    @Volatile private var fullTrackCacheKey: String? = null
+    @Volatile private var activeFullTrackCacheWriter: CacheWriter? = null
+    private var cacheAssetsSongId: Long? = null
     private var currentSongName = "SpatialFlow"
     private var currentAlbumArt: Bitmap? = null
     private var lastWidgetProgressUpdateAtMs: Long = 0L
@@ -501,6 +507,10 @@ class AudioPlaybackService : MediaSessionService() {
                 handler.removeCallbacks(progressUpdateRunnable)
             }
             updateWidgetState(isPlaying)
+            if (isPlaying) {
+                ensureCurrentTrackCacheAssets()
+                startCurrentTrackCache()
+            }
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
@@ -522,6 +532,10 @@ class AudioPlaybackService : MediaSessionService() {
                 viewModel?.setLoading(false)
                 viewModel?.setPlaybackReady(true)
                 persistCurrentCacheMimeType()
+                if (player.isPlaying) {
+                    ensureCurrentTrackCacheAssets()
+                    startCurrentTrackCache()
+                }
                 if (pendingSeekPos >= 0) {
                     player.seekTo(pendingSeekPos)
                     pendingSeekPos = -1
@@ -665,7 +679,15 @@ class AudioPlaybackService : MediaSessionService() {
             }
             // A user-selected track can replace the current item without changing the
             // playing/paused state, so onIsPlayingChanged is not guaranteed to run.
+            cancelCurrentTrackCache()
+            cacheAssetsSongId = null
             updateWidgetState(player.isPlaying)
+            if (player.isPlaying) {
+                handler.post {
+                    ensureCurrentTrackCacheAssets()
+                    startCurrentTrackCache()
+                }
+            }
         }
     }
 
@@ -834,6 +856,7 @@ class AudioPlaybackService : MediaSessionService() {
             handler.removeCallbacks(progressUpdateRunnable)
         }
         abandonAudioFocus()
+        cancelCurrentTrackCache()
 
         if (isPlayerInitialized) {
             viewModel?.cleanupBgScope()
@@ -867,21 +890,23 @@ class AudioPlaybackService : MediaSessionService() {
      * Custom PCM processing is deliberately kept out of the critical audio path: a failure
      * in a visualizer/haptics processor must never prevent both local and remote tracks.
      */
+    @OptIn(UnstableApi::class)
+    private fun createCacheDataSourceFactory(context: Context): CacheDataSource.Factory {
+        val httpDataSourceFactory = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(streamHttpClient)
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0")
+        // Keep playback and full-track caching on the exact same upstream/interceptor path.
+        val upstreamFactory = androidx.media3.datasource.DefaultDataSource.Factory(context, httpDataSourceFactory)
+        return CacheDataSource.Factory()
+            .setCache(getCache(context.applicationContext))
+            .setUpstreamDataSourceFactory(upstreamFactory)
+            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+    }
+
     private fun buildExoPlayer(): ExoPlayer {
         val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(this)
             .setEnableDecoderFallback(true)
 
-        val httpDataSourceFactory = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(streamHttpClient)
-            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0")
-
-        // DefaultDataSource handles content:// and file:// locally; only HTTP(S) traffic
-        // reaches OkHttp and the YouTube stream interceptor.
-        val upstreamFactory = androidx.media3.datasource.DefaultDataSource.Factory(this, httpDataSourceFactory)
-        val cacheDataSourceFactory = androidx.media3.datasource.cache.CacheDataSource.Factory()
-            .setCache(getCache(this))
-            .setUpstreamDataSourceFactory(upstreamFactory)
-            .setFlags(androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
-
+        val cacheDataSourceFactory = createCacheDataSourceFactory(this)
         val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(this)
             .setDataSourceFactory(cacheDataSourceFactory)
 
@@ -1339,6 +1364,149 @@ class AudioPlaybackService : MediaSessionService() {
     }
     
     /**
+     * Prepare the non-audio requirements of a Cache playlist item. The cache folder deliberately
+     * contains only tracks with a saved cover and a positive lyrics result.
+     */
+    private fun ensureCurrentTrackCacheAssets() {
+        val vm = viewModel ?: return
+        val song = vm.currentSong.value ?: return
+        if (song.isCachedTrack || song.isDownloadedOffline) return
+        if (cacheAssetsSongId == song.id) return
+        cacheAssetsSongId = song.id
+
+        val artwork = getCachedMediaArtworkFile(applicationContext, song.id.toString())
+        if (!artwork.isFile || artwork.length() <= 0L) {
+            when {
+                !song.thumbnailUrl.isNullOrBlank() -> setSongMetadataByUrl(song.title, song.thumbnailUrl)
+                song.albumId > 0L -> setSongMetadataById(song.title, song.albumId)
+            }
+        }
+
+        // LyricsFetchManager checks its persistent cache first, so this does not re-download
+        // existing lyrics. It fills the lyrics prerequisite automatically during normal playback.
+        if (vm.syncedLyrics.value.isNullOrEmpty() &&
+            vm.plainLyrics.value.isNullOrBlank() &&
+            !vm.isLyricsLoading.value
+        ) {
+            vm.fetchLyricsForCurrentSong()
+        }
+    }
+
+    private fun cancelCurrentTrackCache() {
+        activeFullTrackCacheWriter?.cancel()
+        activeFullTrackCacheWriter = null
+        fullTrackCacheJob?.cancel()
+        fullTrackCacheJob = null
+        fullTrackCacheKey = null
+    }
+
+    /**
+     * ExoPlayer normally caches only the ranges needed for its rolling playback buffer. The Cache
+     * playlist requires a complete stream, so finish the current remote resource in the same
+     * SimpleCache while playback continues. CacheWriter reuses every range already downloaded by
+     * ExoPlayer and stores the remaining bytes under the exact same URI cache key.
+     */
+    @OptIn(UnstableApi::class)
+    private fun startCurrentTrackCache() {
+        if (!isPlayerInitialized || !player.isPlaying) return
+        if (!getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_MEDIA_CACHE_ENABLED, true)
+        ) return
+
+        val item = player.currentMediaItem ?: return
+        val uri = item.localConfiguration?.uri ?: return
+        if (uri.scheme != "http" && uri.scheme != "https") return
+
+        val song = viewModel?.currentSong?.value
+        if (song?.isCachedTrack == true || song?.isDownloadedOffline == true) return
+
+        val cacheKey = uri.toString()
+        if (fullTrackCacheKey == cacheKey && fullTrackCacheJob?.isActive == true) return
+
+        val songId = item.mediaId.takeIf { it.isNotBlank() }
+            ?: song?.id?.toString()?.takeIf { it.isNotBlank() }
+            ?: return
+        val title = item.mediaMetadata.title?.toString()?.takeIf { it.isNotBlank() }
+            ?: song?.title?.takeIf { it.isNotBlank() }
+            ?: return
+        val artist = item.mediaMetadata.artist?.toString()?.takeIf { it.isNotBlank() }
+            ?: song?.artist.orEmpty()
+        val durationMs = player.duration.takeIf {
+            it > 0L && it != C.TIME_UNSET
+        } ?: song?.duration ?: 0L
+        val videoId = song?.videoId.orEmpty()
+
+        cancelCurrentTrackCache()
+        fullTrackCacheKey = cacheKey
+
+        fullTrackCacheJob = serviceScope.launch(Dispatchers.IO) {
+            try {
+                rememberMediaCacheMetadata(
+                    applicationContext,
+                    cacheKey,
+                    title,
+                    artist,
+                    songId,
+                    durationMs,
+                    videoId
+                )
+
+                val existingFacts = getCachedAudioFacts(
+                    applicationContext,
+                    songId,
+                    videoId,
+                    cacheKey
+                )
+                if (existingFacts?.isComplete == true) {
+                    Log.d(TAG, "Current track is already fully cached: $title")
+                    return@launch
+                }
+
+                val writer = CacheWriter(
+                    createCacheDataSourceFactory(applicationContext).createDataSource(),
+                    DataSpec.Builder().setUri(uri).setKey(cacheKey).build(),
+                    null,
+                    null
+                )
+
+                synchronized(this@AudioPlaybackService) {
+                    // A newer song may have replaced this one while metadata/cache checks ran.
+                    if (fullTrackCacheKey != cacheKey) {
+                        writer.cancel()
+                        return@launch
+                    }
+                    activeFullTrackCacheWriter = writer
+                }
+
+                try {
+                    writer.cache()
+                    val completedFacts = getCachedAudioFacts(
+                        applicationContext,
+                        songId,
+                        videoId,
+                        cacheKey
+                    )
+                    Log.i(
+                        TAG,
+                        "Full-track cache finished for '$title': " +
+                            "${completedFacts?.cachedBytes ?: 0L} bytes, complete=${completedFacts?.isComplete == true}"
+                    )
+                } finally {
+                    synchronized(this@AudioPlaybackService) {
+                        if (activeFullTrackCacheWriter === writer) {
+                            activeFullTrackCacheWriter = null
+                        }
+                    }
+                }
+            } catch (error: Exception) {
+                if (fullTrackCacheKey == cacheKey) {
+                    Log.w(TAG, "Full-track cache failed for '$title': ${error.message}", error)
+                }
+            }
+        }
+    }
+
+    /**
      * Pre-cache the first 512KB of the audio stream into SimpleCache for instant playback start.
      */
     private fun preCacheFirstChunk(streamUrl: String) {
@@ -1349,15 +1517,7 @@ class AudioPlaybackService : MediaSessionService() {
         }
         serviceScope.launch(Dispatchers.IO) {
             try {
-                val httpDataSourceFactory = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(streamHttpClient)
-                    .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0")
-
-                val upstreamFactory = androidx.media3.datasource.DefaultDataSource.Factory(applicationContext, httpDataSourceFactory)
-                val cacheDataSourceFactory = androidx.media3.datasource.cache.CacheDataSource.Factory()
-                    .setCache(getCache(applicationContext))
-                    .setUpstreamDataSourceFactory(upstreamFactory)
-                    .setFlags(androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
-                
+                val cacheDataSourceFactory = createCacheDataSourceFactory(applicationContext)
                 val dataSpec = DataSpec.Builder()
                     .setUri(streamUrl)
                     .setLength(512 * 1024) // 512KB first chunk
@@ -1675,6 +1835,8 @@ class AudioPlaybackService : MediaSessionService() {
     fun getCurrentSourceUri(): Uri? = originalSourceUri ?: currentSourceUri
 
     private fun loadAudioInternal(uri: Uri, keepPlayingUntilReady: Boolean = false) {
+        cancelCurrentTrackCache()
+        cacheAssetsSongId = null
         if (!keepPlayingUntilReady) {
             player.pause()
             player.stop()
