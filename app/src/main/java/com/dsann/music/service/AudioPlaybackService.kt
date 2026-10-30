@@ -538,7 +538,15 @@ class AudioPlaybackService : MediaSessionService() {
                     startCurrentTrackCache()
                 }
                 if (pendingSeekPos >= 0) {
-                    player.seekTo(pendingSeekPos)
+                    // Keep the requested resume point until the replacement media item is READY.
+                    // A pre-prepare seek can be discarded by a source transition on some devices.
+                    val requestedPosition = pendingSeekPos
+                    val duration = player.duration.takeIf {
+                        it > 0L && it != C.TIME_UNSET
+                    }
+                    val targetPosition = duration?.let { requestedPosition.coerceAtMost((it - 1L).coerceAtLeast(0L)) }
+                        ?: requestedPosition
+                    player.seekTo(targetPosition)
                     pendingSeekPos = -1
                 }
             }
@@ -1887,12 +1895,10 @@ class AudioPlaybackService : MediaSessionService() {
                 player.setMediaItem(mediaItem)
             }
             
-            // Seek BEFORE prepare to avoid double-buffering pass
-            if (pendingSeekPos >= 0) {
-                player.seekTo(pendingSeekPos)
-                pendingSeekPos = -1
-            }
-            
+            // The pending resume point is applied from onPlaybackStateChanged(STATE_READY).
+            // Do not consume it here: ExoPlayer can discard a pre-prepare seek while swapping
+            // from a muxed video item back to an audio-only item.
+
             // Effects/normalization were removed; every newly loaded track must start
             // with normal playback gain rather than inherit a stale crossfade volume.
             player.volume = currentBaseVolume.coerceIn(0f, 1f)
@@ -2455,7 +2461,7 @@ class AudioPlaybackService : MediaSessionService() {
 
         if (!enabled) {
             if (!vm.isVideoMode.value) return
-            val position = player.currentPosition.coerceAtLeast(0L)
+            val position = captureVideoModePosition(vm)
             vm.setVideoModeState(false)
             loadAndPlay("innertube://$videoId".toUri(), position)
             return
@@ -2463,7 +2469,7 @@ class AudioPlaybackService : MediaSessionService() {
 
         if (vm.isVideoMode.value) return
         val songId = song.id
-        val position = player.currentPosition.coerceAtLeast(0L)
+        val position = captureVideoModePosition(vm)
         isResolvingVideoMode = true
         vm.setLoading(true)
         serviceScope.launch {
@@ -2487,6 +2493,27 @@ class AudioPlaybackService : MediaSessionService() {
             vm.setVideoModeState(true)
             loadAndPlay(videoUrl.toUri(), position)
         }
+    }
+
+    /**
+     * Switch video quality without changing the queue item or playback timestamp.
+     * The URL is a muxed audio+video stream selected from the available NewPipe formats.
+     */
+    fun setVideoStreamQuality(streamUrl: String) {
+        val vm = viewModel ?: return
+        if (!isPlayerInitialized || !vm.isVideoMode.value || streamUrl.isBlank()) return
+        val song = vm.currentSong.value ?: return
+        if (song.videoId.isNullOrBlank()) return
+        val position = captureVideoModePosition(vm)
+        loadAndPlay(streamUrl.toUri(), position)
+    }
+
+    private fun captureVideoModePosition(vm: PlayerSharedViewModel): Long {
+        val fallbackPosition = vm.currentPosition.value.toLong().coerceAtLeast(0L)
+        if (!isPlayerInitialized || player.currentMediaItem == null || player.playbackState == Player.STATE_IDLE) {
+            return fallbackPosition
+        }
+        return player.currentPosition.coerceAtLeast(0L)
     }
 
     fun getPlayerInstance(): ExoPlayer = player
