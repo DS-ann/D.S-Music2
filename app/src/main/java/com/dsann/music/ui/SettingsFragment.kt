@@ -1228,7 +1228,7 @@ fun SettingsScreenContent(
         composable(SettingsRoute.BackupRestore.route) {
             BackupRestoreScreen(
                 navController = navController,
-                onBackupClick = { exportBackupLauncher.launch("spatialflow_backup.json") },
+                onBackupClick = { exportBackupLauncher.launch("D.S-Music-backup.json") },
                 onRestoreClick = { importBackupLauncher.launch(arrayOf("application/json")) }
             )
         }
@@ -2133,7 +2133,7 @@ private fun AccountScreen(
                             )
                             if (ytCookies != null) {
                                 Text(
-                                    text = "Profile: SpatialFlow User",
+                                    text = "Profile: D.S Music User",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold
@@ -3034,7 +3034,7 @@ private fun AudioFormatRow(
             Column {
                 Text(text = title, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    text = "Requests this source format without transcoding. If a track has no matching stream, SpatialFlow asks you to choose from formats that track actually offers.",
+                    text = "Requests this source format without transcoding. If a track has no matching stream, D.S Music asks you to choose from formats that track actually offers.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -3074,7 +3074,7 @@ private fun AudioFormatRow(
 private fun WhatsNewScreen(navController: androidx.navigation.NavController) {
     val releases by androidx.compose.runtime.produceState<List<com.dsann.music.update.GitHubReleaseClient.ReleaseInfo>?>(initialValue = null) {
         withContext(Dispatchers.IO) {
-            val client = com.dsann.music.update.GitHubReleaseClient("MythicalSHUB", "SpatialFlow")
+            val client = com.dsann.music.update.GitHubReleaseClient("DS-ann", "D.S-Music2")
             value = client.getAllReleases()
         }
     }
@@ -3841,7 +3841,7 @@ private fun CreditsCard(onOpenUrl: (String) -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 coil.compose.AsyncImage(
-                    model = "https://github.com/MythicalSHUB.png",
+                    model = "https://github.com/DS-ann.png",
                     contentDescription = "Shubham Karande",
                     modifier = Modifier
                         .size(80.dp)
@@ -3867,7 +3867,7 @@ private fun CreditsCard(onOpenUrl: (String) -> Unit) {
                     modifier = Modifier.padding(top = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    SocialIconButton(icon = R.drawable.ic_github, onClick = { onOpenUrl("https://github.com/MythicalSHUB") })
+                    SocialIconButton(icon = R.drawable.ic_github, onClick = { onOpenUrl("https://github.com/DS-ann") })
                     SocialIconButton(icon = R.drawable.ic_instagram, onClick = { onOpenUrl("https://instagram.com/mythicalshub") })
                     SocialIconButton(icon = R.drawable.ic_youtube, onClick = { onOpenUrl("https://youtube.com/@8dmusic_s") })
                 }
@@ -4048,7 +4048,7 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
                             modifier = Modifier.clickable {
                                 val title = URLEncoder.encode("[Bug] ", "UTF-8")
                                 val body = URLEncoder.encode("## Description\n\n\n## Device Information\n$debugInfo\n\n## Steps to Reproduce\n1.\n2.\n3.\n", "UTF-8")
-                                val url = "https://github.com/MythicalSHUB/SpatialFlow/issues/new?title=$title&body=$body"
+                                val url = "https://github.com/DS-ann/D.S-Music2/issues/new?title=$title&body=$body"
                                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                             }
                         )
@@ -4056,7 +4056,7 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
                     {
                         ListItem(
                             headlineContent = { Text("Request Feature", style = MaterialTheme.typography.bodyLarge) },
-                            supportingContent = { Text("Suggest a new feature for SpatialFlow", style = MaterialTheme.typography.bodyMedium) },
+                            supportingContent = { Text("Suggest a new feature for D.S Music", style = MaterialTheme.typography.bodyMedium) },
                             leadingContent = { Icon(Icons.Rounded.OpenInNew, null, tint = MaterialTheme.colorScheme.primary) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             modifier = Modifier.clickable {
