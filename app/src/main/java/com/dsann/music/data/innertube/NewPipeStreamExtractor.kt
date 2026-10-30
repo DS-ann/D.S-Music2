@@ -19,9 +19,13 @@ data class VideoStreamOption(
     val url: String,
     val resolution: String,
     val height: Int,
-    val mimeType: String?
+    val mimeType: String?,
+    /** Non-null when YouTube exposes this resolution as a video-only DASH stream. */
+    val audioUrl: String? = null,
+    val audioMimeType: String? = null
 ) {
     val label: String get() = if (height > 0) "${height}p" else resolution.ifBlank { "Unknown quality" }
+    val usesSeparateAudio: Boolean get() = !audioUrl.isNullOrBlank()
 }
 
 object NewPipeStreamExtractor {
@@ -399,41 +403,95 @@ object NewPipeStreamExtractor {
      * deliberately excluded: this player mode uses one Media3 item and must keep its audio track.
      * The existing StreamInfo cache is reused so entering video mode does not repeat extraction.
      */
+    /**
+     * Collect both progressive/muxed streams and adaptive video-only streams.
+     * YouTube increasingly omits muxed formats; in that case pair a video-only MP4
+     * with the lowest compatible audio-only format and let Media3 merge the sources.
+     */
     suspend fun getVideoStreamOptions(videoId: String?): List<VideoStreamOption> = withContext(Dispatchers.IO) {
         if (videoId.isNullOrBlank()) return@withContext emptyList()
         val info = fetchStreamInfo(videoId) ?: return@withContext emptyList()
-        info.videoStreams
+
+        val muxed = info.videoStreams
             .asSequence()
             .filterNot { it.isVideoOnly }
             .filter { it.content.startsWith("http", ignoreCase = true) }
-            .map { stream ->
-                val resolution = stream.resolution
+            .mapNotNull { stream ->
+                val height = stream.resolution.filter { it.isDigit() }.toIntOrNull() ?: return@mapNotNull null
                 VideoStreamOption(
                     url = stream.content,
-                    resolution = resolution,
-                    height = resolution.filter { it.isDigit() }.toIntOrNull() ?: 0,
+                    resolution = stream.resolution,
+                    height = height,
                     mimeType = stream.format?.mimeType?.substringBefore(';')?.trim()
                 )
             }
-            .filter { it.height > 0 }
-            .distinctBy { it.height }
-            .sortedByDescending { it.height }
             .toList()
+
+        val preferredAudioFormat = getPlaybackAudioFormat()
+        val targetAudioKbps = if (getPreferenceSnapshot().dataSaver) {
+            minOf(96, getTargetBitrateKbps())
+        } else {
+            getTargetBitrateKbps()
+        }
+        val audioStreams = info.audioStreams
+            .filter { it.content.startsWith("http", ignoreCase = true) }
+        val audioCandidates = candidatesForFormat(audioStreams, preferredAudioFormat)
+            .ifEmpty { audioStreams }
+        val separateAudio = audioCandidates.minByOrNull { stream ->
+            val bitrate = streamBitrateKbps(stream)
+            if (bitrate > 0) kotlin.math.abs(bitrate - targetAudioKbps) else Int.MAX_VALUE
+        }
+
+        val videoOnly = if (separateAudio == null) {
+            emptyList()
+        } else {
+            info.videoOnlyStreams
+                .asSequence()
+                .filter { it.content.startsWith("http", ignoreCase = true) }
+                .mapNotNull { stream ->
+                    val height = stream.resolution.filter { it.isDigit() }.toIntOrNull() ?: return@mapNotNull null
+                    VideoStreamOption(
+                        url = stream.content,
+                        resolution = stream.resolution,
+                        height = height,
+                        mimeType = stream.format?.mimeType?.substringBefore(';')?.trim(),
+                        audioUrl = separateAudio.content,
+                        audioMimeType = separateAudio.format?.mimeType?.substringBefore(';')?.trim()
+                    )
+                }
+                .toList()
+        }
+
+        // One selectable choice per resolution. Prefer muxed MP4 when it exists because it
+        // needs one HTTP stream; use paired DASH streams only where no muxed format exists.
+        val combined = (muxed + videoOnly)
+            .groupBy { it.height }
+            .mapNotNull { (_, sameHeight) ->
+                sameHeight.firstOrNull { !it.usesSeparateAudio && it.mimeType?.contains("video/mp4", true) == true }
+                    ?: sameHeight.firstOrNull { !it.usesSeparateAudio }
+                    ?: sameHeight.firstOrNull { it.usesSeparateAudio && it.mimeType?.contains("video/mp4", true) == true }
+                    ?: sameHeight.firstOrNull()
+            }
+            .sortedByDescending { it.height }
+
+        combined
     }
 
     /**
-     * Data-saver default for mode switches. Keep the full option list available to the player
-     * so the user can explicitly choose a higher resolution from the in-video quality menu.
-     */
-    /**
-     * Prefer the lowest-data MP4 muxed stream. Android's Media3 decoder support is broader
-     * for H.264/AAC MP4 than WebM/VP9, especially on Android 6 devices. If YouTube has no
-     * MP4 muxed stream, fall back to the lowest available muxed option.
+     * Data-saver default: use the lowest MP4 resolution and avoid a second audio stream when a
+     * progressive muxed stream exists at that same resolution. Separate DASH tracks are used
+     * only when YouTube doesn't expose a muxed stream.
      */
     fun dataSaverVideoOption(options: List<VideoStreamOption>): VideoStreamOption? =
         options.filter { it.mimeType?.contains("video/mp4", ignoreCase = true) == true }
-            .minByOrNull { it.height }
-            ?: options.minByOrNull { it.height }
+            .minWithOrNull(
+                compareBy<VideoStreamOption> { it.height }
+                    .thenBy { if (it.usesSeparateAudio) 1 else 0 }
+            )
+            ?: options.minWithOrNull(
+                compareBy<VideoStreamOption> { it.height }
+                    .thenBy { if (it.usesSeparateAudio) 1 else 0 }
+            )
 
     suspend fun getDataSaverVideoOption(videoId: String?): VideoStreamOption? =
         dataSaverVideoOption(getVideoStreamOptions(videoId))
