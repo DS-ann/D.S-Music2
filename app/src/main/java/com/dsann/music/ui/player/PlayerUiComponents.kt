@@ -259,6 +259,9 @@ internal fun WavySliderWithLabels(
     contentColor: Color,
     contentSecondary: Color,
     isDark: Boolean,
+    scrubberStyle: String = "Waveform",
+    scrubberColor: String = "Accent",
+    playerTimes: String = "Both",
     modifier: Modifier = Modifier
 ) {
     var isScrubbing by remember { mutableStateOf(false) }
@@ -274,6 +277,17 @@ internal fun WavySliderWithLabels(
             .fillMaxWidth()
             .padding(horizontal = 8.dp)
     ) {
+        val activeColor = when (scrubberColor) {
+            "White" -> Color.White
+            "Cover" -> dynamicAccentColor.copy(alpha = 0.92f)
+            else -> dynamicAccentColor
+        }
+        val thickness = when (scrubberStyle) {
+            "Hairline" -> 2.dp
+            "Bold" -> 6.dp
+            else -> 4.dp
+        }
+        val waveEnabled = scrubberStyle == "Waveform"
         WavyMusicSlider(
             value = if (isScrubbing) sliderScrubPos else progressRatio,
             onValueChange = {
@@ -284,32 +298,41 @@ internal fun WavySliderWithLabels(
                 isScrubbing = false
                 onSeekTo((sliderScrubPos * safeDur).toInt())
             },
-            activeTrackColor = dynamicAccentColor,
+            activeTrackColor = activeColor,
             inactiveTrackColor = contentColor.copy(alpha = if (isDark) 0.08f else 0.06f),
             thumbColor = contentColor,
             isPlaying = isPlaying,
-            trackHeight = 4.dp,
-            thumbRadius = 6.dp,
-            waveAmplitudeWhenPlaying = 6.dp,
+            trackHeight = thickness,
+            thumbRadius = if (scrubberStyle == "Thumb") 7.dp else 3.dp,
+            waveAmplitudeWhenPlaying = if (waveEnabled) 6.dp else 0.dp,
             waveLength = 48.dp,
+            isWaveEligible = waveEnabled,
         )
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = formatDuration(displayPos.toLong()),
-                style = MaterialTheme.typography.labelSmall,
-                color = contentSecondary
-            )
-            Text(
-                text = formatDuration(duration.toLong()),
-                style = MaterialTheme.typography.labelSmall,
-                color = contentSecondary
-            )
+        if (playerTimes != "None") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = if (playerTimes == "Both" || playerTimes == "Elapsed") {
+                        formatDuration(displayPos.toLong())
+                    } else "",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = contentSecondary
+                )
+                Text(
+                    text = when (playerTimes) {
+                        "Both" -> formatDuration(duration.toLong())
+                        "Time left" -> "-${formatDuration((duration - displayPos).coerceAtLeast(0).toLong())}"
+                        else -> ""
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = contentSecondary
+                )
+            }
         }
     }
 }
