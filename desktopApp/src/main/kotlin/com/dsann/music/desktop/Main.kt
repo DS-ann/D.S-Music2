@@ -1,5 +1,11 @@
 package com.dsann.music.desktop
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -2046,11 +2052,11 @@ private fun DesktopMiniPlayerVisualizer(style: String, isPlaying: Boolean, color
                 val gap = 3.dp.toPx()
                 val width = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
                 repeat(count) { index ->
-                    val wave = kotlin.math.abs(kotlin.math.sin(index * 0.65f + phase * 6.28f))
+                    val wave = kotlin.math.abs(kotlin.math.sin(index.toDouble() * 0.65 + phase.toDouble() * 6.28)).toFloat()
                     val height = size.height * (0.1f + wave * amplitude)
                     drawRoundRect(
-                        color.copy(alpha = 0.35f + wave * 0.5f),
-                        topLeft = androidx.compose.ui.geometry.Offset(index * (width + gap), (size.height - height) / 2f),
+                        color = color.copy(alpha = 0.35f + wave * 0.5f),
+                        topLeft = androidx.compose.ui.geometry.Offset(index.toFloat() * (width + gap), (size.height - height) / 2f),
                         size = androidx.compose.ui.geometry.Size(width, height),
                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(width / 2f)
                     )
