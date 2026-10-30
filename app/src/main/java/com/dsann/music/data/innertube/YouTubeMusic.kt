@@ -75,22 +75,113 @@ object YouTubeMusic {
      */
     suspend fun search(query: String, filter: SearchFilter? = null): Result<SearchResult> = withContext(Dispatchers.IO) {
         runCatching {
-            // Older Android 6 devices may need longer for the first TLS/API request.
+            // Live broadcasts come from standard YouTube search; every other category comes from YouTube Music.
             kotlinx.coroutines.withTimeout(15000L.milliseconds) {
-                val response = InnerTubeClient.search(query.trim(), filter?.value)
+                val response = if (filter == SearchFilter.LIVE) {
+                    InnerTubeClient.liveSearch(query.trim())
+                } else {
+                    InnerTubeClient.search(query.trim(), filter?.value)
+                }
                 if (response.entrySet().isEmpty()) {
                     throw IllegalStateException(
                         "YouTube Music search returned an empty response; check InnerTubeClient HTTP/network logs"
                     )
                 }
-                InnerTubeParser.parseSearchResponse(response).also { result ->
-                    if (result.items.isEmpty()) {
-                        Log.w(TAG, "Search returned a response but no parsed items for query: $query")
+                val parsed = if (filter == SearchFilter.LIVE) {
+                    InnerTubeParser.parseLiveSearchResponse(response)
+                } else {
+                    InnerTubeParser.parseSearchResponse(response)
+                }
+                if (parsed.items.isEmpty()) {
+                    Log.w(TAG, "Search returned a response but no parsed items for query: $query filter=$filter")
+                }
+                parsed
+            }
+        }
+    }
+
+    /**
+     * Prism-style Top results: request each YouTube Music category independently, then keep
+     * the result groups separate so the UI can show songs as rows and browseable collections
+     * as horizontal shelves. The unfiltered response supplies an extra best-match candidate.
+     */
+    suspend fun searchTop(query: String): Result<SearchResult> = withContext(Dispatchers.IO) {
+        runCatching {
+            kotlinx.coroutines.withTimeout(30000L.milliseconds) {
+                coroutineScope {
+                    val mixedRequest = async(Dispatchers.IO) { search(query, null).getOrNull() }
+                    val requests = SearchFilter.values().map { filter ->
+                        filter to async(Dispatchers.IO) { search(query, filter).getOrNull() }
                     }
+                    val mixed = mixedRequest.await()
+                    val sections = requests.mapNotNull { (filter, request) ->
+                        val found = request.await()?.items.orEmpty()
+                        val unique = found.distinctBy { searchItemKey(it) }.take(6)
+                        unique.takeIf { it.isNotEmpty() }?.let { SearchResultSection(filter, it) }
+                    }
+
+                    val candidates = (mixed?.items.orEmpty() + sections.flatMap { it.items })
+                        .distinctBy { searchItemKey(it) }
+                    if (candidates.isEmpty()) {
+                        throw IllegalStateException("No search results were returned")
+                    }
+
+                    val normalizedQuery = normalizeSearchText(query)
+                    fun score(item: SearchItem): Int {
+                        val title = normalizeSearchText(when (item) {
+                            is SearchItem.Song -> item.song.title
+                            is SearchItem.Album -> item.album.title
+                            is SearchItem.Artist -> item.artist.title
+                            is SearchItem.Playlist -> item.playlist.title
+                        })
+                        val detail = normalizeSearchText(when (item) {
+                            is SearchItem.Song -> item.song.artist
+                            is SearchItem.Album -> item.album.artists.joinToString(" ") { it.name }
+                            is SearchItem.Artist -> item.artist.subscriberCount.orEmpty()
+                            is SearchItem.Playlist -> item.playlist.author?.name.orEmpty()
+                        })
+                        return when {
+                            title == normalizedQuery -> 1000
+                            title.startsWith(normalizedQuery) -> 800
+                            normalizedQuery.isNotBlank() && title.contains(normalizedQuery) -> 600
+                            normalizedQuery.isNotBlank() && detail.contains(normalizedQuery) -> 300
+                            else -> 0
+                        }
+                    }
+
+                    val top = candidates.maxWithOrNull(
+                        compareBy<SearchItem> { score(it) }
+                            .thenBy { if (it is SearchItem.Song) 1 else 0 }
+                    )
+                    val topKey = top?.let(::searchItemKey)
+                    val visibleSections = sections.mapNotNull { section ->
+                        val remaining = section.items.filterNot { searchItemKey(it) == topKey }
+                        remaining.takeIf { it.isNotEmpty() }?.let { section.copy(items = it) }
+                    }
+                    val allItems = visibleSections.flatMap { it.items }.ifEmpty { candidates }
+                    SearchResult(
+                        items = allItems,
+                        continuation = null,
+                        topResult = top,
+                        sections = visibleSections
+                    )
                 }
             }
         }
     }
+
+    private fun searchItemKey(item: SearchItem): String = when (item) {
+        is SearchItem.Song -> "song:" + item.song.videoId
+        is SearchItem.Album -> "album:" + item.album.browseId
+        is SearchItem.Artist -> "artist:" + item.artist.browseId
+        is SearchItem.Playlist -> "playlist:" + item.playlist.playlistId
+    }
+
+    private fun normalizeSearchText(value: String): String =
+        java.text.Normalizer.normalize(value.lowercase(), java.text.Normalizer.Form.NFD)
+            .replace(Regex("\\p{Mn}+"), "")
+            .replace(Regex("[^\\p{L}\\p{N}]+"), " ")
+            .trim()
 
     /**
      * Load more search results using continuation token.
@@ -100,6 +191,18 @@ object YouTubeMusic {
             kotlinx.coroutines.withTimeout(7000L.milliseconds) {
                 val response = InnerTubeClient.search("", continuation = continuation)
                 InnerTubeParser.parseSearchResponse(response)
+            }
+        }
+    }
+
+    /**
+     * Fetch both text completions and the songs, albums, artists or playlists YouTube attaches
+     * to its suggestions response. Those entities are rendered as image rows while typing.
+     */
+    suspend fun searchSuggestionsWithItems(query: String): Result<SearchSuggestions> = withContext(Dispatchers.IO) {
+        runCatching {
+            kotlinx.coroutines.withTimeout(5000L.milliseconds) {
+                InnerTubeParser.parseSearchSuggestions(InnerTubeClient.searchSuggestions(query))
             }
         }
     }
