@@ -21,7 +21,8 @@ internal data class DesktopPlaylist(
     val id: String,
     val title: String,
     val songIds: List<String> = emptyList(),
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val songs: List<DesktopSavedSong> = emptyList()
 )
 
 internal object DesktopLibraryStore {
@@ -95,6 +96,25 @@ internal object DesktopLibraryStore {
         val all = playlists().map { playlist ->
             if (playlist.id == playlistId && videoId !in playlist.songIds) {
                 playlist.copy(songIds = playlist.songIds + videoId)
+            } else playlist
+        }
+        playlistsFile.writeText(gson.toJson(all))
+    }
+
+    @Synchronized
+    fun addToPlaylist(playlistId: String, song: com.dsann.music.data.innertube.OnlineSong) {
+        val all = playlists().map { playlist ->
+            if (playlist.id == playlistId && song.videoId !in playlist.songIds) {
+                val saved = DesktopSavedSong(
+                    videoId = song.videoId,
+                    title = song.title,
+                    artist = song.artist,
+                    album = song.albumName.orEmpty(),
+                    durationMs = song.durationMs,
+                    thumbnailUrl = song.thumbnailUrl,
+                    audioPath = ""
+                )
+                playlist.copy(songIds = playlist.songIds + song.videoId, songs = playlist.songs + saved)
             } else playlist
         }
         playlistsFile.writeText(gson.toJson(all))
