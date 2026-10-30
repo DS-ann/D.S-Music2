@@ -191,6 +191,8 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     var videoFullscreen by remember { mutableStateOf(false) }
     var videoQualityOptions by remember { mutableStateOf<List<DesktopVideoOption>>(emptyList()) }
     var selectedVideoQuality by remember { mutableStateOf<String?>(null) }
+    var videoDisplayTitle by remember { mutableStateOf("") }
+    var videoDisplayUploader by remember { mutableStateOf("") }
     var homeFeed by remember { mutableStateOf<DesktopHomePage?>(null) }
     var exploreFeed by remember { mutableStateOf<DesktopHomePage?>(null) }
     var feedLoading by remember { mutableStateOf(false) }
@@ -206,17 +208,26 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
     var remotePlaylistTitle by remember { mutableStateOf("") }
     var selectedRemotePlaylistId by remember { mutableStateOf<String?>(null) }
     val videoSurface = remember { DesktopVideoSurface() }
+    val videoModeState = rememberUpdatedState(videoMode)
     val coroutineScope = rememberCoroutineScope()
 
     val currentTrack = tracks.getOrNull(selectedIndex)
-    val nowPlayingTitle = currentOnlineSong?.title ?: currentSavedSong?.title ?: currentTrack?.title.orEmpty()
+    val nowPlayingTitle = if (videoMode) {
+        videoDisplayTitle.ifBlank { currentOnlineSong?.title.orEmpty() }
+    } else {
+        currentOnlineSong?.title ?: currentSavedSong?.title ?: currentTrack?.title.orEmpty()
+    }
 
     LaunchedEffect(appearancePreset) {
         accentColor = desktopAccentFor(appearancePreset)
         preferences.put("appearance_preset", appearancePreset)
         runCatching { preferences.flush() }
     }
-    val nowPlayingArtist = currentOnlineSong?.artist ?: currentSavedSong?.artist ?: currentTrack?.artist.orEmpty()
+    val nowPlayingArtist = if (videoMode) {
+        videoDisplayUploader.ifBlank { currentOnlineSong?.artist.orEmpty() }
+    } else {
+        currentOnlineSong?.artist ?: currentSavedSong?.artist ?: currentTrack?.artist.orEmpty()
+    }
     val hasNowPlaying = nowPlayingTitle.isNotBlank()
     val visibleTracks = remember(tracks, search) {
         val query = search.trim()
@@ -410,6 +421,11 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
 
     fun playOnlineSong(song: OnlineSong, queue: List<OnlineSong>? = null) {
         videoMode = false
+        videoFullscreen = false
+        videoQualityOptions = emptyList()
+        selectedVideoQuality = null
+        videoDisplayTitle = ""
+        videoDisplayUploader = ""
         if (queue != null) onlineQueue = queue
         if (onlineQueue.isEmpty()) onlineQueue = listOf(song)
         onlineQueueIndex = onlineQueue.indexOfFirst { it.videoId == song.videoId }.takeIf { it >= 0 } ?: 0
@@ -458,6 +474,8 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                     videoQualityOptions = emptyList()
                     selectedVideoQuality = null
                     videoFullscreen = false
+                    videoDisplayTitle = ""
+                    videoDisplayUploader = ""
                 } else {
                     val options = DesktopNewPipeExtractor.getVideoOptions(song.videoId)
                     val selected = options.lastOrNull()
@@ -480,6 +498,8 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                     }
                     videoQualityOptions = options
                     selectedVideoQuality = selected.label
+                    videoDisplayTitle = selected.videoTitle.orEmpty()
+                    videoDisplayUploader = selected.videoUploader.orEmpty()
                     videoMode = true
                 }
                 statusMessage = ""
@@ -523,6 +543,8 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                     )
                 }
                 selectedVideoQuality = option.label
+                videoDisplayTitle = option.videoTitle.orEmpty().ifBlank { song.title }
+                videoDisplayUploader = option.videoUploader.orEmpty().ifBlank { song.artist }
                 statusMessage = ""
             } catch (error: Exception) {
                 if (wasPlaying) player.resume()
@@ -545,6 +567,16 @@ private fun SpatialFlowDesktopApp(player: DesktopAudioPlayer) {
                 EventQueue.invokeLater { videoFullscreen = !videoFullscreen }
             }
         )
+    }
+
+    // Attach a newly-created JavaFX MediaPlayer immediately. Without this callback,
+    // SwingPanel may first attach null while videoMode recomposes, then never refresh until
+    // a quality change forces another Compose update.
+    DisposableEffect(player, videoSurface) {
+        player.setOnRemotePlayerChanged { mediaPlayer ->
+            if (videoModeState.value) videoSurface.attach(mediaPlayer)
+        }
+        onDispose { player.setOnRemotePlayerChanged(null) }
     }
 
     fun openCollection(browseId: String, title: String) {
