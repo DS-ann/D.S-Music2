@@ -147,7 +147,7 @@ internal object DesktopNewPipeExtractor {
                 ServiceList.YouTube,
                 "https://www.youtube.com/watch?v=$videoId"
             )
-            val options = info.videoStreams
+            val allOptions = info.videoStreams
                 .asSequence()
                 .filter { !it.isVideoOnly() && it.content.startsWith("http", true) }
                 .mapNotNull { stream ->
@@ -165,8 +165,12 @@ internal object DesktopNewPipeExtractor {
                 }
                 .groupBy { it.height }
                 .mapNotNull { (_, sameHeight) -> sameHeight.maxByOrNull { it.bitrateKbps } }
-                .sortedByDescending { it.height }
                 .toList()
+
+            // JavaFX Media on Windows has dependable MP4/H.264 support, but WebM decoding
+            // depends on the system runtime. Keep only MP4 choices whenever YouTube offers them.
+            val mp4Options = allOptions.filter { it.mimeType.contains("video/mp4", ignoreCase = true) }
+            val options = (mp4Options.ifEmpty { allOptions }).sortedByDescending { it.height }
             videoOptionsCache[videoId] = options to System.currentTimeMillis()
             options
         }
