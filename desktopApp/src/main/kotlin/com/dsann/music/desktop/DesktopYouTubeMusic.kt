@@ -100,58 +100,24 @@ internal object DesktopYouTubeMusic {
         require(normalizedQuery.isNotEmpty()) { "Enter a search query." }
 
         coroutineScope {
-            val mixedRequest = async(Dispatchers.IO) {
-                runCatching { search(normalizedQuery, null) }.getOrNull()
+            // Prism-style: fetch each result type independently and also ask YouTube Music
+            // for its own unfiltered Top result card. Account cookies are intentionally not
+            // attached to searches so the user's search history does not bias ranking.
+            val cardRequest = async(Dispatchers.IO) {
+                runCatching { searchTopCard(normalizedQuery) }.getOrNull()
             }
             val requests = SearchFilter.values().map { filter ->
                 filter to async(Dispatchers.IO) {
-                    runCatching { search(normalizedQuery, filter) }.getOrNull()
+                    runCatching { search(normalizedQuery, filter) }.getOrNull()?.items.orEmpty()
                 }
             }
 
-            val mixed = mixedRequest.await()
-            val sections = requests.mapNotNull { (filter, request) ->
-                val found = request.await()?.items.orEmpty()
-                val unique = found.distinctBy(::itemKey).take(6)
-                unique.takeIf { it.isNotEmpty() }?.let { SearchResultSection(filter, it) }
-            }
-
-            val candidates = (mixed?.items.orEmpty() + sections.flatMap { it.items })
-                .distinctBy(::itemKey)
-            check(candidates.isNotEmpty()) {
+            val results = requests.map { (filter, request) -> filter to request.await() }
+            val card = cardRequest.await()
+            check(results.any { it.second.isNotEmpty() } || card != null) {
                 "No results were returned. YouTube Music may be temporarily unavailable."
             }
-
-            val normalized = normalizeSearchText(normalizedQuery)
-            fun score(item: SearchItem): Int {
-                val title = normalizeSearchText(itemTitle(item))
-                val detail = normalizeSearchText(itemSubtitle(item))
-                return when {
-                    title == normalized -> 1000
-                    title.startsWith(normalized) -> 800
-                    normalized.isNotBlank() && title.contains(normalized) -> 600
-                    normalized.isNotBlank() && detail.contains(normalized) -> 300
-                    else -> 0
-                }
-            }
-
-            val top = candidates.maxWithOrNull(
-                compareBy<SearchItem> { score(it) }
-                    .thenBy { if (it is SearchItem.Song) 1 else 0 }
-            )
-            val topKey = top?.let(::itemKey)
-            val visibleSections = sections.mapNotNull { section ->
-                val rest = section.items.filterNot { itemKey(it) == topKey }
-                rest.takeIf { it.isNotEmpty() }?.let { section.copy(items = it) }
-            }
-            val remaining = visibleSections.flatMap { it.items }
-                .ifEmpty { candidates.filterNot { itemKey(it) == topKey } }
-
-            SearchResult(
-                items = remaining,
-                topResult = top,
-                sections = visibleSections
-            )
+            SearchRank.rank(normalizedQuery, results, card)
         }
     }
 
@@ -395,6 +361,38 @@ internal object DesktopYouTubeMusic {
         }
     }
 
+    private suspend fun searchTopCard(query: String): SearchItem? = withContext(Dispatchers.IO) {
+        val client = JsonObject().apply {
+            addProperty("clientName", "WEB_REMIX")
+            addProperty("clientVersion", CLIENT_VERSION)
+            addProperty("hl", Locale.getDefault().language.ifBlank { "en" })
+            addProperty("gl", Locale.getDefault().country.ifBlank { "US" })
+        }
+        val body = JsonObject().apply {
+            add("context", JsonObject().apply { add("client", client) })
+            addProperty("query", query)
+        }
+        val request = Request.Builder()
+            .url("$MUSIC_BASE/search?key=$API_KEY&prettyPrint=false")
+            .post(JsonParserBody.encode(body))
+            .header("Content-Type", "application/json; charset=utf-8")
+            .header("Accept-Language", "${Locale.getDefault().language},en;q=0.9")
+            .header("X-Goog-Api-Format-Version", "1")
+            .header("X-Origin", "https://music.youtube.com")
+            .header("Origin", "https://music.youtube.com")
+            .header("Referer", "https://music.youtube.com/")
+            .header("User-Agent", USER_AGENT)
+            .header("X-YouTube-Client-Name", "67")
+            .header("X-YouTube-Client-Version", CLIENT_VERSION)
+            .build()
+
+        http.newCall(request).execute().use { response ->
+            val raw = response.body?.string().orEmpty()
+            check(response.isSuccessful) { "YouTube top-result request returned HTTP ${response.code}." }
+            DesktopSearchParser.parseTopCard(JsonParser.parseString(raw).asJsonObject)
+        }
+    }
+
     private suspend fun search(query: String, filter: SearchFilter?): SearchResult = withContext(Dispatchers.IO) {
         val live = filter == SearchFilter.LIVE
         val web = live
@@ -428,7 +426,6 @@ internal object DesktopYouTubeMusic {
             .header("User-Agent", USER_AGENT)
             .header("X-YouTube-Client-Name", if (web) "1" else "67")
             .header("X-YouTube-Client-Version", clientVersion)
-            .withSession(if (web) "https://www.youtube.com" else "https://music.youtube.com")
             .build()
 
         http.newCall(request).execute().use { response ->
