@@ -2494,7 +2494,9 @@ class AudioPlaybackService : MediaSessionService() {
             return
         }
 
-        serviceScope.launch(Dispatchers.IO) {
+        // ExoPlayer is main-looper confined. Inspect its active item here, then do disk/cache
+        // removal on IO so cleanup cannot stall playback or access the player from the wrong thread.
+        serviceScope.launch {
             delay(180L)
             val currentSong = viewModel?.currentSong?.value
             val currentUri = if (isPlayerInitialized) {
@@ -2506,14 +2508,14 @@ class AudioPlaybackService : MediaSessionService() {
                 player.playbackState != Player.STATE_ENDED
             if (sameVideoRestarted) return@launch
 
-            val removed = removeMediaCacheResources(applicationContext, cacheUris)
+            val removed = withContext(Dispatchers.IO) {
+                removeMediaCacheResources(applicationContext, cacheUris)
+            }
             Log.i(TAG, "Removed " + removed + " temporary video cache resource(s) after '" +
                 endedSong.title + "' ended")
-            withContext(Dispatchers.Main) {
-                if (activeVideoCacheVideoId == endedVideoId && activeVideoCacheUris == cacheUris) {
-                    activeVideoCacheVideoId = null
-                    activeVideoCacheUris = emptySet()
-                }
+            if (activeVideoCacheVideoId == endedVideoId && activeVideoCacheUris == cacheUris) {
+                activeVideoCacheVideoId = null
+                activeVideoCacheUris = emptySet()
             }
         }
     }
