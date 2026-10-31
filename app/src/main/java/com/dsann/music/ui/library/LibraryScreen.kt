@@ -49,6 +49,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -372,81 +373,98 @@ fun LibraryScreen(
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Library header remains visible in every Library destination.
-                AnimatedVisibility(
-                    visible = true,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
+                // Fixed D.S Launcher-style Library header. The header is static; only the content list scrolls.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Library",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onSurface
+                    Column {
+                        BasicText(
+                            "D.S MUSIC",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.4.sp
+                            )
                         )
+                        BasicText(
+                            "Library",
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        )
+                    }
 
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            if (activeTab == "Playlists" || activeTab == "Albums" || activeTab == "Artists") {
-                                IconButton(
-                                    onClick = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(7.dp)
+                    ) {
+                        if (activeTab == "Playlists" || activeTab == "Albums" || activeTab == "Artists") {
+                            Box(
+                                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                    .clickable {
                                         when (activeTab) {
                                             "Playlists" -> playlistsAsList = !playlistsAsList
                                             "Albums" -> albumsAsList = !albumsAsList
                                             "Artists" -> artistsAsList = !artistsAsList
                                         }
-                                    }
-                                ) {
-                                    Icon(
-                                        imageVector = if (currentCollectionAsList) Icons.Default.GridView else Icons.Default.ViewList,
-                                        contentDescription = if (currentCollectionAsList) "Show as grid" else "Show as list",
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
-                            }
-
-                            IconButton(onClick = { activeTab = "History" }) {
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Icon(
-                                    painter = painterResource(id = R.drawable.ic_history),
-                                    contentDescription = "Listening History",
+                                    imageVector = if (currentCollectionAsList) Icons.Default.GridView else Icons.Default.ViewList,
+                                    contentDescription = if (currentCollectionAsList) "Show as grid" else "Show as list",
                                     tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(21.dp)
                                 )
                             }
+                        }
 
-                            val userProfile by accountViewModel?.userProfile?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(null) }
-                            if (userProfile?.avatarUrl != null) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(userProfile?.avatarUrl)
-                                        .crossfade(true)
-                                        .build(),
+                        Box(
+                            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                .clickable { activeTab = "History" },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_history),
+                                contentDescription = "Listening History",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(21.dp)
+                            )
+                        }
+
+                        val userProfile by accountViewModel?.userProfile?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(null) }
+                        if (userProfile?.avatarUrl != null) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(userProfile?.avatarUrl)
+                                    .build(),
+                                contentDescription = "Account Settings",
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { showAccountScreen = true },
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Box(
+                                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                    .clickable { showAccountScreen = true },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AccountCircle,
                                     contentDescription = "Account Settings",
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .clickable { showAccountScreen = true },
-                                    contentScale = ContentScale.Crop
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(25.dp)
                                 )
-                            } else {
-                                IconButton(onClick = { showAccountScreen = true }) {
-                                    Icon(
-                                        imageVector = Icons.Default.AccountCircle,
-                                        contentDescription = "Account Settings",
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                }
                             }
                         }
                     }
@@ -473,22 +491,38 @@ fun LibraryScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     tabs.forEach { (label, tabKey) ->
-                        FilterChip(
-                            selected = activeTab == tabKey,
-                            onClick = {
-                                activeTab = tabKey
-                                if (tabKey == "History") accountViewModel?.loadLibrary()
-                            },
-                            label = { Text(label, fontWeight = FontWeight.SemiBold) },
-                            shape = CircleShape,
-                            border = null,
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        val selected = activeTab == tabKey
+                        val pill = RoundedCornerShape(50)
+                        Box(
+                            modifier = Modifier
+                                .clip(pill)
+                                .background(
+                                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                                    else MaterialTheme.colorScheme.surfaceContainerLow
+                                )
+                                .then(
+                                    if (selected) Modifier.border(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
+                                        pill
+                                    ) else Modifier
+                                )
+                                .clickable {
+                                    activeTab = tabKey
+                                    if (tabKey == "History") accountViewModel?.loadLibrary()
+                                }
+                                .padding(horizontal = 14.dp, vertical = 9.dp)
+                        ) {
+                            BasicText(
+                                label,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    color = if (selected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                ),
+                                maxLines = 1
                             )
-                        )
+                        }
                     }
                 }
 
