@@ -23,6 +23,9 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -1202,6 +1205,30 @@ fun FullPlayer(
                             label = "Sleep timer",
                             isSelected = sleepTimerEndTime != null,
                             onClick = { showSleepTimerDialog = true },
+                            contentColor = contentColor,
+                            accentColor = dynamicAccentColor,
+                            isDark = isDark
+                        )
+                        "shuffle" -> PillChip(
+                            style = playerButtonStyle,
+                            icon = Icons.Default.Shuffle,
+                            label = "Shuffle",
+                            isSelected = isShuffleEnabled,
+                            onClick = { viewModel.toggleShuffle() },
+                            contentColor = contentColor,
+                            accentColor = dynamicAccentColor,
+                            isDark = isDark
+                        )
+                        "repeat" -> PillChip(
+                            style = playerButtonStyle,
+                            icon = if (repeatMode == PlayerSharedViewModel.REPEAT_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
+                            label = when (repeatMode) {
+                                PlayerSharedViewModel.REPEAT_ONE -> "Repeat one"
+                                PlayerSharedViewModel.REPEAT_ALL -> "Repeat all"
+                                else -> "Repeat"
+                            },
+                            isSelected = repeatMode != PlayerSharedViewModel.REPEAT_OFF,
+                            onClick = { viewModel.toggleLoopMode() },
                             contentColor = contentColor,
                             accentColor = dynamicAccentColor,
                             isDark = isDark

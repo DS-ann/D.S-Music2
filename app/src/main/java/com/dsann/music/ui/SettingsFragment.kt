@@ -501,7 +501,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putFloat("player_artwork_scale", safe) }
     }
 
-    private val availablePlayerButtons = listOf("lyrics", "video", "queue", "share", "download", "like", "dislike", "sleep")
+    private val availablePlayerButtons = listOf("lyrics", "video", "queue", "share", "download", "like", "dislike", "sleep", "shuffle", "repeat")
     private val defaultPlayerButtons = listOf("lyrics", "video", "queue", "share", "download")
     private fun readPlayerButtons(): List<String> {
         val stored = prefs.getString("player_buttons", null)
@@ -3186,6 +3186,8 @@ private fun PlayerCustomizationPreview(
                             "like" -> "LIKE"
                             "dislike" -> "NO"
                             "sleep" -> "SLEEP"
+                            "shuffle" -> "SHUFFLE"
+                            "repeat" -> "REPEAT"
                             else -> key.take(4).uppercase()
                         }
                         Text(
@@ -3334,7 +3336,9 @@ private val playerButtonNames = linkedMapOf(
     "download" to "Download",
     "like" to "Like",
     "dislike" to "Not for me",
-    "sleep" to "Sleep timer"
+    "sleep" to "Sleep timer",
+    "shuffle" to "Shuffle",
+    "repeat" to "Repeat"
 )
 
 @Composable
