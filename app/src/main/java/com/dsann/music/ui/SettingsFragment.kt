@@ -2569,7 +2569,6 @@ private fun AppearanceScreen(
                         onSelected = onMiniPlayerStyleChange
                     )
                 },
-                },
                 {
                     SettingsChoiceRow(
                         title = "Mini-player button shape",
