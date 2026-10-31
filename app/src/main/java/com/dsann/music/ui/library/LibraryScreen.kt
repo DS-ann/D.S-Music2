@@ -44,6 +44,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -1415,6 +1416,7 @@ private fun PlaylistsTabContent(
     var selectedOnlinePlaylistToDelete by remember { mutableStateOf<OnlinePlaylist?>(null) }
     var isDeletingOnlinePlaylist by remember { mutableStateOf(false) }
     var showCachePlaylist by remember { mutableStateOf(false) }
+    val playlistGridState = rememberLazyGridState()
 
     BackHandler(enabled = showCachePlaylist) { showCachePlaylist = false }
 
@@ -1582,30 +1584,30 @@ private fun PlaylistsTabContent(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Playlists", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(
-                        localPlaylists.size.toString() + " on device · " +
-                            onlinePlaylists.size.toString() + " on YouTube Music",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    "Playlists",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
                 IconButton(onClick = { showCreatePlaylistDialog = true }) {
                     Icon(Icons.Default.Add, contentDescription = "Create playlist", tint = MaterialTheme.colorScheme.primary)
                 }
             }
 
             LazyVerticalGrid(
+                state = playlistGridState,
                 columns = if (showAsList) GridCells.Fixed(1) else GridCells.Adaptive(minSize = 152.dp),
                 contentPadding = PaddingValues(bottom = 160.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier
-                    .fillMaxSize()
+                    .weight(1f)
+                    .fillMaxWidth()
                     .nestedScroll(nestedScrollConnection)
             ) {
-                item(key = "ds-cache-folder") {
+                item(key = "ds-cache-folder", contentType = "special-playlist-folder") {
                     if (showAsList) {
                         ListItem(
                             headlineContent = { Text("Cache", fontWeight = FontWeight.SemiBold) },
@@ -1650,7 +1652,7 @@ private fun PlaylistsTabContent(
                     }
                 }
 
-                item(key = "ds-create-playlist") {
+                item(key = "ds-create-playlist", contentType = "special-playlist-create") {
                     if (showAsList) {
                         ListItem(
                             headlineContent = { Text("Create playlist", fontWeight = FontWeight.SemiBold) },
@@ -1691,7 +1693,11 @@ private fun PlaylistsTabContent(
                     }
                 }
 
-                items(localPlaylists, key = { "local-" + it.id }) { playlist ->
+                items(
+                    items = localPlaylists,
+                    key = { "local-" + it.id },
+                    contentType = { "local-playlist" }
+                ) { playlist ->
                     if (showAsList) {
                         ListItem(
                             headlineContent = {
@@ -1744,7 +1750,11 @@ private fun PlaylistsTabContent(
                     }
                 }
 
-                items(onlinePlaylists, key = { "youtube-" + it.playlistId }) { playlist ->
+                items(
+                    items = onlinePlaylists,
+                    key = { "youtube-" + it.playlistId },
+                    contentType = { "online-playlist" }
+                ) { playlist ->
                     OnlinePlaylistCard(
                         playlist = playlist,
                         asList = showAsList,
@@ -1825,222 +1835,225 @@ private fun LocalPlaylistDetailsScreen(
                         )
                     )
             )
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 40.dp)
-            ) {
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .statusBarsPadding()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back to Library",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Text(
-                            "Playlist",
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Only the playlist name stays pinned. Artwork, controls and songs scroll below it.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back to Library",
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
-                        IconButton(
-                            onClick = {
-                                viewModel.deleteLocalPlaylist(playlist.id)
-                                onDismiss()
-                            }
-                        ) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = "Delete playlist",
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
                     }
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(196.dp)
-                                .clip(RoundedCornerShape(22.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (!artworkUrl.isNullOrBlank()) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(context)
-                                        .data(artworkUrl)
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = "Playlist artwork",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.PlaylistPlay,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(72.dp)
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(18.dp))
-                        Text(
-                            playlist.title,
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            "${songs.size} songs • On this device",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                        if (songs.isNotEmpty()) {
-                            Spacer(Modifier.height(18.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Button(
-                                    onClick = {
-                                        viewModel.setSongList(songs)
-                                        viewModel.playSong(songs.first())
-                                        onDismiss()
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Default.PlayArrow, null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Play All")
-                                }
-                                OutlinedButton(
-                                    onClick = {
-                                        val shuffled = songs.shuffled()
-                                        viewModel.setSongList(shuffled)
-                                        viewModel.playSong(shuffled.first())
-                                        onDismiss()
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Default.Shuffle, null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Shuffle")
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.height(12.dp))
                     Text(
-                        "Songs",
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                        style = MaterialTheme.typography.titleMedium,
+                        playlist.title,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
+                    IconButton(
+                        onClick = {
+                            viewModel.deleteLocalPlaylist(playlist.id)
+                            onDismiss()
+                        }
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete playlist",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
 
-                if (songs.isEmpty()) {
-                    item {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().height(180.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "This playlist is empty",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                } else {
-                    items(songs, key = { it.id }) { song ->
-                        Surface(
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(bottom = 40.dp)
+                ) {
+                    item(key = "playlist-details-header", contentType = "playlist-header") {
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 4.dp)
-                                .clip(RoundedCornerShape(14.dp)),
-                            shape = RoundedCornerShape(14.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f)
+                                .padding(horizontal = 24.dp, vertical = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Row(
+                            Box(
+                                modifier = Modifier
+                                    .size(196.dp)
+                                    .clip(RoundedCornerShape(22.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (!artworkUrl.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(context)
+                                            .data(artworkUrl)
+                                            .crossfade(false)
+                                            .build(),
+                                        contentDescription = "Playlist artwork",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.PlaylistPlay,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(72.dp)
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(18.dp))
+                            Text(
+                                "${songs.size} songs • On this device",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                            if (songs.isNotEmpty()) {
+                                Spacer(Modifier.height(18.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            viewModel.setSongList(songs)
+                                            viewModel.playSong(songs.first())
+                                            onDismiss()
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Default.PlayArrow, null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Play All")
+                                    }
+                                    OutlinedButton(
+                                        onClick = {
+                                            val shuffled = songs.shuffled()
+                                            viewModel.setSongList(shuffled)
+                                            viewModel.playSong(shuffled.first())
+                                            onDismiss()
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Default.Shuffle, null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Shuffle")
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "Songs",
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    if (songs.isEmpty()) {
+                        item(key = "playlist-empty", contentType = "empty") {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().height(180.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "This playlist is empty",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else {
+                        items(
+                            items = songs,
+                            key = { it.id },
+                            contentType = { "playlist-song" }
+                        ) { song ->
+                            Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable {
-                                        viewModel.setSongList(songs)
-                                        viewModel.playSong(song)
-                                        onDismiss()
-                                    }
-                                    .padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                                    .clip(RoundedCornerShape(14.dp)),
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f)
                             ) {
-                                Box(
+                                Row(
                                     modifier = Modifier
-                                        .size(50.dp)
-                                        .clip(RoundedCornerShape(9.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                                    contentAlignment = Alignment.Center
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            viewModel.setSongList(songs)
+                                            viewModel.playSong(song)
+                                            onDismiss()
+                                        }
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    if (!song.thumbnailUrl.isNullOrBlank()) {
-                                        AsyncImage(
-                                            model = song.thumbnailUrl,
-                                            contentDescription = null,
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Crop
+                                    Box(
+                                        modifier = Modifier
+                                            .size(50.dp)
+                                            .clip(RoundedCornerShape(9.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (!song.thumbnailUrl.isNullOrBlank()) {
+                                            AsyncImage(
+                                                model = song.thumbnailUrl,
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        } else {
+                                            Icon(
+                                                Icons.Default.MusicNote,
+                                                null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            song.title,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
-                                    } else {
+                                        Text(
+                                            song.artist,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.removeSongFromLocalPlaylist(
+                                                playlist.id,
+                                                song.videoId ?: song.id.toString()
+                                            )
+                                        }
+                                    ) {
                                         Icon(
-                                            Icons.Default.MusicNote,
-                                            null,
+                                            Icons.Default.Close,
+                                            contentDescription = "Remove song",
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
-                                }
-                                Spacer(Modifier.width(12.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        song.title,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        song.artist,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                IconButton(
-                                    onClick = {
-                                        viewModel.removeSongFromLocalPlaylist(
-                                            playlist.id,
-                                            song.videoId ?: song.id.toString()
-                                        )
-                                    }
-                                ) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = "Remove song",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
                                 }
                             }
                         }
