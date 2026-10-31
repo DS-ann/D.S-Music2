@@ -343,6 +343,31 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit {putBoolean("dynamic_nav_style", enabled)}
     }
 
+    // ── Navigation dock customization ──────────────────────────────────────
+    private val _navBarStyle = MutableStateFlow(
+        prefs.getString("nav_bar_style", "Floating")?.takeIf {
+            it in listOf("Floating", "Docked", "Minimal")
+        } ?: "Floating"
+    )
+    val navBarStyle: StateFlow<String> = _navBarStyle.asStateFlow()
+    fun setNavBarStyle(value: String) {
+        val safe = value.takeIf { it in listOf("Floating", "Docked", "Minimal") } ?: "Floating"
+        _navBarStyle.value = safe
+        prefs.edit { putString("nav_bar_style", safe) }
+    }
+
+    private val _navBarSize = MutableStateFlow(
+        prefs.getString("nav_bar_size", "Standard")?.takeIf {
+            it in listOf("Compact", "Standard", "Tall")
+        } ?: "Standard"
+    )
+    val navBarSize: StateFlow<String> = _navBarSize.asStateFlow()
+    fun setNavBarSize(value: String) {
+        val safe = value.takeIf { it in listOf("Compact", "Standard", "Tall") } ?: "Standard"
+        _navBarSize.value = safe
+        prefs.edit { putString("nav_bar_size", safe) }
+    }
+
     // ── Dynamic Album Theme ────────────────────────────────────────────────
     private val _dynamicAlbumTheme = MutableStateFlow(prefs.getBoolean(KEY_DYNAMIC_ALBUM_THEME, false))
     val dynamicAlbumTheme: StateFlow<Boolean> = _dynamicAlbumTheme.asStateFlow()
@@ -615,7 +640,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         "scrubber_color", "player_visualizer", "player_button_style", "scrubber_thickness",
         "scrubber_thumb_style", "visualizer_color", "lyrics_text_size", "lyrics_alignment",
         "lyrics_font_family", "ui_density", "nav_label_mode", "hide_nav_labels",
-        "dynamic_nav_style"
+        "dynamic_nav_style", "nav_bar_style", "nav_bar_size"
     )
 
     private fun readSavedAppearanceLooks(): List<String> = runCatching {
@@ -684,6 +709,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         setUiDensity(look.optString("ui_density", _uiDensity.value))
         setNavLabelsMode(look.optString("nav_label_mode", _navLabelsMode.value))
         setDynamicNavStyle(look.optBoolean("dynamic_nav_style", _dynamicNavStyle.value))
+        setNavBarStyle(look.optString("nav_bar_style", _navBarStyle.value))
+        setNavBarSize(look.optString("nav_bar_size", _navBarSize.value))
     }
 
     fun deleteAppearanceLook(name: String) {
@@ -1201,6 +1228,8 @@ fun SettingsScreenContent(
     val autoplayEnabled by viewModel.autoplayEnabled.collectAsStateWithLifecycle()
     val navLabelsMode by viewModel.navLabelsMode.collectAsStateWithLifecycle()
     val dynamicNavStyle by viewModel.dynamicNavStyle.collectAsStateWithLifecycle()
+    val navBarStyle by viewModel.navBarStyle.collectAsStateWithLifecycle()
+    val navBarSize by viewModel.navBarSize.collectAsStateWithLifecycle()
     val crossfadeEnabled by viewModel.crossfadeEnabled.collectAsStateWithLifecycle()
     val crossfadeDuration by viewModel.crossfadeDuration.collectAsStateWithLifecycle()
     val audioFocus by viewModel.audioFocus.collectAsStateWithLifecycle()
@@ -1405,6 +1434,10 @@ fun SettingsScreenContent(
                 onNavLabelsModeChange = { viewModel.setNavLabelsMode(it) },
                 dynamicNavStyle = dynamicNavStyle,
                 onDynamicNavStyleChange = { viewModel.setDynamicNavStyle(it) },
+                navBarStyle = navBarStyle,
+                onNavBarStyleChange = { viewModel.setNavBarStyle(it) },
+                navBarSize = navBarSize,
+                onNavBarSizeChange = { viewModel.setNavBarSize(it) },
                 playerLayout = playerLayout,
                 onPlayerLayoutChange = { viewModel.setPlayerLayout(it) },
                 playerButtons = playerButtons,
@@ -2445,6 +2478,10 @@ private fun AppearanceScreen(
     onNavLabelsModeChange: (String) -> Unit,
     dynamicNavStyle: Boolean,
     onDynamicNavStyleChange: (Boolean) -> Unit,
+    navBarStyle: String,
+    onNavBarStyleChange: (String) -> Unit,
+    navBarSize: String,
+    onNavBarSizeChange: (String) -> Unit,
     playerLayout: String,
     onPlayerLayoutChange: (String) -> Unit,
     playerButtons: List<String>,
@@ -2517,11 +2554,8 @@ private fun AppearanceScreen(
 
             SettingsHeader("Colors")
             SettingsGroupCard(listOf {
-                SettingsChoiceRow(
-                    title = "Accent palette",
-                    description = "Choose the app-wide accent. Dynamic colors can still tint the interface from the current artwork.",
+                ColorPaletteSelector(
                     selected = appearancePreset,
-                    options = listOf("Ocean", "Violet", "Emerald", "Amber", "Rose", "Monochrome", "Crimson", "Teal", "Cyan", "Indigo", "Lime", "Graphite"),
                     onSelected = onAppearancePresetChange
                 )
             })
@@ -2773,8 +2807,84 @@ private fun AppearanceScreen(
                         onSelected = onNavLabelsModeChange
                     )
                 }
+                add {
+                    SettingsChoiceRow(
+                        title = "Dock style",
+                        description = "Floating keeps a compact pill, Docked spans the bottom edge, and Minimal removes the dock surface.",
+                        selected = navBarStyle,
+                        options = listOf("Floating", "Docked", "Minimal"),
+                        onSelected = onNavBarStyleChange
+                    )
+                }
+                add {
+                    SettingsChoiceRow(
+                        title = "Dock size",
+                        description = "Adjust the navigation touch area and icon scale.",
+                        selected = navBarSize,
+                        options = listOf("Compact", "Standard", "Tall"),
+                        onSelected = onNavBarSizeChange
+                    )
+                }
                 add { DynamicNavStyleRow(dynamicNavStyle, onDynamicNavStyleChange) }
             })
+        }
+    }
+}
+
+@Composable
+private fun ColorPaletteSelector(selected: String, onSelected: (String) -> Unit) {
+    val palettes = listOf(
+        "Ocean" to Color(0xFF7C9CFF),
+        "Violet" to Color(0xFFB69CFF),
+        "Emerald" to Color(0xFF62C9A2),
+        "Amber" to Color(0xFFFFC36F),
+        "Rose" to Color(0xFFFF8FA3),
+        "Monochrome" to Color(0xFFC9CDD4),
+        "Crimson" to Color(0xFFD94A65),
+        "Teal" to Color(0xFF36B9A8),
+        "Cyan" to Color(0xFF43B8D2),
+        "Indigo" to Color(0xFF6475E9),
+        "Lime" to Color(0xFF9FBF42),
+        "Graphite" to Color(0xFF8A939F)
+    )
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text("Accent palette", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            "Choose the app-wide accent. Dynamic colors can still tint the interface from the current artwork.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(13.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            palettes.forEach { (name, color) ->
+                val active = selected == name
+                Column(
+                    Modifier.width(56.dp).clickable { onSelected(name) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Box(
+                        Modifier.size(34.dp).clip(CircleShape)
+                            .background(color)
+                            .then(
+                                if (active) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                else Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                            )
+                    )
+                    Text(
+                        name,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+            }
         }
     }
 }
