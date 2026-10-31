@@ -1489,7 +1489,10 @@ fun SettingsScreenContent(
                 onDynamicAlbumThemeChange = { viewModel.setDynamicAlbumTheme(it) },
                 savedLooks = savedAppearanceLooks,
                 onSaveLook = { viewModel.saveAppearanceLook(it) },
-                onApplyLook = { viewModel.applyAppearanceLook(it) },
+                onApplyLook = {
+                    viewModel.applyAppearanceLook(it)
+                    playerSharedViewModel.audioService?.updateMediaSessionCustomLayout()
+                },
                 onDeleteLook = { viewModel.deleteAppearanceLook(it) },
                 appearancePreset = appearancePreset,
                 onAppearancePresetChange = { viewModel.setAppearancePreset(it) },
@@ -1535,8 +1538,14 @@ fun SettingsScreenContent(
                 onPlayerButtonsChange = { viewModel.setPlayerButtons(it) },
                 onMovePlayerButton = { from, to -> viewModel.movePlayerButton(from, to) },
                 sessionButtons = sessionButtons,
-                onSessionButtonsChange = { viewModel.setSessionButtons(it) },
-                onMoveSessionButton = { from, to -> viewModel.moveSessionButton(from, to) },
+                onSessionButtonsChange = {
+                    viewModel.setSessionButtons(it)
+                    playerSharedViewModel.audioService?.updateMediaSessionCustomLayout()
+                },
+                onMoveSessionButton = { from, to ->
+                    viewModel.moveSessionButton(from, to)
+                    playerSharedViewModel.audioService?.updateMediaSessionCustomLayout()
+                },
                 playerTitleAlign = playerTitleAlign,
                 onPlayerTitleAlignChange = { viewModel.setPlayerTitleAlign(it) },
                 playerTitleSize = playerTitleSize,

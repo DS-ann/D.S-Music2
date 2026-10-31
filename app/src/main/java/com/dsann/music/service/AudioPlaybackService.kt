@@ -2466,7 +2466,10 @@ class AudioPlaybackService : MediaSessionService() {
                 .add(CMD_TOGGLE_LOOP)
                 .add(CMD_CYCLE_PLAYBACK_MODE)
                 .add(CMD_TOGGLE_FAV)
-            configuredSessionButtons().forEach { key ->
+            // Authorise the whole supported action set for this controller connection.
+            // The visible custom layout can then be reordered or changed without a
+            // controller reconnecting just to receive a newly selected command.
+            supportedSessionButtons.forEach { key ->
                 sessionCommandsBuilder.add(sessionButtonCommand(key))
             }
             val sessionCommands = sessionCommandsBuilder.build()
