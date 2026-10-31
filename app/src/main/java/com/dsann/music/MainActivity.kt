@@ -53,9 +53,13 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -65,6 +69,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -77,6 +82,11 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
@@ -89,6 +99,7 @@ import com.dsann.music.model.SongItem
 import com.dsann.music.service.AudioPlaybackService
 import com.dsann.music.ui.AudioFormatChoiceDialogHost
 import com.dsann.music.ui.PlayerBottomSheetCompose
+import com.dsann.music.ui.LocalRootTabActive
 import com.dsann.music.ui.SettingsScreenContent
 import com.dsann.music.ui.TagEditorScreenEntryPoint
 import com.dsann.music.ui.explore.ExploreScreen
@@ -204,6 +215,9 @@ class MainActivity : AppCompatActivity() {
                 val hasSeenOnboarding by prefs.observeKey("has_seen_onboarding_1_8", false)
 
                 val currentNavController = rememberNavController()
+                val rootTabRoutes = remember { setOf("explore", "library", "local_music", "settings") }
+                val cachedRootTabs = remember { mutableStateListOf<String>() }
+                var lastRootTab by remember { mutableStateOf("explore") }
                 LaunchedEffect(currentNavController) {
                     navController = currentNavController
                 }
@@ -317,6 +331,19 @@ class MainActivity : AppCompatActivity() {
                 ) { paddingValues ->
                     val navBackStackEntry by currentNavController.currentBackStackEntryAsState()
                     val currentDestination = navBackStackEntry?.destination
+                    val currentRoute = currentDestination?.route
+                    LaunchedEffect(currentRoute) {
+                        if (currentRoute in rootTabRoutes) {
+                            val route = currentRoute!!
+                            lastRootTab = route
+                            if (route !in cachedRootTabs) cachedRootTabs.add(route)
+                        }
+                    }
+                    val activeCachedRootTab = when {
+                        currentRoute in rootTabRoutes -> currentRoute
+                        currentRoute == "tag_editor" || currentRoute == "google_signin" -> lastRootTab
+                        else -> null
+                    }
                     LaunchedEffect(currentDestination?.route) {
                         exploreViewModel.setExplorePageActive(currentDestination?.route == "explore")
                     }
@@ -371,6 +398,51 @@ class MainActivity : AppCompatActivity() {
                                 .fillMaxSize()
                                 .padding(start = railInset, bottom = finalPadding.coerceAtLeast(0.dp))
                         ) {
+                            cachedRootTabs.forEach { route ->
+                                val active = route == activeCachedRootTab
+                                Box(
+                                    modifier = (if (active) Modifier.fillMaxSize() else Modifier.size(1.dp))
+                                        .graphicsLayer { alpha = if (active) 1f else 0f }
+                                        .zIndex(if (active) 0f else -1f)
+                                ) {
+                                    RetainedRootTabLayer(active = active) {
+                                        when (route) {
+                                            "explore" -> ExploreScreen(
+                                                viewModel = exploreViewModel,
+                                                playerSharedViewModel = playerViewModel,
+                                                onNavigateToLibrary = {
+                                                    currentNavController.navigate("library") {
+                                                        popUpTo(currentNavController.graph.findStartDestination().id) {
+                                                            saveState = true
+                                                        }
+                                                        launchSingleTop = true
+                                                        restoreState = true
+                                                    }
+                                                }
+                                            )
+                                            "library" -> LibraryScreen(
+                                                viewModel = playerViewModel,
+                                                onEditSong = { song ->
+                                                    editingSong = song
+                                                    currentNavController.navigate("tag_editor")
+                                                },
+                                                onNavigateToExplore = {
+                                                    currentNavController.navigate("explore") {
+                                                        popUpTo(currentNavController.graph.findStartDestination().id) {
+                                                            saveState = true
+                                                        }
+                                                        launchSingleTop = true
+                                                        restoreState = true
+                                                    }
+                                                }
+                                            )
+                                            "local_music" -> LocalMusicScreen(viewModel = playerViewModel)
+                                            "settings" -> SettingsScreenContent()
+                                        }
+                                    }
+                                }
+                            }
+
                             val routeIndices = remember {
                                 mapOf(
                                     "explore" to 0,
@@ -466,46 +538,10 @@ class MainActivity : AppCompatActivity() {
                                         }
                                     )
                                 }
-                                composable("explore") {
-                                    ExploreScreen(
-                                        viewModel = exploreViewModel,
-                                        playerSharedViewModel = playerViewModel,
-                                        onNavigateToLibrary = {
-                                            currentNavController.navigate("library") {
-                                                popUpTo(currentNavController.graph.findStartDestination().id) {
-                                                    saveState = true
-                                                }
-                                                launchSingleTop = true
-                                                restoreState = true
-                                            }
-                                        }
-                                    )
-                                }
-                                composable("library") {
-                                    LibraryScreen(
-                                        viewModel = playerViewModel,
-                                        onEditSong = { song ->
-                                            editingSong = song
-                                            currentNavController.navigate("tag_editor")
-                                        },
-                                        onNavigateToExplore = {
-                                            currentNavController.navigate("explore") {
-                                                popUpTo(currentNavController.graph.findStartDestination().id) {
-                                                    saveState = true
-                                                }
-                                                launchSingleTop = true
-                                                restoreState = true
-                                            }
-                                        }
-                                    )
-                                }
-                                composable("local_music") {
-                                    LocalMusicScreen(viewModel = playerViewModel)
-                                }
-                                composable("settings") {
-                                    SettingsScreenContent(
-                                    )
-                                }
+                                composable("explore") { }
+                                composable("library") { }
+                                composable("local_music") { }
+                                composable("settings") { }
                                 composable("tag_editor") {
                                     editingSong?.let { song ->
                                         TagEditorScreenEntryPoint(
@@ -988,4 +1024,51 @@ class MainActivity : AppCompatActivity() {
         private const val KEY_PREVIOUS_DESTINATION = "key_previous_destination"
         const val EXTRA_OPEN_PLAYER = "open_player"
     }
+}
+
+
+/**
+ * A root tab remains composed after its first visit, preserving scroll and nested-screen state.
+ * When inactive, its Flow collectors are paused by moving its child lifecycle to CREATED.
+ */
+@Composable
+private fun RetainedRootTabLayer(
+    active: Boolean,
+    content: @Composable () -> Unit
+) {
+    val parentOwner = LocalLifecycleOwner.current
+    val tabOwner = remember(parentOwner) { RetainedRootTabLifecycleOwner() }
+    var parentState by remember(parentOwner) {
+        mutableStateOf(parentOwner.lifecycle.currentState)
+    }
+
+    DisposableEffect(parentOwner, tabOwner) {
+        val observer = LifecycleEventObserver { _, _ ->
+            parentState = parentOwner.lifecycle.currentState
+        }
+        parentOwner.lifecycle.addObserver(observer)
+        parentState = parentOwner.lifecycle.currentState
+        onDispose {
+            parentOwner.lifecycle.removeObserver(observer)
+            tabOwner.lifecycle.currentState = Lifecycle.State.DESTROYED
+        }
+    }
+
+    SideEffect {
+        val targetState = if (active) parentState else Lifecycle.State.CREATED
+        if (tabOwner.lifecycle.currentState != targetState) {
+            tabOwner.lifecycle.currentState = targetState
+        }
+    }
+
+    CompositionLocalProvider(
+        LocalLifecycleOwner provides tabOwner,
+        LocalRootTabActive provides active
+    ) {
+        content()
+    }
+}
+
+private class RetainedRootTabLifecycleOwner : LifecycleOwner {
+    override val lifecycle: LifecycleRegistry = LifecycleRegistry(this)
 }

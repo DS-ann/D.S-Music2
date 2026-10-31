@@ -115,6 +115,7 @@ import com.dsann.music.util.FavoritesManager
 import com.dsann.music.util.SongDownloader
 import com.dsann.music.viewmodel.ExploreViewModel
 import com.dsann.music.viewmodel.PlayerSharedViewModel
+import com.dsann.music.ui.LocalRootTabActive
 
 /**
  * Standard UI Shimmer Modifier to render placeholder skeleton states efficiently.
@@ -135,16 +136,19 @@ fun ShimmerModifier(
 
 fun Modifier.shimmerEffect(): Modifier = composed {
     var positionInRoot by remember { mutableStateOf(Offset.Zero) }
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val translateAnim by transition.animateFloat(
-        initialValue = -1000f,
-        targetValue = 3000f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shimmer_anim"
-    )
+    val translateAnim = if (LocalRootTabActive.current) {
+        val transition = rememberInfiniteTransition(label = "shimmer")
+        val animatedValue by transition.animateFloat(
+            initialValue = -1000f,
+            targetValue = 3000f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 2000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "shimmer_anim"
+        )
+        animatedValue
+    } else 0f
     val shimmerColors = listOf(
         MaterialTheme.colorScheme.surfaceContainerLow,
         MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -170,6 +174,18 @@ fun AnimatedEqualizerBars(
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.primary
 ) {
+    if (!LocalRootTabActive.current) {
+        Row(
+            modifier = modifier,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            Box(Modifier.width(3.dp).fillMaxHeight(0.45f).background(color, RoundedCornerShape(1.dp)))
+            Box(Modifier.width(3.dp).fillMaxHeight(0.62f).background(color, RoundedCornerShape(1.dp)))
+            Box(Modifier.width(3.dp).fillMaxHeight(0.36f).background(color, RoundedCornerShape(1.dp)))
+        }
+        return
+    }
     val infiniteTransition = rememberInfiniteTransition(label = "equalizer")
     val height1 by infiniteTransition.animateFloat(
         initialValue = 0.2f, targetValue = 0.8f,
@@ -352,14 +368,17 @@ fun SearchResultItem(
                 contentScale = ContentScale.Crop
             )
             if (isLoading) {
-                val loadingTransition = rememberInfiniteTransition(label = "loading_shimmer")
-                val shimmerAlpha by loadingTransition.animateFloat(
-                    initialValue = 0.3f, targetValue = 0.7f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(800, easing = LinearEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ), label = "shimmer_alpha"
-                )
+                val shimmerAlpha = if (LocalRootTabActive.current) {
+                    val loadingTransition = rememberInfiniteTransition(label = "loading_shimmer")
+                    val animatedAlpha by loadingTransition.animateFloat(
+                        initialValue = 0.3f, targetValue = 0.7f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(800, easing = LinearEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ), label = "shimmer_alpha"
+                    )
+                    animatedAlpha
+                } else 0.45f
                 Box(
                     modifier = Modifier.fillMaxSize().clip(imageShape)
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = shimmerAlpha)),
