@@ -56,22 +56,16 @@ import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.ThumbUpOffAlt
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -672,11 +666,8 @@ fun BentoCell(
         is SearchItem.Playlist -> item.playlist.thumbnailUrl
     }
 
-    Card(
-        modifier = modifier.clip(RoundedCornerShape(24.dp)).clickable(onClick = onClick),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        elevation = CardDefaults.cardElevation(0.dp)
+    Box(
+        modifier = modifier.clip(RoundedCornerShape(24.dp)).clickable(onClick = onClick)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImage(
@@ -698,16 +689,16 @@ fun BentoCell(
                 verticalArrangement = Arrangement.Bottom
             ) {
                 if (isFeature) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f),
-                        shape = CircleShape,
+                    Box(
                         modifier = Modifier.padding(bottom = 8.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
                             text = "Feature",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Black,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
@@ -1075,11 +1066,10 @@ fun HomeSectionRow(
                             is SearchItem.Playlist -> item.playlist.thumbnailUrl
                         }
 
-                        Card(
-                            modifier = Modifier.width(320.dp).padding(vertical = 4.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                        Box(
+                            modifier = Modifier.width(320.dp).padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1111,19 +1101,21 @@ fun HomeSectionRow(
                                     horizontalArrangement = Arrangement.Start,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    IconButton(
-                                        onClick = {
-                                            when (item) {
-                                                is SearchItem.Song -> onSongClick(item.song)
-                                                is SearchItem.Playlist -> onPlaylistClick(item.playlist)
-                                                else -> {}
-                                            }
-                                        },
+                                    Box(
                                         modifier = Modifier.size(54.dp)
-                                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primaryContainer)
+                                            .clickable {
+                                                when (item) {
+                                                    is SearchItem.Song -> onSongClick(item.song)
+                                                    is SearchItem.Playlist -> onPlaylistClick(item.playlist)
+                                                    else -> {}
+                                                }
+                                            },
+                                        contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
-                                            Icons.Default.PlayArrow, 
+                                            Icons.Default.PlayArrow,
                                             contentDescription = "Play",
                                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                             modifier = Modifier.size(32.dp)
@@ -1258,11 +1250,11 @@ fun HomeCarouselItem(
             modifier = Modifier.fillMaxWidth().aspectRatio(1f),
             contentAlignment = Alignment.TopStart
         ) {
-            Card(
-                modifier = Modifier.fillMaxSize().sharedElementIfAvailable("image-$itemId"),
-                shape = imageShape,
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+            Box(
+                modifier = Modifier.fillMaxSize()
+                    .sharedElementIfAvailable("image-$itemId")
+                    .clip(imageShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     AsyncImage(
@@ -1384,39 +1376,40 @@ fun HomeSongListItem(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun CompactMenuItem(
     text: String,
     icon: ImageVector,
-    shapes: ListItemShapes = ListItemDefaults.shapes(),
     onClick: () -> Unit
 ) {
-    ListItem(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        leadingContent = {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(36.dp)
+                .clip(RoundedCornerShape(11.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)),
+            contentAlignment = Alignment.Center
+        ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(24.dp)
-            )
-        },
-        shapes = shapes,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        colors = ListItemDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            headlineColor = MaterialTheme.colorScheme.onSurface,
-            leadingIconColor = MaterialTheme.colorScheme.primary
-        ),
-        content = {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(21.dp)
             )
         }
-    )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
