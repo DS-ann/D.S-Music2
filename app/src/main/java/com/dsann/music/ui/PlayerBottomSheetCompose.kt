@@ -1445,7 +1445,12 @@ fun PlayerBottomSheetCompose(
                                 val startPaddingPx = sheetVisualState.currentHorizontalPaddingStartPxProvider()
 
                                 // Position relative to the Surface top-left
-                                val xStartPx = startPaddingPx + 16.dp.toPx()
+                                val xStartPx = startPaddingPx +
+                                    (if (configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+                                        10.dp
+                                    } else {
+                                        16.dp
+                                    }).toPx()
                                 val xEndPx = if (useWidePlayer) {
                                     with(density) {
                                         (20.dp + (containerWidthDp - 60.dp) * 0.54f / 2f - albumArtSizeDp / 2f).toPx()
@@ -1455,7 +1460,8 @@ fun PlayerBottomSheetCompose(
                                 }
 
                                 val yStartPx = 16.dp.toPx()
-                                val minTopOffsetDp = with(density) { statusBarTopPx.toDp() } + 68.dp
+                                val minTopOffsetDp = with(density) { statusBarTopPx.toDp() } +
+                                    if (configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) 52.dp else 68.dp
                                 val topOffsetDp = if (useWidePlayer) {
                                     minTopOffsetDp
                                 } else {
