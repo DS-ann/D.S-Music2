@@ -1863,7 +1863,7 @@ private fun MiniPlayerContentInternal(
     val controlIconSet by miniPlayerPreferences.observeKey("mini_player_control_icons", "Classic")
     val controlShape: Shape = when (controlShapeName) {
         "Rounded" -> RoundedCornerShape(12.dp)
-        "Pill" -> RoundedCornerShape(20.dp)
+        "Pill" -> RoundedCornerShape(50.dp)
         else -> CircleShape
     }
     val miniControlBackgroundColor = if (isDark) Color(0x1AFFFFFF) else Color(0x0D000000)
@@ -1922,7 +1922,7 @@ private fun MiniPlayerContentInternal(
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(
                 onClick = { viewModel.playPreviousSong() },
-                modifier = Modifier.size(width = if (controlShapeName == "Pill") 48.dp else 40.dp, height = 40.dp).then(controlBackground)
+                modifier = Modifier.size(width = if (controlShapeName == "Pill") 64.dp else 48.dp, height = 48.dp).then(controlBackground)
             ) {
                 if (controlIconSet == "Classic") {
                     Icon(
@@ -1947,7 +1947,7 @@ private fun MiniPlayerContentInternal(
                         if (isPlaying) viewModel.pauseAudio() else viewModel.playAudio()
                     }
                 },
-                modifier = Modifier.size(width = if (controlShapeName == "Pill") 50.dp else 42.dp, height = 42.dp).then(controlBackground)
+                modifier = Modifier.size(width = if (controlShapeName == "Pill") 68.dp else 48.dp, height = 48.dp).then(controlBackground)
             ) {
                 if (isLoading) {
                     androidx.compose.material3.CircularProgressIndicator(
@@ -1972,7 +1972,7 @@ private fun MiniPlayerContentInternal(
 
             IconButton(
                 onClick = { viewModel.playNextSong() },
-                modifier = Modifier.size(width = if (controlShapeName == "Pill") 48.dp else 40.dp, height = 40.dp).then(controlBackground)
+                modifier = Modifier.size(width = if (controlShapeName == "Pill") 64.dp else 48.dp, height = 48.dp).then(controlBackground)
             ) {
                 if (controlIconSet == "Classic") {
                     Icon(
