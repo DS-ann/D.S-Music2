@@ -62,6 +62,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -1380,6 +1382,7 @@ fun HomeSongListItem(
 fun CompactMenuItem(
     text: String,
     icon: ImageVector,
+    shapes: ListItemShapes = ListItemDefaults.shapes(),
     onClick: () -> Unit
 ) {
     Row(
