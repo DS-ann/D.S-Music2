@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
@@ -40,9 +41,9 @@ private val DsmusicPanelShape = RoundedCornerShape(18.dp)
 fun DsmusicCard(
     modifier: Modifier = Modifier,
     shape: Shape = DsmusicPanelShape,
-    colors: Any? = null,
+    colors: ButtonColors? = null,
     elevation: Any? = null,
-    border: Any? = null,
+    border: BorderStroke? = null,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -77,7 +78,9 @@ fun DsmusicSurface(
             )
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {
-        content()
+        CompositionLocalProvider(LocalContentColor provides contentColor) {
+            content()
+        }
     }
 }
 
@@ -138,23 +141,37 @@ fun DsmusicButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     shape: Shape = RoundedCornerShape(14.dp),
-    colors: Any? = null,
-    border: Any? = null,
+    colors: ButtonColors? = null,
+    border: BorderStroke? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
     elevation: Any? = null,
     interactionSource: Any? = null,
     content: @Composable RowScope.() -> Unit
 ) {
-    val accent = MaterialTheme.colorScheme.primary
+    val scheme = MaterialTheme.colorScheme
+    val backgroundColor = colors?.containerColor(enabled)?.value
+        ?: if (enabled) scheme.primary else scheme.surfaceVariant
+    val foregroundColor = colors?.contentColor(enabled)?.value
+        ?: if (enabled) scheme.onPrimary else scheme.onSurfaceVariant
     Row(
         modifier = modifier.defaultMinSize(minHeight = 40.dp).clip(shape)
-            .background(accent.copy(alpha = if (enabled) 0.16f else 0.06f))
-            .border(1.dp, accent.copy(alpha = if (enabled) 0.24f else 0.08f), shape)
+            .background(backgroundColor)
+            .then(
+                if (border != null) Modifier.border(border, shape)
+                else Modifier.border(
+                    1.dp,
+                    backgroundColor.copy(alpha = if (enabled) 0.92f else 0.36f),
+                    shape
+                )
+            )
             .clickable(enabled = enabled, onClick = onClick).padding(contentPadding),
         horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-        content = content
-    )
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CompositionLocalProvider(LocalContentColor provides foregroundColor) {
+            content()
+        }
+    }
 }
 
 @Composable
@@ -163,21 +180,35 @@ fun DsmusicOutlinedButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     shape: Shape = RoundedCornerShape(14.dp),
-    colors: Any? = null,
-    border: Any? = null,
+    colors: ButtonColors? = null,
+    border: BorderStroke? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
     interactionSource: Any? = null,
     content: @Composable RowScope.() -> Unit
 ) {
+    val scheme = MaterialTheme.colorScheme
+    val backgroundColor = colors?.containerColor(enabled)?.value ?: scheme.surfaceContainerLow
+    val foregroundColor = colors?.contentColor(enabled)?.value
+        ?: if (enabled) scheme.onSurface else scheme.onSurfaceVariant
     Row(
         modifier = modifier.defaultMinSize(minHeight = 40.dp).clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f), shape)
+            .background(backgroundColor)
+            .then(
+                if (border != null) Modifier.border(border, shape)
+                else Modifier.border(
+                    1.dp,
+                    scheme.outlineVariant.copy(alpha = if (enabled) 0.55f else 0.28f),
+                    shape
+                )
+            )
             .clickable(enabled = enabled, onClick = onClick).padding(contentPadding),
         horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-        content = content
-    )
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CompositionLocalProvider(LocalContentColor provides foregroundColor) {
+            content()
+        }
+    }
 }
 
 @Composable
@@ -185,18 +216,20 @@ fun DsmusicTextButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    colors: Any? = null,
+    colors: ButtonColors? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
     interactionSource: Any? = null,
     content: @Composable RowScope.() -> Unit
 ) {
+    val contentColor = colors?.contentColor(enabled)?.value ?: MaterialTheme.colorScheme.primary
     Row(
         modifier = modifier.clip(RoundedCornerShape(10.dp))
             .clickable(enabled = enabled, onClick = onClick).padding(contentPadding),
         horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-        content = content
-    )
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CompositionLocalProvider(LocalContentColor provides contentColor) { content() }
+    }
 }
 
 @Composable
@@ -265,7 +298,7 @@ fun DsmusicSwitchControl(
     val accent = MaterialTheme.colorScheme.primary
     Box(
         modifier = modifier.size(width = 44.dp, height = 26.dp).clip(CircleShape)
-            .background(if (checked) accent.copy(alpha = if (enabled) 0.9f else 0.35f) else MaterialTheme.colorScheme.surfaceVariant)
+            .background(if (checked && enabled) accent else MaterialTheme.colorScheme.surfaceVariant)
             .clickable(enabled = enabled && onCheckedChange != null) { onCheckedChange?.invoke(!checked) }
             .padding(horizontal = 3.dp),
         contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
