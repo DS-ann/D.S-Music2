@@ -50,7 +50,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -546,20 +545,17 @@ class MainActivity : AppCompatActivity() {
                                 if (dynamicNavStyle) 34.dp else 26.dp,
                                 label = "RailIconSize"
                             )
-                            Surface(
+                            Column(
                                 modifier = Modifier
                                     .align(Alignment.CenterStart)
                                     .padding(start = railStartPadding)
-                                    .width(76.dp),
-                                shape = RoundedCornerShape(38.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainer,
-                                tonalElevation = 6.dp
+                                    .width(76.dp)
+                                    .clip(RoundedCornerShape(22.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                                    .padding(vertical = 8.dp, horizontal = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
                                     val items = listOf(
                                         Triple("explore", "Explore", R.drawable.ic_explore),
                                         Triple("library", "Library", R.drawable.ic_library_music),
@@ -611,7 +607,6 @@ class MainActivity : AppCompatActivity() {
                                             }
                                         }
                                     }
-                                }
                             }
                         }
 
