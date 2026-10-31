@@ -1225,96 +1225,75 @@ fun FullPlayer(
             val centerIconColor = if (minimalTransport) dynamicAccentColor
                 else if (isDark) Color(0xFF1C1B1F) else Color.White
 
-            androidx.compose.material3.ButtonGroup(
+            // D.S Launcher-style transport controls: flat rounded touch targets with
+            // independent sizing and no Material ButtonGroup indicator/elevation layers.
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                expandedRatio = 0.3f,
-                overflowIndicator = {}
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                val scope = this
-                customItem(
-                    buttonGroupContent = {
-                        androidx.compose.material3.Button(
-                            onClick = onPreviousClick,
-                            modifier = with(scope) {
-                                Modifier.weight(1f).height(if (compactLandscape) 52.dp else 76.dp)
-                            },
-                            shape = transportShape,
-                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                containerColor = sideControlColor,
-                                contentColor = sideIconColor
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(if (compactLandscape) 52.dp else 76.dp)
+                        .clip(transportShape)
+                        .background(sideControlColor)
+                        .clickable(onClick = onPreviousClick),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_skip_previous),
+                        contentDescription = "Previous Song",
+                        modifier = Modifier.size(34.dp),
+                        tint = sideIconColor
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1.2f)
+                        .height(if (compactLandscape) 52.dp else 76.dp)
+                        .clip(transportShape)
+                        .background(centerControlColor)
+                        .clickable(enabled = !uiState.isLoading) { onPlayPauseClick() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (uiState.isLoading) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(30.dp),
+                            color = centerIconColor,
+                            strokeWidth = 2.5.dp
+                        )
+                    } else {
+                        Icon(
+                            painter = painterResource(
+                                id = if (uiState.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
                             ),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_skip_previous),
-                                contentDescription = "Previous Song",
-                                modifier = Modifier.size(36.dp),
-                                tint = sideIconColor
-                            )
-                        }
-                    },
-                    menuContent = {}
-                )
-                customItem(
-                    buttonGroupContent = {
-                        androidx.compose.material3.Button(
-                            onClick = { if (!uiState.isLoading) onPlayPauseClick() },
-                            modifier = with(scope) {
-                                Modifier.weight(1.2f).height(if (compactLandscape) 52.dp else 76.dp)
-                            },
-                            shape = transportShape,
-                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                containerColor = centerControlColor,
-                                contentColor = centerIconColor
-                            ),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
-                        ) {
-                            if (uiState.isLoading) {
-                                androidx.compose.material3.CircularProgressIndicator(
-                                    modifier = Modifier.size(32.dp),
-                                    color = centerIconColor,
-                                    strokeWidth = 3.dp
-                                )
-                            } else {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (uiState.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
-                                    ),
-                                    contentDescription = if (uiState.isPlaying) "Pause" else "Play",
-                                    modifier = Modifier.size(42.dp),
-                                    tint = centerIconColor
-                                )
-                            }
-                        }
-                    },
-                    menuContent = {}
-                )
-                customItem(
-                    buttonGroupContent = {
-                        androidx.compose.material3.Button(
-                            onClick = onNextClick,
-                            modifier = with(scope) {
-                                Modifier.weight(1f).height(if (compactLandscape) 52.dp else 76.dp)
-                            },
-                            shape = transportShape,
-                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                containerColor = sideControlColor,
-                                contentColor = sideIconColor
-                            ),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_skip_next),
-                                contentDescription = "Next Song",
-                                modifier = Modifier.size(36.dp),
-                                tint = sideIconColor
-                            )
-                        }
-                    },
-                    menuContent = {}
-                )
+                            contentDescription = if (uiState.isPlaying) "Pause" else "Play",
+                            modifier = Modifier.size(40.dp),
+                            tint = centerIconColor
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(if (compactLandscape) 52.dp else 76.dp)
+                        .clip(transportShape)
+                        .background(sideControlColor)
+                        .clickable(onClick = onNextClick),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_skip_next),
+                        contentDescription = "Next Song",
+                        modifier = Modifier.size(34.dp),
+                        tint = sideIconColor
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 16.dp))
