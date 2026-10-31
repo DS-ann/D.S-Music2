@@ -43,6 +43,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.KeyboardDoubleArrowLeft
 import androidx.compose.material.icons.filled.KeyboardDoubleArrowRight
 import androidx.compose.material.icons.filled.Pause
@@ -1015,6 +1017,12 @@ fun PlayerBottomSheetCompose(
         val playerContentExpansionFraction = remember(viewModel) {
             Animatable(restoredExpansionFraction)
         }
+
+        // Observe the animation through a threshold, not as a raw Float in composition.
+        // The old direct reads recomposed the player subtree on every animation frame.
+        val isPlayerFullyExpanded by remember(playerContentExpansionFraction) {
+            derivedStateOf { playerContentExpansionFraction.value > 0.95f }
+        }
         val isPlaybackReady by viewModel.isPlaybackReady.collectAsStateWithLifecycle()
 
         var currentSheetContentState by remember(viewModel) {
@@ -1590,7 +1598,7 @@ fun PlayerBottomSheetCompose(
                         if (
                             isVideoMode &&
                             audioService != null &&
-                            playerContentExpansionFraction.value > 0.95f &&
+                            isPlayerFullyExpanded &&
                             !isLyricsModeEnabled &&
                             !isQueueExpanded
                         ) {
@@ -1727,7 +1735,7 @@ fun PlayerBottomSheetCompose(
                                 songList = songList,
                                 currentSongIndex = uiState.currentSongIndex,
                                 context = context,
-                                userScrollEnabled = playerContentExpansionFraction.value > 0.95f && !isLyricsModeEnabled && !isQueueExpanded,
+                                userScrollEnabled = isPlayerFullyExpanded && !isLyricsModeEnabled && !isQueueExpanded,
                                 modifier = Modifier.fillMaxSize()
                             )
                             MiniPlayerArtworkProgressOverlay(
@@ -1862,8 +1870,8 @@ private fun MiniPlayerContentInternal(
     val controlShapeName by miniPlayerPreferences.observeKey("mini_player_control_shape", "Circle")
     val controlIconSet by miniPlayerPreferences.observeKey("mini_player_control_icons", "Classic")
     val controlShape: Shape = when (controlShapeName) {
-        "Rounded" -> RoundedCornerShape(12.dp)
-        "Pill" -> RoundedCornerShape(50.dp)
+        "Rounded" -> RoundedCornerShape(14.dp)
+        "Pill" -> RoundedCornerShape(percent = 50)
         else -> CircleShape
     }
     val miniControlBackgroundColor = if (isDark) Color(0x1AFFFFFF) else Color(0x0D000000)
@@ -1872,6 +1880,18 @@ private fun MiniPlayerContentInternal(
     } else {
         Modifier.background(miniControlBackgroundColor, controlShape)
     }
+    val sideControlWidth = when (controlShapeName) {
+        "Pill" -> 64.dp
+        "Rounded" -> 52.dp
+        else -> 48.dp
+    }
+    val centerControlWidth = when (controlShapeName) {
+        "Pill" -> 68.dp
+        "Rounded" -> 56.dp
+        else -> 48.dp
+    }
+    fun controlModifier(width: Dp): Modifier =
+        Modifier.size(width = width, height = 48.dp).then(controlBackground)
     val compactLandscape = LocalConfiguration.current.orientation ==
         android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val artworkSize = if (compactLandscape) 48.dp else 60.dp
@@ -1918,11 +1938,14 @@ private fun MiniPlayerContentInternal(
             )
         }
 
-        // Controls Row using custom icons painterResource
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        // Keep a visible gap so adjacent rounded backgrounds never merge into one shape.
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             IconButton(
                 onClick = { viewModel.playPreviousSong() },
-                modifier = Modifier.size(width = if (controlShapeName == "Pill") 64.dp else 48.dp, height = 48.dp).then(controlBackground)
+                modifier = controlModifier(sideControlWidth)
             ) {
                 if (controlIconSet == "Classic") {
                     Icon(
@@ -1933,7 +1956,7 @@ private fun MiniPlayerContentInternal(
                     )
                 } else {
                     Icon(
-                        imageVector = if (controlIconSet == "Seek") Icons.Filled.KeyboardDoubleArrowLeft else Icons.Filled.ChevronLeft,
+                        imageVector = if (controlIconSet == "Seek") Icons.Filled.FastRewind else Icons.Filled.ChevronLeft,
                         contentDescription = "Previous",
                         tint = contentColor,
                         modifier = Modifier.size(24.dp)
@@ -1947,7 +1970,7 @@ private fun MiniPlayerContentInternal(
                         if (isPlaying) viewModel.pauseAudio() else viewModel.playAudio()
                     }
                 },
-                modifier = Modifier.size(width = if (controlShapeName == "Pill") 68.dp else 48.dp, height = 48.dp).then(controlBackground)
+                modifier = controlModifier(centerControlWidth)
             ) {
                 if (isLoading) {
                     androidx.compose.material3.CircularProgressIndicator(
@@ -1972,7 +1995,7 @@ private fun MiniPlayerContentInternal(
 
             IconButton(
                 onClick = { viewModel.playNextSong() },
-                modifier = Modifier.size(width = if (controlShapeName == "Pill") 64.dp else 48.dp, height = 48.dp).then(controlBackground)
+                modifier = controlModifier(sideControlWidth)
             ) {
                 if (controlIconSet == "Classic") {
                     Icon(
@@ -1983,7 +2006,7 @@ private fun MiniPlayerContentInternal(
                     )
                 } else {
                     Icon(
-                        imageVector = if (controlIconSet == "Seek") Icons.Filled.KeyboardDoubleArrowRight else Icons.Filled.ChevronRight,
+                        imageVector = if (controlIconSet == "Seek") Icons.Filled.FastForward else Icons.Filled.ChevronRight,
                         contentDescription = "Next",
                         tint = contentColor,
                         modifier = Modifier.size(24.dp)

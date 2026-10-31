@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.net.Uri
@@ -1408,7 +1409,11 @@ class AudioPlaybackService : MediaSessionService() {
         cacheAssetsSongId = song.id
 
         val artwork = getCachedMediaArtworkFile(applicationContext, song.id.toString())
-        if (!artwork.isFile || artwork.length() <= 0L) {
+        if (artwork.isFile && artwork.length() > 0L) {
+            // A cache hit must also hydrate the live MediaSession/notification artwork.
+            // Previously the file suppressed a network fetch but was never decoded again.
+            setSongMetadataFromCache(song.title, artwork, song.id.toString())
+        } else {
             when {
                 !song.thumbnailUrl.isNullOrBlank() -> setSongMetadataByUrl(song.title, song.thumbnailUrl)
                 song.albumId > 0L -> setSongMetadataById(song.title, song.albumId)
@@ -1816,7 +1821,8 @@ class AudioPlaybackService : MediaSessionService() {
         songName: String?,
         albumArt: Bitmap?,
         expectedSongId: String,
-        requestGeneration: Long
+        requestGeneration: Long,
+        persistArtwork: Boolean = true
     ) {
         val activeSong = viewModel?.currentSong?.value
         if (expectedSongId.isBlank() ||
@@ -1831,7 +1837,7 @@ class AudioPlaybackService : MediaSessionService() {
                 .scale(512, 512, true)
         }
         currentAlbumArtSongId = expectedSongId.takeIf { currentAlbumArt != null }
-        persistCurrentSongArtwork(currentAlbumArt, expectedSongId)
+        if (persistArtwork) persistCurrentSongArtwork(currentAlbumArt, expectedSongId)
 
         val mediaItem = if (isPlayerInitialized) player.currentMediaItem else null
         if (mediaItem != null && mediaItem.mediaId == expectedSongId) {
@@ -1855,6 +1861,42 @@ class AudioPlaybackService : MediaSessionService() {
             )
         }
         refreshMediaNotification()
+    }
+
+    private fun setSongMetadataFromCache(songName: String?, artworkFile: File, expectedSongId: String) {
+        if (expectedSongId.isBlank()) return
+        val requestGeneration = ++artworkRequestGeneration
+        serviceScope.launch(Dispatchers.IO) {
+            val cachedArtwork = BitmapFactory.decodeFile(artworkFile.absolutePath)
+            if (cachedArtwork == null) artworkFile.delete()
+            withContext(Dispatchers.Main) {
+                if (cachedArtwork != null) {
+                    setSongMetadata(
+                        songName,
+                        cachedArtwork,
+                        expectedSongId,
+                        requestGeneration,
+                        persistArtwork = false
+                    )
+                } else {
+                    val activeSong = viewModel?.currentSong?.value
+                        ?.takeIf { it.id.toString() == expectedSongId } ?: return@withContext
+                    when {
+                        !activeSong.thumbnailUrl.isNullOrBlank() ->
+                            setSongMetadataByUrl(activeSong.title, activeSong.thumbnailUrl)
+                        activeSong.albumId > 0L ->
+                            setSongMetadataById(activeSong.title, activeSong.albumId)
+                        else -> setSongMetadata(
+                            songName,
+                            null,
+                            expectedSongId,
+                            requestGeneration,
+                            persistArtwork = false
+                        )
+                    }
+                }
+            }
+        }
     }
 
     fun setSongMetadataById(songName: String?, albumId: Long) {
