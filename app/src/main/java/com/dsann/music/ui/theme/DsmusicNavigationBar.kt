@@ -47,6 +47,7 @@ fun DsmusicNavigationBar(
     labelsMode: String,
     iconSize: Dp,
     bottomInset: Dp,
+    barStyle: String = "Floating",
     modifier: Modifier = Modifier,
     onNavigate: (String) -> Unit
 ) {
@@ -54,10 +55,18 @@ fun DsmusicNavigationBar(
     val selectedColor = MaterialTheme.colorScheme.primary
     val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant
 
+    val dockShape = when (barStyle) {
+        "Docked" -> RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)
+        "Minimal" -> RoundedCornerShape(0.dp)
+        else -> RoundedCornerShape(26.dp)
+    }
+    val horizontalInset = if (barStyle == "Floating") 14.dp else 0.dp
+    val verticalInset = if (barStyle == "Floating") 4.dp else 0.dp
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
-            .background(surface)
+            .padding(horizontal = horizontalInset, vertical = verticalInset)
+            .clip(dockShape)
+            .background(if (barStyle == "Minimal") Color.Transparent else surface)
             .padding(bottom = bottomInset, start = 6.dp, end = 6.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
@@ -79,7 +88,7 @@ fun DsmusicNavigationBar(
                         .size(width = 52.dp, height = 34.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(
-                            if (selected) selectedColor.copy(alpha = 0.16f)
+                            if (selected && barStyle != "Minimal") selectedColor.copy(alpha = 0.16f)
                             else Color.Transparent
                         ),
                     contentAlignment = Alignment.Center
