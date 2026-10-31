@@ -141,10 +141,6 @@ dependencies {
     // Hilt
     implementation libs.hilt.android
     ksp libs.hilt.compiler
-
-    // Liquid Glass Effect
-    implementation libs.liquid
-    
     // Graphics Shapes
     implementation 'androidx.graphics:graphics-shapes:1.0.1'
 }
