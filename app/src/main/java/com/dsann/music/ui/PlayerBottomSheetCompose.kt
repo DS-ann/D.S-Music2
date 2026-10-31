@@ -1473,15 +1473,17 @@ fun PlayerBottomSheetCompose(
                         "Vinyl", "Cassette" -> 0.82f
                         else -> 0.9f
                     }
-                    val albumArtSizeDp = if (
-                        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-                    ) {
-                        minOf(containerHeight * 0.28f, screenWidth.dp * 0.30f) * (albumArtScale / 0.9f)
-                    } else if (useWidePlayer) {
-                        minOf(containerHeight * 0.50f, screenWidth.dp * 0.42f) * (albumArtScale / 0.9f)
-                    } else {
-                        (screenWidth * albumArtScale).dp
-                    } * playerArtworkScale.coerceIn(0.65f, 1f)
+                    val albumArtSizeDp = (
+                        if (
+                            configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                        ) {
+                            minOf(containerHeight * 0.28f, screenWidth.dp * 0.30f) * (albumArtScale / 0.9f)
+                        } else if (useWidePlayer) {
+                            minOf(containerHeight * 0.50f, screenWidth.dp * 0.42f) * (albumArtScale / 0.9f)
+                        } else {
+                            (screenWidth * albumArtScale).dp
+                        }
+                    ) * playerArtworkScale.coerceIn(0.65f, 1f)
                     val statusBarTopPx = WindowInsets.statusBars.getTop(density).toFloat()
 
                     Box(
