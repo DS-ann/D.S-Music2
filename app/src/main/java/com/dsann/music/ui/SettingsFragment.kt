@@ -1661,14 +1661,26 @@ private fun SettingsDetailTopBar(title: String, onBack: () -> Unit) {
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        DsmusicPageHeading(
+            title = title,
+            subtitle = "Settings",
+            kicker = "D.S MUSIC",
+            modifier = Modifier.weight(1f)
+        )
         Box(
             modifier = Modifier
-                .size(42.dp)
+                .size(44.dp)
                 .clip(RoundedCornerShape(13.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .border(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+                    RoundedCornerShape(13.dp)
+                )
                 .clickable(onClick = onBack),
             contentAlignment = Alignment.Center
         ) {
@@ -1676,26 +1688,7 @@ private fun SettingsDetailTopBar(title: String, onBack: () -> Unit) {
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
                 tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-        Column(Modifier.padding(start = 13.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            BasicText(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold
-                ),
-                maxLines = 1
-            )
-            BasicText(
-                text = "D.S MUSIC",
-                style = MaterialTheme.typography.labelMedium.copy(
-                    color = MaterialTheme.colorScheme.primary,
-                    letterSpacing = 1.6.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                maxLines = 1
+                modifier = Modifier.size(21.dp)
             )
         }
     }
