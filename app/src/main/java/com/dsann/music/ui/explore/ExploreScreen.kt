@@ -449,49 +449,10 @@ fun ExploreScreen(
         { viewModel.clearSearch() }
     }
 
-    val color1 = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-    val color2 = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
-    val color3 = MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f)
+    // Solid D.S Launcher surface: no animated mesh, blur, or parallax layer behind long lists.
     val backgroundColor = MaterialTheme.colorScheme.background
 
-    val gradientAlpha by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (isLoadingHome || homeSections.isEmpty()) 0f else 1f,
-        animationSpec = androidx.compose.animation.core.tween(durationMillis = 1200, easing = androidx.compose.animation.core.LinearOutSlowInEasing),
-        label = "GradientFadeIn"
-    )
-
     Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(500.dp)
-                .graphicsLayer {
-                    val scrollY = when {
-                        isSearchActive || searchQuery.isNotBlank() || searchResults.isNotEmpty() -> {
-                            if (searchListState.firstVisibleItemIndex == 0) searchListState.firstVisibleItemScrollOffset else 2000
-                        }
-                        else -> {
-                            if (homeListState.firstVisibleItemIndex == 0) homeListState.firstVisibleItemScrollOffset else 2000
-                        }
-                    }
-                    // Smoothly fade out as you scroll down
-                    val scrollAlpha = (1f - (scrollY / 600f)).coerceIn(0f, 1f)
-                    alpha = scrollAlpha * gradientAlpha
-                    // Slight parallax scroll effect
-                    translationY = -scrollY * 0.1f
-                }
-                .background(
-                    brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                        colors = listOf(
-                            color1,
-                            color2,
-                            color3,
-                            backgroundColor
-                        )
-                    )
-                )
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -514,27 +475,11 @@ fun ExploreScreen(
 
                         AnimatedContent(
                             targetState = currentScreen,
+                            // Switching between large result/detail lists should not animate two
+                            // complete LazyColumn trees simultaneously on low-memory phones.
                             transitionSpec = {
-                                val initialWeight = screenPriority[initialState] ?: 0
-                                val targetWeight = screenPriority[targetState] ?: 0
-
-                                if (targetWeight > initialWeight) {
-                                    // SLIDE PUSH: Entering from right, existing sliding out to left
-                                    (slideInHorizontally(animationSpec = spatialSpec) { it } + fadeIn(
-                                        effectsSpec
-                                    ))
-                                        .togetherWith(slideOutHorizontally(animationSpec = spatialSpec) { -it / 3 } + fadeOut(
-                                            effectsSpec
-                                        ))
-                                } else {
-                                    // SLIDE POP: Entering from left, existing sliding out to right
-                                    (slideInHorizontally(animationSpec = spatialSpec) { -it / 3 } + fadeIn(
-                                        effectsSpec
-                                    ))
-                                        .togetherWith(slideOutHorizontally(animationSpec = spatialSpec) { it } + fadeOut(
-                                            effectsSpec
-                                        ))
-                                }
+                                androidx.compose.animation.EnterTransition.None togetherWith
+                                    androidx.compose.animation.ExitTransition.None
                             },
                             label = "Explore Slide Transitions"
                         ) { screen ->
