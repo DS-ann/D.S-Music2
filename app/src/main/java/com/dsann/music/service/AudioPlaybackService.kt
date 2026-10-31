@@ -401,6 +401,46 @@ class AudioPlaybackService : MediaSessionService() {
             return removedResources
         }
 
+        /**
+         * Removes only the supplied stream URLs. Temporary video cleanup must not remove
+         * normal audio cache variants or the track's saved artwork.
+         */
+        @JvmStatic
+        @Synchronized
+        fun removeMediaCacheResources(context: Context, cacheUris: Set<String>): Int {
+            if (cacheUris.isEmpty()) return 0
+            val appContext = context.applicationContext
+            val currentCache = getCache(appContext)
+            val cachedKeys = currentCache.keys
+            val metadataEditor = appContext.getSharedPreferences(
+                PREF_MEDIA_CACHE_METADATA,
+                Context.MODE_PRIVATE
+            ).edit()
+            var removedResources = 0
+
+            cacheUris.asSequence()
+                .filter { it.isNotBlank() }
+                .distinct()
+                .forEach { key ->
+                    if (key !in cachedKeys) {
+                        metadataEditor.remove(cacheMetadataEntryKey(key))
+                        return@forEach
+                    }
+                    try {
+                        currentCache.removeResource(key)
+                        metadataEditor.remove(cacheMetadataEntryKey(key))
+                        removedResources++
+                    } catch (error: Exception) {
+                        Log.w(TAG, "Could not remove ended video stream cache", error)
+                    }
+                }
+
+            metadataEditor.apply()
+            // SimpleCache reports each removed span to AdjustableCacheEvictor.onSpanRemoved.
+            // Avoid refresh(), which would rescan every cache key on disk.
+            return removedResources
+        }
+
         @Synchronized
         fun clearMediaCache(context: Context) {
             context.getSharedPreferences(PREF_MEDIA_CACHE_METADATA, Context.MODE_PRIVATE).edit().clear().apply()
@@ -451,6 +491,8 @@ class AudioPlaybackService : MediaSessionService() {
     @Volatile private var fullTrackCacheKey: String? = null
     @Volatile private var activeFullTrackCacheWriter: CacheWriter? = null
     private var cacheAssetsSongId: Long? = null
+    @Volatile private var activeVideoCacheVideoId: String? = null
+    @Volatile private var activeVideoCacheUris: Set<String> = emptySet()
     private var currentSongName = "D.S Music"
     private var currentAlbumArt: Bitmap? = null
     private var currentAlbumArtSongId: String? = null
@@ -676,6 +718,8 @@ class AudioPlaybackService : MediaSessionService() {
                     
                     val nextIdx = if (matchedIdx >= 0) matchedIdx else vm.getNextSongIndex()
                     if (nextIdx >= 0) {
+                        val nextSong = songs.getOrNull(nextIdx)
+                        cleanupEndedVideoCacheIfNeeded(vm.currentSong.value, nextSong)
                         vm.updateSongIndexOnly(nextIdx)
                         
                         songs.getOrNull(nextIdx)?.let { song ->
@@ -2421,9 +2465,56 @@ class AudioPlaybackService : MediaSessionService() {
     private fun handlePlaybackCompleted() {
         if (isCrossfading && crossfadeNextSongStarted) return
         viewModel?.let { vm ->
+            val endedSong = vm.currentSong.value
+            val nextSong = vm.getNextSongIndex().let { index ->
+                vm.songList.value.getOrNull(index)
+            }
+            cleanupEndedVideoCacheIfNeeded(endedSong, nextSong)
             vm.setCurrentPosition(0)
-            
             handler.post { vm.playNextSong() }
+        }
+    }
+
+    /**
+     * Remove only the video URL(s) used by the finished video session. Audio cache variants
+     * and artwork are deliberately retained. The short delay lets Media3 finish replacing the
+     * ended item; a quick replay of the same cached video cancels this cleanup safely.
+     */
+    private fun cleanupEndedVideoCacheIfNeeded(
+        endedSong: com.dsann.music.model.SongItem?,
+        nextSong: com.dsann.music.model.SongItem?
+    ) {
+        val endedVideoId = endedSong?.videoId?.takeIf { it.isNotBlank() } ?: return
+        if (activeVideoCacheVideoId != endedVideoId) return
+        if (nextSong?.videoId == endedVideoId) return
+
+        val cacheUris = activeVideoCacheUris
+        if (cacheUris.isEmpty()) {
+            activeVideoCacheVideoId = null
+            return
+        }
+
+        serviceScope.launch(Dispatchers.IO) {
+            delay(180L)
+            val currentSong = viewModel?.currentSong?.value
+            val currentUri = if (isPlayerInitialized) {
+                player.currentMediaItem?.localConfiguration?.uri?.toString()
+            } else null
+            val sameVideoRestarted = currentSong?.videoId == endedVideoId &&
+                currentUri in cacheUris &&
+                isPlayerInitialized &&
+                player.playbackState != Player.STATE_ENDED
+            if (sameVideoRestarted) return@launch
+
+            val removed = removeMediaCacheResources(applicationContext, cacheUris)
+            Log.i(TAG, "Removed " + removed + " temporary video cache resource(s) after '" +
+                endedSong.title + "' ended")
+            withContext(Dispatchers.Main) {
+                if (activeVideoCacheVideoId == endedVideoId && activeVideoCacheUris == cacheUris) {
+                    activeVideoCacheVideoId = null
+                    activeVideoCacheUris = emptySet()
+                }
+            }
         }
     }
 
@@ -2650,6 +2741,11 @@ class AudioPlaybackService : MediaSessionService() {
                     return@launch
                 }
 
+                activeVideoCacheVideoId = videoId
+                activeVideoCacheUris = buildSet {
+                    add(videoOption.url)
+                    videoOption.audioUrl?.takeIf { it.isNotBlank() }?.let(::add)
+                }
                 vm.setVideoModeState(true)
                 vm.setVideoPlaybackMetadata(
                     com.dsann.music.viewmodel.VideoPlaybackMetadata(
@@ -2707,6 +2803,14 @@ class AudioPlaybackService : MediaSessionService() {
         if (song.videoId.isNullOrBlank()) return
         val position = captureVideoModePosition(vm)
         val wasPlaying = player.isPlaying
+        if (activeVideoCacheVideoId != song.videoId) {
+            activeVideoCacheVideoId = song.videoId
+            activeVideoCacheUris = emptySet()
+        }
+        activeVideoCacheUris = activeVideoCacheUris + listOfNotNull(
+            streamUrl.takeIf { it.isNotBlank() },
+            audioUrl?.takeIf { it.isNotBlank() }
+        )
         // Stop the old resolution before loading the new one to avoid overlapping network use.
         player.pause()
         if (!audioUrl.isNullOrBlank()) {
