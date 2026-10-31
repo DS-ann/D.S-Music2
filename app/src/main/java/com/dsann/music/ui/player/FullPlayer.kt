@@ -966,7 +966,9 @@ fun FullPlayer(
                         color = contentColor,
                         maxLines = 1,
                         textAlign = if (playerTitleAlign == "Centered") androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
-                        modifier = if (playerTitleScroll) Modifier.basicMarqueeWithFadedEdges() else Modifier
+                        modifier = if (playerTitleScroll && isPlayerVisible) {
+                            Modifier.basicMarqueeWithFadedEdges()
+                        } else Modifier
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
