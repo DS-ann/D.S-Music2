@@ -64,7 +64,6 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -270,14 +269,6 @@ class MainActivity : AppCompatActivity() {
                             ),
                             label = "BottomNavTranslationY"
                         )
-
-                        // Monitor translations without triggering recomposition every frame
-                        LaunchedEffect(totalSlideDistPx) {
-                            snapshotFlow { animatedBaseTranslationState.value }
-                                .collect { translationY ->
-                                    playerViewModel.setBottomNavTranslationY(translationY)
-                                }
-                        }
 
                         val navBarHeight by animateDpAsState(if (dynamicNavStyle) 64.dp else 80.dp, label = "navBarHeight")
                         val navIconSize by animateDpAsState(if (dynamicNavStyle) 34.dp else 26.dp, label = "navIconSize")
