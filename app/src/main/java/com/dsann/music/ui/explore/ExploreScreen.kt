@@ -1507,101 +1507,132 @@ fun ExploreScreen(
                     .imePadding()
             ) {
                 Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                DsmusicPageHeading(
+                    title = "Search",
+                    subtitle = "Songs, artists, albums and playlists",
+                    modifier = Modifier.weight(1f)
+                )
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(13.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                            .clickable {
-                                keyboardController?.hide()
-                                if (isSearchDestination) {
-                                    onLeaveSearchDestination()
-                                } else {
-                                    onSearchActiveChange(false)
-                                    onClearSearch()
-                                }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .border(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+                            RoundedCornerShape(13.dp)
                         )
-                    }
-
-                    BasicTextField(
-                        value = searchQuery,
-                        onValueChange = onQueryChange,
-                        modifier = Modifier
-                            .weight(1f)
-                            .focusRequester(searchFocusRequester)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                            .padding(horizontal = 13.dp, vertical = 12.dp),
-                        singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(
-                            color = MaterialTheme.colorScheme.onSurface
-                        ),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { submitSearch() }),
-                        decorationBox = { innerTextField ->
-                            Box {
-                                if (searchQuery.isBlank()) {
-                                    BasicText(
-                                        text = "Search music, artists, albums...",
-                                        style = MaterialTheme.typography.bodyLarge.copy(
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        ),
-                                        maxLines = 1
-                                    )
-                                }
-                                innerTextField()
+                        .clickable {
+                            keyboardController?.hide()
+                            if (isSearchDestination) {
+                                onLeaveSearchDestination()
+                            } else {
+                                onSearchActiveChange(false)
+                                onClearSearch()
                             }
-                        }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
+                }
+            }
 
-                    if (searchQuery.isNotBlank()) {
-                        Box(
-                            Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .clickable { onQueryChange("") },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Clear query",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                BasicTextField(
+                    value = searchQuery,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier
+                        .weight(1f)
+                        .focusRequester(searchFocusRequester)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .border(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+                            RoundedCornerShape(14.dp)
+                        )
+                        .padding(horizontal = 14.dp, vertical = 14.dp),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { submitSearch() }),
+                    decorationBox = { innerTextField ->
+                        Box {
+                            if (searchQuery.isBlank()) {
+                                BasicText(
+                                    text = "Search music, artists, albums...",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    maxLines = 1
+                                )
+                            }
+                            innerTextField()
                         }
                     }
+                )
 
+                if (searchQuery.isNotBlank()) {
                     Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(13.dp))
-                            .background(
-                                if (searchQuery.isNotBlank()) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-                                else MaterialTheme.colorScheme.surfaceContainerLow
-                            )
-                            .clickable(enabled = searchQuery.isNotBlank()) { submitSearch() },
+                        Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .clickable { onQueryChange("") },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
-                            tint = if (searchQuery.isNotBlank()) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Clear query",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
+
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(
+                            if (searchQuery.isNotBlank()) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surfaceContainerLow
+                        )
+                        .border(
+                            1.dp,
+                            if (searchQuery.isNotBlank()) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+                            RoundedCornerShape(13.dp)
+                        )
+                        .clickable(enabled = searchQuery.isNotBlank()) { submitSearch() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Search",
+                        tint = if (searchQuery.isNotBlank()) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
                 Spacer(
                     modifier = Modifier
@@ -1935,35 +1966,18 @@ fun ExploreScreen(
                 ) {
                     items(homeMoods) { label ->
                         val selected = currentMood == label
-                        val pill = RoundedCornerShape(50)
-                        Row(
-                            modifier = Modifier
-                                .clip(pill)
-                                .background(
-                                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.17f)
-                                    else MaterialTheme.colorScheme.surfaceContainerLow
-                                )
-                                .then(
-                                    if (selected) Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f), pill)
-                                    else Modifier
-                                )
-                                .clickable { onMoodClick(if (selected) null else label) }
-                                .padding(horizontal = 14.dp, vertical = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            if (selected) {
-                                Icon(Icons.Default.Done, contentDescription = "Selected", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                            }
-                            BasicText(
-                                label,
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        DsmusicFilterChip(
+                            selected = selected,
+                            onClick = { onMoodClick(if (selected) null else label) },
+                            shape = CircleShape,
+                            label = {
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.labelMedium,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
-                                ),
-                                maxLines = 1
-                            )
-                        }
+                                )
+                            }
+                        )
                     }
                 }
             }
@@ -1978,35 +1992,18 @@ fun ExploreScreen(
                         listOf(null to "Top results") + SearchFilter.values().map { it to it.label }
                     items(filters) { (filter, label) ->
                         val selected = currentFilter == filter
-                        val pill = RoundedCornerShape(50)
-                        Row(
-                            modifier = Modifier
-                                .clip(pill)
-                                .background(
-                                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.17f)
-                                    else MaterialTheme.colorScheme.surfaceContainerLow
-                                )
-                                .then(
-                                    if (selected) Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f), pill)
-                                    else Modifier
-                                )
-                                .clickable { onFilterClick(filter) }
-                                .padding(horizontal = 14.dp, vertical = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            if (selected) {
-                                Icon(Icons.Default.Done, contentDescription = "Selected", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                            }
-                            BasicText(
-                                label,
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        DsmusicFilterChip(
+                            selected = selected,
+                            onClick = { onFilterClick(filter) },
+                            shape = CircleShape,
+                            label = {
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.labelMedium,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
-                                ),
-                                maxLines = 1
-                            )
-                        }
+                                )
+                            }
+                        )
                     }
                 }
             }
