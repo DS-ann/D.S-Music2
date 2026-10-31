@@ -891,7 +891,11 @@ fun FullPlayer(
 
         val density = androidx.compose.ui.platform.LocalDensity.current
         val statusBarTopDp = with(density) { androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(this).toDp() }
-        val minTopOffset = statusBarTopDp + if (compactLandscape) 52.dp else 68.dp
+        val minTopOffset = statusBarTopDp + when {
+            compactLandscape && useWidePlayer -> 76.dp
+            compactLandscape -> 52.dp
+            else -> 68.dp
+        }
         val headerHeight = if (compactLandscape) 40.dp else 56.dp
 
         // Calculate top offset to perfectly match yEndPx in PlayerBottomSheetCompose

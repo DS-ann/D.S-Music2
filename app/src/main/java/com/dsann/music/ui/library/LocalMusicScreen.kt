@@ -1,5 +1,6 @@
 package com.dsann.music.ui.library
 
+import com.dsann.music.ui.LocalRootTabActive
 import com.dsann.music.ui.theme.DsmusicPageHeading
 import com.dsann.music.ui.theme.DsmusicCard
 import com.dsann.music.ui.theme.DsmusicSurface
@@ -119,14 +120,14 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
         }
     }
 
-    LaunchedEffect(Unit) {
-        if (localSongs.isEmpty()) {
-            isScanning = true
-            try {
-                scanLocalFiles(context, viewModel)
-            } finally {
-                isScanning = false
-            }
+    val rootTabActive = LocalRootTabActive.current
+    LaunchedEffect(rootTabActive, localSongs.isEmpty()) {
+        if (!rootTabActive || localSongs.isNotEmpty()) return@LaunchedEffect
+        isScanning = true
+        try {
+            scanLocalFiles(context, viewModel)
+        } finally {
+            isScanning = false
         }
     }
 
