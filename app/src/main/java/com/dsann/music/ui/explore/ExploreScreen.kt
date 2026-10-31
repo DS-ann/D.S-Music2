@@ -1753,50 +1753,76 @@ fun ExploreScreen(
         // over the results and make the screen appear to open and immediately close.
         Column(modifier = Modifier.statusBarsPadding()) {
             Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 18.dp, top = 8.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    BasicText(
+                        text = "D.S MUSIC",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.5.sp
+                        )
+                    )
+                    BasicText(
+                        text = "Explore",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
+                }
+                BasicText(
+                    text = "DISCOVER",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        letterSpacing = 1.2.sp
+                    )
+                )
+            }
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Surface(
+                Row(
                     modifier = Modifier
                         .weight(1f)
-                        .height(56.dp)
-                        .clip(RoundedCornerShape(28.dp))
-                        .clickable { onSearchActiveChange(true) },
-                    shape = RoundedCornerShape(28.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow
+                        .height(54.dp)
+                        .clip(RoundedCornerShape(17.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .clickable { onSearchActiveChange(true) }
+                        .padding(horizontal = 15.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(11.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = searchQuery.ifBlank { "Search Music" },
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (searchQuery.isBlank()) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    BasicText(
+                        text = searchQuery.ifBlank { "Search music, artists, albums..." },
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            color = if (searchQuery.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
+                                else MaterialTheme.colorScheme.onSurface
+                        ),
+                        maxLines = 1
+                    )
                 }
 
                 if (searchQuery.isNotBlank()) {
-                    IconButton(onClick = onClearSearch) {
+                    Box(
+                        Modifier.size(40.dp).clip(RoundedCornerShape(13.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .clickable { onClearSearch() },
+                        contentAlignment = Alignment.Center
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Clear search",
@@ -1804,7 +1830,12 @@ fun ExploreScreen(
                         )
                     }
                 } else {
-                    IconButton(onClick = { onAccountVisibleChange(true) }) {
+                    Box(
+                        Modifier.size(40.dp).clip(RoundedCornerShape(13.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .clickable { onAccountVisibleChange(true) },
+                        contentAlignment = Alignment.Center
+                    ) {
                         if (userProfile?.avatarUrl != null) {
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
@@ -1814,16 +1845,14 @@ fun ExploreScreen(
                                     .crossfade(false)
                                     .build(),
                                 contentDescription = "Account",
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape),
+                                modifier = Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)),
                                 contentScale = ContentScale.Crop
                             )
                         } else {
                             Icon(
                                 imageVector = Icons.Default.AccountCircle,
                                 contentDescription = "Account",
-                                modifier = Modifier.size(28.dp),
+                                modifier = Modifier.size(26.dp),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
@@ -1840,30 +1869,35 @@ fun ExploreScreen(
                 ) {
                     items(homeMoods) { label ->
                         val selected = currentMood == label
-                        FilterChip(
-                            selected = selected,
-                            onClick = { onMoodClick(if (selected) null else label) },
-                            label = { Text(label, fontWeight = FontWeight.SemiBold) },
-                            leadingIcon = if (selected) {
-                                {
-                                    Icon(
-                                        imageVector = Icons.Default.Done,
-                                        contentDescription = "Selected",
-                                        modifier = Modifier.size(FilterChipDefaults.IconSize)
-                                    )
-                                }
-                            } else {
-                                null
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            border = null,
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        val pill = RoundedCornerShape(50)
+                        Row(
+                            modifier = Modifier
+                                .clip(pill)
+                                .background(
+                                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.17f)
+                                    else MaterialTheme.colorScheme.surfaceContainerLow
+                                )
+                                .then(
+                                    if (selected) Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f), pill)
+                                    else Modifier
+                                )
+                                .clickable { onMoodClick(if (selected) null else label) }
+                                .padding(horizontal = 14.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (selected) {
+                                Icon(Icons.Default.Done, contentDescription = "Selected", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                            }
+                            BasicText(
+                                label,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                ),
+                                maxLines = 1
                             )
-                        )
+                        }
                     }
                 }
             }
@@ -1878,30 +1912,35 @@ fun ExploreScreen(
                         listOf(null to "Top results") + SearchFilter.values().map { it to it.label }
                     items(filters) { (filter, label) ->
                         val selected = currentFilter == filter
-                        FilterChip(
-                            selected = selected,
-                            onClick = { onFilterClick(filter) },
-                            label = { Text(label, fontWeight = FontWeight.SemiBold) },
-                            leadingIcon = if (selected) {
-                                {
-                                    Icon(
-                                        imageVector = Icons.Default.Done,
-                                        contentDescription = "Selected",
-                                        modifier = Modifier.size(FilterChipDefaults.IconSize)
-                                    )
-                                }
-                            } else {
-                                null
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            border = null,
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        val pill = RoundedCornerShape(50)
+                        Row(
+                            modifier = Modifier
+                                .clip(pill)
+                                .background(
+                                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.17f)
+                                    else MaterialTheme.colorScheme.surfaceContainerLow
+                                )
+                                .then(
+                                    if (selected) Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f), pill)
+                                    else Modifier
+                                )
+                                .clickable { onFilterClick(filter) }
+                                .padding(horizontal = 14.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (selected) {
+                                Icon(Icons.Default.Done, contentDescription = "Selected", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                            }
+                            BasicText(
+                                label,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                ),
+                                maxLines = 1
                             )
-                        )
+                        }
                     }
                 }
             }
