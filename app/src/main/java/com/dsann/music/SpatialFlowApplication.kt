@@ -82,8 +82,21 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         instance = this
-        isLowRamDevice = (getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)
-            ?.isLowRamDevice == true
+        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        val memoryInfo = ActivityManager.MemoryInfo()
+        activityManager?.getMemoryInfo(memoryInfo)
+
+        // Android's isLowRamDevice flag is often false on retail 3 GB phones.
+        // Treat devices with up to 4 GiB physical RAM as constrained so the
+        // lightweight image, animation and artwork-cache profile is actually used.
+        val physicalMemoryLimit = 4L * 1024L * 1024L * 1024L
+        isLowRamDevice = activityManager?.isLowRamDevice == true ||
+            (memoryInfo.totalMem > 0L && memoryInfo.totalMem <= physicalMemoryLimit)
+        Log.i(
+            "SpatialFlowApplication",
+            "Performance profile: ${if (isLowRamDevice) "constrained-memory" else "standard"} " +
+                "(${memoryInfo.totalMem / (1024L * 1024L)} MiB RAM)"
+        )
 
         // Defer stream extractor and cache maintenance initialization until after first draw.
         val appContext = applicationContext

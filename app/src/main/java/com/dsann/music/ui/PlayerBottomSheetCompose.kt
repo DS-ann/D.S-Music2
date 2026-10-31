@@ -1102,6 +1102,15 @@ fun PlayerBottomSheetCompose(
             Animatable(sheetCollapsedTargetYState.value * (1f - restoredExpansionFraction))
         }
 
+        // The full-player close action must also clear nested modes. Otherwise
+        // lyrics/queue keep the full-player subtree mounted after the sheet closes.
+        fun collapsePlayerFully() {
+            viewModel.setLyricsModeEnabled(false)
+            viewModel.setQueueExpanded(false)
+            pendingSheetAnimation = null
+            currentSheetContentState = PlayerSheetState.COLLAPSED
+        }
+
         // A rotation changes the sheet's coordinate space. Recalculate its Y position using
         // the new height while retaining the previously saved expansion fraction.
         LaunchedEffect(screenHeightPx, containerWidthDp, useNavigationRail) {
@@ -1142,8 +1151,11 @@ fun PlayerBottomSheetCompose(
 
         val sheetBackProgress = 0f
 
-        androidx.activity.compose.BackHandler(enabled = currentSheetContentState == PlayerSheetState.EXPANDED && !isLyricsModeEnabled) {
-            currentSheetContentState = PlayerSheetState.COLLAPSED
+        androidx.activity.compose.BackHandler(
+            enabled = currentSheetContentState == PlayerSheetState.EXPANDED &&
+                !isLyricsModeEnabled && !isQueueExpanded
+        ) {
+            collapsePlayerFully()
         }
 
         // Auto-expand/collapse sheet when currentSong is changed / ready
@@ -1434,7 +1446,7 @@ fun PlayerBottomSheetCompose(
                                 context = context,
                                 playerContentExpansionFraction = playerContentExpansionFraction,
                                 containerHeight = containerHeight,
-                                onCollapse = { currentSheetContentState = PlayerSheetState.COLLAPSED },
+                                onCollapse = { collapsePlayerFully() },
                                 onExpand = { currentSheetContentState = PlayerSheetState.EXPANDED },
                                 dragModifier = verticalDragModifier,
                                 miniPlayerHeight = miniPlayerHeight

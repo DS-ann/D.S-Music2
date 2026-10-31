@@ -188,16 +188,17 @@ fun SpatialFlowTheme(
     }
 
     val baseDensity = LocalDensity.current
-    val fontScaleFactor = when (uiDensity) {
+    // UI density changes actual layout spacing and control dimensions, not just
+    // text size. Keep the system font scale intact for accessibility.
+    val densityFactor = when (uiDensity) {
         "Compact" -> 0.92f
         "Large" -> 1.08f
         else -> 1f
     }
-    val adjustedDensity = remember(baseDensity, fontScaleFactor) {
+    val adjustedDensity = remember(baseDensity, densityFactor) {
         object : androidx.compose.ui.unit.Density {
-            override val density: Float = baseDensity.density
-            override val fontScale: Float =
-                (baseDensity.fontScale * fontScaleFactor).coerceIn(0.8f, 1.25f)
+            override val density: Float = baseDensity.density * densityFactor
+            override val fontScale: Float = baseDensity.fontScale
         }
     }
 

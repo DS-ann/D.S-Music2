@@ -2600,6 +2600,15 @@ private fun AppearanceScreen(
                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
             )
 
+            PlayerCustomizationPreview(
+                layout = playerLayout,
+                artworkShape = playerArtworkShape,
+                miniPlayerStyle = miniPlayerStyle,
+                controlShape = miniPlayerControlShape,
+                buttonStyle = playerButtonStyle,
+                buttons = playerButtons
+            )
+
             SavedLooksEditor(
                 looks = savedLooks,
                 onSave = onSaveLook,
@@ -3017,6 +3026,116 @@ private fun ColorPaletteSelector(selected: String, onSelected: (String) -> Unit)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PlayerCustomizationPreview(
+    layout: String,
+    artworkShape: String,
+    miniPlayerStyle: String,
+    controlShape: String,
+    buttonStyle: String,
+    buttons: List<String>
+) {
+    val accent = MaterialTheme.colorScheme.primary
+    val previewBackground = Color(0xFF111923)
+    val artworkCorner = when (artworkShape) {
+        "Square" -> RoundedCornerShape(3.dp)
+        "Circle" -> CircleShape
+        "Squircle" -> RoundedCornerShape(26.dp)
+        "Arch" -> RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp, bottomStart = 10.dp, bottomEnd = 10.dp)
+        "Slanted" -> RoundedCornerShape(8.dp)
+        else -> RoundedCornerShape(18.dp)
+    }
+    val shellShape = when (miniPlayerStyle) {
+        "Flat" -> RoundedCornerShape(8.dp)
+        "Compact" -> RoundedCornerShape(12.dp)
+        "Pill" -> CircleShape
+        else -> RoundedCornerShape(22.dp)
+    }
+    val actionShape = when (controlShape) {
+        "Circle", "Pill" -> CircleShape
+        "None" -> RoundedCornerShape(3.dp)
+        else -> RoundedCornerShape(10.dp)
+    }
+    val artworkSize = when (layout) {
+        "Cover" -> 104.dp
+        "Minimal" -> 64.dp
+        "Vinyl", "Cassette" -> 88.dp
+        else -> 84.dp
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("PLAYER PREVIEW", style = MaterialTheme.typography.labelLarge, color = accent, fontWeight = FontWeight.SemiBold)
+            Text(layout, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clip(shellShape)
+                .background(previewBackground)
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(artworkSize).clip(artworkCorner)
+                    .background(accent.copy(alpha = 0.22f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("DS", color = accent, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            }
+            Column(
+                modifier = Modifier.weight(1f).padding(start = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text("Now playing", color = Color.White, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                Text("Artist · Album", color = Color.White.copy(alpha = 0.62f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Box(Modifier.weight(0.42f).height(3.dp).clip(CircleShape).background(accent))
+                    Box(Modifier.weight(0.58f).height(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.20f)))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    buttons.take(4).forEach { key ->
+                        val shortLabel = when (key) {
+                            "lyrics" -> "LYR"
+                            "video" -> "VID"
+                            "queue" -> "QUEUE"
+                            "share" -> "SHARE"
+                            "download" -> "SAVE"
+                            "like" -> "LIKE"
+                            "dislike" -> "NO"
+                            "sleep" -> "SLEEP"
+                            else -> key.take(4).uppercase()
+                        }
+                        Text(
+                            shortLabel,
+                            modifier = Modifier.clip(actionShape)
+                                .background(if (buttonStyle == "Minimal") Color.Transparent else accent.copy(alpha = 0.17f))
+                                .padding(horizontal = 5.dp, vertical = 4.dp),
+                            color = if (buttonStyle == "Minimal") Color.White.copy(alpha = 0.76f) else accent,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+        Text(
+            "$layout layout · $artworkShape artwork · $miniPlayerStyle mini player · $buttonStyle actions",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
