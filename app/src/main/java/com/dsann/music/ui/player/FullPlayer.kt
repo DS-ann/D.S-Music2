@@ -618,6 +618,14 @@ fun FullPlayerScreen(
     val scrubberThumbStyle by customizeViewModel.scrubberThumbStyle.collectAsStateWithLifecycle()
     val visualizerColor by customizeViewModel.visualizerColor.collectAsStateWithLifecycle()
 
+    // Prism-style Lyrics layout opens the existing lyrics view when the full player
+    // is opened. Dismissing lyrics does not immediately reopen it.
+    LaunchedEffect(playerLayout, isPlayerVisible) {
+        if (playerLayout == "Lyrics" && isPlayerVisible) {
+            viewModel.setLyricsModeEnabled(true)
+        }
+    }
+
     // Handle back button when lyrics mode is enabled
     BackHandler(enabled = isLyricsModeEnabled) {
         viewModel.setLyricsModeEnabled(false)

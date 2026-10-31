@@ -481,12 +481,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     // ── Player, your way ────────────────────────────────────────────────────
     private val _playerLayout = MutableStateFlow(
         prefs.getString("player_layout", "Standard")?.takeIf {
-            it in listOf("Standard", "Cover", "Minimal", "Vinyl", "Cassette")
+            it in listOf("Standard", "Cover", "Lyrics", "Minimal", "Vinyl", "Cassette")
         } ?: "Standard"
     )
     val playerLayout: StateFlow<String> = _playerLayout.asStateFlow()
     fun setPlayerLayout(value: String) {
-        val safe = value.takeIf { it in listOf("Standard", "Cover", "Minimal", "Vinyl", "Cassette") } ?: "Standard"
+        val safe = value.takeIf { it in listOf("Standard", "Cover", "Lyrics", "Minimal", "Vinyl", "Cassette") } ?: "Standard"
         _playerLayout.value = safe
         prefs.edit { putString("player_layout", safe) }
     }
@@ -2680,9 +2680,9 @@ private fun AppearanceScreen(
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
                     title = "Layout preset",
-                    description = "Standard keeps the balanced player; Cover enlarges artwork; Minimal reduces artwork; Vinyl and Cassette change the artwork presentation.",
+                    description = "Standard balances the controls; Cover enlarges artwork; Lyrics opens directly to lyrics; Minimal, Vinyl and Cassette change the presentation.",
                     selected = playerLayout,
-                    options = listOf("Standard", "Cover", "Minimal", "Vinyl", "Cassette"),
+                    options = listOf("Standard", "Cover", "Lyrics", "Minimal", "Vinyl", "Cassette"),
                     onSelected = onPlayerLayoutChange
                 )
             })

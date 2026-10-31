@@ -36,6 +36,7 @@ import coil.size.Precision
 import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
 import com.dsann.music.R
+import com.dsann.music.SpatialFlowApplication
 import com.dsann.music.model.SongItem
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import com.dsann.music.ui.theme.observeKey
@@ -66,14 +67,17 @@ fun ArtworkPager(
     // bandwidth and can cause avoidable bitmap pressure while the pager is moving.
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
+    val lowRamProfile = SpatialFlowApplication.isLowRamDevice
     val artworkTargetSizePx = remember(
         configuration.screenWidthDp,
         configuration.screenHeightDp,
-        density.density
+        density.density,
+        lowRamProfile
     ) {
+        val maxArtworkDimension = if (lowRamProfile) 768 else 1024
         (minOf(configuration.screenWidthDp, configuration.screenHeightDp) * density.density)
             .roundToInt()
-            .coerceIn(256, 1024)
+            .coerceIn(256, maxArtworkDimension)
     }
 
     // Keep the previous and next covers warm in Coil's existing memory/disk caches.
@@ -124,7 +128,9 @@ fun ArtworkPager(
             state = pagerState,
             key = { page -> "${songList.getOrNull(page)?.id ?: currentSong.id}:$page" },
             userScrollEnabled = userScrollEnabled,
-            beyondViewportPageCount = 1,
+            // Neighbour images are prefetched into Coil above; avoid also retaining
+            // extra pager page compositions on constrained-memory devices.
+            beyondViewportPageCount = if (lowRamProfile) 0 else 1,
             modifier = Modifier.fillMaxSize().clip(artworkShape)
         ) { page ->
             val song = if (page == currentSongIndex) currentSong else (songList.getOrNull(page) ?: currentSong)
