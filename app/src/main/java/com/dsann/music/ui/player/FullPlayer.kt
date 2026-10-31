@@ -1728,7 +1728,7 @@ fun FullPlayer(
                         }
                     },
                     confirmButton = {
-                        androidx.compose.material3.DsmusicTextButton(onClick = { showSongInfoDialog = false }) { Text("Close") }
+                        DsmusicTextButton(onClick = { showSongInfoDialog = false }) { Text("Close") }
                     }
                 )
             }
