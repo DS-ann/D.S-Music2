@@ -144,6 +144,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.dsann.music.MainActivity
+import com.dsann.music.SpatialFlowApplication
 import com.dsann.music.R
 import com.dsann.music.data.db.PlaylistEntity
 import com.dsann.music.data.lyrics.MetadataRepair
@@ -2357,7 +2358,7 @@ private fun SongsTabContent(nestedScrollConnection: androidx.compose.ui.input.ne
                                     painter = coil.compose.rememberAsyncImagePainter(
                                         model = ImageRequest.Builder(LocalContext.current)
                                             .data(song.thumbnailUrl)
-                                            .crossfade(true)
+                                            .crossfade(!SpatialFlowApplication.isLowRamDevice)
                                             .build()
                                     ),
                                     contentDescription = null,
