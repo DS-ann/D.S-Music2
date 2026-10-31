@@ -857,22 +857,19 @@ fun FullPlayer(
         }
         val useWidePlayer = configuration.screenWidthDp >= 840 ||
             (configuration.screenWidthDp >= 600 && configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
-        val compactLandscape = useWidePlayer &&
+        val compactLandscape =
             configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val albumArtSize = if (useWidePlayer) {
-            val baseSize = if (compactLandscape) {
-                minOf(screenHeight * 0.28f, screenWidth * 0.30f)
-            } else {
-                minOf(screenHeight * 0.50f, screenWidth * 0.42f)
-            }
-            baseSize * (artScale / 0.9f)
+        val albumArtSize = if (compactLandscape) {
+            minOf(screenHeight * 0.28f, screenWidth * 0.30f) * (artScale / 0.9f)
+        } else if (useWidePlayer) {
+            minOf(screenHeight * 0.50f, screenWidth * 0.42f) * (artScale / 0.9f)
         } else {
             screenWidth * artScale
         }
 
         val density = androidx.compose.ui.platform.LocalDensity.current
         val statusBarTopDp = with(density) { androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(this).toDp() }
-        val minTopOffset = statusBarTopDp + 68.dp // Removed 16.dp extra gap
+        val minTopOffset = statusBarTopDp + if (compactLandscape) 52.dp else 68.dp
 
         // Calculate top offset to perfectly match yEndPx in PlayerBottomSheetCompose
         val topOffset = if (useWidePlayer) minTopOffset
@@ -916,7 +913,7 @@ fun FullPlayer(
                 Spacer(modifier = Modifier.size(48.dp))
             }
 
-            Spacer(modifier = Modifier.height(topOffset - (statusBarTopDp + 68.dp)))
+            Spacer(modifier = Modifier.height(topOffset - minTopOffset))
 
             // Album Art Container Placeholder (ArtworkPager is rendered at this absolute position)
             Box(
@@ -1517,9 +1514,11 @@ fun FullPlayer(
                 }
                 val onlineStreamMetadata by produceState<OnlineStreamMetadata?>(
                     initialValue = null,
-                    key1 = song.videoId
+                    key1 = song.videoId,
+                    key2 = isVideoMode
                 ) {
                     value = if (
+                        !isVideoMode &&
                         !song.videoId.isNullOrBlank() &&
                         !song.isCachedTrack &&
                         !song.isDownloadedOffline
@@ -1529,9 +1528,12 @@ fun FullPlayer(
                         }
                     } else null
                 }
-                val streamBitrateBps = streamFormat?.bitrateBps?.takeIf { it > 0 }
-                    ?: onlineStreamMetadata?.bitrateBps
+                val streamBitrateBps = if (isVideoMode) null else {
+                    streamFormat?.bitrateBps?.takeIf { it > 0 } ?: onlineStreamMetadata?.bitrateBps
+                }
                 val durationMs = when {
+                    isVideoMode && (videoPlaybackMetadata?.durationMs ?: 0L) > 0L ->
+                        videoPlaybackMetadata?.durationMs ?: 0L
                     song.duration > 0L -> song.duration
                     (streamFormat?.durationMs ?: 0L) > 0L -> streamFormat?.durationMs ?: 0L
                     (onlineStreamMetadata?.durationMs ?: 0L) > 0L -> onlineStreamMetadata?.durationMs ?: 0L
@@ -1559,7 +1561,9 @@ fun FullPlayer(
                 val fileSizeBytes = songFileMetadata.sizeBytes
                 val fileBitrateBps = songFileMetadata.bitrateBps
                 val estimatedFileBitrateBps = songFileMetadata.estimatedBitrateBps
-                val sizeText = when {
+                val sizeText = if (isVideoMode) {
+                    "Video stream size is not exposed by the selected source"
+                } else when {
                     fileSizeBytes != null ->
                         android.text.format.Formatter.formatFileSize(context, fileSizeBytes)
                     reportedOnlineStreamBytes != null ->
@@ -1571,7 +1575,9 @@ fun FullPlayer(
                         "Streaming source; full-file size varies with the selected audio stream"
                     else -> "File provider does not expose the byte length"
                 }
-                val bitrateText = when {
+                val bitrateText = if (isVideoMode) {
+                    "Video bitrate is not exposed by the selected stream metadata"
+                } else when {
                     fileBitrateBps != null ->
                         "${(fileBitrateBps + 500L) / 1000L} kb/s (file metadata)"
                     streamBitrateBps != null ->
@@ -1581,15 +1587,20 @@ fun FullPlayer(
                     songFileMetadata.isRemote -> "Stream bitrate is not exposed by the current audio format"
                     else -> "Bitrate metadata is absent; no estimate can be calculated"
                 }
-                val formatText = songFileMetadata.mimeType
-                    ?: streamFormat?.mimeType
-                    ?: onlineStreamMetadata?.mimeType
-                    ?: songFileMetadata.fileName?.substringAfterLast('.', "")
-                        ?.takeIf { it.isNotBlank() }
-                        ?.uppercase(java.util.Locale.ROOT)
-                        ?.plus(" (file extension)")
-                    ?: if (songFileMetadata.isRemote) "Streaming audio (codec not identified yet)"
-                       else "Audio format not exposed by file provider"
+                val formatText = if (isVideoMode) {
+                    videoPlaybackMetadata?.mimeType?.takeIf { it.isNotBlank() }
+                        ?: "Video format not exposed by selected stream"
+                } else {
+                    songFileMetadata.mimeType
+                        ?: streamFormat?.mimeType
+                        ?: onlineStreamMetadata?.mimeType
+                        ?: songFileMetadata.fileName?.substringAfterLast('.', "")
+                            ?.takeIf { it.isNotBlank() }
+                            ?.uppercase(java.util.Locale.ROOT)
+                            ?.plus(" (file extension)")
+                        ?: if (songFileMetadata.isRemote) "Streaming audio (codec not identified yet)"
+                           else "Audio format not exposed by file provider"
+                }
                 val sourceText = when {
                     song.isCachedTrack -> "D.S Music cache (cached audio stream)"
                     song.isDownloadedOffline -> "Downloaded audio file (offline)"
@@ -1611,35 +1622,47 @@ fun FullPlayer(
                     ?: "Artist not supplied by source"
                 val details = mutableListOf(
                     "Title" to displayTitle,
-                    "Artist" to displayArtist,
-                    "Album" to (
+                    (if (isVideoMode) "Uploader" else "Artist") to displayArtist,
+                    "Album" to if (isVideoMode) {
+                        "Not supplied by the video source"
+                    } else {
                         song.albumName?.takeIf { it.isNotBlank() && !it.equals("<unknown>", true) }
                             ?: streamFormat?.albumTitle
                             ?: songFileMetadata.album
                             ?: if (song.albumId > 0L) "Album ID ${song.albumId} (title unavailable)" else "Album title unavailable in source metadata"
-                    ),
+                    },
                     "Duration" to durationText,
                     "Source" to if (isVideoMode) "YouTube video stream" else sourceText,
-                    "Song size" to sizeText,
-                    "Bitrate" to bitrateText,
-                    "Format" to formatText
+                    (if (isVideoMode) "Video size" else "Song size") to sizeText,
+                    (if (isVideoMode) "Video bitrate" else "Bitrate") to bitrateText,
+                    (if (isVideoMode) "Video format" else "Format") to formatText
                 )
-                onlineStreamMetadata?.audioQuality?.let { details.add("Source audio quality" to it) }
-                streamFormat?.sampleRateHz?.takeIf { it > 0 }?.let {
-                    details.add("Sample rate" to "${it} Hz")
+                if (isVideoMode) {
+                    videoPlaybackMetadata?.resolution?.takeIf { it.isNotBlank() }?.let {
+                        details.add("Resolution" to it)
+                    }
+                } else {
+                    onlineStreamMetadata?.audioQuality?.let { details.add("Source audio quality" to it) }
+                    streamFormat?.sampleRateHz?.takeIf { it > 0 }?.let {
+                        details.add("Sample rate" to "${it} Hz")
+                    }
                 }
-                details.add("Song ID" to song.id.toString())
-                if (song.albumId > 0L) details.add("Album ID" to song.albumId.toString())
-                songFileMetadata.fileName?.let { details.add("File name" to it) }
-                songFileMetadata.filePath?.let { details.add("File path" to it) }
-                if (!songFileMetadata.isRemote && song.dateAdded > 0L) {
-                    details.add("Added to device library" to java.text.DateFormat.getDateTimeInstance()
-                        .format(java.util.Date(song.dateAdded * 1000L)))
+                details.add(if (isVideoMode) "Queue track ID" else "Song ID", song.id.toString())
+                if (!isVideoMode) {
+                    if (song.albumId > 0L) details.add("Album ID" to song.albumId.toString())
+                    songFileMetadata.fileName?.let { details.add("File name" to it) }
+                    songFileMetadata.filePath?.let { details.add("File path" to it) }
+                    if (!songFileMetadata.isRemote && song.dateAdded > 0L) {
+                        details.add("Added to device library" to java.text.DateFormat.getDateTimeInstance()
+                            .format(java.util.Date(song.dateAdded * 1000L)))
+                    }
                 }
                 if (!song.videoId.isNullOrBlank()) details.add("Video ID" to song.videoId!!)
-                if (!song.artistId.isNullOrBlank()) details.add("Artist ID" to song.artistId!!)
-                song.lufs?.let { details.add("LUFS" to it.toString()) }
-                    ?: details.add("Loudness" to "Not analyzed")
+                if (!isVideoMode) {
+                    if (!song.artistId.isNullOrBlank()) details.add("Artist ID" to song.artistId!!)
+                    song.lufs?.let { details.add("LUFS" to it.toString()) }
+                        ?: details.add("Loudness" to "Not analyzed")
+                }
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { showSongInfoDialog = false },
                     title = { Text(if (isVideoMode) "Video information" else "Song information", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
