@@ -5,14 +5,10 @@ package com.dsann.music.ui.theme
 import android.app.Activity
 import android.content.ContextWrapper
 import android.content.SharedPreferences
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.MaterialExpressiveTheme
-import androidx.compose.material3.MotionScheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -23,53 +19,48 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat.getInsetsController
 
+/**
+ * Observe one SharedPreferences key without keeping a listener after the
+ * calling composition leaves the screen.
+ */
 @Composable
 fun <T> SharedPreferences.observeKey(key: String, defaultValue: T): State<T> {
-    val state = remember { mutableStateOf(defaultValue) }
+    val state = remember(this, key) { mutableStateOf(defaultValue) }
     DisposableEffect(this, key) {
-        state.value = when (defaultValue) {
-            is Boolean -> getBoolean(key, defaultValue) as T
-            is String -> getString(key, defaultValue) as T
-            is Float -> getFloat(key, defaultValue) as T
-            is Int -> getInt(key, defaultValue) as T
-            is Long -> getLong(key, defaultValue) as T
-            else -> defaultValue
-        }
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, changedKey ->
-            if (changedKey == key) {
-                state.value = when (defaultValue) {
-                    is Boolean -> prefs.getBoolean(key, defaultValue) as T
-                    is String -> prefs.getString(key, defaultValue) as T
-                    is Float -> prefs.getFloat(key, defaultValue) as T
-                    is Int -> prefs.getInt(key, defaultValue) as T
-                    is Long -> prefs.getLong(key, defaultValue) as T
-                    else -> defaultValue
-                }
+        fun readValue(prefs: SharedPreferences): T {
+            @Suppress("UNCHECKED_CAST")
+            return when (defaultValue) {
+                is Boolean -> prefs.getBoolean(key, defaultValue) as T
+                is String -> (prefs.getString(key, defaultValue) ?: defaultValue) as T
+                is Float -> prefs.getFloat(key, defaultValue) as T
+                is Int -> prefs.getInt(key, defaultValue) as T
+                is Long -> prefs.getLong(key, defaultValue) as T
+                else -> defaultValue
             }
         }
-        registerOnSharedPreferenceChangeListener(listener)
-        onDispose {
-            unregisterOnSharedPreferenceChangeListener(listener)
+
+        state.value = readValue(this@observeKey)
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, changedKey ->
+            if (changedKey == key) state.value = readValue(prefs)
         }
+        registerOnSharedPreferenceChangeListener(listener)
+        onDispose { unregisterOnSharedPreferenceChangeListener(listener) }
     }
     return state
 }
 
 /**
- * D.S Music's root composable theme.
+ * D.S Music skin based on D.S Launcher.
  *
- * @param darkTheme       Whether to use dark mode colors.
- * @param content         The composable content.
+ * Existing user controls are intentionally retained: light/dark/system mode,
+ * appearance presets, album-art accent, AMOLED black and density preferences.
  */
-@Suppress("DEPRECATION")
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SpatialFlowTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -84,202 +75,101 @@ fun SpatialFlowTheme(
     val albumArtThemeEnabled by prefs.observeKey("dynamic_album_theme", false)
     val appearancePreset by prefs.observeKey("appearance_preset", "Ocean")
     val uiDensity by prefs.observeKey("ui_density", "Comfortable")
-    val baseDensity = LocalDensity.current
-    val fontScale = when (uiDensity) {
-        "Compact" -> 0.92f
-        "Large" -> 1.08f
-        else -> 1f
+
+    val accent = remember(appearancePreset, albumArtThemeEnabled, dynamicAlbumColor) {
+        if (albumArtThemeEnabled && dynamicAlbumColor != null) {
+            Color(dynamicAlbumColor)
+        } else {
+            when (appearancePreset) {
+                "Violet" -> Color(0xFFB69CFF)
+                "Emerald" -> Color(0xFF62C9A2)
+                "Amber" -> Color(0xFFFFC36F)
+                "Rose" -> Color(0xFFFF8FA3)
+                "Monochrome" -> Color(0xFFC9CDD4)
+                "Crimson" -> Color(0xFFD94A65)
+                "Teal" -> Color(0xFF36B9A8)
+                "Cyan" -> Color(0xFF43B8D2)
+                "Indigo" -> Color(0xFF6475E9)
+                "Lime" -> Color(0xFF9FBF42)
+                "Graphite" -> Color(0xFF8A939F)
+                else -> Color(0xFF7C9CFF) // D.S Launcher blue
+            }
+        }
     }
 
-    val colorScheme = remember(darkTheme, amoledEnabled, albumArtThemeEnabled, dynamicAlbumColor, appearancePreset) {
-        val baseScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (darkTheme) dynamicDarkColorScheme(context)
-            else dynamicLightColorScheme(context)
-        } else {
-            if (darkTheme) darkColorScheme(
-                primary = Primary,
-                onPrimary = OnPrimary,
-                primaryContainer = PrimaryContainer,
-                onPrimaryContainer = OnPrimaryContainer,
-                background = Surface,
-                onBackground = OnSurface,
-                surface = Surface,
-                onSurface = OnSurface,
-                surfaceVariant = SurfaceVariant,
-                onSurfaceVariant = OnSurfaceVariant
+    val colorScheme = remember(darkTheme, amoledEnabled, accent) {
+        if (darkTheme) {
+            val base = darkColorScheme(
+                primary = accent,
+                onPrimary = Color(0xFF0B1220),
+                primaryContainer = accent.copy(alpha = 0.19f),
+                onPrimaryContainer = Color(0xFFE6EDFF),
+                secondary = Color(0xFFB8C6DE),
+                onSecondary = Color(0xFF172131),
+                secondaryContainer = Color(0xFF27364A),
+                onSecondaryContainer = Color(0xFFDCE6F7),
+                tertiary = Color(0xFF8CC9D8),
+                onTertiary = Color(0xFF0B2228),
+                background = Color(0xFF121620),
+                onBackground = Color(0xFFE9EDF5),
+                surface = Color(0xFF171E29),
+                onSurface = Color(0xFFE9EDF5),
+                surfaceVariant = Color(0xFF263141),
+                onSurfaceVariant = Color(0xFFB7C3D5),
+                surfaceTint = accent,
+                outline = Color(0xFF65748A),
+                outlineVariant = Color(0xFF354255),
+                error = Color(0xFFFF8C91),
+                onError = Color(0xFF2B080D),
+                errorContainer = Color(0xFF5B2028),
+                onErrorContainer = Color(0xFFFFDADD),
+                surfaceContainerLowest = Color(0xFF0E131B),
+                surfaceContainerLow = Color(0xFF151C26),
+                surfaceContainer = Color(0xFF1B2431),
+                surfaceContainerHigh = Color(0xFF222D3B),
+                surfaceContainerHighest = Color(0xFF2A3747)
             )
-            else lightColorScheme()
-        }
-
-        val finalScheme = if (darkTheme && amoledEnabled && !(albumArtThemeEnabled && dynamicAlbumColor != null)) {
-            baseScheme.copy(
-                background = Color.Black,
-                surface = Color.Black,
-                surfaceContainer = Color.Black,
-                surfaceContainerHigh = Color(0xFF0D0D0D),
-                surfaceContainerHighest = Color(0xFF141414),
-                surfaceContainerLow = Color.Black,
-                surfaceContainerLowest = Color.Black
-            )
-        } else {
-            baseScheme
-        }
-
-        if (albumArtThemeEnabled && dynamicAlbumColor != null) {
-            val seedColor = Color(dynamicAlbumColor)
-            val hsl = FloatArray(3)
-            androidx.core.graphics.ColorUtils.colorToHSL(seedColor.toArgb(), hsl)
-            
-            val isMonochrome = hsl[1] < 0.06f
-            val baseHue = hsl[0]
-            val baseSat = if (isMonochrome) 0f else hsl[1]
-            
-            // Saturation calculations that respect monochrome
-            val primarySat = if (isMonochrome) 0f else baseSat.coerceAtLeast(0.5f)
-            val primaryContainerSat = if (isMonochrome) 0f else baseSat.coerceAtLeast(0.4f)
-            val secondarySat = if (isMonochrome) 0f else (baseSat * 0.5f).coerceIn(0.2f, 0.35f)
-            val secondaryContainerSat = if (isMonochrome) 0f else (baseSat * 0.5f).coerceIn(0.15f, 0.30f)
-            val tertiarySat = if (isMonochrome) 0f else (baseSat * 0.6f).coerceIn(0.3f, 0.5f)
-            val tertiaryContainerSat = if (isMonochrome) 0f else (baseSat * 0.6f).coerceIn(0.25f, 0.45f)
-            
-            fun colorAt(h: Float, s: Float, l: Float): Color {
-                return Color(
-                    androidx.core.graphics.ColorUtils.HSLToColor(floatArrayOf(h, s, l))
-                )
-            }
-
-            val finalDynamicScheme = if (darkTheme) {
-                // Dark Theme Tones
-                val bgSat = (baseSat * 0.15f).coerceAtMost(0.1f)
-                
-                finalScheme.copy(
-                    background = colorAt(baseHue, bgSat, 0.04f),
-                    onBackground = colorAt(baseHue, bgSat, 0.90f),
-                    
-                    surface = colorAt(baseHue, bgSat, 0.06f),
-                    onSurface = colorAt(baseHue, bgSat, 0.90f),
-                    
-                    surfaceContainerLowest = colorAt(baseHue, bgSat, 0.02f),
-                    surfaceContainerLow = colorAt(baseHue, bgSat, 0.08f),
-                    surfaceContainer = colorAt(baseHue, bgSat, 0.12f),
-                    surfaceContainerHigh = colorAt(baseHue, bgSat, 0.16f),
-                    surfaceContainerHighest = colorAt(baseHue, bgSat, 0.22f),
-                    
-                    surfaceVariant = colorAt(baseHue, bgSat, 0.28f),
-                    onSurfaceVariant = colorAt(baseHue, bgSat, 0.80f),
-                    
-                    primary = colorAt(baseHue, primarySat, 0.75f),
-                    onPrimary = colorAt(baseHue, primarySat, 0.20f),
-                    primaryContainer = colorAt(baseHue, primaryContainerSat, 0.25f),
-                    onPrimaryContainer = colorAt(baseHue, primaryContainerSat, 0.90f),
-                    
-                    secondary = colorAt(baseHue, secondarySat, 0.70f),
-                    onSecondary = colorAt(baseHue, secondarySat, 0.20f),
-                    secondaryContainer = colorAt(baseHue, secondaryContainerSat, 0.20f),
-                    onSecondaryContainer = colorAt(baseHue, secondaryContainerSat, 0.85f),
-                    
-                    tertiary = colorAt((baseHue + 60f) % 360f, tertiarySat, 0.70f),
-                    onTertiary = colorAt((baseHue + 60f) % 360f, tertiarySat, 0.20f),
-                    tertiaryContainer = colorAt((baseHue + 60f) % 360f, tertiaryContainerSat, 0.20f),
-                    onTertiaryContainer = colorAt((baseHue + 60f) % 360f, tertiaryContainerSat, 0.85f),
-                    
-                    outline = colorAt(baseHue, bgSat, 0.60f),
-                    outlineVariant = colorAt(baseHue, bgSat, 0.30f),
-                    
-                    error = colorAt(0f, 0.60f, 0.65f),
-                    onError = colorAt(0f, 0.60f, 0.20f),
-                    errorContainer = colorAt(0f, 0.60f, 0.25f),
-                    onErrorContainer = colorAt(0f, 0.60f, 0.90f)
-                )
-            } else {
-                // Light Theme Tones
-                val bgSat = (baseSat * 0.15f).coerceAtMost(0.15f)
-                
-                finalScheme.copy(
-                    background = colorAt(baseHue, bgSat, 0.98f),
-                    onBackground = colorAt(baseHue, bgSat, 0.10f),
-                    
-                    surface = colorAt(baseHue, bgSat, 0.98f),
-                    onSurface = colorAt(baseHue, bgSat, 0.10f),
-                    
-                    surfaceContainerLowest = colorAt(baseHue, bgSat, 1.0f),
-                    surfaceContainerLow = colorAt(baseHue, bgSat, 0.96f),
-                    surfaceContainer = colorAt(baseHue, bgSat, 0.94f),
-                    surfaceContainerHigh = colorAt(baseHue, bgSat, 0.90f),
-                    surfaceContainerHighest = colorAt(baseHue, bgSat, 0.86f),
-                    
-                    surfaceVariant = colorAt(baseHue, bgSat, 0.80f),
-                    onSurfaceVariant = colorAt(baseHue, bgSat, 0.30f),
-                    
-                    primary = colorAt(baseHue, primarySat, 0.40f),
-                    onPrimary = colorAt(baseHue, primarySat, 0.95f),
-                    primaryContainer = colorAt(baseHue, primaryContainerSat, 0.85f),
-                    onPrimaryContainer = colorAt(baseHue, primaryContainerSat, 0.10f),
-                    
-                    secondary = colorAt(baseHue, secondarySat, 0.45f),
-                    onSecondary = colorAt(baseHue, secondarySat, 0.95f),
-                    secondaryContainer = colorAt(baseHue, secondaryContainerSat, 0.85f),
-                    onSecondaryContainer = colorAt(baseHue, secondaryContainerSat, 0.10f),
-                    
-                    tertiary = colorAt((baseHue + 60f) % 360f, tertiarySat, 0.45f),
-                    onTertiary = colorAt((baseHue + 60f) % 360f, tertiarySat, 0.95f),
-                    tertiaryContainer = colorAt((baseHue + 60f) % 360f, tertiaryContainerSat, 0.85f),
-                    onTertiaryContainer = colorAt((baseHue + 60f) % 360f, tertiaryContainerSat, 0.10f),
-                    
-                    outline = colorAt(baseHue, bgSat, 0.50f),
-                    outlineVariant = colorAt(baseHue, bgSat, 0.80f),
-                    
-                    error = colorAt(0f, 0.60f, 0.45f),
-                    onError = colorAt(0f, 0.60f, 0.95f),
-                    errorContainer = colorAt(0f, 0.60f, 0.85f),
-                    onErrorContainer = colorAt(0f, 0.60f, 0.10f)
-                )
-            }
-            
-            // AMOLED black override for dynamic theme
-            if (darkTheme && amoledEnabled) {
-                finalDynamicScheme.copy(
+            if (amoledEnabled) {
+                base.copy(
                     background = Color.Black,
                     surface = Color.Black,
                     surfaceContainerLowest = Color.Black,
                     surfaceContainerLow = Color.Black,
-                    surfaceContainer = Color.Black
+                    surfaceContainer = Color.Black,
+                    surfaceContainerHigh = Color(0xFF080A0F),
+                    surfaceContainerHighest = Color(0xFF111722)
                 )
-            } else {
-                finalDynamicScheme
-            }
+            } else base
         } else {
-            val presetArgb = when (appearancePreset) {
-                "Violet" -> 0xFFB69CFF.toInt()
-                "Emerald" -> 0xFF62C9A2.toInt()
-                "Amber" -> 0xFFFFC36F.toInt()
-                "Rose" -> 0xFFFF8FA3.toInt()
-                "Monochrome" -> 0xFFC9CDD4.toInt()
-                "Crimson" -> 0xFFD94A65.toInt()
-                "Teal" -> 0xFF36B9A8.toInt()
-                "Cyan" -> 0xFF43B8D2.toInt()
-                "Indigo" -> 0xFF6475E9.toInt()
-                "Lime" -> 0xFF9FBF42.toInt()
-                "Graphite" -> 0xFF8A939F.toInt()
-                else -> 0xFF6FA8FF.toInt()
-            }
-            val onPrimary = if (androidx.core.graphics.ColorUtils.calculateLuminance(presetArgb) > 0.52) {
-                Color(0xFF10131A)
-            } else {
-                Color.White
-            }
-            val containerArgb = androidx.core.graphics.ColorUtils.blendARGB(
-                presetArgb,
-                if (darkTheme) android.graphics.Color.BLACK else android.graphics.Color.WHITE,
-                if (darkTheme) 0.62f else 0.82f
-            )
-            finalScheme.copy(
-                primary = Color(presetArgb),
-                onPrimary = onPrimary,
-                primaryContainer = Color(containerArgb),
-                onPrimaryContainer = if (darkTheme) Color.White else Color(0xFF171923),
-                secondary = Color(presetArgb),
-                onSecondary = onPrimary
+            lightColorScheme(
+                primary = accent,
+                onPrimary = Color(0xFF0B1220),
+                primaryContainer = accent.copy(alpha = 0.18f),
+                onPrimaryContainer = Color(0xFF17233A),
+                secondary = Color(0xFF536783),
+                onSecondary = Color.White,
+                secondaryContainer = Color(0xFFDCE5F2),
+                onSecondaryContainer = Color(0xFF202D40),
+                tertiary = Color(0xFF397E91),
+                onTertiary = Color.White,
+                background = Color(0xFFF3F6FA),
+                onBackground = Color(0xFF182131),
+                surface = Color(0xFFFFFFFF),
+                onSurface = Color(0xFF182131),
+                surfaceVariant = Color(0xFFE5EBF3),
+                onSurfaceVariant = Color(0xFF536176),
+                surfaceTint = accent,
+                outline = Color(0xFF7B899B),
+                outlineVariant = Color(0xFFD1D9E4),
+                error = Color(0xFFB32635),
+                onError = Color.White,
+                errorContainer = Color(0xFFF9DADD),
+                onErrorContainer = Color(0xFF410E16),
+                surfaceContainerLowest = Color.White,
+                surfaceContainerLow = Color(0xFFF7F9FC),
+                surfaceContainer = Color(0xFFEFF3F8),
+                surfaceContainerHigh = Color(0xFFE5EBF3),
+                surfaceContainerHighest = Color(0xFFDCE4EF)
             )
         }
     }
@@ -287,34 +177,42 @@ fun SpatialFlowTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val activity = view.context.findActivity()
-            activity?.window?.let { window ->
+            view.context.findActivity()?.window?.let { window ->
                 window.statusBarColor = android.graphics.Color.TRANSPARENT
                 getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
             }
         }
     }
 
-    val adjustedDensity = remember(baseDensity, fontScale) {
+    val baseDensity = LocalDensity.current
+    val fontScaleFactor = when (uiDensity) {
+        "Compact" -> 0.92f
+        "Large" -> 1.08f
+        else -> 1f
+    }
+    val adjustedDensity = remember(baseDensity, fontScaleFactor) {
         object : androidx.compose.ui.unit.Density {
             override val density: Float = baseDensity.density
             override val fontScale: Float =
-                (baseDensity.fontScale * fontScale).coerceIn(0.8f, 1.25f)
+                (baseDensity.fontScale * fontScaleFactor).coerceIn(0.8f, 1.25f)
         }
     }
-    CompositionLocalProvider(
-        LocalDensity provides adjustedDensity
-    ) {
-        MaterialExpressiveTheme(
+
+    CompositionLocalProvider(LocalDensity provides adjustedDensity) {
+        MaterialTheme(
             colorScheme = colorScheme,
             typography = Typography,
-            motionScheme = MotionScheme.expressive(),
+            shapes = Shapes(
+                extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(7.dp),
+                small = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                medium = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                large = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
+            ),
             content = content
         )
     }
 }
-
-
 
 internal tailrec fun android.content.Context.findActivity(): Activity? = when (this) {
     is Activity -> this
