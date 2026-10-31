@@ -305,7 +305,7 @@ fun DsmusicSwitchControl(
         contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
     ) {
         Box(Modifier.size(if (checked) 20.dp else 18.dp).clip(CircleShape)
-            .background(if (checked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant))
+            .background(if (checked && enabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant))
     }
 }
 
