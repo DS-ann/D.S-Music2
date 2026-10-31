@@ -596,6 +596,7 @@ fun FullPlayerScreen(
     val customizeViewModel: SettingsViewModel =
         androidx.lifecycle.viewmodel.compose.viewModel(viewModelStoreOwner = activity)
     val playerLayout by customizeViewModel.playerLayout.collectAsStateWithLifecycle()
+    val playerArtworkScale by customizeViewModel.playerArtworkScale.collectAsStateWithLifecycle()
     val playerButtons by customizeViewModel.playerButtons.collectAsStateWithLifecycle()
     val playerTitleAlign by customizeViewModel.playerTitleAlign.collectAsStateWithLifecycle()
     val playerTitleSize by customizeViewModel.playerTitleSize.collectAsStateWithLifecycle()
@@ -629,6 +630,7 @@ fun FullPlayerScreen(
         providerResults = providerResults,
         selectedProvider = selectedProvider,
         playerLayout = playerLayout,
+        playerArtworkScale = playerArtworkScale,
         playerButtons = playerButtons,
         playerTitleAlign = playerTitleAlign,
         playerTitleSize = playerTitleSize,
@@ -720,6 +722,7 @@ fun FullPlayer(
     providerResults: Map<String, LyricsResult>,
     selectedProvider: String?,
     playerLayout: String = "Standard",
+    playerArtworkScale: Float = 1f,
     playerButtons: List<String> = listOf("lyrics", "video", "queue", "share", "download"),
     playerTitleAlign: String = "Left",
     playerTitleSize: String = "Medium",
@@ -854,12 +857,12 @@ fun FullPlayer(
         val configuration = LocalConfiguration.current
         val screenWidth = configuration.screenWidthDp.dp
         val screenHeight = configuration.screenHeightDp.dp
-        val artScale = when (playerLayout) {
+        val artScale = (when (playerLayout) {
             "Cover" -> 0.98f
             "Minimal" -> 0.68f
             "Vinyl", "Cassette" -> 0.82f
             else -> 0.9f
-        }
+        }) * playerArtworkScale.coerceIn(0.65f, 1f)
         val useWidePlayer = configuration.screenWidthDp >= 840 ||
             (configuration.screenWidthDp >= 600 && configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
         val compactLandscape =

@@ -491,6 +491,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putString("player_layout", safe) }
     }
 
+    private val _playerArtworkScale = MutableStateFlow(
+        prefs.getFloat("player_artwork_scale", 1f).coerceIn(0.65f, 1f)
+    )
+    val playerArtworkScale: StateFlow<Float> = _playerArtworkScale.asStateFlow()
+    fun setPlayerArtworkScale(value: Float) {
+        val safe = value.coerceIn(0.65f, 1f)
+        _playerArtworkScale.value = safe
+        prefs.edit { putFloat("player_artwork_scale", safe) }
+    }
+
     private val availablePlayerButtons = listOf("lyrics", "video", "queue", "share", "download", "like", "dislike", "sleep")
     private val defaultPlayerButtons = listOf("lyrics", "video", "queue", "share", "download")
     private fun readPlayerButtons(): List<String> {
@@ -660,7 +670,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         "theme_mode", KEY_AMOLED_BLACK, KEY_DYNAMIC_ALBUM_THEME, KEY_APPEARANCE_PRESET,
         "custom_accent_color", "ui_corner_style", KEY_PLAYER_ARTWORK_SHAPE, "player_background_style", "mini_player_style",
         "mini_player_control_shape", "mini_player_control_icons", "mini_player_progress",
-        "player_layout", "player_buttons", "player_title_align", "player_title_size",
+        "player_layout", "player_artwork_scale", "player_buttons", "player_title_align", "player_title_size",
         "player_title_weight", "player_title_scroll", "player_times", "scrubber_style",
         "scrubber_color", "player_visualizer", "player_button_style", "scrubber_thickness",
         "scrubber_thumb_style", "visualizer_color", "lyrics_text_size", "lyrics_alignment",
@@ -721,6 +731,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         setMiniPlayerControlIcons(look.optString("mini_player_control_icons", _miniPlayerControlIcons.value))
         setMiniPlayerProgressStyle(look.optString("mini_player_progress", _miniPlayerProgressStyle.value))
         setPlayerLayout(look.optString("player_layout", _playerLayout.value))
+        setPlayerArtworkScale(look.optDouble("player_artwork_scale", _playerArtworkScale.value.toDouble()).toFloat())
         setPlayerButtons(
             look.optString("player_buttons", _playerButtons.value.joinToString(","))
                 .split(",").map { it.trim() }.filter { it.isNotEmpty() }
@@ -1238,6 +1249,7 @@ fun SettingsScreenContent(
     val customAccentColor by viewModel.customAccentColor.collectAsStateWithLifecycle()
     val uiCornerStyle by viewModel.uiCornerStyle.collectAsStateWithLifecycle()
     val playerArtworkShape by viewModel.playerArtworkShape.collectAsStateWithLifecycle()
+    val playerArtworkScale by viewModel.playerArtworkScale.collectAsStateWithLifecycle()
     val playerBackgroundStyle by viewModel.playerBackgroundStyle.collectAsStateWithLifecycle()
     val miniPlayerStyle by viewModel.miniPlayerStyle.collectAsStateWithLifecycle()
     val miniPlayerControlShape by viewModel.miniPlayerControlShape.collectAsStateWithLifecycle()
@@ -1452,6 +1464,8 @@ fun SettingsScreenContent(
                 onUiCornerStyleChange = { viewModel.setUiCornerStyle(it) },
                 playerArtworkShape = playerArtworkShape,
                 onPlayerArtworkShapeChange = { viewModel.setPlayerArtworkShape(it) },
+                playerArtworkScale = playerArtworkScale,
+                onPlayerArtworkScaleChange = { viewModel.setPlayerArtworkScale(it) },
                 playerBackgroundStyle = playerBackgroundStyle,
                 onPlayerBackgroundStyleChange = { viewModel.setPlayerBackgroundStyle(it) },
                 miniPlayerStyle = miniPlayerStyle,
@@ -2526,6 +2540,8 @@ private fun AppearanceScreen(
     onUiCornerStyleChange: (String) -> Unit,
     playerArtworkShape: String,
     onPlayerArtworkShapeChange: (String) -> Unit,
+    playerArtworkScale: Float,
+    onPlayerArtworkScaleChange: (Float) -> Unit,
     playerBackgroundStyle: String,
     onPlayerBackgroundStyleChange: (String) -> Unit,
     miniPlayerStyle: String,
@@ -2606,7 +2622,8 @@ private fun AppearanceScreen(
                 miniPlayerStyle = miniPlayerStyle,
                 controlShape = miniPlayerControlShape,
                 buttonStyle = playerButtonStyle,
-                buttons = playerButtons
+                buttons = playerButtons,
+                artworkScale = playerArtworkScale
             )
 
             SavedLooksEditor(
@@ -2654,6 +2671,25 @@ private fun AppearanceScreen(
                     options = listOf("Standard", "Cover", "Minimal", "Vinyl", "Cassette"),
                     onSelected = onPlayerLayoutChange
                 )
+            })
+            SettingsGroupCard(listOf {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Text(
+                        "Artwork size · ${(playerArtworkScale * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Slider(
+                        value = playerArtworkScale,
+                        onValueChange = onPlayerArtworkScaleChange,
+                        valueRange = 0.65f..1f
+                    )
+                    Text(
+                        "Adjust the full-player cover independently of its layout preset.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             })
 
             SettingsHeader("Player buttons")
@@ -3036,7 +3072,8 @@ private fun PlayerCustomizationPreview(
     miniPlayerStyle: String,
     controlShape: String,
     buttonStyle: String,
-    buttons: List<String>
+    buttons: List<String>,
+    artworkScale: Float
 ) {
     val accent = MaterialTheme.colorScheme.primary
     val previewBackground = Color(0xFF111923)
@@ -3059,12 +3096,12 @@ private fun PlayerCustomizationPreview(
         "None" -> RoundedCornerShape(3.dp)
         else -> RoundedCornerShape(10.dp)
     }
-    val artworkSize = when (layout) {
+    val artworkSize = (when (layout) {
         "Cover" -> 104.dp
         "Minimal" -> 64.dp
         "Vinyl", "Cassette" -> 88.dp
         else -> 84.dp
-    }
+    }) * artworkScale.coerceIn(0.65f, 1f)
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
