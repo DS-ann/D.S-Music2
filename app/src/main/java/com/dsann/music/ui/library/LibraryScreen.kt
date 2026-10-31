@@ -495,37 +495,21 @@ fun LibraryScreen(
                 ) {
                     tabs.forEach { (label, tabKey) ->
                         val selected = activeTab == tabKey
-                        val pill = RoundedCornerShape(50)
-                        Box(
-                            modifier = Modifier
-                                .clip(pill)
-                                .background(
-                                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-                                    else MaterialTheme.colorScheme.surfaceContainerLow
-                                )
-                                .then(
-                                    if (selected) Modifier.border(
-                                        1.dp,
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
-                                        pill
-                                    ) else Modifier
-                                )
-                                .clickable {
-                                    activeTab = tabKey
-                                    if (tabKey == "History") accountViewModel?.loadLibrary()
-                                }
-                                .padding(horizontal = 14.dp, vertical = 9.dp)
-                        ) {
-                            BasicText(
-                                label,
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    color = if (selected) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        DsmusicFilterChip(
+                            selected = selected,
+                            onClick = {
+                                activeTab = tabKey
+                                if (tabKey == "History") accountViewModel?.loadLibrary()
+                            },
+                            shape = CircleShape,
+                            label = {
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.labelMedium,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
-                                ),
-                                maxLines = 1
-                            )
-                        }
+                                )
+                            }
+                        )
                     }
                 }
 
