@@ -55,6 +55,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -1580,22 +1581,51 @@ fun SettingsScreenContent(
 // COMPOSE UI — MAIN SETTINGS BODY
 // ═══════════════════════════════════════════════════════════════════════════════
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsDetailTopBar(title: String, onBack: () -> Unit) {
-    TopAppBar(
-        title = { Text(title) },
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            navigationIconContentColor = MaterialTheme.colorScheme.onSurface
-        )
-    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(RoundedCornerShape(13.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .clickable(onClick = onBack),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Column(Modifier.padding(start = 13.dp)) {
+            BasicText(
+                text = title,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
+                ),
+                maxLines = 1
+            )
+            BasicText(
+                text = "D.S MUSIC",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = MaterialTheme.colorScheme.primary,
+                    letterSpacing = 1.3.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                maxLines = 1
+            )
+        }
+    }
 }
 
 sealed class SettingsRoute(val route: String) {
@@ -2066,7 +2096,7 @@ private fun MusicManagementScreen(
                                 else "Disabled. New stream data is not retained.",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         },
-                        trailingContent = { Switch(checked = mediaCacheEnabled, onCheckedChange = onMediaCacheToggle) },
+                        trailingContent = { DsmusicSwitch(checked = mediaCacheEnabled, onCheckedChange = onMediaCacheToggle) },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                     )
                 }
@@ -2174,10 +2204,7 @@ private fun IgnoreShortAudioRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
             }
         },
         trailingContent = {
-            Switch(
-                checked = checked,
-                onCheckedChange = onToggle
-            )
+            DsmusicSwitch(checked = checked, onCheckedChange = onToggle)
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
@@ -3225,7 +3252,7 @@ private fun ToggleSettingRow(
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        DsmusicSwitch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -3237,49 +3264,95 @@ private fun SettingsChoiceRow(
     options: List<String>,
     onSelected: (String) -> Unit
 ) {
-    // Keep the selector on its own full-width row. Putting all six palette/shape
-    // chips in ListItem.trailingContent leaves only a few pixels on phone layouts,
-    // which clips every option down to its first letter.
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(title, style = MaterialTheme.typography.bodyLarge)
-        Text(
+        BasicText(
+            title,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium
+            )
+        )
+        BasicText(
             description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.bodySmall.copy(
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             options.forEach { option ->
                 val active = selected == option
-                Surface(
+                val pillShape = RoundedCornerShape(50)
+                Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .clickable { onSelected(option) },
-                    shape = RoundedCornerShape(50),
-                    color = if (active) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.surfaceVariant
+                        .clip(pillShape)
+                        .background(
+                            if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.17f)
+                            else MaterialTheme.colorScheme.surfaceContainerHigh
+                        )
+                        .then(
+                            if (active) Modifier.border(
+                                1.dp,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.65f),
+                                pillShape
+                            ) else Modifier
+                        )
+                        .clickable { onSelected(option) }
+                        .padding(horizontal = 13.dp, vertical = 9.dp)
                 ) {
-                    Text(
+                    BasicText(
                         text = option,
-                        maxLines = 1,
-                        color = if (active) MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = if (active) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium
+                        ),
+                        maxLines = 1
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DsmusicSwitch(
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?,
+    modifier: Modifier = Modifier
+) {
+    val trackColor = if (checked) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.surfaceVariant
+    val thumbColor = if (checked) MaterialTheme.colorScheme.onPrimary
+        else MaterialTheme.colorScheme.onSurfaceVariant
+
+    Box(
+        modifier = modifier
+            .size(width = 44.dp, height = 26.dp)
+            .clip(RoundedCornerShape(50))
+            .background(trackColor)
+            .clickable(enabled = onCheckedChange != null) {
+                onCheckedChange?.invoke(!checked)
+            }
+            .padding(horizontal = 3.dp),
+        contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
+    ) {
+        Box(
+            Modifier
+                .size(20.dp)
+                .clip(CircleShape)
+                .background(thumbColor)
+        )
     }
 }
 
@@ -3825,22 +3898,43 @@ private fun AboutScreen(
 
 @Composable
 private fun SettingsHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 24.dp, bottom = 12.dp)
-    )
+    Row(
+        modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(width = 3.dp, height = 13.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(MaterialTheme.colorScheme.primary)
+        )
+        BasicText(
+            text = text.uppercase(),
+            style = MaterialTheme.typography.labelLarge.copy(
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 1.1.sp,
+                fontWeight = FontWeight.Bold
+            ),
+            modifier = Modifier.padding(start = 9.dp),
+            maxLines = 1
+        )
+    }
 }
 
 @Composable
 private fun SettingsGroupCard(items: List<@Composable () -> Unit>) {
+    val shape = MaterialTheme.shapes.medium
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow),
+            .padding(vertical = 7.dp)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .border(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                shape
+            ),
         verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         items.forEachIndexed { index, item ->
@@ -3848,7 +3942,7 @@ private fun SettingsGroupCard(items: List<@Composable () -> Unit>) {
             if (index < items.lastIndex) {
                 Box(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(1.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.32f))
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
                 )
             }
         }
@@ -3886,26 +3980,7 @@ private fun ThemeRow(isDark: Boolean, onToggle: (Boolean) -> Unit) {
 
 @Composable
 private fun ThemeSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?) {
-    Switch(
-        checked = checked,
-        onCheckedChange = onCheckedChange,
-        thumbContent = {
-            AnimatedContent(
-                targetState = checked,
-                transitionSpec = {
-                    fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMedium)) togetherWith
-                        fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMedium))
-                },
-                label = "theme_icon"
-            ) { dark ->
-                Icon(
-                    imageVector = if (!dark) Icons.Default.WbSunny else Icons.Default.NightsStay,
-                    contentDescription = null,
-                    modifier = Modifier.size(SwitchDefaults.IconSize)
-                )
-            }
-        }
-    )
+    DsmusicSwitch(checked = checked, onCheckedChange = onCheckedChange)
 }
 
 
@@ -3960,7 +4035,7 @@ private fun CrossfadeRow(
                 }
             }
         },
-        trailingContent = { Switch(checked = enabled, onCheckedChange = onToggle) },
+        trailingContent = { DsmusicSwitch(checked = enabled, onCheckedChange = onToggle) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
 }
