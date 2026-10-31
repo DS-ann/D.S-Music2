@@ -53,6 +53,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -333,14 +334,14 @@ class MainActivity : AppCompatActivity() {
                     val currentDestination = navBackStackEntry?.destination
                     val currentRoute = currentDestination?.route
                     LaunchedEffect(currentRoute) {
-                        if (currentRoute in rootTabRoutes) {
+                        if (currentRoute != null && currentRoute in rootTabRoutes) {
                             val route = currentRoute!!
                             lastRootTab = route
                             if (route !in cachedRootTabs) cachedRootTabs.add(route)
                         }
                     }
                     val activeCachedRootTab = when {
-                        currentRoute in rootTabRoutes -> currentRoute
+                        currentRoute != null && currentRoute in rootTabRoutes -> currentRoute
                         currentRoute == "tag_editor" || currentRoute == "google_signin" -> lastRootTab
                         else -> null
                     }
