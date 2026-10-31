@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -25,7 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /** Flat D.S Launcher-inspired surfaces: no tonal elevation or liquid-glass layers. */
 private val DsmusicPanelShape = RoundedCornerShape(18.dp)
@@ -45,7 +49,7 @@ fun DsmusicCard(
         modifier = modifier
             .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(BorderStroke(1.dp, outline), shape)
+            .border(BorderStroke(1.dp, outline.copy(alpha = 0.62f)), shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         content = content
     )
@@ -65,6 +69,10 @@ fun DsmusicSurface(
 ) {
     Box(
         modifier = modifier.clip(shape).background(color)
+            .border(
+                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)),
+                shape
+            )
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {
         content()
@@ -92,6 +100,11 @@ fun DsmusicListItem(
     Row(
         modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .border(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.34f),
+                RoundedCornerShape(14.dp)
+            )
             .then(
                 when {
                     onClick != null -> Modifier.clickable(onClick = onClick)
@@ -249,5 +262,66 @@ fun DsmusicSwitchControl(
     ) {
         Box(Modifier.size(if (checked) 20.dp else 18.dp).clip(CircleShape)
             .background(if (checked) Color(0xFF0B1220) else MaterialTheme.colorScheme.onSurfaceVariant))
+    }
+}
+
+/**
+ * Shared D.S Launcher / Home Studio page heading used by the main tabs.
+ * The larger title, accent rail and deliberate vertical rhythm replace compact
+ * Material-style top bars while keeping the screen's own trailing actions.
+ */
+@Composable
+fun DsmusicPageHeading(
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    kicker: String = "D.S MUSIC"
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .width(4.dp)
+                .height(if (subtitle == null) 42.dp else 48.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.primary)
+        )
+        Column(
+            modifier = Modifier.padding(start = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            androidx.compose.material3.Text(
+                text = kicker.uppercase(),
+                style = MaterialTheme.typography.labelMedium.copy(
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.7.sp
+                ),
+                maxLines = 1
+            )
+            androidx.compose.material3.Text(
+                text = title,
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontSize = 31.sp,
+                    lineHeight = 37.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.sp
+                ),
+                maxLines = 1
+            )
+            if (subtitle != null) {
+                androidx.compose.material3.Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 20.sp
+                    ),
+                    maxLines = 1
+                )
+            }
+        }
     }
 }

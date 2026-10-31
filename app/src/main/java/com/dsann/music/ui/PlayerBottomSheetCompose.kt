@@ -331,7 +331,11 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
     }
     // Mini-player gesture mappings can open Lyrics or Queue directly. Keep those states
     // functional even when the sheet has not crossed the normal full-player threshold.
-    val shouldComposeFullPlayer = isFullPlayerVisible || isLyricsModeEnabled || isQueueExpanded
+    val shouldComposeFullPlayer by remember(playerContentExpansionFraction, isLyricsModeEnabled, isQueueExpanded) {
+        derivedStateOf {
+            playerContentExpansionFraction.value > 0.015f || isLyricsModeEnabled || isQueueExpanded
+        }
+    }
 
     val miniPlayerZIndex by remember {
         derivedStateOf { if (playerContentExpansionFraction.value < 0.5f) 1f else 0f }
@@ -347,8 +351,9 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
             .fillMaxWidth()
             .height(miniPlayerHeight)
             .graphicsLayer {
-                // Cross-fades fully to 0.0 alpha at 50% expansion
-                alpha = (1f - playerContentExpansionFraction.value * 2f).coerceIn(0f, 1f)
+                // Keep both layers visible through the same progress range so the
+                // mini/full transition never has a transparent frame between them.
+                alpha = (1f - playerContentExpansionFraction.value).coerceIn(0f, 1f)
             }
             .zIndex(miniPlayerZIndex)
     ) {
@@ -357,7 +362,13 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
             currentSong = currentSong,
             isPlaying = isPlaying,
             accentColor = baseAccentColor,
-            onClick = onExpand,
+            onClick = {
+                // A tap on the mini player always opens the normal full player.
+                // Lyrics and Queue are explicit modes, never inherited from the last session.
+                viewModel.setLyricsModeEnabled(false)
+                viewModel.setQueueExpanded(false)
+                onExpand()
+            },
             modifier = Modifier.fillMaxSize()
         )
     }
@@ -372,11 +383,7 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
                 .requiredHeight(containerHeight)
                 .graphicsLayer {
                     val fraction = playerContentExpansionFraction.value
-                    alpha = ((fraction - 0.5f) * 2f).coerceIn(0f, 1f)
-                    val scale = androidx.compose.ui.util.lerp(0.972f, 1f, fraction)
-                    scaleX = scale
-                    scaleY = scale
-                    translationY = androidx.compose.ui.util.lerp(100f, 0f, fraction)
+                    alpha = fraction.coerceIn(0f, 1f)
                 }
                 .zIndex(fullPlayerZIndex)
         ) {

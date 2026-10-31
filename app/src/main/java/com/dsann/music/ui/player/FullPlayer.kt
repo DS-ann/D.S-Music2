@@ -621,13 +621,8 @@ fun FullPlayerScreen(
     val scrubberThumbStyle by customizeViewModel.scrubberThumbStyle.collectAsStateWithLifecycle()
     val visualizerColor by customizeViewModel.visualizerColor.collectAsStateWithLifecycle()
 
-    // Prism-style Lyrics layout opens the existing lyrics view when the full player
-    // is opened. Dismissing lyrics does not immediately reopen it.
-    LaunchedEffect(playerLayout, isPlayerVisible) {
-        if (playerLayout == "Lyrics" && isPlayerVisible) {
-            viewModel.setLyricsModeEnabled(true)
-        }
-    }
+    // The saved Lyrics layout controls appearance only. Opening the mini player must
+    // always show the normal player; lyrics are entered through the explicit Lyrics action.
 
     // Handle back button when lyrics mode is enabled
     BackHandler(enabled = isLyricsModeEnabled) {
@@ -896,7 +891,7 @@ fun FullPlayer(
 
         val density = androidx.compose.ui.platform.LocalDensity.current
         val statusBarTopDp = with(density) { androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(this).toDp() }
-        val minTopOffset = statusBarTopDp + 68.dp
+        val minTopOffset = statusBarTopDp + if (compactLandscape) 52.dp else 68.dp
         val headerHeight = if (compactLandscape) 40.dp else 56.dp
 
         // Calculate top offset to perfectly match yEndPx in PlayerBottomSheetCompose
