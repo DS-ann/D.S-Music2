@@ -1647,7 +1647,7 @@ fun FullPlayer(
                         details.add("Sample rate" to "${it} Hz")
                     }
                 }
-                details.add(if (isVideoMode) "Queue track ID" else "Song ID", song.id.toString())
+                details.add((if (isVideoMode) "Queue track ID" else "Song ID") to song.id.toString())
                 if (!isVideoMode) {
                     if (song.albumId > 0L) details.add("Album ID" to song.albumId.toString())
                     songFileMetadata.fileName?.let { details.add("File name" to it) }
