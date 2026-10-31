@@ -26,6 +26,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import java.io.File
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
@@ -80,20 +81,21 @@ fun ArtworkPager(
     ) {
         HorizontalPager(
             state = pagerState,
+            key = { page -> songList.getOrNull(page)?.id ?: currentSong.id },
             userScrollEnabled = userScrollEnabled,
             modifier = Modifier.fillMaxSize()
         ) { page ->
             val song = if (page == currentSongIndex) currentSong else (songList.getOrNull(page) ?: currentSong)
-            val rawUri = song.getAlbumArtUri()
             val videoId = song.videoId
-
-            val artworkUrl = remember(rawUri, videoId) {
-                if (rawUri != null && rawUri.toString().isNotEmpty()) {
-                    SongItem.enhanceThumbnailUrl(rawUri.toString())
-                } else if (!videoId.isNullOrEmpty()) {
-                    "https://img.youtube.com/vi/$videoId/hqdefault.jpg"
-                } else {
-                    null
+            val artworkUrl = remember(song.id, song.thumbnailUrl, song.albumId, song.path, videoId) {
+                val thumbnail = song.thumbnailUrl?.takeIf { it.isNotBlank() }
+                when {
+                    thumbnail != null -> SongItem.enhanceThumbnailUrl(thumbnail)
+                    !videoId.isNullOrBlank() -> "https://img.youtube.com/vi/$videoId/hqdefault.jpg"
+                    song.albumId > 0L -> song.getAlbumArtUri()?.toString()
+                    !song.path.isNullOrBlank() && File(song.path!!).isFile ->
+                        song.getAlbumArtUri()?.toString()
+                    else -> null
                 }
             }
             val imageRequest = remember(context, artworkUrl) {
