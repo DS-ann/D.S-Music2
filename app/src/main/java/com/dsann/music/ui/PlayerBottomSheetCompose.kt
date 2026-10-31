@@ -784,6 +784,7 @@ fun PlayerBottomSheetCompose(
         }
         val playerBackgroundStyle by playerPreferences.observeKey("player_background_style", "Artwork")
         val playerLayout by playerPreferences.observeKey("player_layout", "Standard")
+        val playerArtworkScale by playerPreferences.observeKey("player_artwork_scale", 1f)
         val playerArtworkShapeName by playerPreferences.observeKey("player_artwork_shape", "Rounded")
         val playerArtworkShape = remember(playerLayout, playerArtworkShapeName) {
             DsmCoverShapes.forPlayerLayout(playerLayout, playerArtworkShapeName)
@@ -1480,7 +1481,7 @@ fun PlayerBottomSheetCompose(
                         minOf(containerHeight * 0.50f, screenWidth.dp * 0.42f) * (albumArtScale / 0.9f)
                     } else {
                         (screenWidth * albumArtScale).dp
-                    }
+                    } * playerArtworkScale.coerceIn(0.65f, 1f)
                     val statusBarTopPx = WindowInsets.statusBars.getTop(density).toFloat()
 
                     Box(
