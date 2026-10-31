@@ -169,7 +169,9 @@ fun Modifier.sharedElementIfAvailable(key: String): Modifier {
 fun ExploreScreen(
     viewModel: ExploreViewModel,
     playerSharedViewModel: PlayerSharedViewModel,
-    onNavigateToLibrary: () -> Unit = {}
+    onNavigateToLibrary: () -> Unit = {},
+    isSearchDestination: Boolean = false,
+    onLeaveSearchDestination: () -> Unit = {}
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -206,7 +208,12 @@ fun ExploreScreen(
     val homeMoods = uiState.homeMoods
     val detailStack = uiState.detailStack
 
-    var isSearchActive by rememberSaveable { mutableStateOf(false) }
+    var isSearchActive by rememberSaveable(isSearchDestination) {
+        mutableStateOf(isSearchDestination)
+    }
+    LaunchedEffect(isSearchDestination) {
+        if (isSearchDestination) isSearchActive = true
+    }
     var selectedSongForMenu by remember { mutableStateOf<OnlineSong?>(null) }
     var showCreditsForSong by remember { mutableStateOf<OnlineSong?>(null) }
 
@@ -358,14 +365,25 @@ fun ExploreScreen(
     // Active query entry must take priority over the non-active results back handler.
     // Otherwise the first back press only clears the query while leaving the query page open.
     androidx.activity.compose.BackHandler(enabled = isSearchActive && !isPlayerExpanded) {
-        isSearchActive = false
-        viewModel.clearSearch()
+        if (isSearchDestination) {
+            onLeaveSearchDestination()
+        } else {
+            isSearchActive = false
+            viewModel.clearSearch()
+        }
     }
 
     androidx.activity.compose.BackHandler(
         enabled = !isSearchActive && searchQuery.isNotBlank() && !isPlayerExpanded
     ) {
         viewModel.clearSearch()
+    }
+
+    androidx.activity.compose.BackHandler(
+        enabled = isSearchDestination && !isSearchActive &&
+            searchQuery.isBlank() && !detailScreenActive && !isPlayerExpanded
+    ) {
+        onLeaveSearchDestination()
     }
 
     androidx.activity.compose.BackHandler(enabled = isAccountVisible && !isPlayerExpanded) {
@@ -659,6 +677,9 @@ fun ExploreScreen(
                                             onQueryChange = onSearchHeaderQueryChange,
                                             onSearch = onSearchHeaderSearch,
                                             isSearchActive = isSearchActive,
+                                            isSearchDestination = isSearchDestination,
+                                            showSearchEntry = isSearchDestination,
+                                            onLeaveSearchDestination = onLeaveSearchDestination,
                                             accountHistory = accountHistory,
                                             onAccountHistorySongClick = { song, queue, index ->
                                                 viewModel.playOnlineSongWithQueue(
@@ -1431,6 +1452,9 @@ fun ExploreScreen(
         onQueryChange: (String) -> Unit,
         onSearch: (String) -> Unit,
         isSearchActive: Boolean,
+        isSearchDestination: Boolean,
+        showSearchEntry: Boolean,
+        onLeaveSearchDestination: () -> Unit,
         accountHistory: List<OnlineSong>,
         onAccountHistorySongClick: (OnlineSong, List<OnlineSong>, Int) -> Unit,
         onSearchActiveChange: (Boolean) -> Unit,
@@ -1490,8 +1514,12 @@ fun ExploreScreen(
                             .background(MaterialTheme.colorScheme.surfaceContainerLow)
                             .clickable {
                                 keyboardController?.hide()
-                                onSearchActiveChange(false)
-                                onClearSearch()
+                                if (isSearchDestination) {
+                                    onLeaveSearchDestination()
+                                } else {
+                                    onSearchActiveChange(false)
+                                    onClearSearch()
+                                }
                             },
                         contentAlignment = Alignment.Center
                     ) {
@@ -1777,28 +1805,63 @@ fun ExploreScreen(
                         )
                     )
                     BasicText(
-                        text = "Explore",
+                        text = if (isSearchDestination) "Search" else "Explore",
                         style = MaterialTheme.typography.headlineMedium.copy(
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold
                         )
                     )
                 }
-                BasicText(
-                    text = "DISCOVER",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        letterSpacing = 1.2.sp
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    BasicText(
+                        text = if (isSearchDestination) "SEARCH" else "DISCOVER",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            letterSpacing = 1.2.sp
+                        )
                     )
-                )
+                    if (!showSearchEntry) {
+                        Box(
+                            Modifier.size(40.dp).clip(RoundedCornerShape(13.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                .clickable { onAccountVisibleChange(true) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (userProfile?.avatarUrl != null) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(userProfile.avatarUrl)
+                                        .size(96, 96)
+                                        .precision(Precision.INEXACT)
+                                        .crossfade(false)
+                                        .build(),
+                                    contentDescription = "Account",
+                                    modifier = Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.AccountCircle,
+                                    contentDescription = "Account",
+                                    modifier = Modifier.size(26.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
             }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            if (showSearchEntry) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                 Row(
                     modifier = Modifier
                         .weight(1f)
@@ -1867,6 +1930,7 @@ fun ExploreScreen(
                             )
                         }
                     }
+                }
                 }
             }
 

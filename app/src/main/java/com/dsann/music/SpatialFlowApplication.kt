@@ -42,7 +42,7 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
             .memoryCache {
                 MemoryCache.Builder(this)
                     // Keep artwork from crowding playback buffers and Compose state on 2 GB phones.
-                    .maxSizePercent(if (lowRam) 0.035 else 0.10)
+                    .maxSizePercent(if (lowRam) 0.06 else 0.11)
                     .strongReferencesEnabled(true)
                     .weakReferencesEnabled(true)
                     .build()
@@ -50,7 +50,7 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(if (lowRam) 64L * 1024L * 1024L else 160L * 1024L * 1024L)
+                    .maxSizeBytes(if (lowRam) 96L * 1024L * 1024L else 160L * 1024L * 1024L)
                     .build()
             }
             .allowHardware(true)
@@ -68,7 +68,12 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+        // RUNNING_LOW may arrive while the player/feed is still foregrounded.
+        // Purging active covers here forces avoidable decode/reload work during scrolling.
+        // Release the cache when the UI is hidden, or immediately for critical pressure.
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN ||
+            level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL
+        ) {
             activeImageLoader?.memoryCache?.clear()
         }
     }

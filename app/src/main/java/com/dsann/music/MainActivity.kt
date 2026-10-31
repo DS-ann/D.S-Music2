@@ -210,7 +210,7 @@ class MainActivity : AppCompatActivity() {
                 val hasSeenOnboarding by prefs.observeKey("has_seen_onboarding_1_8", false)
 
                 val currentNavController = rememberNavController()
-                val rootTabRoutes = remember { setOf("explore", "library", "local_music", "settings") }
+                val rootTabRoutes = remember { setOf("explore", "search", "library", "local_music", "settings") }
                 val rootTabStateHolder = rememberSaveableStateHolder()
                 var lastRootTab by remember { mutableStateOf("explore") }
                 LaunchedEffect(currentNavController) {
@@ -231,7 +231,7 @@ class MainActivity : AppCompatActivity() {
                         val navBackStackEntry by currentNavController.currentBackStackEntryAsState()
                         val currentDestination = navBackStackEntry?.destination
 
-                        val showBottomBar = !isPlayerExpanded && currentDestination?.route in listOf("explore", "library", "local_music", "settings")
+                        val showBottomBar = !isPlayerExpanded && currentDestination?.route in listOf("explore", "search", "library", "local_music", "settings")
 
                         val density = LocalDensity.current
                         val navigationBarsHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
@@ -268,6 +268,7 @@ class MainActivity : AppCompatActivity() {
                         DsmusicNavigationBar(
                             destinations = listOf(
                                 DsmusicNavigationDestination("explore", "Explore", R.drawable.ic_explore),
+                                DsmusicNavigationDestination("search", "Search", R.drawable.ic_search),
                                 DsmusicNavigationDestination("library", "Library", R.drawable.ic_library_music),
                                 DsmusicNavigationDestination("local_music", "Local Music", R.drawable.ic_music_note),
                                 DsmusicNavigationDestination("settings", "Settings", R.drawable.ic_settings)
@@ -289,6 +290,9 @@ class MainActivity : AppCompatActivity() {
                                     playerViewModel.setBottomNavHeight(coordinates.size.height.toFloat())
                                 },
                             onNavigate = { route ->
+                                if (currentDestination?.route == "search" && route != "search") {
+                                    exploreViewModel.clearSearch()
+                                }
                                 if (currentDestination?.route != route) {
                                     currentNavController.navigate(route) {
                                         popUpTo(currentNavController.graph.findStartDestination().id) {
@@ -317,7 +321,7 @@ class MainActivity : AppCompatActivity() {
                         else -> null
                     }
                     LaunchedEffect(currentDestination?.route) {
-                        exploreViewModel.setExplorePageActive(currentDestination?.route == "explore")
+                        exploreViewModel.setExplorePageActive(currentDestination?.route == "explore" || currentDestination?.route == "search")
                     }
                     val showBottomBar = !isPlayerExpanded && currentDestination?.route in listOf("explore", "library", "local_music", "settings")
                     // Keep the rail persistent in wide layouts; scroll-driven bottom-bar hiding is phone-only.
@@ -392,6 +396,30 @@ class MainActivity : AppCompatActivity() {
                                                 }
                                             }
                                         )
+                                        "search" -> ExploreScreen(
+                                            viewModel = exploreViewModel,
+                                            playerSharedViewModel = playerViewModel,
+                                            isSearchDestination = true,
+                                            onNavigateToLibrary = {
+                                                currentNavController.navigate("library") {
+                                                    popUpTo(currentNavController.graph.findStartDestination().id) {
+                                                        saveState = true
+                                                    }
+                                                    launchSingleTop = true
+                                                    restoreState = true
+                                                }
+                                            },
+                                            onLeaveSearchDestination = {
+                                                exploreViewModel.clearSearch()
+                                                currentNavController.navigate("explore") {
+                                                    popUpTo(currentNavController.graph.findStartDestination().id) {
+                                                        saveState = true
+                                                    }
+                                                    launchSingleTop = true
+                                                    restoreState = true
+                                                }
+                                            }
+                                        )
                                         "library" -> LibraryScreen(
                                             viewModel = playerViewModel,
                                             onEditSong = { song ->
@@ -417,9 +445,10 @@ class MainActivity : AppCompatActivity() {
                             val routeIndices = remember {
                                 mapOf(
                                     "explore" to 0,
-                                    "library" to 1,
-                                    "local_music" to 2,
-                                    "settings" to 3
+                                    "search" to 1,
+                                    "library" to 2,
+                                    "local_music" to 3,
+                                    "settings" to 4
                                 )
                             }
 
@@ -443,6 +472,7 @@ class MainActivity : AppCompatActivity() {
                                     )
                                 }
                                 composable("explore") { }
+                                composable("search") { }
                                 composable("library") { }
                                 composable("local_music") { }
                                 composable("settings") { }
@@ -491,6 +521,7 @@ class MainActivity : AppCompatActivity() {
                             ) {
                                     val items = listOf(
                                         Triple("explore", "Explore", R.drawable.ic_explore),
+                                        Triple("search", "Search", R.drawable.ic_search),
                                         Triple("library", "Library", R.drawable.ic_library_music),
                                         Triple("local_music", "Local Music", R.drawable.ic_music_note),
                                         Triple("settings", "Settings", R.drawable.ic_settings)

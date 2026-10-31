@@ -1101,6 +1101,7 @@ fun PlayerBottomSheetCompose(
         // collapse before the mini player reached its bottom position.
         var pendingSheetAnimation by remember { mutableStateOf<SheetAnimationRequest?>(null) }
         var sheetAnimationRequestId by remember { mutableStateOf(0) }
+        var isSheetAnimating by remember { mutableStateOf(false) }
 
         val currentSheetTranslationY = remember(viewModel) {
             Animatable(sheetCollapsedTargetYState.value * (1f - restoredExpansionFraction))
@@ -1154,16 +1155,26 @@ fun PlayerBottomSheetCompose(
             viewModel.setPlayerExpanded(currentSheetContentState == PlayerSheetState.EXPANDED)
         }
 
-        // Synchronize dynamic scrolling Bottom Nav visibility changes
-        LaunchedEffect(Unit) {
-            snapshotFlow { sheetCollapsedTargetYState.value }.collect { targetY ->
-                if (currentSheetContentState == PlayerSheetState.COLLAPSED &&
-                    pendingSheetAnimation == null &&
-                    !isDragging &&
+        // Synchronize dock changes both during and after a player transition.
+        // If the dock moves while the sheet is animating, apply the latest target
+        // when the animation owner finishes instead of silently discarding the update.
+        LaunchedEffect(screenHeightPx) {
+            snapshotFlow {
+                Triple(
+                    sheetCollapsedTargetYState.value,
+                    isSheetAnimating,
+                    currentSheetContentState == PlayerSheetState.COLLAPSED &&
+                        pendingSheetAnimation == null && !isDragging
+                )
+            }.collect { (targetY, animationRunning, shouldSynchronize) ->
+                if (shouldSynchronize &&
+                    !animationRunning &&
                     !currentSheetTranslationY.isRunning &&
                     currentSheetTranslationY.value != screenHeightPx
                 ) {
-                    currentSheetTranslationY.snapTo(targetY)
+                    currentSheetTranslationY.snapTo(
+                        targetY.coerceIn(0f, screenHeightPx)
+                    )
                 }
             }
         }
@@ -1224,21 +1235,26 @@ fun PlayerBottomSheetCompose(
             val resolvedAnimationSpec = animationSpec
                 ?: spring(dampingRatio = 0.85f, stiffness = 400f)
 
-            coroutineScope {
-                launch {
-                    currentSheetTranslationY.animateTo(
-                        targetValue = destY,
-                        animationSpec = resolvedAnimationSpec,
-                        initialVelocity = initialVelocity
-                    )
+            isSheetAnimating = true
+            try {
+                coroutineScope {
+                    launch {
+                        currentSheetTranslationY.animateTo(
+                            targetValue = destY,
+                            animationSpec = resolvedAnimationSpec,
+                            initialVelocity = initialVelocity
+                        )
+                    }
+                    launch {
+                        playerContentExpansionFraction.animateTo(
+                            targetValue = destFraction,
+                            animationSpec = resolvedAnimationSpec,
+                            initialVelocity = initialFractionVelocity
+                        )
+                    }
                 }
-                launch {
-                    playerContentExpansionFraction.animateTo(
-                        targetValue = destFraction,
-                        animationSpec = resolvedAnimationSpec,
-                        initialVelocity = initialFractionVelocity
-                    )
-                }
+            } finally {
+                isSheetAnimating = false
             }
         }
 
