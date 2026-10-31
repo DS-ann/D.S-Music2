@@ -36,6 +36,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Radio
@@ -157,7 +158,8 @@ fun PlaylistDetailView(
     onSongClick: (OnlineSong, List<OnlineSong>, Int) -> Unit,
     onSongMenuClick: (OnlineSong) -> Unit,
     onStartRadioClick: (String) -> Unit,
-    onPlaylistSaved: (String, String, String) -> Unit = { _, _, _ -> }
+    onPlaylistSaved: (String, String, String) -> Unit = { _, _, _ -> },
+    onPlaylistDeleted: () -> Unit = {}
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -167,6 +169,8 @@ fun PlaylistDetailView(
     var editTitle by remember(playlistPage.playlist.title) { mutableStateOf(playlistPage.playlist.title) }
     var editDescription by remember(playlistPage.description) { mutableStateOf(playlistPage.description.orEmpty()) }
     var editPrivacy by remember(playlistPage.privacy) { mutableStateOf(playlistPage.privacy ?: "PRIVATE") }
+    var confirmDelete by remember(playlistPage.playlist.playlistId) { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf(false) }
 
     AdaptiveDetailContainer(
         isLandscape = isLandscape,
@@ -205,6 +209,19 @@ fun PlaylistDetailView(
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                     ) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit playlist")
+                    }
+                    IconButton(
+                        onClick = { confirmDelete = true },
+                        enabled = !deleting,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.72f))
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete playlist",
+                            tint = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }
@@ -307,6 +324,54 @@ fun PlaylistDetailView(
             },
             dismissButton = {
                 TextButton(enabled = !saving, onClick = { editing = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (confirmDelete && playlistPage.isOwned) {
+        AlertDialog(
+            onDismissRequest = { if (!deleting) confirmDelete = false },
+            title = { Text("Delete playlist?") },
+            text = {
+                Text("Delete “${playlistPage.playlist.title}” from your YouTube Music library? This cannot be undone.")
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !deleting,
+                    onClick = {
+                        if (!deleting) {
+                            deleting = true
+                            scope.launch {
+                                YouTubeMusic.deletePlaylist(playlistPage.playlist.playlistId)
+                                    .onSuccess { deleted ->
+                                        if (deleted) {
+                                            com.dsann.music.ui.SnackbarController.showMessage(
+                                                "Playlist deleted from YouTube Music."
+                                            )
+                                            confirmDelete = false
+                                            onPlaylistDeleted()
+                                        } else {
+                                            com.dsann.music.ui.SnackbarController.showMessage(
+                                                "YouTube Music did not confirm playlist deletion."
+                                            )
+                                        }
+                                    }
+                                    .onFailure { error ->
+                                        com.dsann.music.ui.SnackbarController.showMessage(
+                                            error.message ?: "Could not delete this playlist."
+                                        )
+                                    }
+                                deleting = false
+                            }
+                        }
+                    }
+                ) { Text(if (deleting) "Deleting…" else "Delete") }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !deleting,
+                    onClick = { confirmDelete = false }
+                ) { Text("Cancel") }
             }
         )
     }

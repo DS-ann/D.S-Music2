@@ -599,6 +599,10 @@ fun ExploreScreen(
                                                     description,
                                                     privacy
                                                 )
+                                            },
+                                            onPlaylistDeleted = {
+                                                accountVM.loadLibrary()
+                                                handleDetailBack()
                                             }
                                         )
                                     }

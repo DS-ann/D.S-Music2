@@ -1413,8 +1413,6 @@ private fun PlaylistsTabContent(
 
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var selectedLocalPlaylist by remember { mutableStateOf<PlaylistEntity?>(null) }
-    var selectedOnlinePlaylistToDelete by remember { mutableStateOf<OnlinePlaylist?>(null) }
-    var isDeletingOnlinePlaylist by remember { mutableStateOf(false) }
     var showCachePlaylist by remember { mutableStateOf(false) }
     val playlistGridState = rememberLazyGridState()
 
@@ -1502,74 +1500,35 @@ private fun PlaylistsTabContent(
         )
     }
 
-    selectedOnlinePlaylistToDelete?.let { playlist ->
-        AlertDialog(
-            onDismissRequest = {
-                if (!isDeletingOnlinePlaylist) selectedOnlinePlaylistToDelete = null
-            },
-            title = { Text("Delete YouTube Music playlist?") },
-            text = {
-                Text("Delete “" + playlist.title + "” from your YouTube Music library? This cannot be undone.")
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = !isDeletingOnlinePlaylist,
-                    onClick = {
-                        if (!isDeletingOnlinePlaylist) {
-                            isDeletingOnlinePlaylist = true
-                            scope.launch {
-                                YouTubeMusic.deletePlaylist(playlist.playlistId)
-                                    .onSuccess { deleted ->
-                                        if (deleted) {
-                                            accountViewModel?.loadLibrary()
-                                            com.dsann.music.ui.SnackbarController.showMessage(
-                                                "Deleted “" + playlist.title + "” from YouTube Music"
-                                            )
-                                        } else {
-                                            com.dsann.music.ui.SnackbarController.showMessage(
-                                                "YouTube Music did not confirm playlist deletion"
-                                            )
-                                        }
-                                    }
-                                    .onFailure { error ->
-                                        com.dsann.music.ui.SnackbarController.showMessage(
-                                            error.message ?: "Could not delete this YouTube Music playlist"
-                                        )
-                                    }
-                                isDeletingOnlinePlaylist = false
-                                selectedOnlinePlaylistToDelete = null
-                            }
-                        }
-                    }
-                ) { Text(if (isDeletingOnlinePlaylist) "Deleting…" else "Delete") }
-            },
-            dismissButton = {
-                TextButton(
-                    enabled = !isDeletingOnlinePlaylist,
-                    onClick = { selectedOnlinePlaylistToDelete = null }
-                ) { Text("Cancel") }
-            }
-        )
-    }
-
     if (showCachePlaylist) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+        Dialog(
+            onDismissRequest = { showCachePlaylist = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
             ) {
-                IconButton(onClick = { showCachePlaylist = false }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to playlists")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { showCachePlaylist = false }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to playlists")
+                    }
+                    Text("Cache", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
-                Text("Cache", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            }
-            Box(modifier = Modifier.weight(1f)) {
                 StreamCacheTabContent(
                     context = context,
                     viewModel = viewModel,
                     exploreViewModel = exploreViewModel,
                     lyricsCache = lyricsCache,
-                    onSongLongClick = onCachedSongLongClick
+                    onSongLongClick = onCachedSongLongClick,
+                    modifier = Modifier.weight(1f).fillMaxWidth()
                 )
             }
         }
@@ -1763,7 +1722,6 @@ private fun PlaylistsTabContent(
                             exploreViewModel?.loadPlaylist(playlist.playlistId)
                             navigateToExplore(activity)
                         },
-                        onDelete = { selectedOnlinePlaylistToDelete = playlist }
                     )
                 }
             }
@@ -2068,8 +2026,7 @@ private fun LocalPlaylistDetailsScreen(
 private fun OnlinePlaylistCard(
     playlist: OnlinePlaylist,
     asList: Boolean = false,
-    onClick: () -> Unit,
-    onDelete: (() -> Unit)? = null
+    onClick: () -> Unit
 ) {
     val context = LocalContext.current
     val thumbnailRequest = remember(context, playlist.thumbnailUrl) {
@@ -2103,17 +2060,6 @@ private fun OnlinePlaylistCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                    }
-                }
-            },
-            trailingContent = {
-                if (onDelete != null) {
-                    IconButton(onClick = onDelete) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Delete YouTube Music playlist",
-                            tint = MaterialTheme.colorScheme.error
-                        )
                     }
                 }
             },
@@ -2155,21 +2101,6 @@ private fun OnlinePlaylistCard(
                             null,
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(48.dp)
-                        )
-                    }
-                }
-                if (onDelete != null) {
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(5.dp)
-                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f), CircleShape)
-                    ) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Delete YouTube Music playlist",
-                            tint = MaterialTheme.colorScheme.error
                         )
                     }
                 }
@@ -3441,16 +3372,22 @@ private fun StreamCacheTabContent(
     viewModel: PlayerSharedViewModel,
     exploreViewModel: ExploreViewModel?,
     lyricsCache: LyricsCacheManager,
-    onSongLongClick: (CachedSongEntry) -> Unit
+    onSongLongClick: (CachedSongEntry) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var cacheEntries by remember { mutableStateOf(emptyList<CachedSongEntry>()) }
     val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
 
     LaunchedEffect(context, lyricsCache) {
-        cacheEntries = readCacheTabSnapshot(context, lyricsCache).entries
+        var snapshot = readCacheTabSnapshot(context, lyricsCache).entries
+        cacheEntries = snapshot
         while (true) {
-            delay(3000L)
-            cacheEntries = readCacheTabSnapshot(context, lyricsCache).entries
+            delay(10_000L)
+            val updated = readCacheTabSnapshot(context, lyricsCache).entries
+            if (updated != snapshot) {
+                snapshot = updated
+                cacheEntries = updated
+            }
         }
     }
 
@@ -3487,8 +3424,8 @@ private fun StreamCacheTabContent(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         // YouTube-style playlist header: cover art, playlist identity, song count, and
@@ -3499,37 +3436,34 @@ private fun StreamCacheTabContent(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         AsyncImage(
                             model = AudioPlaybackService.getCachedMediaArtworkFile(context, cacheEntries.first().songId),
                             contentDescription = "Cache playlist artwork",
-                            modifier = Modifier.size(136.dp).clip(RoundedCornerShape(14.dp)),
+                            modifier = Modifier
+                                .size(216.dp)
+                                .clip(RoundedCornerShape(18.dp)),
                             contentScale = ContentScale.Crop
                         )
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                "Cache",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                            Text(
-                                "D.S Music · ${cacheEntries.size} songs",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                "Available offline",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+                        Text(
+                            "Cache",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            "D.S Music · ${cacheEntries.size} songs",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "Available offline",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
