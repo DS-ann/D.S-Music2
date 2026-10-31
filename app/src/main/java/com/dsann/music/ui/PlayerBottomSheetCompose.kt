@@ -186,7 +186,8 @@ fun rememberSheetVisualState(
     currentSheetTranslationY: Animatable<Float, AnimationVector1D>,
     sheetCollapsedTargetYProvider: () -> Float,
     isNavBarHiddenProvider: () -> Boolean,
-    navBarCornerRadiusDp: Dp
+    navBarCornerRadiusDp: Dp,
+    miniPlayerHeight: Dp = MiniPlayerHeight
 ): SheetVisualState {
     
     val currentBottomPadding by remember(showPlayerContentArea, collapsedStateHorizontalPadding, predictiveBackCollapseProgress) {
@@ -200,11 +201,11 @@ fun rememberSheetVisualState(
     }
 
     val density = LocalDensity.current
-    val miniHeightPx = remember(density) { with(density) { MiniPlayerHeight.toPx() } }
+    val miniHeightPx = remember(miniPlayerHeight, density) { with(density) { miniPlayerHeight.toPx() } }
     val containerHeightPx = remember(containerHeight, density) { with(density) { containerHeight.toPx() } }
     
     // Dynamic height provider (Layout-phase)
-    val playerContentAreaHeightPxProvider: () -> Float = remember(showPlayerContentArea, playerContentExpansionFraction) {
+    val playerContentAreaHeightPxProvider: () -> Float = remember(showPlayerContentArea, playerContentExpansionFraction, miniHeightPx, containerHeightPx) {
         {
             if (showPlayerContentArea) {
                 androidx.compose.ui.util.lerp(miniHeightPx, containerHeightPx, playerContentExpansionFraction.value)
@@ -215,7 +216,7 @@ fun rememberSheetVisualState(
     }
 
     val predictiveBackCollapseProgressState = rememberUpdatedState(predictiveBackCollapseProgress)
-    val visualSheetTranslationYProvider: () -> Float = remember(currentSheetTranslationY) {
+    val visualSheetTranslationYProvider: () -> Float = remember(currentSheetTranslationY, sheetCollapsedTargetYProvider) {
         {
             val progress = predictiveBackCollapseProgressState.value
             val collapsedY = sheetCollapsedTargetYProvider()
@@ -224,23 +225,23 @@ fun rememberSheetVisualState(
     }
 
     // Dynamic top corners logic (lerps from pill corner to 0.dp)
-    val overallSheetTopCornerRadiusProvider: () -> Dp = remember(showPlayerContentArea, playerContentExpansionFraction, navBarCornerRadiusDp, isNavBarHiddenProvider) {
+    val overallSheetTopCornerRadiusProvider: () -> Dp = remember(showPlayerContentArea, playerContentExpansionFraction, navBarCornerRadiusDp, isNavBarHiddenProvider, miniPlayerHeight) {
         {
             if (showPlayerContentArea) {
-                val collapsedCornerTarget = 40.dp // Perfect capsule: half of 80.dp height
+                val collapsedCornerTarget = miniPlayerHeight / 2f
                 val fraction = playerContentExpansionFraction.value
                 lerp(collapsedCornerTarget, 0.dp, fraction)
             } else {
-                40.dp
+                miniPlayerHeight / 2f
             }
         }
     }
 
     // Dynamic bottom corners logic (morphs down to 0.dp)
-    val playerContentActualBottomRadiusProvider: () -> Dp = remember(showPlayerContentArea, playerContentExpansionFraction, isNavBarHiddenProvider, navBarCornerRadiusDp) {
+    val playerContentActualBottomRadiusProvider: () -> Dp = remember(showPlayerContentArea, playerContentExpansionFraction, isNavBarHiddenProvider, navBarCornerRadiusDp, miniPlayerHeight) {
         {
             val fraction = playerContentExpansionFraction.value
-            val collapsedRadius = 40.dp // Perfect capsule: half of 80.dp height
+            val collapsedRadius = miniPlayerHeight / 2f
             
             // Morphs outward to 26.dp in first 20% drag to form curved floating card, then goes flat
             if (fraction < 0.2f) {
@@ -321,7 +322,7 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
         modifier = Modifier
             .align(Alignment.TopCenter)
             .fillMaxWidth()
-            .height(MiniPlayerHeight)
+            .height(miniPlayerHeight)
             .graphicsLayer {
                 // Cross-fades fully to 0.0 alpha at 50% expansion
                 alpha = (1f - playerContentExpansionFraction.value * 2f).coerceIn(0f, 1f)
@@ -754,6 +755,9 @@ fun PlayerBottomSheetCompose(
         val useNavigationRail = configuration.screenWidthDp >= 600
         val useWidePlayer = configuration.screenWidthDp >= 840 ||
             (useNavigationRail && configuration.screenWidthDp > configuration.screenHeightDp)
+        val miniPlayerHeight = if (
+            configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        ) 64.dp else MiniPlayerHeight
         val scope = rememberCoroutineScope()
         val playerPreferences = remember(context) {
             context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
@@ -950,7 +954,7 @@ fun PlayerBottomSheetCompose(
         
         // Zero-Recomposition logic: calculating layout targets inside derivedStateOf
         // This ensures the composable body doesn't re-run for every pixel of nav bar scroll
-        val sheetCollapsedTargetYState = remember(screenHeightPx, density, useNavigationRail) {
+        val sheetCollapsedTargetYState = remember(screenHeightPx, density, useNavigationRail, miniPlayerHeight) {
             derivedStateOf {
                 val bottomNavHeightPx = if (useNavigationRail) {
                     0f
@@ -959,7 +963,7 @@ fun PlayerBottomSheetCompose(
                 } else {
                     with(density) { 75.dp.toPx() }
                 }
-                val miniPlayerHeightPx = with(density) { MiniPlayerHeight.toPx() }
+                val miniPlayerHeightPx = with(density) { miniPlayerHeight.toPx() }
                 
                 // Dynamically adjust gap: 12dp when BottomNav is visible, 8dp when hidden
                 val bottomNavVisibilityFraction = if (useNavigationRail) {
@@ -1150,7 +1154,7 @@ fun PlayerBottomSheetCompose(
             val expectedBottomGapPx = with(density) {
                 (if (useNavigationRail) 8.dp else 12.dp).toPx()
             }
-            val miniPlayerHeightPx = with(density) { MiniPlayerHeight.toPx() }
+            val miniPlayerHeightPx = with(density) { miniPlayerHeight.toPx() }
             val destY = if (targetExpanded) {
                 0f
             } else {
@@ -1222,7 +1226,8 @@ fun PlayerBottomSheetCompose(
                 if (useNavigationRail) playerContentExpansionFraction.value > 0.5f
                 else (bottomNavTranslationYState.value / (if (dynamicBottomNavHeightState.value > 0) dynamicBottomNavHeightState.value else 1f)) > 0.5f
             },
-            navBarCornerRadiusDp = 32.dp
+            navBarCornerRadiusDp = 32.dp,
+            miniPlayerHeight = miniPlayerHeight
         )
 
         // Dynamic Shape instantiation
@@ -1249,7 +1254,7 @@ fun PlayerBottomSheetCompose(
         val velocityTracker = remember { VelocityTracker() }
         
         val sheetVerticalDragGestureHandler = remember(density) {
-            val miniHeightPx = with(density) { MiniPlayerHeight.toPx() }
+            val miniHeightPx = with(density) { miniPlayerHeight.toPx() }
             SheetVerticalDragGestureHandler(
                 scope = scope,
                 velocityTracker = velocityTracker,
@@ -1411,13 +1416,12 @@ fun PlayerBottomSheetCompose(
                         "Vinyl", "Cassette" -> 0.82f
                         else -> 0.9f
                     }
-                    val albumArtSizeDp = if (useWidePlayer) {
-                        val baseSize = if (configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
-                            minOf(containerHeight * 0.28f, screenWidth.dp * 0.30f)
-                        } else {
-                            minOf(containerHeight * 0.50f, screenWidth.dp * 0.42f)
-                        }
-                        baseSize * (albumArtScale / 0.9f)
+                    val albumArtSizeDp = if (
+                        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                    ) {
+                        minOf(containerHeight * 0.28f, screenWidth.dp * 0.30f) * (albumArtScale / 0.9f)
+                    } else if (useWidePlayer) {
+                        minOf(containerHeight * 0.50f, screenWidth.dp * 0.42f) * (albumArtScale / 0.9f)
                     } else {
                         (screenWidth * albumArtScale).dp
                     }
@@ -1746,7 +1750,7 @@ fun PlayerBottomSheetCompose(
                                 // Keep download/playback messages inside the visible player instead.
                                 bottomOffsetPx = with(density) { 96.dp.toPx() }
                             } else {
-                                val miniPlayerHeightPx = with(density) { MiniPlayerHeight.toPx() }
+                                val miniPlayerHeightPx = with(density) { miniPlayerHeight.toPx() }
                                 bottomOffsetPx = effectiveBottomNavHeight + currentBottomGapPx + miniPlayerHeightPx + with(density) { 8.dp.toPx() }
 
                                 val topOfPlayerSheetY = sheetVisualState.visualSheetTranslationYProvider()
@@ -1812,6 +1816,9 @@ private fun MiniPlayerContentInternal(
 ) {
 
     val isDark = isSystemInDarkTheme()
+    val compactLandscape = LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val artworkSize = if (compactLandscape) 48.dp else 60.dp
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val contentColor = if (isDark) Color.White else Color(0xFF1C1B1F)
     val contentSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1C1B1F).copy(alpha = 0.6f)
@@ -1821,14 +1828,19 @@ private fun MiniPlayerContentInternal(
         modifier = modifier
             .fillMaxSize()
             .clickable(onClick = onClick)
-            .padding(start = 10.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+            .padding(
+                start = 10.dp,
+                end = 8.dp,
+                top = if (compactLandscape) 4.dp else 10.dp,
+                bottom = if (compactLandscape) 4.dp else 10.dp
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Reserves the same 60dp artwork slot used by the shared transformed cover.
         // Progress is painted above that cover so both always share coordinates and clipping.
-        Box(modifier = Modifier.size(60.dp))
+        Box(modifier = Modifier.size(artworkSize))
 
-        Spacer(modifier = Modifier.width(20.dp))
+        Spacer(modifier = Modifier.width(if (compactLandscape) 12.dp else 20.dp))
 
         // Song Info
         Column(modifier = Modifier.weight(1f)) {
