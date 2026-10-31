@@ -74,9 +74,11 @@ fun SpatialFlowTheme(
     val amoledEnabled by prefs.observeKey("amoled_black", false)
     val albumArtThemeEnabled by prefs.observeKey("dynamic_album_theme", false)
     val appearancePreset by prefs.observeKey("appearance_preset", "Ocean")
+    val customAccentHex by prefs.observeKey("custom_accent_color", "#7C9CFF")
     val uiDensity by prefs.observeKey("ui_density", "Comfortable")
+    val uiCornerStyle by prefs.observeKey("ui_corner_style", "Soft")
 
-    val accent = remember(appearancePreset, albumArtThemeEnabled, dynamicAlbumColor) {
+    val accent = remember(appearancePreset, albumArtThemeEnabled, dynamicAlbumColor, customAccentHex) {
         if (albumArtThemeEnabled && dynamicAlbumColor != null) {
             Color(dynamicAlbumColor)
         } else {
@@ -92,6 +94,7 @@ fun SpatialFlowTheme(
                 "Indigo" -> Color(0xFF6475E9)
                 "Lime" -> Color(0xFF9FBF42)
                 "Graphite" -> Color(0xFF8A939F)
+                "Custom" -> runCatching { Color(android.graphics.Color.parseColor(customAccentHex)) }.getOrDefault(Color(0xFF7C9CFF))
                 else -> Color(0xFF7C9CFF) // D.S Launcher blue
             }
         }
@@ -202,13 +205,20 @@ fun SpatialFlowTheme(
         MaterialTheme(
             colorScheme = colorScheme,
             typography = Typography,
-            shapes = Shapes(
-                extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(7.dp),
-                small = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
-                medium = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-                large = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
-                extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
-            ),
+            shapes = remember(uiCornerStyle) {
+                val (xs, sm, md, lg, xl) = when (uiCornerStyle) {
+                    "Tight" -> listOf(3.dp, 5.dp, 8.dp, 11.dp, 15.dp)
+                    "Round" -> listOf(9.dp, 14.dp, 20.dp, 26.dp, 32.dp)
+                    else -> listOf(5.dp, 9.dp, 13.dp, 18.dp, 24.dp)
+                }
+                Shapes(
+                    extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(xs),
+                    small = androidx.compose.foundation.shape.RoundedCornerShape(sm),
+                    medium = androidx.compose.foundation.shape.RoundedCornerShape(md),
+                    large = androidx.compose.foundation.shape.RoundedCornerShape(lg),
+                    extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(xl)
+                )
+            },
             content = content
         )
     }
