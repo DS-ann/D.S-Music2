@@ -1009,7 +1009,7 @@ fun ExpressiveConnectedButtonGroup(
                     ),
                     label = "ShuffleCorner"
                 )
-                androidx.compose.material3.DsmusicButton(
+                DsmusicButton(
                     onClick = onShuffleClick,
                     modifier = with(scope) {
                         Modifier
@@ -1055,7 +1055,7 @@ fun ExpressiveConnectedButtonGroup(
                     ),
                     label = "RadioCorner"
                 )
-                androidx.compose.material3.DsmusicButton(
+                DsmusicButton(
                     onClick = onRadioClick,
                     modifier = with(scope) {
                         Modifier

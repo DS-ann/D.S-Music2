@@ -287,7 +287,7 @@ fun SleepTimerBottomSheet(
                             )
                         },
                         trailingContent = {
-                            androidx.compose.material3.DsmusicSwitchControl(
+                            DsmusicSwitchControl(
                                 checked = sleepTimerMode == PlayerSharedViewModel.SleepTimerMode.END_OF_SONG,
                                 onCheckedChange = null
                             )

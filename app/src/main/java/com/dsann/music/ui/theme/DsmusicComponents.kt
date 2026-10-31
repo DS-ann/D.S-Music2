@@ -20,13 +20,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.platform.LocalContentColor
 import androidx.compose.ui.unit.dp
 
 /** Flat D.S Launcher-inspired surfaces: no tonal elevation or liquid-glass layers. */
@@ -69,7 +67,7 @@ fun DsmusicSurface(
         modifier = modifier.clip(shape).background(color)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {
-        CompositionLocalProvider(LocalContentColor provides contentColor) { content() }
+        content()
     }
 }
 
@@ -86,13 +84,22 @@ fun DsmusicListItem(
     colors: Any? = null,
     shapes: Any? = null,
     verticalAlignment: Alignment.Vertical = Alignment.CenterVertically,
+    checked: Boolean? = null,
+    onCheckedChange: ((Boolean) -> Unit)? = null,
     content: (@Composable () -> Unit)? = null
 ) {
     val paddingValues = contentPadding ?: PaddingValues(horizontal = 13.dp, vertical = 10.dp)
     Row(
         modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(
+                when {
+                    onClick != null -> Modifier.clickable(onClick = onClick)
+                    checked != null && onCheckedChange != null ->
+                        Modifier.clickable { onCheckedChange(!checked) }
+                    else -> Modifier
+                }
+            )
             .padding(paddingValues),
         verticalAlignment = verticalAlignment,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -184,11 +191,12 @@ fun DsmusicIconButton(
     enabled: Boolean = true,
     interactionSource: Any? = null,
     colors: Any? = null,
+    shape: Shape = CircleShape,
     content: @Composable BoxScope.() -> Unit
 ) {
     Box(
         modifier = modifier.defaultMinSize(minWidth = 40.dp, minHeight = 40.dp)
-            .clip(CircleShape).clickable(enabled = enabled, onClick = onClick),
+            .clip(shape).clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
         content = content
     )
@@ -218,7 +226,7 @@ fun DsmusicFilterChip(
         verticalAlignment = Alignment.CenterVertically
     ) {
         leadingIcon?.invoke()
-        CompositionLocalProvider(LocalContentColor provides if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant) { label() }
+        label()
         trailingIcon?.invoke()
     }
 }
