@@ -199,22 +199,33 @@ internal fun SyncedLyricsCompose(
             }
         }
 
-        var lastFrameNanos = 0L
-        while (true) {
-            withFrameNanos { frameNanos ->
-                val actualMs = currentPositionProvider().coerceAtLeast(0).toDouble()
-                if (lastFrameNanos == 0L) {
-                    shownMs = actualMs
-                } else {
-                    val elapsedMs = (frameNanos - lastFrameNanos).coerceAtLeast(0L) / 1_000_000.0
-                    shownMs += elapsedMs
-                    val errorMs = actualMs - shownMs
-                    // Large differences are seeks/buffering; small differences are corrected gently.
-                    shownMs = if (abs(errorMs) > 220.0) actualMs else shownMs + errorMs * 0.12
+        if (SpatialFlowApplication.isLowRamDevice) {
+            // A 25 Hz clock is sufficient for lyric highlighting and reduces state
+            // invalidation on 3–4 GB phones. The service position remains authoritative,
+            // so a pause, seek or buffering jump is reflected on the next tick.
+            while (true) {
+                delay(40L)
+                val actualMs = currentPositionProvider().coerceAtLeast(0)
+                if (lyricClock.intValue != actualMs) lyricClock.intValue = actualMs
+            }
+        } else {
+            var lastFrameNanos = 0L
+            while (true) {
+                withFrameNanos { frameNanos ->
+                    val actualMs = currentPositionProvider().coerceAtLeast(0).toDouble()
+                    if (lastFrameNanos == 0L) {
+                        shownMs = actualMs
+                    } else {
+                        val elapsedMs = (frameNanos - lastFrameNanos).coerceAtLeast(0L) / 1_000_000.0
+                        shownMs += elapsedMs
+                        val errorMs = actualMs - shownMs
+                        // Large differences are seeks/buffering; small differences are corrected gently.
+                        shownMs = if (abs(errorMs) > 220.0) actualMs else shownMs + errorMs * 0.12
+                    }
+                    lastFrameNanos = frameNanos
+                    val nextPosition = shownMs.roundToInt().coerceAtLeast(0)
+                    if (lyricClock.intValue != nextPosition) lyricClock.intValue = nextPosition
                 }
-                lastFrameNanos = frameNanos
-                val nextPosition = shownMs.roundToInt().coerceAtLeast(0)
-                if (lyricClock.intValue != nextPosition) lyricClock.intValue = nextPosition
             }
         }
     }
