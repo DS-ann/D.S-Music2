@@ -1860,10 +1860,11 @@ private fun MiniPlayerContentInternal(
         "Pill" -> RoundedCornerShape(50.dp)
         else -> CircleShape
     }
+    val miniControlBackgroundColor = if (isDark) Color(0x1AFFFFFF) else Color(0x0D000000)
     val controlBackground: Modifier = if (controlShapeName == "None") {
         Modifier
     } else {
-        Modifier.background(playBgColor, controlShape)
+        Modifier.background(miniControlBackgroundColor, controlShape)
     }
     val compactLandscape = LocalConfiguration.current.orientation ==
         android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -1871,8 +1872,6 @@ private fun MiniPlayerContentInternal(
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val contentColor = if (isDark) Color.White else Color(0xFF1C1B1F)
     val contentSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1C1B1F).copy(alpha = 0.6f)
-    val playBgColor = if (isDark) Color(0x1AFFFFFF) else Color(0x0D000000)
-
     Row(
         modifier = modifier
             .fillMaxSize()

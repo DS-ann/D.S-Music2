@@ -346,7 +346,7 @@ fun SearchResultItem(
         // Thumbnail Image
         Box(modifier = Modifier.size(48.dp)) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).size(160, 160).precision(Precision.INEXACT).crossfade(false).build(),
+                model = rememberExploreImageRequest(thumbnailUrl, 160),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize().clip(imageShape).sharedElementIfAvailable("image-$itemId"),
                 contentScale = ContentScale.Crop
@@ -526,8 +526,7 @@ fun SearchTopResultCard(
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current).data(thumbnail)
-                .size(320, 320).precision(Precision.INEXACT).crossfade(false).build(),
+            model = rememberExploreImageRequest(thumbnail, 320),
             contentDescription = null,
             modifier = Modifier.size(92.dp).clip(imageShape),
             contentScale = ContentScale.Crop
@@ -601,8 +600,7 @@ fun SearchBrowseCard(item: SearchItem, onClick: () -> Unit) {
             .padding(4.dp)
     ) {
         AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current).data(thumbnail)
-                .size(260, 260).precision(Precision.INEXACT).crossfade(false).build(),
+            model = rememberExploreImageRequest(thumbnail, 260),
             contentDescription = null,
             modifier = Modifier.size(124.dp).clip(if (isArtist) CircleShape else RoundedCornerShape(12.dp)),
             contentScale = ContentScale.Crop
@@ -658,7 +656,7 @@ fun BentoCell(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).size(512, 512).precision(Precision.INEXACT).crossfade(false).build(),
+                model = rememberExploreImageRequest(thumbnailUrl, 512),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
@@ -874,7 +872,7 @@ fun HomeSectionRow(
                                         }
                                 ) {
                                     AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).size(512, 512).precision(Precision.INEXACT).crossfade(false).build(),
+                                        model = rememberExploreImageRequest(thumbnailUrl, 512),
                                         contentDescription = null,
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = ContentScale.Crop
@@ -962,7 +960,7 @@ fun HomeSectionRow(
                                 }
                         ) {
                             AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).size(512, 512).precision(Precision.INEXACT).crossfade(false).build(),
+                                model = rememberExploreImageRequest(thumbnailUrl, 512),
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
@@ -1062,7 +1060,7 @@ fun HomeSectionRow(
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).size(256, 256).precision(Precision.INEXACT).crossfade(false).build(),
+                                        model = rememberExploreImageRequest(thumbnailUrl, 256),
                                         contentDescription = null,
                                         modifier = Modifier.size(72.dp).clip(RoundedCornerShape(10.dp)),
                                         contentScale = ContentScale.Crop
@@ -1244,7 +1242,7 @@ fun HomeCarouselItem(
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).size(384, 384).precision(Precision.INEXACT).crossfade(false).build(),
+                        model = rememberExploreImageRequest(thumbnailUrl, 384),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
@@ -1319,7 +1317,7 @@ fun HomeSongListItem(
     ) {
         Box(modifier = Modifier.size(56.dp)) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current).data(song.thumbnailUrl).size(192, 192).precision(Precision.INEXACT).crossfade(false).build(),
+                model = rememberExploreImageRequest(song.thumbnailUrl, 192),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(4.dp)),
                 contentScale = ContentScale.Crop
@@ -1706,3 +1704,23 @@ fun OnlineSongBottomSheet(
     }
 }
 
+
+
+/**
+ * Keeps Coil requests stable while LazyColumn/LazyRow parents recompose during scrolling.
+ * A request is rebuilt only when its data or requested target size actually changes.
+ */
+@Composable
+private fun rememberExploreImageRequest(data: Any?, targetSizePx: Int): ImageRequest? {
+    val context = LocalContext.current
+    return remember(context, data, targetSizePx) {
+        data?.let {
+            ImageRequest.Builder(context)
+                .data(it)
+                .size(targetSizePx, targetSizePx)
+                .precision(Precision.INEXACT)
+                .crossfade(false)
+                .build()
+        }
+    }
+}

@@ -637,7 +637,7 @@ fun AdaptiveDetailContainer(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer { alpha = 0.22f }
-                        .blur(56.dp),
+                        .blur(20.dp),
                     contentScale = ContentScale.Crop
                 )
                 Box(
@@ -767,7 +767,7 @@ fun AdaptiveDetailContainer(
                             alpha = imageAlpha * 0.5f 
                             translationY = scrollOffset
                         }
-                        .blur(56.dp),
+                        .blur(20.dp),
                     contentScale = ContentScale.Crop
                 )
                 
