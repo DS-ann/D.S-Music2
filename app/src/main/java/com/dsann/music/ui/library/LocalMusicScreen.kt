@@ -1,5 +1,6 @@
 package com.dsann.music.ui.library
 
+import com.dsann.music.ui.theme.DsmusicPageHeading
 import com.dsann.music.ui.theme.DsmusicCard
 import com.dsann.music.ui.theme.DsmusicSurface
 import com.dsann.music.ui.theme.DsmusicListItem
@@ -245,23 +246,15 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 12.dp, bottom = 6.dp),
+                        .padding(top = 18.dp, bottom = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Local music",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "${localSongs.size} songs on this device",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    DsmusicPageHeading(
+                        title = "Local Music",
+                        subtitle = "${localSongs.size} songs on this device",
+                        modifier = Modifier.weight(1f)
+                    )
                     DsmusicIconButton(
                         enabled = !isScanning,
                         onClick = {

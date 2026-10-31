@@ -1,5 +1,6 @@
 package com.dsann.music.ui.explore
 
+import com.dsann.music.ui.theme.DsmusicPageHeading
 import com.dsann.music.ui.LocalRootTabActive
 import com.dsann.music.ui.theme.DsmusicCard
 import com.dsann.music.ui.theme.DsmusicSurface
@@ -1795,27 +1796,14 @@ fun ExploreScreen(
         // over the results and make the screen appear to open and immediately close.
         Column(modifier = Modifier.statusBarsPadding()) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 18.dp, top = 8.dp, bottom = 2.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 18.dp, top = 14.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                    BasicText(
-                        text = "D.S MUSIC",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.5.sp
-                        )
-                    )
-                    BasicText(
-                        text = if (isSearchDestination) "Search" else "Explore",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    )
-                }
+                DsmusicPageHeading(
+                    title = if (isSearchDestination) "Search" else "Explore",
+                    modifier = Modifier.weight(1f)
+                )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)

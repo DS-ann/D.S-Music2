@@ -4,6 +4,7 @@
 
 package com.dsann.music.ui.library
 
+import com.dsann.music.ui.theme.DsmusicPageHeading
 import com.dsann.music.ui.LocalRootTabActive
 import com.dsann.music.ui.theme.DsmusicCard
 import com.dsann.music.ui.theme.DsmusicSurface
@@ -391,27 +392,14 @@ fun LibraryScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 18.dp, vertical = 10.dp),
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        BasicText(
-                            "D.S MUSIC",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.4.sp
-                            )
-                        )
-                        BasicText(
-                            "Library",
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        )
-                    }
+                    DsmusicPageHeading(
+                        title = "Library",
+                        modifier = Modifier.weight(1f)
+                    )
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,

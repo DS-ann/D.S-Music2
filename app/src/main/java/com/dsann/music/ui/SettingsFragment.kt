@@ -1678,10 +1678,10 @@ private fun SettingsDetailTopBar(title: String, onBack: () -> Unit) {
                 modifier = Modifier.size(20.dp)
             )
         }
-        Column(Modifier.padding(start = 13.dp)) {
+        Column(Modifier.padding(start = 13.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             BasicText(
                 text = title,
-                style = MaterialTheme.typography.titleLarge.copy(
+                style = MaterialTheme.typography.headlineSmall.copy(
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold
                 ),
@@ -1689,9 +1689,9 @@ private fun SettingsDetailTopBar(title: String, onBack: () -> Unit) {
             )
             BasicText(
                 text = "D.S MUSIC",
-                style = MaterialTheme.typography.labelSmall.copy(
+                style = MaterialTheme.typography.labelMedium.copy(
                     color = MaterialTheme.colorScheme.primary,
-                    letterSpacing = 1.3.sp,
+                    letterSpacing = 1.6.sp,
                     fontWeight = FontWeight.Bold
                 ),
                 maxLines = 1
@@ -4192,20 +4192,22 @@ private fun AboutScreen(
 @Composable
 private fun SettingsHeader(text: String) {
     Row(
-        modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
+        modifier = Modifier.padding(top = 28.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             Modifier
-                .size(width = 3.dp, height = 13.dp)
+                .size(width = 4.dp, height = 18.dp)
                 .clip(RoundedCornerShape(3.dp))
                 .background(MaterialTheme.colorScheme.primary)
         )
         BasicText(
             text = text.uppercase(),
-            style = MaterialTheme.typography.labelLarge.copy(
+            style = MaterialTheme.typography.titleMedium.copy(
                 color = MaterialTheme.colorScheme.primary,
-                letterSpacing = 1.1.sp,
+                fontSize = 15.sp,
+                lineHeight = 20.sp,
+                letterSpacing = 1.15.sp,
                 fontWeight = FontWeight.Bold
             ),
             modifier = Modifier.padding(start = 9.dp),
@@ -4225,7 +4227,7 @@ private fun SettingsGroupCard(items: List<@Composable () -> Unit>) {
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .border(
                 1.dp,
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f),
                 shape
             ),
         verticalArrangement = Arrangement.spacedBy(0.dp)
@@ -4235,7 +4237,7 @@ private fun SettingsGroupCard(items: List<@Composable () -> Unit>) {
             if (index < items.lastIndex) {
                 Box(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(1.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
                 )
             }
         }
