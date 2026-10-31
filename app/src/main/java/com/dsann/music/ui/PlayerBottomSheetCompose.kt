@@ -1459,7 +1459,10 @@ fun PlayerBottomSheetCompose(
                                     (with(density) { screenWidth.dp.toPx() } - fullSizePx) / 2f
                                 }
 
-                                val yStartPx = 16.dp.toPx()
+                                val miniPlayerArtworkStartInset = with(density) {
+                                    ((miniPlayerHeight - 48.dp) / 2f).toPx()
+                                }
+                                val yStartPx = miniPlayerArtworkStartInset
                                 val minTopOffsetDp = with(density) { statusBarTopPx.toDp() } +
                                     if (configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) 52.dp else 68.dp
                                 val topOffsetDp = if (useWidePlayer) {
