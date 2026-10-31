@@ -51,6 +51,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -565,28 +566,54 @@ fun LibraryScreen(
                         ) {
                             Column(modifier = Modifier.fillMaxSize()) {
                                 // Search Bar
-                                OutlinedTextField(
-                                    value = searchQuery,
-                                    onValueChange = { searchQuery = it },
-                                    placeholder = { Text("Search local songs...") },
-                                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                                    trailingIcon = {
-                                        if (searchQuery.isNotEmpty()) {
-                                            IconButton(onClick = { searchQuery = "" }) {
-                                                Icon(Icons.Default.Clear, null)
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                                    shape = CircleShape,
-                                    singleLine = true,
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                                Row(
+                                    modifier = Modifier.fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f), CircleShape)
+                                        .padding(horizontal = 15.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Search,
+                                        contentDescription = "Search local songs",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(21.dp)
                                     )
-                                )
+                                    Box(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                                        if (searchQuery.isEmpty()) {
+                                            Text(
+                                                "Search local songs...",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        BasicTextField(
+                                            value = searchQuery,
+                                            onValueChange = { searchQuery = it },
+                                            singleLine = true,
+                                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            ),
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
+                                    if (searchQuery.isNotEmpty()) {
+                                        Box(
+                                            modifier = Modifier.size(28.dp).clip(CircleShape)
+                                                .clickable { searchQuery = "" },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Clear,
+                                                contentDescription = "Clear search",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
 
                                 // Sorting chips
                                 Row(
@@ -598,24 +625,24 @@ fun LibraryScreen(
                                 ) {
                                     SortOrder.entries.forEach { order ->
                                         val isSel = sortOrder == order
-                                        FilterChip(
-                                            selected = isSel,
-                                            onClick = { sortOrder = order },
-                                            label = {
-                                                Text(
-                                                    text = order.name.replace("_", " "),
+                                        Box(
+                                            modifier = Modifier.clip(RoundedCornerShape(9.dp))
+                                                .background(
+                                                    if (isSel) MaterialTheme.colorScheme.primaryContainer
+                                                    else MaterialTheme.colorScheme.surfaceContainerLow
+                                                )
+                                                .clickable { sortOrder = order }
+                                                .padding(horizontal = 13.dp, vertical = 9.dp)
+                                        ) {
+                                            BasicText(
+                                                text = order.name.replace("_", " "),
+                                                style = MaterialTheme.typography.labelMedium.copy(
+                                                    color = if (isSel) MaterialTheme.colorScheme.onPrimaryContainer
+                                                        else MaterialTheme.colorScheme.onSurfaceVariant,
                                                     fontWeight = FontWeight.SemiBold
                                                 )
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            border = null,
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
                                             )
-                                        )
+                                        }
                                     }
                                 }
 
@@ -1405,6 +1432,72 @@ private fun libraryCardGradient(title: String): List<Color> {
 }
 
 @Composable
+private fun DsmusicLibraryListTile(
+    title: String,
+    subtitle: String,
+    iconBackground: Color = MaterialTheme.colorScheme.primaryContainer,
+    onClick: () -> Unit,
+    iconContent: @Composable () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(15.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier.size(54.dp).clip(RoundedCornerShape(12.dp))
+                .background(iconBackground),
+            contentAlignment = Alignment.Center,
+            content = { iconContent() }
+        )
+        Column(Modifier.weight(1f).padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun DsmusicLibraryGridTile(
+    title: String,
+    backgroundColor: Color,
+    iconColor: Color,
+    onClick: () -> Unit,
+    iconContent: @Composable () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().height(190.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(backgroundColor)
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier.fillMaxWidth().weight(1f)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+            content = { iconContent() }
+        )
+        Text(
+            title,
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
 private fun UnifiedLibraryCard(item: UnifiedLibraryItem) {
     val accent = remember(item.title) { libraryCardGradient(item.title) }
     val hasArtwork = !item.thumbnailUrl.isNullOrBlank()
@@ -1662,86 +1755,43 @@ private fun PlaylistsTabContent(
             ) {
                 item(key = "ds-cache-folder", contentType = "special-playlist-folder") {
                     if (showAsList) {
-                        ListItem(
-                            headlineContent = { Text("Cache", fontWeight = FontWeight.SemiBold) },
-                            supportingContent = { Text("Cached audio, artwork and lyrics") },
-                            leadingContent = {
-                                Box(
-                                    Modifier.size(54.dp).clip(RoundedCornerShape(10.dp))
-                                        .background(MaterialTheme.colorScheme.primaryContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                                }
-                            },
-                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                .clickable { showCachePlaylist = true }
-                        )
-                    } else {
-                        Card(
-                            modifier = Modifier.fillMaxWidth().height(190.dp).clickable {
-                                showCachePlaylist = true
-                            },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                        DsmusicLibraryListTile(
+                            title = "Cache",
+                            subtitle = "Cached audio, artwork and lyrics",
+                            onClick = { showCachePlaylist = true }
                         ) {
-                            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Box(
-                                    Modifier.fillMaxWidth().weight(1f)
-                                        .background(MaterialTheme.colorScheme.primaryContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Default.Folder,
-                                        null,
-                                        modifier = Modifier.size(42.dp),
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                }
-                                Text("Cache", modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold)
-                            }
+                            Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                    } else {
+                        DsmusicLibraryGridTile(
+                            title = "Cache",
+                            backgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            iconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            onClick = { showCachePlaylist = true }
+                        ) {
+                            Icon(Icons.Default.Folder, null, modifier = Modifier.size(42.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                     }
                 }
 
                 item(key = "ds-create-playlist", contentType = "special-playlist-create") {
                     if (showAsList) {
-                        ListItem(
-                            headlineContent = { Text("Create playlist", fontWeight = FontWeight.SemiBold) },
-                            supportingContent = { Text("New playlist") },
-                            leadingContent = {
-                                Box(
-                                    Modifier.size(54.dp).clip(RoundedCornerShape(10.dp))
-                                        .background(MaterialTheme.colorScheme.secondaryContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                                }
-                            },
-                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                .clickable { showCreatePlaylistDialog = true }
-                        )
-                    } else {
-                        Card(
-                            modifier = Modifier.fillMaxWidth().height(190.dp).clickable {
-                                showCreatePlaylistDialog = true
-                            },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                        DsmusicLibraryListTile(
+                            title = "Create playlist",
+                            subtitle = "New playlist",
+                            iconBackground = MaterialTheme.colorScheme.secondaryContainer,
+                            onClick = { showCreatePlaylistDialog = true }
                         ) {
-                            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Default.Add,
-                                        null,
-                                        modifier = Modifier.size(42.dp),
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer
-                                    )
-                                }
-                                Text("Create playlist", modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold)
-                            }
+                            Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                        }
+                    } else {
+                        DsmusicLibraryGridTile(
+                            title = "Create playlist",
+                            backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
+                            iconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            onClick = { showCreatePlaylistDialog = true }
+                        ) {
+                            Icon(Icons.Default.Add, null, modifier = Modifier.size(42.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
                         }
                     }
                 }
@@ -1752,53 +1802,26 @@ private fun PlaylistsTabContent(
                     contentType = { "local-playlist" }
                 ) { playlist ->
                     if (showAsList) {
-                        ListItem(
-                            headlineContent = {
-                                Text(playlist.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            },
-                            supportingContent = { Text("On this device") },
-                            leadingContent = {
-                                Box(
-                                    Modifier.size(54.dp).clip(RoundedCornerShape(10.dp))
-                                        .background(MaterialTheme.colorScheme.primaryContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                                }
-                            },
-                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                .clickable { selectedLocalPlaylist = playlist }
-                        )
-                    } else {
-                        Card(
-                            modifier = Modifier.fillMaxWidth().height(190.dp).clickable {
-                                selectedLocalPlaylist = playlist
-                            },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                        DsmusicLibraryListTile(
+                            title = playlist.title,
+                            subtitle = "On this device",
+                            onClick = { selectedLocalPlaylist = playlist }
                         ) {
-                            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Box(
-                                    Modifier.fillMaxWidth().weight(1f)
-                                        .background(MaterialTheme.colorScheme.primaryContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.PlaylistPlay,
-                                        null,
-                                        modifier = Modifier.size(42.dp),
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                }
-                                Text(
-                                    playlist.title,
-                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
+                            Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                    } else {
+                        DsmusicLibraryGridTile(
+                            title = playlist.title,
+                            backgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            iconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            onClick = { selectedLocalPlaylist = playlist }
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.PlaylistPlay,
+                                null,
+                                modifier = Modifier.size(42.dp),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         }
                     }
                 }
