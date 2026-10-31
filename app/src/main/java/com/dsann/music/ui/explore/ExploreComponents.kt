@@ -137,10 +137,14 @@ fun ShimmerModifier(
 }
 
 fun Modifier.shimmerEffect(): Modifier = composed {
-    var positionInRoot by remember { mutableStateOf(Offset.Zero) }
-    val translateAnim = if (LocalRootTabActive.current) {
+    // A static placeholder on low-memory devices avoids an infinite animation and
+    // per-frame position/draw invalidations while the feed is loading.
+    if (SpatialFlowApplication.isLowRamDevice || !LocalRootTabActive.current) {
+        this.background(MaterialTheme.colorScheme.surfaceContainerHigh)
+    } else {
+        var positionInRoot by remember { mutableStateOf(Offset.Zero) }
         val transition = rememberInfiniteTransition(label = "shimmer")
-        val animatedValue by transition.animateFloat(
+        val translateAnim by transition.animateFloat(
             initialValue = -1000f,
             targetValue = 3000f,
             animationSpec = infiniteRepeatable(
@@ -149,23 +153,22 @@ fun Modifier.shimmerEffect(): Modifier = composed {
             ),
             label = "shimmer_anim"
         )
-        animatedValue
-    } else 0f
-    val shimmerColors = listOf(
-        MaterialTheme.colorScheme.surfaceContainerLow,
-        MaterialTheme.colorScheme.surfaceContainerHigh,
-        MaterialTheme.colorScheme.surfaceContainerLow
-    )
-
-    this
-        .onGloballyPositioned { positionInRoot = it.positionInRoot() }
-        .background(
-            brush = Brush.linearGradient(
-                colors = shimmerColors,
-                start = Offset(translateAnim - positionInRoot.x, translateAnim - positionInRoot.y),
-                end = Offset(translateAnim - positionInRoot.x + 600f, translateAnim - positionInRoot.y + 600f)
-            )
+        val shimmerColors = listOf(
+            MaterialTheme.colorScheme.surfaceContainerLow,
+            MaterialTheme.colorScheme.surfaceContainerHigh,
+            MaterialTheme.colorScheme.surfaceContainerLow
         )
+
+        this
+            .onGloballyPositioned { positionInRoot = it.positionInRoot() }
+            .background(
+                brush = Brush.linearGradient(
+                    colors = shimmerColors,
+                    start = Offset(translateAnim - positionInRoot.x, translateAnim - positionInRoot.y),
+                    end = Offset(translateAnim - positionInRoot.x + 600f, translateAnim - positionInRoot.y + 600f)
+                )
+            )
+    }
 }
 
 /**
@@ -176,7 +179,7 @@ fun AnimatedEqualizerBars(
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.primary
 ) {
-    if (!LocalRootTabActive.current) {
+    if (!LocalRootTabActive.current || SpatialFlowApplication.isLowRamDevice) {
         Row(
             modifier = modifier,
             horizontalArrangement = Arrangement.spacedBy(2.dp),
