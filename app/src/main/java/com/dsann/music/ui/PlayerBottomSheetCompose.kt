@@ -1436,7 +1436,6 @@ fun PlayerBottomSheetCompose(
                     val albumArtScale = when (playerLayout) {
                         "Cover" -> 0.98f
                         "Minimal" -> 0.68f
-                        "Lyrics" -> 0.78f
                         "Vinyl", "Cassette" -> 0.82f
                         else -> 0.9f
                     }
