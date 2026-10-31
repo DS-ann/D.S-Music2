@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -41,9 +42,9 @@ private val DsmusicPanelShape = RoundedCornerShape(18.dp)
 fun DsmusicCard(
     modifier: Modifier = Modifier,
     shape: Shape = DsmusicPanelShape,
-    colors: ButtonColors? = null,
+    colors: Any? = null,
     elevation: Any? = null,
-    border: BorderStroke? = null,
+    border: Any? = null,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -320,6 +321,16 @@ fun DsmusicPageHeading(
     subtitle: String? = null,
     kicker: String = "D.S MUSIC"
 ) {
+    val titleSize = when {
+        title.length >= 19 -> 22.sp
+        title.length >= 15 -> 26.sp
+        else -> 31.sp
+    }
+    val titleLineHeight = when {
+        title.length >= 19 -> 27.sp
+        title.length >= 15 -> 32.sp
+        else -> 37.sp
+    }
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
@@ -347,13 +358,14 @@ fun DsmusicPageHeading(
             androidx.compose.material3.Text(
                 text = title,
                 style = MaterialTheme.typography.headlineMedium.copy(
-                    fontSize = 31.sp,
-                    lineHeight = 37.sp,
+                    fontSize = titleSize,
+                    lineHeight = titleLineHeight,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.sp
                 ),
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             if (subtitle != null) {
                 androidx.compose.material3.Text(
