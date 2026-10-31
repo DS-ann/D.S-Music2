@@ -321,9 +321,14 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
     val currentSong = uiState.currentSong ?: return
     val isPlaying = uiState.isPlaying
     val fullPlayerStateHolder = rememberSaveableStateHolder()
+    val isLyricsModeEnabled by viewModel.isLyricsModeEnabled.collectAsStateWithLifecycle()
+    val isQueueExpanded by viewModel.isQueueExpanded.collectAsStateWithLifecycle()
     val isFullPlayerVisible by remember(playerContentExpansionFraction) {
         derivedStateOf { playerContentExpansionFraction.value >= 0.5f }
     }
+    // Mini-player gesture mappings can open Lyrics or Queue directly. Keep those states
+    // functional even when the sheet has not crossed the normal full-player threshold.
+    val shouldComposeFullPlayer = isFullPlayerVisible || isLyricsModeEnabled || isQueueExpanded
 
     val miniPlayerZIndex by remember {
         derivedStateOf { if (playerContentExpansionFraction.value < 0.5f) 1f else 0f }
@@ -357,7 +362,7 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
     // Mount the expensive full-player tree only after the sheet is actually open.
     // Its saveable state is retained while collapsed, without keeping lyrics, visualizers,
     // and hidden layout work alive behind the mini player.
-    if (isFullPlayerVisible) {
+    if (shouldComposeFullPlayer) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -382,7 +387,7 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
                     context = context,
                     onCollapse = onCollapse,
                     dragModifier = dragModifier,
-                    isPlayerVisible = true,
+                    isPlayerVisible = isFullPlayerVisible,
                     modifier = Modifier.fillMaxSize()
                 )
             }
