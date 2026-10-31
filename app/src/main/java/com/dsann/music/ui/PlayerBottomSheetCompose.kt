@@ -1103,6 +1103,24 @@ fun PlayerBottomSheetCompose(
             Animatable(sheetCollapsedTargetYState.value * (1f - restoredExpansionFraction))
         }
 
+        // Route every close gesture/button through the same animation owner. Incrementing
+        // the request id also handles a stale "collapsed" state after a partial gesture,
+        // while clearing nested modes prevents Lyrics/Queue from keeping the full tree mounted.
+        fun collapsePlayerFully() {
+            viewModel.setLyricsModeEnabled(false)
+            viewModel.setQueueExpanded(false)
+            pendingSheetAnimation = SheetAnimationRequest(
+                targetExpanded = false,
+                animationSpec = spring(
+                    dampingRatio = 0.92f,
+                    stiffness = Spring.StiffnessMediumLow
+                ),
+                initialVelocity = 0f
+            )
+            sheetAnimationRequestId += 1
+            currentSheetContentState = PlayerSheetState.COLLAPSED
+        }
+
         // A rotation changes the sheet's coordinate space. Recalculate its Y position using
         // the new height while retaining the previously saved expansion fraction.
         LaunchedEffect(screenHeightPx, containerWidthDp, useNavigationRail) {
@@ -1226,24 +1244,6 @@ fun PlayerBottomSheetCompose(
                     )
                 }
             }
-        }
-
-        // Route every close gesture/button through the same animation owner. Incrementing
-        // the request id also handles a stale "collapsed" state after a partial gesture,
-        // while clearing nested modes prevents Lyrics/Queue from keeping the full tree mounted.
-        fun collapsePlayerFully() {
-            viewModel.setLyricsModeEnabled(false)
-            viewModel.setQueueExpanded(false)
-            pendingSheetAnimation = SheetAnimationRequest(
-                targetExpanded = false,
-                animationSpec = spring(
-                    dampingRatio = 0.92f,
-                    stiffness = Spring.StiffnessMediumLow
-                ),
-                initialVelocity = 0f
-            )
-            sheetAnimationRequestId += 1
-            currentSheetContentState = PlayerSheetState.COLLAPSED
         }
 
         // This is the only place that animates the sheet. Taps and Back use the default spring;
