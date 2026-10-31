@@ -1,7 +1,10 @@
 package com.dsann.music
 
 import android.annotation.SuppressLint
+import android.app.ActivityManager
 import android.app.Application
+import android.content.ComponentCallbacks2
+import android.content.Context
 import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
 import coil.ImageLoader
@@ -14,7 +17,6 @@ import com.bumptech.glide.GlideBuilder
 import com.dsann.music.data.innertube.InnerTubeClient
 import com.dsann.music.data.innertube.NewPipeStreamExtractor
 import com.dsann.music.util.CacheManager
-import com.google.android.material.color.DynamicColors
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
@@ -23,41 +25,67 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
     companion object {
         lateinit var instance: SpatialFlowApplication
             private set
+
+        /** Shared low-memory profile used by Compose screens to avoid expensive decoration. */
+        @Volatile
+        var isLowRamDevice: Boolean = false
+            private set
     }
 
+    @Volatile
+    private var activeImageLoader: ImageLoader? = null
 
     override fun newImageLoader(): ImageLoader {
-        return ImageLoader.Builder(this)
+        val lowRam = isLowRamDevice
+        val builder = ImageLoader.Builder(this)
             .okHttpClient { InnerTubeClient.httpClient }
             .memoryCache {
                 MemoryCache.Builder(this)
-                    .maxSizePercent(0.15) // Lower bitmap-cache pressure on older devices
+                    // Keep artwork from crowding playback buffers and Compose state on 2 GB phones.
+                    .maxSizePercent(if (lowRam) 0.06 else 0.11)
                     .strongReferencesEnabled(true)
                     .weakReferencesEnabled(true)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
-                    .directory(this.cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(250 * 1024 * 1024) // 250MB size quota for offline artwork persistent caching
+                    .directory(cacheDir.resolve("image_cache"))
+                    .maxSizeBytes(if (lowRam) 96L * 1024L * 1024L else 160L * 1024L * 1024L)
                     .build()
             }
-            .crossfade(120) // Shorter crossfade reduces animation work on older GPUs
             .allowHardware(true)
-            .allowRgb565(true) // Halves decoded artwork bitmap memory versus ARGB_8888
+            .allowRgb565(true)
             .diskCachePolicy(CachePolicy.ENABLED)
             .memoryCachePolicy(CachePolicy.ENABLED)
             .networkCachePolicy(CachePolicy.ENABLED)
-            .build()
+
+        // Crossfades keep two artwork bitmaps alive during the transition. Avoid them
+        // on low-RAM devices; the image still uses the same decoded-size and disk caches.
+        if (lowRam) builder.crossfade(false) else builder.crossfade(80)
+
+        return builder.build().also { activeImageLoader = it }
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+            activeImageLoader?.memoryCache?.clear()
+        }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        activeImageLoader?.memoryCache?.clear()
     }
 
     @SuppressLint("VisibleForTests")
     override fun onCreate() {
         super.onCreate()
         instance = this
-        
-        // Do not perform disk-cache/client initialization on the process main thread.
-        // These components are used by streaming, but are not required to draw the first screen.
+        isLowRamDevice = (getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)
+            ?.isLowRamDevice == true
+
+        // Defer stream extractor and cache maintenance initialization until after first draw.
         val appContext = applicationContext
         Thread({
             try {
@@ -67,27 +95,25 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
             } catch (error: Exception) {
                 Log.e("SpatialFlowApplication", "Background startup initialization failed", error)
             }
-        }, "SpatialFlow-StartupInit").start()
+        }, "D.S-Music-Startup").start()
 
-        // Theme reads are small, synchronous preference reads needed for the first activity.
         val prefs = getSharedPreferences("AppSettings", MODE_PRIVATE)
-        val isDarkMode = prefs.getBoolean("dark_mode", true)
+        val isDarkMode = prefs.getString("theme_mode", "system")?.let { mode ->
+            when (mode) {
+                "dark" -> true
+                "light" -> false
+                else -> prefs.getBoolean("dark_mode", true)
+            }
+        } ?: true
         AppCompatDelegate.setDefaultNightMode(
-            if (isDarkMode) AppCompatDelegate.MODE_NIGHT_YES 
+            if (isDarkMode) AppCompatDelegate.MODE_NIGHT_YES
             else AppCompatDelegate.MODE_NIGHT_NO
         )
 
-        // Apply dynamic colors to all activities
-        DynamicColors.applyToActivitiesIfAvailable(this)
+        // Load saved YouTube Music cookies for account-backed features.
+        prefs.getString("yt_cookies", null)?.let { InnerTubeClient.cookie = it }
 
-        // Load saved YouTube Music cookies for logged-in features
-        val savedCookie = prefs.getString("yt_cookies", null)
-        if (savedCookie != null) {
-            InnerTubeClient.cookie = savedCookie
-        }
-        // Suppress expected Glide warnings for missing album arts
+        // Glide remains available for legacy image call sites; Compose artwork uses Coil above.
         Glide.init(this, GlideBuilder().setLogLevel(Log.ERROR))
-
-        // Cache cleanup is already scheduled on the startup worker above.
     }
 }
