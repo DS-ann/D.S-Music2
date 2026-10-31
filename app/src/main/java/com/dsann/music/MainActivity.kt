@@ -70,6 +70,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -357,12 +358,10 @@ class MainActivity : AppCompatActivity() {
                     // negative animated inset into Compose's non-negative padding modifier.
                     val railInset = railInsetState.value.coerceAtLeast(0.dp)
 
+                    // Read the high-frequency expansion state during measurement rather than
+                    // composition. This keeps each animation frame from recomposing the entire
+                    // root navigation tree and all retained tab hosts.
                     val playerExpansionFractionState = playerViewModel.playerExpansionFraction.collectAsState()
-                    val playerSheetStartInset = androidx.compose.ui.unit.lerp(
-                        railInset,
-                        0.dp,
-                        playerExpansionFractionState.value.coerceIn(0f, 1f)
-                    ).coerceAtLeast(0.dp)
 
                     // Base padding target not considering expansion
                     val baseTargetPadding = if (!useNavigationRail && showBottomBar) {
@@ -642,7 +641,27 @@ class MainActivity : AppCompatActivity() {
                         PlayerBottomSheetCompose(
                             activity = this@MainActivity,
                             viewModel = playerViewModel,
-                            modifier = Modifier.fillMaxSize().padding(start = playerSheetStartInset.coerceAtLeast(0.dp))
+                            modifier = Modifier.layout { measurable, constraints ->
+                                val expansion = playerExpansionFractionState.value.coerceIn(0f, 1f)
+                                val startInsetPx = (railInset.toPx() * (1f - expansion))
+                                    .roundToInt()
+                                    .coerceAtLeast(0)
+                                val childMaxWidth = (constraints.maxWidth - startInsetPx).coerceAtLeast(0)
+                                val childMinWidth = (constraints.minWidth - startInsetPx)
+                                    .coerceAtLeast(0)
+                                    .coerceAtMost(childMaxWidth)
+                                val placeable = measurable.measure(
+                                    constraints.copy(
+                                        minWidth = childMinWidth,
+                                        maxWidth = childMaxWidth
+                                    )
+                                )
+                                val width = constraints.constrainWidth(placeable.width + startInsetPx)
+                                val height = constraints.constrainHeight(placeable.height)
+                                layout(width, height) {
+                                    placeable.placeRelative(startInsetPx, 0)
+                                }
+                            }.fillMaxSize()
                         )
                         AudioFormatChoiceDialogHost()
                     }
