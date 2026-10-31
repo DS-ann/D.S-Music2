@@ -63,7 +63,13 @@ import kotlin.time.Duration.Companion.milliseconds
  * Migrated from legacy Java/LiveData architecture to StateFlow + Coroutines.
  * Optimized for Material 3 Expressive and Media3 integration.
  */
-data class VideoPlaybackMetadata(val title: String, val uploader: String)
+data class VideoPlaybackMetadata(
+    val title: String,
+    val uploader: String,
+    val durationMs: Long = 0L,
+    val resolution: String? = null,
+    val mimeType: String? = null
+)
 
 @HiltViewModel
 class PlayerSharedViewModel @Inject constructor(
@@ -460,12 +466,12 @@ class PlayerSharedViewModel @Inject constructor(
                 }
 
                 if (_currentSong.value?.videoId != videoId || !isAutoplayEnabled()) return@launch
-                autoplayFetchedVideoIds += videoId
 
                 if (fresh.isEmpty()) {
                     Log.w(TAG, "Autoplay returned no new songs for $videoId")
                     return@launch
                 }
+                autoplayFetchedVideoIds += videoId
 
                 val additions = fresh.map { onlineSong ->
                     SongItem.createOnlineSong(
@@ -1587,7 +1593,15 @@ class PlayerSharedViewModel @Inject constructor(
             } else {
                 val job = prefetchAutoplayRecommendations(sourceVideoId)
                 if (job == null) {
-                    audioService?.pause()
+                    // A previous/completed fetch can mean the queue already has recommendations.
+                    // Recheck before interpreting a null job as an empty queue.
+                    val alreadyQueuedIndex = if (_currentSong.value?.videoId == sourceVideoId) {
+                        getNextSongIndex()
+                    } else {
+                        -1
+                    }
+                    if (alreadyQueuedIndex >= 0) playSongAtIndex(alreadyQueuedIndex)
+                    else audioService?.pause()
                 } else {
                     viewModelScope.launch {
                         job.join()
