@@ -109,6 +109,7 @@ class AudioPlaybackService : MediaSessionService() {
         const val ACTION_TOGGLE_LOOP = "com.dsann.music.ACTION_TOGGLE_LOOP"
         const val ACTION_CYCLE_PLAYBACK_MODE = "com.dsann.music.ACTION_CYCLE_PLAYBACK_MODE"
         const val ACTION_TOGGLE_FAV = "com.dsann.music.ACTION_TOGGLE_FAV"
+        const val ACTION_SESSION_CUSTOM_PREFIX = "com.dsann.music.ACTION_SESSION_CUSTOM."
         const val ACTION_WIDGET_FETCH_LYRICS = "com.dsann.music.ACTION_WIDGET_FETCH_LYRICS"
         const val ACTION_WIDGET_REFRESH_STATE = "com.dsann.music.ACTION_WIDGET_REFRESH_STATE"
 
@@ -887,6 +888,8 @@ class AudioPlaybackService : MediaSessionService() {
             }
             ACTION_CYCLE_PLAYBACK_MODE -> cycleNotificationPlaybackMode()
             ACTION_TOGGLE_FAV -> viewModel?.toggleFavorite()
+            action.startsWith(ACTION_SESSION_CUSTOM_PREFIX) ->
+                handleSessionAction(action.removePrefix(ACTION_SESSION_CUSTOM_PREFIX))
             ACTION_WIDGET_FETCH_LYRICS -> requestWidgetLyrics()
             ACTION_WIDGET_REFRESH_STATE -> {
                 updateWidgetState(player.isPlaying)
@@ -2356,6 +2359,62 @@ class AudioPlaybackService : MediaSessionService() {
         }
     }
 
+    private val supportedSessionButtons = listOf("like", "shuffle", "repeat", "dislike", "back10", "ahead30")
+    private val defaultSessionButtons = listOf("like", "shuffle", "repeat", "back10", "ahead30")
+
+    private fun configuredSessionButtons(): List<String> {
+        val preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val raw = preferences.getString("session_buttons", null)
+        val parsed = raw?.split(",")?.map { it.trim().lowercase() }
+            ?.filter { it in supportedSessionButtons }?.distinct().orEmpty()
+        return (parsed + defaultSessionButtons.filter { it !in parsed }).take(6)
+    }
+
+    private fun sessionButtonCommand(button: String): SessionCommand =
+        SessionCommand(ACTION_SESSION_CUSTOM_PREFIX + button, Bundle.EMPTY)
+
+    private fun sessionButtonLabel(button: String): String = when (button) {
+        "like" -> "Like"
+        "shuffle" -> "Shuffle"
+        "repeat" -> "Repeat"
+        "dislike" -> "Not for me"
+        "back10" -> "Back 10 seconds"
+        "ahead30" -> "Forward 30 seconds"
+        else -> button
+    }
+
+    private fun sessionButtonIcon(button: String): Int = when (button) {
+        "like" -> if (viewModel?.isCurrentSongFavorite?.value == true) R.drawable.ic_favorite else R.drawable.ic_favorite_border
+        "shuffle" -> R.drawable.ic_shuffle_noti
+        "repeat" -> when (viewModel?.repeatMode?.value ?: PlayerSharedViewModel.REPEAT_OFF) {
+            PlayerSharedViewModel.REPEAT_ONE -> R.drawable.ic_repeat_one_noti
+            PlayerSharedViewModel.REPEAT_ALL -> R.drawable.ic_repeat_noti
+            else -> R.drawable.ic_repeat_noti
+        }
+        "dislike" -> R.drawable.ic_thumbdown
+        "back10" -> android.R.drawable.ic_media_rew
+        "ahead30" -> android.R.drawable.ic_media_ff
+        else -> R.drawable.ic_music_note
+    }
+
+    private fun handleSessionAction(button: String) {
+        val vm = viewModel
+        when (button) {
+            "like" -> vm?.toggleFavorite()
+            "shuffle" -> vm?.toggleShuffle()
+            "repeat" -> vm?.toggleLoopMode()
+            "dislike" -> vm?.toggleDislike()
+            "back10" -> player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
+            "ahead30" -> {
+                val nextPosition = player.currentPosition + 30_000L
+                val duration = player.duration
+                player.seekTo(if (duration > 0L) nextPosition.coerceAtMost(duration) else nextPosition)
+            }
+        }
+        updateMediaSessionCustomLayout()
+        updateWidgetState(player.isPlaying)
+    }
+
     private fun cycleNotificationPlaybackMode() {
         val vm = viewModel ?: return
         val repeatMode = vm.repeatMode.value
@@ -2384,25 +2443,15 @@ class AudioPlaybackService : MediaSessionService() {
 
     fun updateMediaSessionCustomLayout() {
         val session = mediaSession ?: return
-        val vm = viewModel
-
-        val mode = currentNotificationPlaybackMode(vm)
-        val modeButton = CommandButton.Builder()
-            .setDisplayName("Playback Mode")
-            .setSessionCommand(CMD_CYCLE_PLAYBACK_MODE)
-            .setIconResId(notificationPlaybackModeIcon(mode))
-            .setEnabled(true)
-            .build()
-            
-        val favIcon = if (vm?.isCurrentSongFavorite?.value == true) R.drawable.ic_favorite else R.drawable.ic_favorite_border
-        val favButton = CommandButton.Builder()
-            .setDisplayName("Favorite")
-            .setSessionCommand(CMD_TOGGLE_FAV)
-            .setIconResId(favIcon)
-            .setEnabled(true)
-            .build()
-            
-        session.setCustomLayout(listOf(modeButton, favButton))
+        val buttons = configuredSessionButtons().map { key ->
+            CommandButton.Builder()
+                .setDisplayName(sessionButtonLabel(key))
+                .setSessionCommand(sessionButtonCommand(key))
+                .setIconResId(sessionButtonIcon(key))
+                .setEnabled(true)
+                .build()
+        }
+        session.setCustomLayout(buttons)
     }
 
     private val mediaSessionCallback = object : MediaSession.Callback {
@@ -2413,11 +2462,14 @@ class AudioPlaybackService : MediaSessionService() {
                 .add(Player.COMMAND_SEEK_TO_PREVIOUS)
                 .build()
 
-            val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
+            val sessionCommandsBuilder = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
                 .add(CMD_TOGGLE_LOOP)
                 .add(CMD_CYCLE_PLAYBACK_MODE)
                 .add(CMD_TOGGLE_FAV)
-                .build()
+            configuredSessionButtons().forEach { key ->
+                sessionCommandsBuilder.add(sessionButtonCommand(key))
+            }
+            val sessionCommands = sessionCommandsBuilder.build()
 
             return MediaSession.ConnectionResult.accept(sessionCommands, playerCommands)
         }
@@ -2432,6 +2484,9 @@ class AudioPlaybackService : MediaSessionService() {
                     cycleNotificationPlaybackMode()
                 }
                 ACTION_TOGGLE_FAV -> viewModel?.toggleFavorite()
+                else -> if (customCommand.customAction.startsWith(ACTION_SESSION_CUSTOM_PREFIX)) {
+                    handleSessionAction(customCommand.customAction.removePrefix(ACTION_SESSION_CUSTOM_PREFIX))
+                }
             }
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
         }
@@ -2997,40 +3052,53 @@ class AudioPlaybackService : MediaSessionService() {
             // arrived yet. Only replace the provider's icon with a confirmed matching cover.
             notificationArtwork?.let(notificationBuilder::setLargeIcon)
 
-            // Order: Mode | Prev | Play | Next | Fav
+            // The first two selected session actions sit either side of the three
+            // transport buttons, matching Prism's notification/session ordering.
             notificationBuilder.clearActions()
-            
-            // 0: Playback mode cycle: Shuffle -> Loop One -> Loop
-            val mode = currentNotificationPlaybackMode(viewModel)
+            val selectedNotificationButtons = configuredSessionButtons().take(2)
+            selectedNotificationButtons.getOrNull(0)?.let { key ->
+                notificationBuilder.addAction(
+                    sessionButtonIcon(key),
+                    sessionButtonLabel(key),
+                    getActionIntent(ACTION_SESSION_CUSTOM_PREFIX + key, 20)
+                )
+            }
+
+            val previousIndex = if (selectedNotificationButtons.isNotEmpty()) 1 else 0
             notificationBuilder.addAction(
-                notificationPlaybackModeIcon(mode),
-                "Mode",
-                getActionIntent(ACTION_CYCLE_PLAYBACK_MODE, 10)
+                android.R.drawable.ic_media_previous,
+                "Previous",
+                getActionIntent(ACTION_PREVIOUS, 11)
             )
-            
-            // 1: Previous
-            notificationBuilder.addAction(android.R.drawable.ic_media_previous, "Previous", getActionIntent(ACTION_PREVIOUS, 11))
-            
-            // 2: Play/Pause
+
+            val playIndex = previousIndex + 1
             notificationBuilder.addAction(
-                if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play, 
-                if (isPlaying) "Pause" else "Play", 
+                if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
+                if (isPlaying) "Pause" else "Play",
                 if (isPlaying) getActionIntent(ACTION_PAUSE, 12) else getActionIntent(ACTION_PLAY, 13)
             )
-            
-            // 3: Next
-            notificationBuilder.addAction(android.R.drawable.ic_media_next, "Next", getActionIntent(ACTION_NEXT, 14))
-            
-            // 4: Favorite
-            val favIcon = if (viewModel?.isCurrentSongFavorite?.value == true) R.drawable.ic_favorite else R.drawable.ic_favorite_border
-            notificationBuilder.addAction(favIcon, "Favorite", getActionIntent(ACTION_TOGGLE_FAV, 15))
-            
-            // Compact view indices (Prev, Play, Next)
+
+            val nextIndex = playIndex + 1
+            notificationBuilder.addAction(
+                android.R.drawable.ic_media_next,
+                "Next",
+                getActionIntent(ACTION_NEXT, 14)
+            )
+
+            selectedNotificationButtons.getOrNull(1)?.let { key ->
+                notificationBuilder.addAction(
+                    sessionButtonIcon(key),
+                    sessionButtonLabel(key),
+                    getActionIntent(ACTION_SESSION_CUSTOM_PREFIX + key, 21)
+                )
+            }
+
+            val compactIndices = intArrayOf(previousIndex, playIndex, nextIndex)
             val style = androidx.media3.session.MediaStyleNotificationHelper.MediaStyle(mediaSession)
-                .setShowActionsInCompactView(1, 2, 3)
+                .setShowActionsInCompactView(previousIndex, playIndex, nextIndex)
             notificationBuilder.setStyle(style)
 
-            return intArrayOf(1, 2, 3)
+            return compactIndices
         }
     }
 
