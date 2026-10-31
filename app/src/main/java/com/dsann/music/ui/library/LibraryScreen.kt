@@ -3494,8 +3494,12 @@ private fun StreamCacheTabContent(
 ) {
     var cacheEntries by remember { mutableStateOf(emptyList<CachedSongEntry>()) }
     val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
+    val rootTabActive = LocalRootTabActive.current
 
-    LaunchedEffect(context, lyricsCache) {
+    // Poll the on-disk Media3 cache only while Library is the foreground root tab.
+    // This keeps its cached screen ready without a 10-second background wakeup loop.
+    LaunchedEffect(context, lyricsCache, rootTabActive) {
+        if (!rootTabActive) return@LaunchedEffect
         var snapshot = readCacheTabSnapshot(context, lyricsCache).entries
         cacheEntries = snapshot
         while (true) {
