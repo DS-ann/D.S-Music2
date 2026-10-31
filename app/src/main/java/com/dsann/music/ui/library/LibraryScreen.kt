@@ -4,6 +4,15 @@
 
 package com.dsann.music.ui.library
 
+import com.dsann.music.ui.theme.DsmusicCard
+import com.dsann.music.ui.theme.DsmusicSurface
+import com.dsann.music.ui.theme.DsmusicListItem
+import com.dsann.music.ui.theme.DsmusicButton
+import com.dsann.music.ui.theme.DsmusicOutlinedButton
+import com.dsann.music.ui.theme.DsmusicTextButton
+import com.dsann.music.ui.theme.DsmusicIconButton
+import com.dsann.music.ui.theme.DsmusicFilterChip
+import com.dsann.music.ui.theme.DsmusicSwitchControl
 import android.app.Activity
 import androidx.activity.compose.BackHandler
 import android.content.Context
@@ -1635,7 +1644,7 @@ private fun PlaylistsTabContent(
                 }
             },
             confirmButton = {
-                Button(
+                DsmusicButton(
                     onClick = {
                         val title = name.trim()
                         if (title.isNotEmpty() && !creating) {
@@ -1671,7 +1680,7 @@ private fun PlaylistsTabContent(
                 }
             },
             dismissButton = {
-                TextButton(
+                DsmusicTextButton(
                     onClick = { showCreatePlaylistDialog = false },
                     enabled = !creating
                 ) { Text("Cancel") }
@@ -1704,7 +1713,7 @@ private fun PlaylistsTabContent(
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { showCachePlaylist = false }) {
+                    DsmusicIconButton(onClick = { showCachePlaylist = false }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to playlists")
                     }
                     Text("Cache", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -1737,7 +1746,7 @@ private fun PlaylistsTabContent(
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
                 )
-                IconButton(onClick = { showCreatePlaylistDialog = true }) {
+                DsmusicIconButton(onClick = { showCreatePlaylistDialog = true }) {
                     Icon(Icons.Default.Add, contentDescription = "Create playlist", tint = MaterialTheme.colorScheme.primary)
                 }
             }
@@ -1919,7 +1928,7 @@ private fun LocalPlaylistDetailsScreen(
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onDismiss) {
+                    DsmusicIconButton(onClick = onDismiss) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back to Library",
@@ -1935,7 +1944,7 @@ private fun LocalPlaylistDetailsScreen(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    IconButton(
+                    DsmusicIconButton(
                         onClick = {
                             viewModel.deleteLocalPlaylist(playlist.id)
                             onDismiss()
@@ -2001,7 +2010,7 @@ private fun LocalPlaylistDetailsScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    Button(
+                                    DsmusicButton(
                                         onClick = {
                                             viewModel.setSongList(songs)
                                             viewModel.playSong(songs.first())
@@ -2013,7 +2022,7 @@ private fun LocalPlaylistDetailsScreen(
                                         Spacer(Modifier.width(8.dp))
                                         Text("Play All")
                                     }
-                                    OutlinedButton(
+                                    DsmusicOutlinedButton(
                                         onClick = {
                                             val shuffled = songs.shuffled()
                                             viewModel.setSongList(shuffled)
@@ -2057,7 +2066,7 @@ private fun LocalPlaylistDetailsScreen(
                             key = { it.id },
                             contentType = { "playlist-song" }
                         ) { song ->
-                            Surface(
+                            DsmusicSurface(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 12.dp, vertical = 4.dp)
@@ -2115,7 +2124,7 @@ private fun LocalPlaylistDetailsScreen(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
-                                    IconButton(
+                                    DsmusicIconButton(
                                         onClick = {
                                             viewModel.removeSongFromLocalPlaylist(
                                                 playlist.id,
@@ -2156,7 +2165,7 @@ private fun OnlinePlaylistCard(
     }
 
     if (asList) {
-        ListItem(
+        DsmusicListItem(
             headlineContent = {
                 Text(playlist.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             },
@@ -2185,7 +2194,7 @@ private fun OnlinePlaylistCard(
         )
         return
     }
-    Card(
+    DsmusicCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(220.dp)
@@ -2373,7 +2382,7 @@ private fun SongsTabContent(nestedScrollConnection: androidx.compose.ui.input.ne
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(onlineSongs) { song ->
-                    ListItem(
+                    DsmusicListItem(
                         headlineContent = { Text(song.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         supportingContent = { Text(song.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         leadingContent = {
@@ -2497,7 +2506,7 @@ private fun OnlineAlbumCard(
     onClick: () -> Unit
 ) {
     if (asList) {
-        ListItem(
+        DsmusicListItem(
             headlineContent = { Text(album.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = { Text(album.artists.firstOrNull()?.name ?: "Unknown Artist", color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) },
             leadingContent = {
@@ -2522,7 +2531,7 @@ private fun OnlineAlbumCard(
         )
         return
     }
-    Card(
+    DsmusicCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(220.dp)
@@ -2658,7 +2667,7 @@ private fun OnlineArtistCard(
     onClick: () -> Unit
 ) {
     if (asList) {
-        ListItem(
+        DsmusicListItem(
             headlineContent = { Text(artist.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = { Text("Artist", color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) },
             leadingContent = {
@@ -2960,7 +2969,7 @@ private fun RecapTabContent(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 periods.forEach { period ->
-                    FilterChip(
+                    DsmusicFilterChip(
                         selected = selectedPeriod == period,
                         onClick = { selectedPeriod = period },
                         label = { Text(period) },
@@ -3086,7 +3095,7 @@ private fun RecapTabContent(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Button(
+                    DsmusicButton(
                         onClick = { playReplay(false) },
                         modifier = Modifier.weight(1f).height(48.dp),
                         enabled = topSongs.isNotEmpty()
@@ -3095,7 +3104,7 @@ private fun RecapTabContent(
                         Spacer(Modifier.width(6.dp))
                         Text("Play")
                     }
-                    OutlinedButton(
+                    DsmusicOutlinedButton(
                         onClick = { playReplay(true) },
                         modifier = Modifier.weight(1f).height(48.dp),
                         enabled = topSongs.isNotEmpty()
@@ -3105,7 +3114,7 @@ private fun RecapTabContent(
                         Text("Shuffle")
                     }
                     if (AccountManager.isLoggedIn(context)) {
-                        IconButton(
+                        DsmusicIconButton(
                             onClick = {
                                 val ids = topSongs.map { it.id }.filter { it.toLongOrNull() == null }.take(100)
                                 if (ids.isNotEmpty()) {
@@ -3586,7 +3595,7 @@ private fun StreamCacheTabContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Button(
+                        DsmusicButton(
                             onClick = { startPlaylist(false) },
                             enabled = cacheQueue.isNotEmpty(),
                             modifier = Modifier.weight(1f)
@@ -3595,7 +3604,7 @@ private fun StreamCacheTabContent(
                             Spacer(Modifier.width(8.dp))
                             Text("Play all")
                         }
-                        OutlinedButton(
+                        DsmusicOutlinedButton(
                             onClick = { startPlaylist(true) },
                             enabled = cacheQueue.isNotEmpty(),
                             modifier = Modifier.weight(1f)
@@ -3653,7 +3662,7 @@ private fun StreamCacheTabContent(
                     currentSong?.id == queueSong?.id &&
                     currentSong?.contentUri?.toString() == item.cachedUri
 
-                ListItem(
+                DsmusicListItem(
                     leadingContent = {
                         AsyncImage(
                             model = artwork,

@@ -84,6 +84,7 @@ fun DsmusicListItem(
     contentPadding: PaddingValues? = null,
     colors: Any? = null,
     shapes: Any? = null,
+    verticalAlignment: Alignment.Vertical = Alignment.CenterVertically,
     content: (@Composable () -> Unit)? = null
 ) {
     val paddingValues = contentPadding ?: PaddingValues(horizontal = 13.dp, vertical = 10.dp)
@@ -92,7 +93,7 @@ fun DsmusicListItem(
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(paddingValues),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = verticalAlignment,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         leadingContent?.let { Box(contentAlignment = Alignment.Center) { it() } }
@@ -117,6 +118,8 @@ fun DsmusicButton(
     colors: Any? = null,
     border: Any? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
+    elevation: Any? = null,
+    interactionSource: Any? = null,
     content: @Composable RowScope.() -> Unit
 ) {
     val accent = MaterialTheme.colorScheme.primary
@@ -140,6 +143,7 @@ fun DsmusicOutlinedButton(
     colors: Any? = null,
     border: Any? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+    interactionSource: Any? = null,
     content: @Composable RowScope.() -> Unit
 ) {
     Row(
@@ -160,6 +164,7 @@ fun DsmusicTextButton(
     enabled: Boolean = true,
     colors: Any? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+    interactionSource: Any? = null,
     content: @Composable RowScope.() -> Unit
 ) {
     Row(

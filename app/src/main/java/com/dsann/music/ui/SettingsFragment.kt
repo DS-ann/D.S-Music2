@@ -6,6 +6,15 @@
 
 package com.dsann.music.ui
 
+import com.dsann.music.ui.theme.DsmusicCard
+import com.dsann.music.ui.theme.DsmusicSurface
+import com.dsann.music.ui.theme.DsmusicListItem
+import com.dsann.music.ui.theme.DsmusicButton
+import com.dsann.music.ui.theme.DsmusicOutlinedButton
+import com.dsann.music.ui.theme.DsmusicTextButton
+import com.dsann.music.ui.theme.DsmusicIconButton
+import com.dsann.music.ui.theme.DsmusicFilterChip
+import com.dsann.music.ui.theme.DsmusicSwitchControl
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Application
@@ -1786,7 +1795,7 @@ private fun ControlsAndGesturesScreen(
                         ) {
                             listOf(3, 5, 10, 15).forEach { seconds ->
                                 val selected = gestures.doubleTapSeekSeconds == seconds
-                                Surface(
+                                DsmusicSurface(
                                     modifier = Modifier
                                         .clip(CircleShape)
                                         .clickable { playerViewModel.setDoubleTapSeekSeconds(seconds) },
@@ -2032,7 +2041,7 @@ private fun SettingsCategoryItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit
 ) {
-    ListItem(
+    DsmusicListItem(
         headlineContent = {
             Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         },
@@ -2130,7 +2139,7 @@ private fun MusicManagementScreen(
                 }
                 if (hiddenFolders.isEmpty()) {
                     add {
-                        ListItem(
+                        DsmusicListItem(
                             headlineContent = { Text("No folders blacklisted", style = MaterialTheme.typography.bodyLarge) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                         )
@@ -2151,7 +2160,7 @@ private fun MusicManagementScreen(
                 add { SongCacheSizeRow(songCacheSize, songCacheMaxSize, onSongCacheMaxSizeChange, onClearSongCache) }
                 add { ImageCacheSizeRow(imageCacheSize, imageCacheMaxSize, onImageCacheMaxSizeChange, onClearImageCache) }
                 add {
-                    ListItem(
+                    DsmusicListItem(
                         modifier = Modifier.clickable { onMediaCacheToggle(!mediaCacheEnabled) },
                         headlineContent = { Text("Online audio cache", fontWeight = FontWeight.SemiBold) },
                         supportingContent = {
@@ -2205,7 +2214,7 @@ private fun BackupRestoreScreen(
             SettingsHeader("Backup & Restore")
             SettingsGroupCard(buildList {
                 add {
-                    ListItem(
+                    DsmusicListItem(
                         onClick = onBackupClick,
                         content = {
                             Column {
@@ -2225,7 +2234,7 @@ private fun BackupRestoreScreen(
                     )
                 }
                 add {
-                    ListItem(
+                    DsmusicListItem(
                         onClick = onRestoreClick,
                         content = {
                             Column {
@@ -2251,7 +2260,7 @@ private fun BackupRestoreScreen(
 
 @Composable
 private fun IgnoreShortAudioRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
-    ListItem(
+    DsmusicListItem(
         onClick = { onToggle(!checked) },
         content = {
             Column {
@@ -2277,7 +2286,7 @@ private fun IgnoreShortAudioRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
 private fun IgnoreShortAudioDurationRow(
     value: Float, onValueChange: (Float) -> Unit
 ) {
-    ListItem(
+    DsmusicListItem(
         onClick = { },
         content = {
             Column {
@@ -2307,7 +2316,7 @@ private fun IgnoreShortAudioDurationRow(
 
 @Composable
 private fun HiddenFolderRow(path: String, onRemove: (String) -> Unit) {
-    ListItem(
+    DsmusicListItem(
         onClick = { },
         content = {
             Text(
@@ -2352,7 +2361,7 @@ private fun HiddenFolderRow(path: String, onRemove: (String) -> Unit) {
 
 @Composable
 private fun AddHiddenFolderRow(onClick: () -> Unit) {
-    ListItem(
+    DsmusicListItem(
         onClick = onClick,
         content = {
             Text(
@@ -2437,7 +2446,7 @@ private fun AccountScreen(
                             )
                         }
 
-                        Button(
+                        DsmusicButton(
                             onClick = {
                                 if (ytCookies != null) {
                                     onYtCookiesChange(null)
@@ -2473,7 +2482,7 @@ private fun AccountScreen(
 
 @Composable
 private fun DataSaverRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
-    ListItem(
+    DsmusicListItem(
         onClick = { onToggle(!checked) },
         content = {
             Column {
@@ -2500,7 +2509,7 @@ private fun DataSaverRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
 
 @Composable
 private fun PauseHistoryRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
-    ListItem(
+    DsmusicListItem(
         onClick = { onToggle(!checked) },
         content = {
             Column {
@@ -2530,7 +2539,7 @@ private fun ManualSyncRow() {
     var isSyncing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    ListItem(
+    DsmusicListItem(
         onClick = {
             if (!isSyncing) {
                 isSyncing = true
@@ -3411,8 +3420,8 @@ private fun SessionButtonsSettings(
                         }
                     )
                     Text(sessionButtonNames[key] ?: key, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    TextButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) { Text("↑") }
-                    TextButton(onClick = { onMove(index, index + 1) }, enabled = index < ordered.lastIndex) { Text("↓") }
+                    DsmusicTextButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) { Text("↑") }
+                    DsmusicTextButton(onClick = { onMove(index, index + 1) }, enabled = index < ordered.lastIndex) { Text("↓") }
                 }
             }
             sessionButtonNames.filterKeys { it !in ordered }.forEach { (key, label) ->
@@ -3429,7 +3438,7 @@ private fun SessionButtonsSettings(
                 }
             }
             if (ordered != listOf("like", "shuffle", "repeat", "back10", "ahead30")) {
-                TextButton(
+                DsmusicTextButton(
                     onClick = { onSelectionChanged(listOf("like", "shuffle", "repeat", "back10", "ahead30")) }
                 ) { Text("Restore default order") }
             }
@@ -3488,11 +3497,11 @@ private fun PlayerButtonsSettings(
                         }
                     )
                     Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    TextButton(
+                    DsmusicTextButton(
                         onClick = { onMove(index, index - 1) },
                         enabled = index > 0
                     ) { Text("↑") }
-                    TextButton(
+                    DsmusicTextButton(
                         onClick = { onMove(index, index + 1) },
                         enabled = index < orderedSelected.lastIndex
                     ) { Text("↓") }
@@ -3532,7 +3541,7 @@ private fun PlayerButtonsSettings(
                 color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.labelSmall
             )
-            TextButton(onClick = {
+            DsmusicTextButton(onClick = {
                 onSelectionChanged(listOf("lyrics", "video", "queue", "share", "download"))
             }) { Text("Restore default buttons") }
         }
@@ -3660,7 +3669,7 @@ private fun DsmusicSwitch(
 
 @Composable
 private fun DynamicNavStyleRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
-    ListItem(
+    DsmusicListItem(
         onClick = { onToggle(!checked) },
         content = {
             Column {
@@ -3687,7 +3696,7 @@ private fun DynamicNavStyleRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
 
 @Composable
 private fun HideNavLabelsRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
-    ListItem(
+    DsmusicListItem(
         onClick = { onToggle(!checked) },
         content = {
             Column {
@@ -3714,7 +3723,7 @@ private fun HideNavLabelsRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
 
 @Composable
 private fun DynamicAlbumThemeRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
-    ListItem(
+    DsmusicListItem(
         onClick = { onToggle(!checked) },
         content = {
             Column {
@@ -3749,7 +3758,7 @@ private fun DynamicAlbumThemeRow(checked: Boolean, onToggle: (Boolean) -> Unit) 
 
 @Composable
 private fun AmoledBlackRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
-    ListItem(
+    DsmusicListItem(
         onClick = { onToggle(!checked) },
         content = {
             Column {
@@ -3855,7 +3864,7 @@ private fun PlaybackScreen(
 
 @Composable
 private fun AutoplayRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
-    ListItem(
+    DsmusicListItem(
         onClick = { onToggle(!checked) },
         content = {
             Column {
@@ -3883,7 +3892,7 @@ private fun AudioQualityRow(
 ) {
     val options = listOf("48 kbps", "64 kbps", "96 kbps", "128 kbps", "160 kbps", "192 kbps", "256 kbps", "320 kbps")
 
-    ListItem(
+    DsmusicListItem(
         headlineContent = {
             Column {
                 Text(text = title, style = MaterialTheme.typography.bodyLarge)
@@ -3901,7 +3910,7 @@ private fun AudioQualityRow(
                 ) {
                     options.forEach { option ->
                         val isSelected = option == currentQuality
-                        Surface(
+                        DsmusicSurface(
                             shape = RoundedCornerShape(50),
                             color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -3939,7 +3948,7 @@ private fun AudioFormatRow(
     val selectedFormat = com.dsann.music.data.innertube.NewPipeStreamExtractor
         .normalizeAudioFormat(currentFormat)
 
-    ListItem(
+    DsmusicListItem(
         headlineContent = {
             Column {
                 Text(text = title, style = MaterialTheme.typography.bodyLarge)
@@ -3957,7 +3966,7 @@ private fun AudioFormatRow(
                 ) {
                     options.forEach { (value, label) ->
                         val isSelected = value == selectedFormat
-                        Surface(
+                        DsmusicSurface(
                             shape = RoundedCornerShape(50),
                             color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -4029,12 +4038,12 @@ private fun WhatsNewScreen(navController: androidx.navigation.NavController) {
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
                         ) {
-                            Surface(
+                            DsmusicSurface(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = getSettingsSegmentedShape(index = 0, count = 2),
                                 color = MaterialTheme.colorScheme.surfaceContainerHigh
                             ) {
-                                ListItem(
+                                DsmusicListItem(
                                     headlineContent = {
                                         Text(
                                             text = release.tagName,
@@ -4047,7 +4056,7 @@ private fun WhatsNewScreen(navController: androidx.navigation.NavController) {
                                 )
                             }
 
-                            Surface(
+                            DsmusicSurface(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = getSettingsSegmentedShape(index = 1, count = 2),
                                 color = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -4060,7 +4069,7 @@ private fun WhatsNewScreen(navController: androidx.navigation.NavController) {
                                     .replace(Regex("# (.*)"), "$1")
                                     .trim()
 
-                                ListItem(
+                                DsmusicListItem(
                                     headlineContent = {
                                         Text(
                                             text = cleanedBody,
@@ -4130,7 +4139,7 @@ private fun AboutScreen(
                 modifier = Modifier.padding(top = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Surface(
+                DsmusicSurface(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.surfaceContainerHigh
                 ) {
@@ -4150,7 +4159,7 @@ private fun AboutScreen(
                     .fillMaxWidth()
                     .padding(top = 32.dp)
             ) {
-                Button(
+                DsmusicButton(
                     onClick = onCheckUpdate,
                     modifier = Modifier.weight(1f).height(48.dp)
                 ) {
@@ -4158,7 +4167,7 @@ private fun AboutScreen(
                     Spacer(Modifier.width(8.dp))
                     Text("Updates", style = MaterialTheme.typography.labelLarge)
                 }
-                Button(
+                DsmusicButton(
                     onClick = onWhatsNew,
                     modifier = Modifier.weight(1f).height(48.dp)
                 ) {
@@ -4249,7 +4258,7 @@ private fun getSettingsSegmentedShape(index: Int, count: Int): androidx.compose.
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ThemeRow(isDark: Boolean, onToggle: (Boolean) -> Unit) {
-    ListItem(
+    DsmusicListItem(
         onClick = { onToggle(!isDark) },
         content = {
             Text(
@@ -4281,7 +4290,7 @@ private fun CrossfadeRow(
     duration: Float,
     onDurationChange: (Float) -> Unit
 ) {
-    ListItem(
+    DsmusicListItem(
         onClick = { onToggle(!enabled) },
         verticalAlignment = Alignment.CenterVertically,
         content = {
@@ -4329,7 +4338,7 @@ private fun CrossfadeRow(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AudioFocusRow(enabled: Boolean, onToggle: (Boolean) -> Unit) {
-    ListItem(
+    DsmusicListItem(
         onClick = { onToggle(!enabled) },
         content = {
             Text(
@@ -4368,7 +4377,7 @@ private fun SleepTimerSection(
     }
 
     Column {
-        ListItem(
+        DsmusicListItem(
             onClick = { showBottomSheet = true },
             content = {
                 Text(
@@ -4433,7 +4442,7 @@ private fun SleepTimerSection(
 
 @Composable
 private fun LibrarySourceHeader() {
-    ListItem(
+    DsmusicListItem(
         headlineContent = {
             Text(
                 text = stringResource(R.string.setting_music_source),
@@ -4455,7 +4464,7 @@ private fun LibrarySourceHeader() {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun LibraryPathRow(path: String, onRemove: ((String) -> Unit)?) {
-    ListItem(
+    DsmusicListItem(
         onClick = { },
         content = {
             Text(
@@ -4496,7 +4505,7 @@ private fun LibraryPathRow(path: String, onRemove: ((String) -> Unit)?) {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AddMorePathRow(onClick: () -> Unit) {
-    ListItem(
+    DsmusicListItem(
         onClick = onClick,
         content = {
             Text(
@@ -4521,7 +4530,7 @@ private fun AddMorePathRow(onClick: () -> Unit) {
 
 @Composable
 private fun DownloadFolderRow(path: String?, onClick: () -> Unit) {
-    ListItem(
+    DsmusicListItem(
         onClick = onClick,
         content = {
             Column {
@@ -4592,7 +4601,7 @@ private fun CacheSizeRow(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showDialog = false }) { Text("Cancel") }
+                DsmusicTextButton(onClick = { showDialog = false }) { Text("Cancel") }
             }
         )
     }
@@ -4602,7 +4611,7 @@ private fun CacheSizeRow(
     val maxBytes = if (maxSize == 0) 0L else maxSize * 1024L * 1024L
     val progress = if (maxBytes > 0) (currentBytes.toFloat() / maxBytes).coerceIn(0f, 1f) else 0f
 
-    ListItem(
+    DsmusicListItem(
         onClick = { showDialog = true },
         content = {
             Column {
@@ -4653,7 +4662,7 @@ private fun CacheSizeRow(
             }
         },
         trailingContent = {
-            IconButton(onClick = onClear) {
+            DsmusicIconButton(onClick = onClear) {
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Clear Cache",
@@ -4722,7 +4731,7 @@ private fun ImageCacheSizeRow(
 @Composable
 private fun CreditsCard(onOpenUrl: (String) -> Unit) {
     Column {
-        Card(
+        DsmusicCard(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
@@ -4773,7 +4782,7 @@ private fun CreditsCard(onOpenUrl: (String) -> Unit) {
 
 @Composable
 private fun SocialIconButton(icon: Int, onClick: () -> Unit) {
-    IconButton(
+    DsmusicIconButton(
         onClick = onClick,
         modifier = Modifier
             .size(48.dp)
@@ -4846,7 +4855,7 @@ fun YouTubeMusicLoginDialog(
         onDismissRequest = onDismissRequest,
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismissRequest) {
+            DsmusicTextButton(onClick = onDismissRequest) {
                 Text("Cancel", color = MaterialTheme.colorScheme.primary)
             }
         },
@@ -4935,7 +4944,7 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
             SettingsGroupCard(
                 items = listOf(
                     {
-                        ListItem(
+                        DsmusicListItem(
                             headlineContent = { Text("Report a Bug", style = MaterialTheme.typography.bodyLarge) },
                             supportingContent = { Text("Open GitHub with pre-filled device information", style = MaterialTheme.typography.bodyMedium) },
                             leadingContent = { Icon(Icons.Rounded.BugReport, null, tint = MaterialTheme.colorScheme.error) },
@@ -4949,7 +4958,7 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
                         )
                     },
                     {
-                        ListItem(
+                        DsmusicListItem(
                             headlineContent = { Text("Request Feature", style = MaterialTheme.typography.bodyLarge) },
                             supportingContent = { Text("Suggest a new feature for D.S Music", style = MaterialTheme.typography.bodyMedium) },
                             leadingContent = { Icon(Icons.Rounded.OpenInNew, null, tint = MaterialTheme.colorScheme.primary) },
@@ -4969,7 +4978,7 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
             SettingsGroupCard(
                 items = listOf(
                     {
-                        ListItem(
+                        DsmusicListItem(
                             headlineContent = { Text("Copy Debug Information", style = MaterialTheme.typography.bodyLarge) },
                             supportingContent = { Text("Copy device & app version to clipboard", style = MaterialTheme.typography.bodyMedium) },
                             leadingContent = { Icon(Icons.Rounded.ContentCopy, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
@@ -4982,7 +4991,7 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
                         )
                     },
                     {
-                        ListItem(
+                        DsmusicListItem(
                             headlineContent = { Text("Export Logs", style = MaterialTheme.typography.bodyLarge) },
                             supportingContent = { Text("Share raw debug logs to attach to an issue", style = MaterialTheme.typography.bodyMedium) },
                             leadingContent = { Icon(Icons.Rounded.Description, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },

@@ -1,5 +1,14 @@
 package com.dsann.music.ui.explore
 
+import com.dsann.music.ui.theme.DsmusicCard
+import com.dsann.music.ui.theme.DsmusicSurface
+import com.dsann.music.ui.theme.DsmusicListItem
+import com.dsann.music.ui.theme.DsmusicButton
+import com.dsann.music.ui.theme.DsmusicOutlinedButton
+import com.dsann.music.ui.theme.DsmusicTextButton
+import com.dsann.music.ui.theme.DsmusicIconButton
+import com.dsann.music.ui.theme.DsmusicFilterChip
+import com.dsann.music.ui.theme.DsmusicSwitchControl
 import android.R.attr.translationY
 import android.content.res.Configuration
 import android.graphics.Color.alpha
@@ -753,7 +762,7 @@ fun ExploreScreen(
                                                                             style = MaterialTheme.typography.titleMedium,
                                                                             fontWeight = FontWeight.SemiBold
                                                                         )
-                                                                        TextButton(onClick = { viewModel.setSearchFilter(section.filter) }) {
+                                                                        DsmusicTextButton(onClick = { viewModel.setSearchFilter(section.filter) }) {
                                                                             Text("See all")
                                                                         }
                                                                     }
@@ -1092,7 +1101,7 @@ fun ExploreScreen(
                                                                                 8.dp
                                                                             )
                                                                         )
-                                                                        OutlinedButton(onClick = { viewModel.refreshHomeFeed() }) {
+                                                                        DsmusicOutlinedButton(onClick = { viewModel.refreshHomeFeed() }) {
                                                                             Text("Load Home Feed")
                                                                         }
                                                                     }
@@ -1114,7 +1123,7 @@ fun ExploreScreen(
                 error?.let { errorMsg ->
                     Snackbar(
                         modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
-                        action = { TextButton(onClick = { viewModel.clearError() }) { Text("OK") } }
+                        action = { DsmusicTextButton(onClick = { viewModel.clearError() }) { Text("OK") } }
                     ) { Text(errorMsg) }
                 }
 
@@ -1183,7 +1192,7 @@ fun ExploreScreen(
         val configuration = LocalConfiguration.current
         val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-        Surface(
+        DsmusicSurface(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding(),
@@ -1199,7 +1208,7 @@ fun ExploreScreen(
                         .padding(horizontal = 8.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onBack) {
+                    DsmusicIconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
@@ -1590,17 +1599,17 @@ fun ExploreScreen(
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                    TextButton(onClick = onClearSearchHistory) {
+                                    DsmusicTextButton(onClick = onClearSearchHistory) {
                                         Text("Clear all")
                                     }
                                 }
                             }
                             items(searchHistory) { historyItem ->
-                                ListItem(
+                                DsmusicListItem(
                                     headlineContent = { Text(historyItem) },
                                     leadingContent = { Icon(Icons.Default.History, null) },
                                     trailingContent = {
-                                        IconButton(
+                                        DsmusicIconButton(
                                             onClick = { onRemoveFromSearchHistory(historyItem) }
                                         ) {
                                             Icon(
@@ -1632,7 +1641,7 @@ fun ExploreScreen(
                                 )
                             }
                             itemsIndexed(accountHistory) { idx, song ->
-                                ListItem(
+                                DsmusicListItem(
                                     headlineContent = {
                                         Text(
                                             song.title,
@@ -1684,7 +1693,7 @@ fun ExploreScreen(
                         }
                     } else if (suggestions.isNotEmpty() || suggestionItems.isNotEmpty()) {
                         item(key = "typed-query") {
-                            ListItem(
+                            DsmusicListItem(
                                 headlineContent = { Text("Search for \"$searchQuery\"") },
                                 leadingContent = { Icon(Icons.Default.Search, null) },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -1692,7 +1701,7 @@ fun ExploreScreen(
                             )
                         }
                         items(suggestions, key = { "suggestion:$it" }) { suggestion ->
-                            ListItem(
+                            DsmusicListItem(
                                 headlineContent = { Text(suggestion) },
                                 leadingContent = { Icon(Icons.Default.Search, null) },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),

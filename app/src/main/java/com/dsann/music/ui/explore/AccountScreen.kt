@@ -1,5 +1,14 @@
 package com.dsann.music.ui.explore
 
+import com.dsann.music.ui.theme.DsmusicCard
+import com.dsann.music.ui.theme.DsmusicSurface
+import com.dsann.music.ui.theme.DsmusicListItem
+import com.dsann.music.ui.theme.DsmusicButton
+import com.dsann.music.ui.theme.DsmusicOutlinedButton
+import com.dsann.music.ui.theme.DsmusicTextButton
+import com.dsann.music.ui.theme.DsmusicIconButton
+import com.dsann.music.ui.theme.DsmusicFilterChip
+import com.dsann.music.ui.theme.DsmusicSwitchControl
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -93,7 +102,7 @@ fun AccountScreen(
             TopAppBar(
                 title = { Text("Account Settings", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    DsmusicIconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
@@ -208,7 +217,7 @@ fun AccountSettingsSection(
                                     .clip(RoundedCornerShape(12.dp))
                                     .clickable { onSongClick(song, history, index) }
                             ) {
-                                Card(
+                                DsmusicCard(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .aspectRatio(1f),
@@ -252,7 +261,7 @@ fun AccountSettingsSection(
 
         item {
             Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
-                ListItem(
+                DsmusicListItem(
                     onClick = {
                         val next = !syncEnabled
                         syncEnabled = next
@@ -260,7 +269,7 @@ fun AccountSettingsSection(
                     },
                     leadingContent = { Icon(Icons.Default.CloudSync, null) },
                     trailingContent = {
-                        Switch(checked = syncEnabled, onCheckedChange = null)
+                        DsmusicSwitchControl(checked = syncEnabled, onCheckedChange = null)
                     },
                     shapes = ListItemDefaults.segmentedShapes(index = 0, count = 2),
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -272,7 +281,7 @@ fun AccountSettingsSection(
                     }
                 )
 
-                ListItem(
+                DsmusicListItem(
                     onClick = { showTokenAlert = true },
                     leadingContent = { Icon(Icons.Default.VpnKey, null) },
                     shapes = ListItemDefaults.segmentedShapes(index = 1, count = 2),
@@ -291,7 +300,7 @@ fun AccountSettingsSection(
             Spacer(modifier = Modifier.height(16.dp))
             
             if (isLoggedIn) {
-                Button(
+                DsmusicButton(
                     onClick = { viewModel.logout(); onClose() },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -305,7 +314,7 @@ fun AccountSettingsSection(
                     Text("Disconnect Account", fontWeight = FontWeight.Bold)
                 }
             } else {
-                Button(
+                DsmusicButton(
                     onClick = onNavigateToSignIn,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(20.dp),
@@ -328,7 +337,7 @@ fun AccountSettingsSection(
             title = { Text("Authentication Signature") },
             text = { Text(token, fontSize = 11.sp, style = MaterialTheme.typography.labelSmall) },
             confirmButton = {
-                TextButton(onClick = { showTokenAlert = false }) { Text("Done") }
+                DsmusicTextButton(onClick = { showTokenAlert = false }) { Text("Done") }
             }
         )
     }

@@ -1,5 +1,14 @@
 package com.dsann.music.ui.library
 
+import com.dsann.music.ui.theme.DsmusicCard
+import com.dsann.music.ui.theme.DsmusicSurface
+import com.dsann.music.ui.theme.DsmusicListItem
+import com.dsann.music.ui.theme.DsmusicButton
+import com.dsann.music.ui.theme.DsmusicOutlinedButton
+import com.dsann.music.ui.theme.DsmusicTextButton
+import com.dsann.music.ui.theme.DsmusicIconButton
+import com.dsann.music.ui.theme.DsmusicFilterChip
+import com.dsann.music.ui.theme.DsmusicSwitchControl
 import android.os.Environment
 
 import androidx.compose.foundation.layout.Arrangement
@@ -253,7 +262,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    IconButton(
+                    DsmusicIconButton(
                         enabled = !isScanning,
                         onClick = {
                             scope.launch {
@@ -279,7 +288,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
+                            DsmusicIconButton(onClick = { searchQuery = "" }) {
                                 Icon(Icons.Default.Clear, contentDescription = "Clear search")
                             }
                         }
@@ -303,7 +312,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                         .padding(bottom = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Button(
+                    DsmusicButton(
                         enabled = visibleSongsInView.isNotEmpty(),
                         onClick = {
                             viewModel.setSongList(visibleSongsInView)
@@ -315,7 +324,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                         Spacer(Modifier.padding(horizontal = 2.dp))
                         Text("Play all")
                     }
-                    OutlinedButton(
+                    DsmusicOutlinedButton(
                         enabled = visibleSongsInView.isNotEmpty(),
                         onClick = {
                             val shuffledLocalSongs = visibleSongsInView.shuffled()
@@ -340,7 +349,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     SortOrder.entries.forEach { order ->
-                        FilterChip(
+                        DsmusicFilterChip(
                             selected = sortOrder == order,
                             onClick = { sortOrder = order },
                             label = {
@@ -358,7 +367,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                             )
                         )
                     }
-                    FilterChip(
+                    DsmusicFilterChip(
                         selected = showAsFolders,
                         onClick = {
                             showAsFolders = !showAsFolders
@@ -396,7 +405,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                             )
                             if (!isScanning && localSongs.isEmpty()) {
                                 Spacer(Modifier.height(8.dp))
-                                OutlinedButton(
+                                DsmusicOutlinedButton(
                                     onClick = {
                                         scope.launch {
                                             isScanning = true
