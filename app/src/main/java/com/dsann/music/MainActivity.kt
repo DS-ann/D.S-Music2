@@ -54,15 +54,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,11 +82,6 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LifecycleRegistry
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
@@ -102,7 +94,6 @@ import com.dsann.music.model.SongItem
 import com.dsann.music.service.AudioPlaybackService
 import com.dsann.music.ui.AudioFormatChoiceDialogHost
 import com.dsann.music.ui.PlayerBottomSheetCompose
-import com.dsann.music.ui.LocalRootTabActive
 import com.dsann.music.ui.SettingsScreenContent
 import com.dsann.music.ui.TagEditorScreenEntryPoint
 import com.dsann.music.ui.explore.ExploreScreen
@@ -221,7 +212,7 @@ class MainActivity : AppCompatActivity() {
 
                 val currentNavController = rememberNavController()
                 val rootTabRoutes = remember { setOf("explore", "library", "local_music", "settings") }
-                val cachedRootTabs = remember { mutableStateListOf<String>() }
+                val rootTabStateHolder = rememberSaveableStateHolder()
                 var lastRootTab by remember { mutableStateOf("explore") }
                 LaunchedEffect(currentNavController) {
                     navController = currentNavController
@@ -331,9 +322,7 @@ class MainActivity : AppCompatActivity() {
                     val currentRoute = currentDestination?.route
                     LaunchedEffect(currentRoute) {
                         if (currentRoute != null && currentRoute in rootTabRoutes) {
-                            val route = currentRoute!!
-                            lastRootTab = route
-                            if (route !in cachedRootTabs) cachedRootTabs.add(route)
+                            lastRootTab = currentRoute
                         }
                     }
                     val activeCachedRootTab = when {
@@ -398,47 +387,43 @@ class MainActivity : AppCompatActivity() {
                                     bottom = finalPadding.coerceAtLeast(0.dp)
                                 )
                         ) {
-                            cachedRootTabs.forEach { route ->
-                                val active = route == activeCachedRootTab
-                                Box(
-                                    modifier = (if (active) Modifier.fillMaxSize() else Modifier.size(1.dp))
-                                        .graphicsLayer { alpha = if (active) 1f else 0f }
-                                        .zIndex(if (active) 0f else -1f)
-                                ) {
-                                    RetainedRootTabLayer(active = active) {
-                                        when (route) {
-                                            "explore" -> ExploreScreen(
-                                                viewModel = exploreViewModel,
-                                                playerSharedViewModel = playerViewModel,
-                                                onNavigateToLibrary = {
-                                                    currentNavController.navigate("library") {
-                                                        popUpTo(currentNavController.graph.findStartDestination().id) {
-                                                            saveState = true
-                                                        }
-                                                        launchSingleTop = true
-                                                        restoreState = true
+                            // Compose only the foreground tab. Inactive screens used to remain
+                            // alive at 1dp/alpha=0, so their effects, animations and non-lifecycle
+                            // work continued consuming CPU while the user was elsewhere.
+                            if (activeCachedRootTab != null) {
+                                rootTabStateHolder.SaveableStateProvider(activeCachedRootTab) {
+                                    when (activeCachedRootTab) {
+                                        "explore" -> ExploreScreen(
+                                            viewModel = exploreViewModel,
+                                            playerSharedViewModel = playerViewModel,
+                                            onNavigateToLibrary = {
+                                                currentNavController.navigate("library") {
+                                                    popUpTo(currentNavController.graph.findStartDestination().id) {
+                                                        saveState = true
                                                     }
+                                                    launchSingleTop = true
+                                                    restoreState = true
                                                 }
-                                            )
-                                            "library" -> LibraryScreen(
-                                                viewModel = playerViewModel,
-                                                onEditSong = { song ->
-                                                    editingSong = song
-                                                    currentNavController.navigate("tag_editor")
-                                                },
-                                                onNavigateToExplore = {
-                                                    currentNavController.navigate("explore") {
-                                                        popUpTo(currentNavController.graph.findStartDestination().id) {
-                                                            saveState = true
-                                                        }
-                                                        launchSingleTop = true
-                                                        restoreState = true
+                                            }
+                                        )
+                                        "library" -> LibraryScreen(
+                                            viewModel = playerViewModel,
+                                            onEditSong = { song ->
+                                                editingSong = song
+                                                currentNavController.navigate("tag_editor")
+                                            },
+                                            onNavigateToExplore = {
+                                                currentNavController.navigate("explore") {
+                                                    popUpTo(currentNavController.graph.findStartDestination().id) {
+                                                        saveState = true
                                                     }
+                                                    launchSingleTop = true
+                                                    restoreState = true
                                                 }
-                                            )
-                                            "local_music" -> LocalMusicScreen(viewModel = playerViewModel)
-                                            "settings" -> SettingsScreenContent()
-                                        }
+                                            }
+                                        )
+                                        "local_music" -> LocalMusicScreen(viewModel = playerViewModel)
+                                        "settings" -> SettingsScreenContent()
                                     }
                                 }
                             }
@@ -1044,51 +1029,4 @@ class MainActivity : AppCompatActivity() {
         private const val KEY_PREVIOUS_DESTINATION = "key_previous_destination"
         const val EXTRA_OPEN_PLAYER = "open_player"
     }
-}
-
-
-/**
- * A root tab remains composed after its first visit, preserving scroll and nested-screen state.
- * When inactive, its Flow collectors are paused by moving its child lifecycle to CREATED.
- */
-@Composable
-private fun RetainedRootTabLayer(
-    active: Boolean,
-    content: @Composable () -> Unit
-) {
-    val parentOwner = LocalLifecycleOwner.current
-    val tabOwner = remember(parentOwner) { RetainedRootTabLifecycleOwner() }
-    var parentState by remember(parentOwner) {
-        mutableStateOf(parentOwner.lifecycle.currentState)
-    }
-
-    DisposableEffect(parentOwner, tabOwner) {
-        val observer = LifecycleEventObserver { _, _ ->
-            parentState = parentOwner.lifecycle.currentState
-        }
-        parentOwner.lifecycle.addObserver(observer)
-        parentState = parentOwner.lifecycle.currentState
-        onDispose {
-            parentOwner.lifecycle.removeObserver(observer)
-            tabOwner.lifecycle.currentState = Lifecycle.State.DESTROYED
-        }
-    }
-
-    SideEffect {
-        val targetState = if (active) parentState else Lifecycle.State.CREATED
-        if (tabOwner.lifecycle.currentState != targetState) {
-            tabOwner.lifecycle.currentState = targetState
-        }
-    }
-
-    CompositionLocalProvider(
-        LocalLifecycleOwner provides tabOwner,
-        LocalRootTabActive provides active
-    ) {
-        content()
-    }
-}
-
-private class RetainedRootTabLifecycleOwner : LifecycleOwner {
-    override val lifecycle: LifecycleRegistry = LifecycleRegistry(this)
 }
