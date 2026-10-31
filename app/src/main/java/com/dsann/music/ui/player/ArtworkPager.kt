@@ -81,7 +81,7 @@ fun ArtworkPager(
     ) {
         HorizontalPager(
             state = pagerState,
-            key = { page -> songList.getOrNull(page)?.id ?: currentSong.id },
+            key = { page -> "${songList.getOrNull(page)?.id ?: currentSong.id}:$page" },
             userScrollEnabled = userScrollEnabled,
             modifier = Modifier.fillMaxSize()
         ) { page ->
@@ -113,6 +113,7 @@ fun ArtworkPager(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .clip(artworkShape)
                     .drawWithContent {
                         drawContent()
                         val side = size.minDimension
