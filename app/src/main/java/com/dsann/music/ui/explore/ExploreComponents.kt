@@ -368,7 +368,7 @@ fun SearchResultItem(
                 contentScale = ContentScale.Crop
             )
             if (isLoading) {
-                val shimmerAlpha = if (LocalRootTabActive.current) {
+                val shimmerAlpha = if (LocalRootTabActive.current && !SpatialFlowApplication.isLowRamDevice) {
                     val loadingTransition = rememberInfiniteTransition(label = "loading_shimmer")
                     val animatedAlpha by loadingTransition.animateFloat(
                         initialValue = 0.3f, targetValue = 0.7f,
