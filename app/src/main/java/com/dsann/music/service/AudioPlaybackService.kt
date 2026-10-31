@@ -2501,7 +2501,7 @@ class AudioPlaybackService : MediaSessionService() {
                 player.currentMediaItem?.localConfiguration?.uri?.toString()
             } else null
             val sameVideoRestarted = currentSong?.videoId == endedVideoId &&
-                currentUri in cacheUris &&
+                currentUri != null && currentUri in cacheUris &&
                 isPlayerInitialized &&
                 player.playbackState != Player.STATE_ENDED
             if (sameVideoRestarted) return@launch
