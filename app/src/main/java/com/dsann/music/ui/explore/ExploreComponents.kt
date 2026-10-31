@@ -1,6 +1,8 @@
 @file:OptIn(ExperimentalMaterial3ExpressiveApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
  
 package com.dsann.music.ui.explore
+
+import com.dsann.music.SpatialFlowApplication
  
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
