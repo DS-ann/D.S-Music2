@@ -32,12 +32,15 @@ internal object DsmCoverShapes {
         else -> RoundedCornerShape(rounded)
     }
 
-    fun forPlayerLayout(playerLayout: String, artworkShapeName: String): Shape = when (playerLayout) {
-        "Vinyl" -> CircleShape
-        "Cassette" -> RoundedCornerShape(14.dp)
-        "Cover" -> of(artworkShapeName, 8.dp)
-        "Minimal" -> of(artworkShapeName, 18.dp)
-        else -> of(artworkShapeName, 24.dp)
+    fun forPlayerLayout(playerLayout: String, artworkShapeName: String): Shape {
+        // Layout presets may add grooves, tape reels and spacing, but do not override
+        // the independently selected artwork clipping shape.
+        val roundedCorner = when (playerLayout) {
+            "Cover" -> 8.dp
+            "Minimal" -> 18.dp
+            else -> 24.dp
+        }
+        return of(artworkShapeName, roundedCorner)
     }
 
     private val Square = GenericShape { size, _ ->
