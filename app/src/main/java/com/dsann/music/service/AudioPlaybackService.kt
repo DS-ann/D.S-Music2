@@ -2949,7 +2949,9 @@ class AudioPlaybackService : MediaSessionService() {
             notificationBuilder.setShowWhen(false)
             notificationBuilder.setCategory(androidx.core.app.NotificationCompat.CATEGORY_TRANSPORT)
             
-            notificationBuilder.setLargeIcon(notificationArtwork)
+            // Do not clear Media3's metadata artwork when our asynchronous bitmap has not
+            // arrived yet. Only replace the provider's icon with a confirmed matching cover.
+            notificationArtwork?.let(notificationBuilder::setLargeIcon)
 
             // Order: Mode | Prev | Play | Next | Fav
             notificationBuilder.clearActions()
