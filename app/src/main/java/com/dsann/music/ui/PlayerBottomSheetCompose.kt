@@ -67,6 +67,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -319,6 +320,7 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
 ) {
     val currentSong = uiState.currentSong ?: return
     val isPlaying = uiState.isPlaying
+    val fullPlayerStateHolder = rememberSaveableStateHolder()
     val isFullPlayerVisible by remember(playerContentExpansionFraction) {
         derivedStateOf { playerContentExpansionFraction.value >= 0.5f }
     }
@@ -352,40 +354,39 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
         )
     }
 
-    // Full Player Container
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .requiredHeight(containerHeight)
-            .graphicsLayer {
-                val fraction = playerContentExpansionFraction.value
-                // Fades in smoothly past 50% expansion
-                alpha = ((fraction - 0.5f) * 2f).coerceIn(0f, 1f)
-                val scale = androidx.compose.ui.util.lerp(0.972f, 1f, fraction)
-                scaleX = scale
-                scaleY = scale
-                
-                // Shift offscreen when collapsed to protect touch targets without causing layout invalidation
-                translationY = if (fraction <= 0.01f) {
-                    10000f
-                } else {
-                    androidx.compose.ui.util.lerp(100f, 0f, fraction)
+    // Mount the expensive full-player tree only after the sheet is actually open.
+    // Its saveable state is retained while collapsed, without keeping lyrics, visualizers,
+    // and hidden layout work alive behind the mini player.
+    if (isFullPlayerVisible) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .requiredHeight(containerHeight)
+                .graphicsLayer {
+                    val fraction = playerContentExpansionFraction.value
+                    alpha = ((fraction - 0.5f) * 2f).coerceIn(0f, 1f)
+                    val scale = androidx.compose.ui.util.lerp(0.972f, 1f, fraction)
+                    scaleX = scale
+                    scaleY = scale
+                    translationY = androidx.compose.ui.util.lerp(100f, 0f, fraction)
                 }
+                .zIndex(fullPlayerZIndex)
+        ) {
+            fullPlayerStateHolder.SaveableStateProvider("full-player") {
+                FullPlayerScreen(
+                    activity = activity,
+                    viewModel = viewModel,
+                    uiState = uiState,
+                    songList = songList,
+                    accentColor = baseAccentColor,
+                    context = context,
+                    onCollapse = onCollapse,
+                    dragModifier = dragModifier,
+                    isPlayerVisible = true,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
-            .zIndex(fullPlayerZIndex)
-    ) {
-        FullPlayerScreen(
-            activity = activity,
-            viewModel = viewModel,
-            uiState = uiState,
-            songList = songList,
-            accentColor = baseAccentColor,
-            context = context,
-            onCollapse = onCollapse,
-            dragModifier = dragModifier,
-            isPlayerVisible = isFullPlayerVisible,
-            modifier = Modifier.fillMaxSize()
-        )
+        }
     }
 }
 
