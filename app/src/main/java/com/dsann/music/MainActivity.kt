@@ -323,7 +323,7 @@ class MainActivity : AppCompatActivity() {
                     LaunchedEffect(currentDestination?.route) {
                         exploreViewModel.setExplorePageActive(currentDestination?.route == "explore" || currentDestination?.route == "search")
                     }
-                    val showBottomBar = !isPlayerExpanded && currentDestination?.route in listOf("explore", "library", "local_music", "settings")
+                    val showBottomBar = !isPlayerExpanded && currentDestination?.route in listOf("explore", "search", "library", "local_music", "settings")
                     // Keep the rail persistent in wide layouts; scroll-driven bottom-bar hiding is phone-only.
                     val showNavigationRail = useNavigationRail && showBottomBar
                     val layoutDirection = LocalLayoutDirection.current
