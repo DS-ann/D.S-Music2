@@ -384,10 +384,34 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setAppearancePreset(preset: String) {
         val safePreset = preset.takeIf {
-            it in listOf("Ocean", "Violet", "Emerald", "Amber", "Rose", "Monochrome", "Crimson", "Teal", "Cyan", "Indigo", "Lime", "Graphite")
+            it in listOf("Ocean", "Violet", "Emerald", "Amber", "Rose", "Monochrome", "Crimson", "Teal", "Cyan", "Indigo", "Lime", "Graphite", "Custom")
         } ?: "Ocean"
         _appearancePreset.value = safePreset
         prefs.edit { putString(KEY_APPEARANCE_PRESET, safePreset) }
+    }
+
+    private val _customAccentColor = MutableStateFlow(
+        prefs.getString("custom_accent_color", "#7C9CFF") ?: "#7C9CFF"
+    )
+    val customAccentColor: StateFlow<String> = _customAccentColor.asStateFlow()
+    fun setCustomAccentColor(value: String) {
+        val cleaned = value.trim().uppercase().let { if (it.startsWith("#")) it else "#$it" }
+        val valid = cleaned.matches(Regex("#[0-9A-F]{6}"))
+        if (!valid) return
+        runCatching { android.graphics.Color.parseColor(cleaned) }.getOrNull() ?: return
+        _customAccentColor.value = cleaned
+        prefs.edit { putString("custom_accent_color", cleaned) }
+        setAppearancePreset("Custom")
+    }
+
+    private val _uiCornerStyle = MutableStateFlow(
+        prefs.getString("ui_corner_style", "Soft")?.takeIf { it in listOf("Tight", "Soft", "Round") } ?: "Soft"
+    )
+    val uiCornerStyle: StateFlow<String> = _uiCornerStyle.asStateFlow()
+    fun setUiCornerStyle(value: String) {
+        val safe = value.takeIf { it in listOf("Tight", "Soft", "Round") } ?: "Soft"
+        _uiCornerStyle.value = safe
+        prefs.edit { putString("ui_corner_style", safe) }
     }
 
     private val _playerArtworkShape = MutableStateFlow(
@@ -633,7 +657,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     // account and library settings are deliberately excluded.
     private val appearanceLookKeys = listOf(
         "theme_mode", KEY_AMOLED_BLACK, KEY_DYNAMIC_ALBUM_THEME, KEY_APPEARANCE_PRESET,
-        KEY_PLAYER_ARTWORK_SHAPE, "player_background_style", "mini_player_style",
+        "custom_accent_color", "ui_corner_style", KEY_PLAYER_ARTWORK_SHAPE, "player_background_style", "mini_player_style",
         "mini_player_control_shape", "mini_player_control_icons", "mini_player_progress",
         "player_layout", "player_buttons", "player_title_align", "player_title_size",
         "player_title_weight", "player_title_scroll", "player_times", "scrubber_style",
@@ -680,6 +704,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         setAmoledBlack(look.optBoolean(KEY_AMOLED_BLACK, _amoledBlack.value))
         setDynamicAlbumTheme(look.optBoolean(KEY_DYNAMIC_ALBUM_THEME, _dynamicAlbumTheme.value))
         setAppearancePreset(look.optString(KEY_APPEARANCE_PRESET, _appearancePreset.value))
+        setCustomAccentColor(look.optString("custom_accent_color", _customAccentColor.value))
+        setUiCornerStyle(look.optString("ui_corner_style", _uiCornerStyle.value))
         setPlayerArtworkShape(look.optString(KEY_PLAYER_ARTWORK_SHAPE, _playerArtworkShape.value))
         setPlayerBackgroundStyle(look.optString("player_background_style", _playerBackgroundStyle.value))
         setMiniPlayerStyle(look.optString("mini_player_style", _miniPlayerStyle.value))
@@ -1201,6 +1227,8 @@ fun SettingsScreenContent(
     val dynamicAlbumTheme by viewModel.dynamicAlbumTheme.collectAsStateWithLifecycle()
     val savedAppearanceLooks by viewModel.savedAppearanceLooks.collectAsStateWithLifecycle()
     val appearancePreset by viewModel.appearancePreset.collectAsStateWithLifecycle()
+    val customAccentColor by viewModel.customAccentColor.collectAsStateWithLifecycle()
+    val uiCornerStyle by viewModel.uiCornerStyle.collectAsStateWithLifecycle()
     val playerArtworkShape by viewModel.playerArtworkShape.collectAsStateWithLifecycle()
     val playerBackgroundStyle by viewModel.playerBackgroundStyle.collectAsStateWithLifecycle()
     val miniPlayerStyle by viewModel.miniPlayerStyle.collectAsStateWithLifecycle()
@@ -1410,6 +1438,10 @@ fun SettingsScreenContent(
                 onDeleteLook = { viewModel.deleteAppearanceLook(it) },
                 appearancePreset = appearancePreset,
                 onAppearancePresetChange = { viewModel.setAppearancePreset(it) },
+                customAccentColor = customAccentColor,
+                onCustomAccentColorChange = { viewModel.setCustomAccentColor(it) },
+                uiCornerStyle = uiCornerStyle,
+                onUiCornerStyleChange = { viewModel.setUiCornerStyle(it) },
                 playerArtworkShape = playerArtworkShape,
                 onPlayerArtworkShapeChange = { viewModel.setPlayerArtworkShape(it) },
                 playerBackgroundStyle = playerBackgroundStyle,
@@ -2454,6 +2486,10 @@ private fun AppearanceScreen(
     onDeleteLook: (String) -> Unit,
     appearancePreset: String,
     onAppearancePresetChange: (String) -> Unit,
+    customAccentColor: String,
+    onCustomAccentColorChange: (String) -> Unit,
+    uiCornerStyle: String,
+    onUiCornerStyleChange: (String) -> Unit,
     playerArtworkShape: String,
     onPlayerArtworkShapeChange: (String) -> Unit,
     playerBackgroundStyle: String,
@@ -2554,10 +2590,16 @@ private fun AppearanceScreen(
 
             SettingsHeader("Colors")
             SettingsGroupCard(listOf {
-                ColorPaletteSelector(
-                    selected = appearancePreset,
-                    onSelected = onAppearancePresetChange
-                )
+                Column {
+                    ColorPaletteSelector(
+                        selected = appearancePreset,
+                        onSelected = onAppearancePresetChange
+                    )
+                    CustomAccentEditor(
+                        value = customAccentColor,
+                        onApply = onCustomAccentColorChange
+                    )
+                }
             })
 
             SettingsHeader("Player layout")
@@ -2788,6 +2830,15 @@ private fun AppearanceScreen(
             SettingsHeader("Typography & Layout")
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
+                    title = "Interface corners",
+                    description = "Choose tighter, balanced or rounder shapes across menus, cards, buttons and dialogs.",
+                    selected = uiCornerStyle,
+                    options = listOf("Tight", "Soft", "Round"),
+                    onSelected = onUiCornerStyleChange
+                )
+            })
+            SettingsGroupCard(listOf {
+                SettingsChoiceRow(
                     title = "Interface density",
                     description = "Compact fits more content. Large increases the app's text scale and touch-target spacing.",
                     selected = uiDensity,
@@ -2827,6 +2878,52 @@ private fun AppearanceScreen(
                 }
                 add { DynamicNavStyleRow(dynamicNavStyle, onDynamicNavStyleChange) }
             })
+        }
+    }
+}
+
+@Composable
+private fun CustomAccentEditor(value: String, onApply: (String) -> Unit) {
+    var draft by remember(value) { mutableStateOf(value) }
+    val valid = draft.trim().let { raw ->
+        val normalized = if (raw.startsWith("#")) raw else "#$raw"
+        normalized.matches(Regex("#[0-9a-fA-F]{6}"))
+    }
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("Custom accent", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            "Enter a six-digit HEX color to use your own app accent.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            val parsed = if (valid) runCatching {
+                Color(android.graphics.Color.parseColor(if (draft.startsWith("#")) draft else "#$draft"))
+            }.getOrDefault(MaterialTheme.colorScheme.primary) else MaterialTheme.colorScheme.surfaceVariant
+            Box(
+                Modifier.size(34.dp).clip(CircleShape).background(parsed)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+            )
+            BasicTextField(
+                value = draft,
+                onValueChange = { draft = it.take(7).uppercase() },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .padding(horizontal = 12.dp, vertical = 11.dp)
+            )
+            Box(
+                Modifier.clip(RoundedCornerShape(50))
+                    .background(if (valid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable(enabled = valid) { onApply(if (draft.startsWith("#")) draft else "#$draft") }
+                    .padding(horizontal = 15.dp, vertical = 10.dp)
+            ) {
+                Text("Apply", style = MaterialTheme.typography.labelLarge, color = if (valid) Color(0xFF0B1220) else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
@@ -3729,22 +3826,23 @@ private fun SettingsHeader(text: String) {
     )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SettingsGroupCard(items: List<@Composable () -> Unit>) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
+            .padding(vertical = 8.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         items.forEachIndexed { index, item ->
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = getSettingsSegmentedShape(index = index, count = items.size),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh
-            ) {
-                item()
+            item()
+            if (index < items.lastIndex) {
+                Box(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.32f))
+                )
             }
         }
     }
