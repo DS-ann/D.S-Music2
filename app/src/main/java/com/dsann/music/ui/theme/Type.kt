@@ -42,7 +42,7 @@ val GoogleSansFlexNonRounded = FontFamily(
  */
 val Typography = Typography(
     displayLarge = TextStyle(
-        fontFamily = GoogleSansFlex,
+        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
         fontSize = 57.sp,
         lineHeight = 64.sp,
