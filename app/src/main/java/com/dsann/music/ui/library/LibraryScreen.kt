@@ -202,6 +202,7 @@ fun LibraryScreen(
     onNavigateToExplore: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val rootTabActive = LocalRootTabActive.current
     val mainActivity = remember(context) { getActivityFromContext(context) as? MainActivity }
     val fragmentActivity = remember(context) { getActivityFromContext(context) as? androidx.fragment.app.FragmentActivity }
     val fragmentManager = remember(fragmentActivity) { fragmentActivity?.supportFragmentManager }
@@ -284,8 +285,8 @@ fun LibraryScreen(
     }
 
     // Observe download completion only while this root tab is active.
-    LaunchedEffect(activeTab, LocalRootTabActive.current) {
-        if (!LocalRootTabActive.current) return@LaunchedEffect
+    LaunchedEffect(activeTab, rootTabActive) {
+        if (!rootTabActive) return@LaunchedEffect
         if (activeTab == "Downloaded songs") {
             SongDownloader.downloadProgress.collect { progress ->
                 if (progress.isEmpty()) {
@@ -296,8 +297,8 @@ fun LibraryScreen(
     }
 
     // Observe online playback triggers only while Library is the active root tab.
-    LaunchedEffect(exploreViewModel, LocalRootTabActive.current) {
-        if (!LocalRootTabActive.current) return@LaunchedEffect
+    LaunchedEffect(exploreViewModel, rootTabActive) {
+        if (!rootTabActive) return@LaunchedEffect
         exploreViewModel?.playbackTriggerEvent?.collect {
             val song = exploreViewModel.currentOnlineSong.value
             if (song != null) {
