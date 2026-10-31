@@ -11,9 +11,9 @@
         <item name="colorSurfaceContainerHigh">@color/md_theme_light_surfaceContainerHigh</item>
         <item name="colorSurfaceContainerHighest">@color/md_theme_light_surfaceContainerHighest</item>
 
-        <item name="android:fontFamily">@font/google_flex</item>
+        <item name="android:fontFamily">sans</item>
         <item name="fontFamily">@font/google_flex</item>
-        <item name="android:fontVariationSettings">"'ROND' 100"</item>
+        <item name="android:fontVariationSettings"></item>
         <item name="fontVariationSettings">"'ROND' 100"</item>
 
         <item name="textAppearanceDisplayLarge">@style/TextAppearance.SpatialFlow.DisplayLarge</item>
@@ -65,7 +65,7 @@
 
     <style name="ShapeAppearance.SpatialFlow.ExtraLarge" parent="ShapeAppearance.Material3.Corner.Large">
         <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">32dp</item>
+        <item name="cornerSize">24dp</item>
     </style>
 
     <!-- ============================================ -->
