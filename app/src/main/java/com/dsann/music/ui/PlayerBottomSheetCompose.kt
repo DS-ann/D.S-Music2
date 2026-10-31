@@ -1,5 +1,8 @@
 package com.dsann.music.ui
 
+import com.dsann.music.ui.theme.DsmusicIconButton
+import com.dsann.music.ui.theme.DsmusicSurface
+import com.dsann.music.ui.theme.DsmusicTextButton
 import android.annotation.SuppressLint
 import android.content.Context
 import androidx.compose.animation.core.Animatable
@@ -730,11 +733,11 @@ private fun androidx.compose.foundation.layout.BoxScope.VideoOverlayControls(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Surface(
+        DsmusicSurface(
             shape = CircleShape,
             color = Color.Black.copy(alpha = 0.62f)
         ) {
-            IconButton(onClick = onOpenQuality, enabled = qualityEnabled) {
+            DsmusicIconButton(onClick = onOpenQuality, enabled = qualityEnabled) {
                 Text(
                     text = "⚙",
                     color = Color.White,
@@ -742,11 +745,11 @@ private fun androidx.compose.foundation.layout.BoxScope.VideoOverlayControls(
                 )
             }
         }
-        Surface(
+        DsmusicSurface(
             shape = CircleShape,
             color = Color.Black.copy(alpha = 0.62f)
         ) {
-            IconButton(onClick = onToggleFullscreen) {
+            DsmusicIconButton(onClick = onToggleFullscreen) {
                 Text(
                     text = if (fullscreen) "⛶" else "⛶",
                     color = Color.White,
@@ -908,7 +911,7 @@ fun PlayerBottomSheetCompose(
                     )
                 },
                 confirmButton = {
-                    TextButton(
+                    DsmusicTextButton(
                         onClick = {
                             viewModel.dismissSignInDialog()
                             activity.navigateToSettings()
@@ -918,7 +921,7 @@ fun PlayerBottomSheetCompose(
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { viewModel.dismissSignInDialog() }) {
+                    DsmusicTextButton(onClick = { viewModel.dismissSignInDialog() }) {
                         Text(text = "Cancel")
                     }
                 }
@@ -1340,7 +1343,7 @@ fun PlayerBottomSheetCompose(
         )
 
         if (showPlayerContentArea) {
-            Surface(
+            DsmusicSurface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .offset { IntOffset(0, sheetVisualState.visualSheetTranslationYProvider().roundToInt()) }
@@ -1723,7 +1726,7 @@ fun PlayerBottomSheetCompose(
                                                 Text("No alternative muxed video qualities are available for this track.")
                                             } else {
                                                 videoQualityOptions.forEach { option ->
-                                                    TextButton(
+                                                    DsmusicTextButton(
                                                         onClick = {
                                                             audioService?.setVideoStreamQuality(
                                                                 streamUrl = option.url,
@@ -1768,7 +1771,7 @@ fun PlayerBottomSheetCompose(
                                         }
                                     },
                                     confirmButton = {
-                                        TextButton(onClick = { showVideoQualityDialog = false }) {
+                                        DsmusicTextButton(onClick = { showVideoQualityDialog = false }) {
                                             Text("Close")
                                         }
                                     }
@@ -1989,7 +1992,7 @@ private fun MiniPlayerContentInternal(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(
+            DsmusicIconButton(
                 onClick = { viewModel.playPreviousSong() },
                 modifier = controlModifier(sideControlWidth)
             ) {
@@ -2010,7 +2013,7 @@ private fun MiniPlayerContentInternal(
                 }
             }
 
-            IconButton(
+            DsmusicIconButton(
                 onClick = {
                     if (!isLoading) {
                         if (isPlaying) viewModel.pauseAudio() else viewModel.playAudio()
@@ -2039,7 +2042,7 @@ private fun MiniPlayerContentInternal(
                 }
             }
 
-            IconButton(
+            DsmusicIconButton(
                 onClick = { viewModel.playNextSong() },
                 modifier = controlModifier(sideControlWidth)
             ) {

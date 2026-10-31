@@ -1,5 +1,8 @@
 package com.dsann.music.ui.player
 
+import com.dsann.music.ui.theme.DsmusicIconButton
+import com.dsann.music.ui.theme.DsmusicSurface
+import com.dsann.music.ui.theme.DsmusicTextButton
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -1020,7 +1023,7 @@ fun FullPlayer(
                             }
                     )
                 }
-                IconButton(
+                DsmusicIconButton(
                     onClick = { showSongInfoDialog = true },
                     modifier = Modifier.size(44.dp)
                 ) {
@@ -1725,7 +1728,7 @@ fun FullPlayer(
                         }
                     },
                     confirmButton = {
-                        androidx.compose.material3.TextButton(onClick = { showSongInfoDialog = false }) { Text("Close") }
+                        androidx.compose.material3.DsmusicTextButton(onClick = { showSongInfoDialog = false }) { Text("Close") }
                     }
                 )
             }
