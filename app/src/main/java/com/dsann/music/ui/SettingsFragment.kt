@@ -6,6 +6,7 @@
 
 package com.dsann.music.ui
 
+import com.dsann.music.ui.theme.DsmusicPageHeading
 import com.dsann.music.ui.theme.DsmusicCard
 import com.dsann.music.ui.theme.DsmusicSurface
 import com.dsann.music.ui.theme.DsmusicListItem
@@ -1952,13 +1953,11 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
             .padding(horizontal = 24.dp)
             .padding(bottom = 120.dp)
     ) {
-        Text(
-            text = "Settings",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+        DsmusicPageHeading(
+            title = "Settings",
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 16.dp, bottom = 24.dp)
+                .padding(top = 18.dp, bottom = 26.dp)
         )
 
         SettingsGroupCard(
