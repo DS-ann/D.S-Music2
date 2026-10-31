@@ -25,7 +25,8 @@ data class VideoStreamOption(
     val audioUrl: String? = null,
     val audioMimeType: String? = null,
     val videoTitle: String? = null,
-    val videoUploader: String? = null
+    val videoUploader: String? = null,
+    val durationMs: Long = 0L
 ) {
     val label: String get() = if (height > 0) "${height}p" else resolution.ifBlank { "Unknown quality" }
     val usesSeparateAudio: Boolean get() = !audioUrl.isNullOrBlank()
@@ -436,7 +437,8 @@ object NewPipeStreamExtractor {
                     height = height,
                     mimeType = stream.format?.mimeType?.substringBefore(';')?.trim(),
                     videoTitle = info.name,
-                    videoUploader = info.uploaderName
+                    videoUploader = info.uploaderName,
+                    durationMs = (info.duration * 1000L).coerceAtLeast(0L)
                 )
             }
             .toList()
@@ -472,7 +474,8 @@ object NewPipeStreamExtractor {
                         audioUrl = separateAudio.content,
                         audioMimeType = separateAudio.format?.mimeType?.substringBefore(';')?.trim(),
                         videoTitle = info.name,
-                        videoUploader = info.uploaderName
+                        videoUploader = info.uploaderName,
+                        durationMs = (info.duration * 1000L).coerceAtLeast(0L)
                     )
                 }
                 .toList()
