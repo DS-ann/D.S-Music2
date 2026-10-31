@@ -239,7 +239,7 @@ class MainActivity : AppCompatActivity() {
                         val configuredNavHeight = when (navBarSize) {
                             "Compact" -> 56.dp
                             "Tall" -> 76.dp
-                            else -> 66.dp
+                            else -> 68.dp
                         }
                         val bottomNavHeight = if (dynamicNavStyle) 64.dp else configuredNavHeight
                         val bottomNavHeightPx = with(density) { bottomNavHeight.toPx() }
@@ -300,7 +300,10 @@ class MainActivity : AppCompatActivity() {
                                     }
                                 }
                             }
-                        )                ) { paddingValues ->
+                        )
+                        }
+                    }
+                ) { paddingValues ->
                     val navBackStackEntry by currentNavController.currentBackStackEntryAsState()
                     val currentDestination = navBackStackEntry?.destination
                     val currentRoute = currentDestination?.route
