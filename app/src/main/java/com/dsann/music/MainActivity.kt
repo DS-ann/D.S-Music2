@@ -353,14 +353,16 @@ class MainActivity : AppCompatActivity() {
                         animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
                         label = "NavigationRailInset"
                     )
-                    val railInset = railInsetState.value
+                    // Springs can overshoot their zero target slightly. Never feed a
+                    // negative animated inset into Compose's non-negative padding modifier.
+                    val railInset = railInsetState.value.coerceAtLeast(0.dp)
 
                     val playerExpansionFractionState = playerViewModel.playerExpansionFraction.collectAsState()
                     val playerSheetStartInset = androidx.compose.ui.unit.lerp(
                         railInset,
                         0.dp,
                         playerExpansionFractionState.value.coerceIn(0f, 1f)
-                    )
+                    ).coerceAtLeast(0.dp)
 
                     // Base padding target not considering expansion
                     val baseTargetPadding = if (!useNavigationRail && showBottomBar) {
@@ -388,7 +390,10 @@ class MainActivity : AppCompatActivity() {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(start = railInset, bottom = finalPadding.coerceAtLeast(0.dp))
+                                .padding(
+                                    start = railInset.coerceAtLeast(0.dp),
+                                    bottom = finalPadding.coerceAtLeast(0.dp)
+                                )
                         ) {
                             cachedRootTabs.forEach { route ->
                                 val active = route == activeCachedRootTab
@@ -637,7 +642,7 @@ class MainActivity : AppCompatActivity() {
                         PlayerBottomSheetCompose(
                             activity = this@MainActivity,
                             viewModel = playerViewModel,
-                            modifier = Modifier.fillMaxSize().padding(start = playerSheetStartInset)
+                            modifier = Modifier.fillMaxSize().padding(start = playerSheetStartInset.coerceAtLeast(0.dp))
                         )
                         AudioFormatChoiceDialogHost()
                     }

@@ -1312,7 +1312,7 @@ fun PlayerBottomSheetCompose(
                     .height(containerHeight),
                 color = Color.Transparent
             ) {
-                Box(modifier = Modifier.fillMaxSize().padding(bottom = sheetVisualState.currentBottomPadding)) {
+                Box(modifier = Modifier.fillMaxSize().padding(bottom = sheetVisualState.currentBottomPadding.coerceAtLeast(0.dp))) {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
