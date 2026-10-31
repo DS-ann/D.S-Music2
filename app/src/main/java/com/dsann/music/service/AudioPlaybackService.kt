@@ -1795,6 +1795,7 @@ class AudioPlaybackService : MediaSessionService() {
         }
     }
 
+    @OptIn(UnstableApi::class)
     private fun refreshMediaNotification() {
         if (!::handler.isInitialized) return
         handler.post {
