@@ -877,21 +877,21 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     private fun handleServiceAction(action: String) {
-        when (action) {
-            ACTION_PLAY -> play()
-            ACTION_PAUSE -> pause()
-            ACTION_PREVIOUS -> playPrevious()
-            ACTION_NEXT -> playNext()
-            ACTION_TOGGLE_LOOP -> {
+        when {
+            action == ACTION_PLAY -> play()
+            action == ACTION_PAUSE -> pause()
+            action == ACTION_PREVIOUS -> playPrevious()
+            action == ACTION_NEXT -> playNext()
+            action == ACTION_TOGGLE_LOOP -> {
                 viewModel?.toggleLoopMode()
                 if (isPlayerInitialized) updateWidgetState(player.isPlaying)
             }
-            ACTION_CYCLE_PLAYBACK_MODE -> cycleNotificationPlaybackMode()
-            ACTION_TOGGLE_FAV -> viewModel?.toggleFavorite()
+            action == ACTION_CYCLE_PLAYBACK_MODE -> cycleNotificationPlaybackMode()
+            action == ACTION_TOGGLE_FAV -> viewModel?.toggleFavorite()
             action.startsWith(ACTION_SESSION_CUSTOM_PREFIX) ->
                 handleSessionAction(action.removePrefix(ACTION_SESSION_CUSTOM_PREFIX))
-            ACTION_WIDGET_FETCH_LYRICS -> requestWidgetLyrics()
-            ACTION_WIDGET_REFRESH_STATE -> {
+            action == ACTION_WIDGET_FETCH_LYRICS -> requestWidgetLyrics()
+            action == ACTION_WIDGET_REFRESH_STATE -> {
                 updateWidgetState(player.isPlaying)
             }
         }
