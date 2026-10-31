@@ -1785,7 +1785,7 @@ class AudioPlaybackService : MediaSessionService() {
                 )
             }
             player.replaceMediaItem(
-                0,
+                player.currentMediaItemIndex,
                 mediaItem.buildUpon().setMediaMetadata(metadataBuilder.build()).build()
             )
         }
