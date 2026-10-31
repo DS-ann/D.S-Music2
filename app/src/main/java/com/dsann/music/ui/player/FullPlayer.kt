@@ -599,6 +599,7 @@ fun FullPlayerScreen(
         androidx.lifecycle.viewmodel.compose.viewModel(viewModelStoreOwner = activity)
     val playerLayout by customizeViewModel.playerLayout.collectAsStateWithLifecycle()
     val playerArtworkScale by customizeViewModel.playerArtworkScale.collectAsStateWithLifecycle()
+    val playerButtonsPill by customizeViewModel.playerButtonsPill.collectAsStateWithLifecycle()
     val playerButtons by customizeViewModel.playerButtons.collectAsStateWithLifecycle()
     val playerTitleAlign by customizeViewModel.playerTitleAlign.collectAsStateWithLifecycle()
     val playerTitleSize by customizeViewModel.playerTitleSize.collectAsStateWithLifecycle()
@@ -633,6 +634,7 @@ fun FullPlayerScreen(
         selectedProvider = selectedProvider,
         playerLayout = playerLayout,
         playerArtworkScale = playerArtworkScale,
+        playerButtonsPill = playerButtonsPill,
         playerButtons = playerButtons,
         playerTitleAlign = playerTitleAlign,
         playerTitleSize = playerTitleSize,
@@ -725,6 +727,7 @@ fun FullPlayer(
     selectedProvider: String?,
     playerLayout: String = "Standard",
     playerArtworkScale: Float = 1f,
+    playerButtonsPill: Boolean = true,
     playerButtons: List<String> = listOf("lyrics", "video", "queue", "share", "download"),
     playerTitleAlign: String = "Left",
     playerTitleSize: String = "Medium",
@@ -1040,6 +1043,15 @@ fun FullPlayer(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clip(if (playerButtonsPill) CircleShape else RoundedCornerShape(0.dp))
+                    .background(
+                        if (playerButtonsPill) contentColor.copy(alpha = if (isDark) 0.075f else 0.055f)
+                        else Color.Transparent
+                    )
+                    .padding(
+                        horizontal = if (playerButtonsPill) 8.dp else 0.dp,
+                        vertical = if (playerButtonsPill) 5.dp else 0.dp
+                    )
                     .layout { measurable, constraints ->
                         val pad = 20.dp.roundToPx()
                         val placeable = measurable.measure(

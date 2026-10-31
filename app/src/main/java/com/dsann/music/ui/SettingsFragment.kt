@@ -591,6 +591,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     // Additional Prism-style player customisation.
+    private val _playerButtonsPill = MutableStateFlow(prefs.getBoolean("player_buttons_pill", true))
+    val playerButtonsPill: StateFlow<Boolean> = _playerButtonsPill.asStateFlow()
+    fun setPlayerButtonsPill(enabled: Boolean) {
+        _playerButtonsPill.value = enabled
+        prefs.edit { putBoolean("player_buttons_pill", enabled) }
+    }
+
     private val _playerButtonStyle = MutableStateFlow(prefs.getString("player_button_style", "Pill") ?: "Pill")
     val playerButtonStyle: StateFlow<String> = _playerButtonStyle.asStateFlow()
     fun setPlayerButtonStyle(value: String) {
@@ -670,7 +677,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         "theme_mode", KEY_AMOLED_BLACK, KEY_DYNAMIC_ALBUM_THEME, KEY_APPEARANCE_PRESET,
         "custom_accent_color", "ui_corner_style", KEY_PLAYER_ARTWORK_SHAPE, "player_background_style", "mini_player_style",
         "mini_player_control_shape", "mini_player_control_icons", "mini_player_progress",
-        "player_layout", "player_artwork_scale", "player_buttons", "player_title_align", "player_title_size",
+        "player_layout", "player_artwork_scale", "player_buttons_pill", "player_buttons", "player_title_align", "player_title_size",
         "player_title_weight", "player_title_scroll", "player_times", "scrubber_style",
         "scrubber_color", "player_visualizer", "player_button_style", "scrubber_thickness",
         "scrubber_thumb_style", "visualizer_color", "lyrics_text_size", "lyrics_alignment",
@@ -732,6 +739,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         setMiniPlayerProgressStyle(look.optString("mini_player_progress", _miniPlayerProgressStyle.value))
         setPlayerLayout(look.optString("player_layout", _playerLayout.value))
         setPlayerArtworkScale(look.optDouble("player_artwork_scale", _playerArtworkScale.value.toDouble()).toFloat())
+        setPlayerButtonsPill(look.optBoolean("player_buttons_pill", _playerButtonsPill.value))
         setPlayerButtons(
             look.optString("player_buttons", _playerButtons.value.joinToString(","))
                 .split(",").map { it.trim() }.filter { it.isNotEmpty() }
@@ -1250,6 +1258,7 @@ fun SettingsScreenContent(
     val uiCornerStyle by viewModel.uiCornerStyle.collectAsStateWithLifecycle()
     val playerArtworkShape by viewModel.playerArtworkShape.collectAsStateWithLifecycle()
     val playerArtworkScale by viewModel.playerArtworkScale.collectAsStateWithLifecycle()
+    val playerButtonsPill by viewModel.playerButtonsPill.collectAsStateWithLifecycle()
     val playerBackgroundStyle by viewModel.playerBackgroundStyle.collectAsStateWithLifecycle()
     val miniPlayerStyle by viewModel.miniPlayerStyle.collectAsStateWithLifecycle()
     val miniPlayerControlShape by viewModel.miniPlayerControlShape.collectAsStateWithLifecycle()
@@ -1466,6 +1475,8 @@ fun SettingsScreenContent(
                 onPlayerArtworkShapeChange = { viewModel.setPlayerArtworkShape(it) },
                 playerArtworkScale = playerArtworkScale,
                 onPlayerArtworkScaleChange = { viewModel.setPlayerArtworkScale(it) },
+                playerButtonsPill = playerButtonsPill,
+                onPlayerButtonsPillChange = { viewModel.setPlayerButtonsPill(it) },
                 playerBackgroundStyle = playerBackgroundStyle,
                 onPlayerBackgroundStyleChange = { viewModel.setPlayerBackgroundStyle(it) },
                 miniPlayerStyle = miniPlayerStyle,
@@ -2542,6 +2553,8 @@ private fun AppearanceScreen(
     onPlayerArtworkShapeChange: (String) -> Unit,
     playerArtworkScale: Float,
     onPlayerArtworkScaleChange: (Float) -> Unit,
+    playerButtonsPill: Boolean,
+    onPlayerButtonsPillChange: (Boolean) -> Unit,
     playerBackgroundStyle: String,
     onPlayerBackgroundStyleChange: (String) -> Unit,
     miniPlayerStyle: String,
@@ -2623,7 +2636,8 @@ private fun AppearanceScreen(
                 controlShape = miniPlayerControlShape,
                 buttonStyle = playerButtonStyle,
                 buttons = playerButtons,
-                artworkScale = playerArtworkScale
+                artworkScale = playerArtworkScale,
+                buttonsPill = playerButtonsPill
             )
 
             SavedLooksEditor(
@@ -2693,15 +2707,26 @@ private fun AppearanceScreen(
             })
 
             SettingsHeader("Player buttons")
-            SettingsGroupCard(listOf {
-                SettingsChoiceRow(
-                    title = "Button presentation",
-                    description = "Choose capsule buttons, soft rounded buttons or a compact icon-first row.",
-                    selected = playerButtonStyle,
-                    options = listOf("Pill", "Rounded", "Minimal"),
-                    onSelected = onPlayerButtonStyleChange
-                )
-            })
+            SettingsGroupCard(listOf(
+                {
+                    SettingsChoiceRow(
+                        title = "Action button grouping",
+                        description = "Place the player actions inside one shared capsule or leave each action separate.",
+                        selected = if (playerButtonsPill) "Capsule" else "Separate",
+                        options = listOf("Capsule", "Separate"),
+                        onSelected = { onPlayerButtonsPillChange(it == "Capsule") }
+                    )
+                },
+                {
+                    SettingsChoiceRow(
+                        title = "Button presentation",
+                        description = "Choose pill, rounded-outline or icon-first action controls.",
+                        selected = playerButtonStyle,
+                        options = listOf("Pill", "Rounded", "Minimal"),
+                        onSelected = onPlayerButtonStyleChange
+                    )
+                }
+            ))
             PlayerButtonsSettings(
                 selected = playerButtons,
                 onSelectionChanged = onPlayerButtonsChange,
@@ -3073,7 +3098,8 @@ private fun PlayerCustomizationPreview(
     controlShape: String,
     buttonStyle: String,
     buttons: List<String>,
-    artworkScale: Float
+    artworkScale: Float,
+    buttonsPill: Boolean
 ) {
     val accent = MaterialTheme.colorScheme.primary
     val previewBackground = Color(0xFF111923)
@@ -3142,7 +3168,14 @@ private fun PlayerCustomizationPreview(
                     Box(Modifier.weight(0.42f).height(3.dp).clip(CircleShape).background(accent))
                     Box(Modifier.weight(0.58f).height(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.20f)))
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier
+                        .clip(if (buttonsPill) CircleShape else RoundedCornerShape(0.dp))
+                        .background(if (buttonsPill) Color.White.copy(alpha = 0.09f) else Color.Transparent)
+                        .padding(horizontal = if (buttonsPill) 6.dp else 0.dp, vertical = if (buttonsPill) 4.dp else 0.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     buttons.take(4).forEach { key ->
                         val shortLabel = when (key) {
                             "lyrics" -> "LYR"
