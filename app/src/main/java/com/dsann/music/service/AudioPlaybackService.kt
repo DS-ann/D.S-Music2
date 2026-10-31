@@ -2484,7 +2484,8 @@ class AudioPlaybackService : MediaSessionService() {
         endedSong: com.dsann.music.model.SongItem?,
         nextSong: com.dsann.music.model.SongItem?
     ) {
-        val endedVideoId = endedSong?.videoId?.takeIf { it.isNotBlank() } ?: return
+        val finishedSong = endedSong ?: return
+        val endedVideoId = finishedSong.videoId?.takeIf { it.isNotBlank() } ?: return
         if (activeVideoCacheVideoId != endedVideoId) return
         if (nextSong?.videoId == endedVideoId) return
 
@@ -2512,7 +2513,7 @@ class AudioPlaybackService : MediaSessionService() {
                 removeMediaCacheResources(applicationContext, cacheUris)
             }
             Log.i(TAG, "Removed " + removed + " temporary video cache resource(s) after '" +
-                endedSong.title + "' ended")
+                finishedSong.title + "' ended")
             if (activeVideoCacheVideoId == endedVideoId && activeVideoCacheUris == cacheUris) {
                 activeVideoCacheVideoId = null
                 activeVideoCacheUris = emptySet()
