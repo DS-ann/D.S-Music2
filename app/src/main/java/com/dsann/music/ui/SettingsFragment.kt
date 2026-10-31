@@ -393,6 +393,26 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putString("mini_player_style", safe) }
     }
 
+    private val _miniPlayerControlShape = MutableStateFlow(
+        prefs.getString("mini_player_control_shape", "Circle") ?: "Circle"
+    )
+    val miniPlayerControlShape: StateFlow<String> = _miniPlayerControlShape.asStateFlow()
+    fun setMiniPlayerControlShape(value: String) {
+        val safe = value.takeIf { it in listOf("Circle", "Rounded", "Pill", "None") } ?: "Circle"
+        _miniPlayerControlShape.value = safe
+        prefs.edit { putString("mini_player_control_shape", safe) }
+    }
+
+    private val _miniPlayerControlIcons = MutableStateFlow(
+        prefs.getString("mini_player_control_icons", "Classic") ?: "Classic"
+    )
+    val miniPlayerControlIcons: StateFlow<String> = _miniPlayerControlIcons.asStateFlow()
+    fun setMiniPlayerControlIcons(value: String) {
+        val safe = value.takeIf { it in listOf("Classic", "Chevron", "Seek") } ?: "Classic"
+        _miniPlayerControlIcons.value = safe
+        prefs.edit { putString("mini_player_control_icons", safe) }
+    }
+
     private val _miniPlayerProgressStyle = MutableStateFlow(
         prefs.getString("mini_player_progress", "Ring") ?: "Ring"
     )
@@ -1059,6 +1079,8 @@ fun SettingsScreenContent(
     val playerArtworkShape by viewModel.playerArtworkShape.collectAsStateWithLifecycle()
     val playerBackgroundStyle by viewModel.playerBackgroundStyle.collectAsStateWithLifecycle()
     val miniPlayerStyle by viewModel.miniPlayerStyle.collectAsStateWithLifecycle()
+    val miniPlayerControlShape by viewModel.miniPlayerControlShape.collectAsStateWithLifecycle()
+    val miniPlayerControlIcons by viewModel.miniPlayerControlIcons.collectAsStateWithLifecycle()
     val miniPlayerProgressStyle by viewModel.miniPlayerProgressStyle.collectAsStateWithLifecycle()
     val playerLayout by viewModel.playerLayout.collectAsStateWithLifecycle()
     val playerButtons by viewModel.playerButtons.collectAsStateWithLifecycle()
@@ -1263,6 +1285,10 @@ fun SettingsScreenContent(
                 onPlayerBackgroundStyleChange = { viewModel.setPlayerBackgroundStyle(it) },
                 miniPlayerStyle = miniPlayerStyle,
                 onMiniPlayerStyleChange = { viewModel.setMiniPlayerStyle(it) },
+                miniPlayerControlShape = miniPlayerControlShape,
+                onMiniPlayerControlShapeChange = { viewModel.setMiniPlayerControlShape(it) },
+                miniPlayerControlIcons = miniPlayerControlIcons,
+                onMiniPlayerControlIconsChange = { viewModel.setMiniPlayerControlIcons(it) },
                 miniPlayerProgressStyle = miniPlayerProgressStyle,
                 onMiniPlayerProgressStyleChange = { viewModel.setMiniPlayerProgressStyle(it) },
                 lyricsTextSize = lyricsTextSize,
@@ -2295,6 +2321,10 @@ private fun AppearanceScreen(
     onPlayerBackgroundStyleChange: (String) -> Unit,
     miniPlayerStyle: String,
     onMiniPlayerStyleChange: (String) -> Unit,
+    miniPlayerControlShape: String,
+    onMiniPlayerControlShapeChange: (String) -> Unit,
+    miniPlayerControlIcons: String,
+    onMiniPlayerControlIconsChange: (String) -> Unit,
     miniPlayerProgressStyle: String,
     onMiniPlayerProgressStyleChange: (String) -> Unit,
     lyricsTextSize: String,
@@ -2537,6 +2567,25 @@ private fun AppearanceScreen(
                         selected = miniPlayerStyle,
                         options = listOf("Card", "Flat", "Compact", "Pill"),
                         onSelected = onMiniPlayerStyleChange
+                    )
+                },
+                },
+                {
+                    SettingsChoiceRow(
+                        title = "Mini-player button shape",
+                        description = "Change the play, pause, previous and next control backgrounds independently of the mini-player card.",
+                        selected = miniPlayerControlShape,
+                        options = listOf("Circle", "Rounded", "Pill", "None"),
+                        onSelected = onMiniPlayerControlShapeChange
+                    )
+                },
+                {
+                    SettingsChoiceRow(
+                        title = "Mini-player skip icons",
+                        description = "Choose classic skip, chevron or seek-style previous and next icons.",
+                        selected = miniPlayerControlIcons,
+                        options = listOf("Classic", "Chevron", "Seek"),
+                        onSelected = onMiniPlayerControlIconsChange
                     )
                 },
                 {

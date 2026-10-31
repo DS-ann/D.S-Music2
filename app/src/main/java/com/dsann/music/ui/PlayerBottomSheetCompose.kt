@@ -40,6 +40,11 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -777,7 +782,6 @@ fun PlayerBottomSheetCompose(
         val videoPlaybackMetadata by viewModel.videoPlaybackMetadata.collectAsStateWithLifecycle()
         val audioService by viewModel.audioServiceState.collectAsStateWithLifecycle()
         val gestureSettings by viewModel.playerGestureSettings.collectAsStateWithLifecycle()
-        val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
         var videoQualityOptions by remember {
             mutableStateOf<List<com.dsann.music.data.innertube.VideoStreamOption>>(emptyList())
         }
@@ -1018,14 +1022,14 @@ fun PlayerBottomSheetCompose(
             when (action) {
                 PlayerGestureAction.NEXT -> viewModel.playNextSong()
                 PlayerGestureAction.PREVIOUS -> viewModel.playPreviousSong()
-                PlayerGestureAction.SEEK_BACK -> viewModel.seekTo((currentPosition - 10_000).coerceAtLeast(0))
-                PlayerGestureAction.SEEK_AHEAD -> viewModel.seekTo(currentPosition + 10_000)
+                PlayerGestureAction.SEEK_BACK -> viewModel.seekTo((viewModel.currentPosition.value - 10_000).coerceAtLeast(0))
+                PlayerGestureAction.SEEK_AHEAD -> viewModel.seekTo(viewModel.currentPosition.value + 10_000)
                 PlayerGestureAction.SEEK_SIDES -> {
                     val delta = gestureSettings.doubleTapSeekSeconds * 1000
                     viewModel.seekTo(if (touchedLeftSide) {
-                        (currentPosition - delta).coerceAtLeast(0)
+                        (viewModel.currentPosition.value - delta).coerceAtLeast(0)
                     } else {
-                        currentPosition + delta
+                        viewModel.currentPosition.value + delta
                     })
                 }
                 PlayerGestureAction.PLAY_PAUSE -> {
@@ -1246,8 +1250,9 @@ fun PlayerBottomSheetCompose(
             when (miniPlayerStyle) {
                 "Flat" -> RoundedCornerShape(0.dp)
                 "Compact" -> RoundedCornerShape(18.dp)
-                "Pill" -> RoundedCornerShape(40.dp)
-                else -> playerShadowShape
+                "Pill" -> CircleShape
+                // Card is a distinct floating rounded rectangle, not the dynamic capsule.
+                else -> RoundedCornerShape(22.dp)
             }
         } else playerShadowShape
         val playerShellElevation = if (
@@ -1844,6 +1849,22 @@ private fun MiniPlayerContentInternal(
 ) {
 
     val isDark = isSystemInDarkTheme()
+    val context = LocalContext.current
+    val miniPlayerPreferences = remember(context) {
+        context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+    }
+    val controlShapeName by miniPlayerPreferences.observeKey("mini_player_control_shape", "Circle")
+    val controlIconSet by miniPlayerPreferences.observeKey("mini_player_control_icons", "Classic")
+    val controlShape: Shape = when (controlShapeName) {
+        "Rounded" -> RoundedCornerShape(12.dp)
+        "Pill" -> RoundedCornerShape(50.dp)
+        else -> CircleShape
+    }
+    val controlBackground: Modifier = if (controlShapeName == "None") {
+        Modifier
+    } else {
+        Modifier.background(playBgColor, controlShape)
+    }
     val compactLandscape = LocalConfiguration.current.orientation ==
         android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val artworkSize = if (compactLandscape) 48.dp else 60.dp
@@ -1894,13 +1915,25 @@ private fun MiniPlayerContentInternal(
 
         // Controls Row using custom icons painterResource
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { viewModel.playPreviousSong() }) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_skip_previous),
-                    contentDescription = "Previous",
-                    tint = contentColor,
-                    modifier = Modifier.size(24.dp)
-                )
+            IconButton(
+                onClick = { viewModel.playPreviousSong() },
+                modifier = Modifier.size(40.dp).then(controlBackground)
+            ) {
+                if (controlIconSet == "Classic") {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_skip_previous),
+                        contentDescription = "Previous",
+                        tint = contentColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (controlIconSet == "Seek") Icons.Filled.FastRewind else Icons.Filled.ChevronLeft,
+                        contentDescription = "Previous",
+                        tint = contentColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
 
             IconButton(
@@ -1909,7 +1942,7 @@ private fun MiniPlayerContentInternal(
                         if (isPlaying) viewModel.pauseAudio() else viewModel.playAudio()
                     }
                 },
-                modifier = Modifier.size(42.dp).background(playBgColor, CircleShape)
+                modifier = Modifier.size(42.dp).then(controlBackground)
             ) {
                 if (isLoading) {
                     androidx.compose.material3.CircularProgressIndicator(
@@ -1925,13 +1958,25 @@ private fun MiniPlayerContentInternal(
                 }
             }
 
-            IconButton(onClick = { viewModel.playNextSong() }) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_skip_next),
-                    contentDescription = "Next",
-                    tint = contentColor,
-                    modifier = Modifier.size(24.dp)
-                )
+            IconButton(
+                onClick = { viewModel.playNextSong() },
+                modifier = Modifier.size(40.dp).then(controlBackground)
+            ) {
+                if (controlIconSet == "Classic") {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_skip_next),
+                        contentDescription = "Next",
+                        tint = contentColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (controlIconSet == "Seek") Icons.Filled.FastForward else Icons.Filled.ChevronRight,
+                        contentDescription = "Next",
+                        tint = contentColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         }
     }

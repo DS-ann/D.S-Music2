@@ -24,6 +24,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -64,6 +65,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -77,6 +79,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.dsann.music.R
 import com.dsann.music.data.lyrics.LyricLine
@@ -144,11 +147,13 @@ internal fun SyncedLyricsCompose(
     val lyricsTextSize by appearancePreferences.observeKey("lyrics_text_size", "Standard")
     val lyricsAlignment by appearancePreferences.observeKey("lyrics_alignment", "Original")
     val lyricsFontFamily by appearancePreferences.observeKey("lyrics_font_family", "Rounded")
-    val lyricsScale = when (lyricsTextSize) {
+    val configuredLyricsScale = when (lyricsTextSize) {
         "Small" -> 0.85f
         "Large" -> 1.18f
         else -> 1f
     }
+    val isLandscape = LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     val currentView = LocalView.current
     DisposableEffect(currentView) {
@@ -231,7 +236,16 @@ internal fun SyncedLyricsCompose(
 
     // Avoid a full-screen offscreen composition on every karaoke frame.
     // The active-line emphasis and generous edge padding keep the reading focus clear.
-    Box(modifier = modifier) {
+    BoxWithConstraints(modifier = modifier) {
+        // The two-pane landscape player has a much shorter lyrics viewport than portrait.
+        // Scale against that real viewport instead of keeping the portrait 38sp lyric size.
+        val viewportScale = if (isLandscape && maxHeight != Dp.Infinity) {
+            (maxHeight.value / 420f).coerceIn(0.58f, 0.86f)
+        } else {
+            1f
+        }
+        val lyricsScale = (configuredLyricsScale * viewportScale).coerceIn(0.48f, 1.18f)
+
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),

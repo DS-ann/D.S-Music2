@@ -221,7 +221,7 @@ class MainActivity : AppCompatActivity() {
                         val navBackStackEntry by currentNavController.currentBackStackEntryAsState()
                         val currentDestination = navBackStackEntry?.destination
 
-                        val showBottomBar = currentDestination?.route in listOf("explore", "library", "local_music", "settings")
+                        val showBottomBar = !isPlayerExpanded && currentDestination?.route in listOf("explore", "library", "local_music", "settings")
 
                         val density = LocalDensity.current
                         val navigationBarsHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
@@ -305,7 +305,7 @@ class MainActivity : AppCompatActivity() {
                     LaunchedEffect(currentDestination?.route) {
                         exploreViewModel.setExplorePageActive(currentDestination?.route == "explore")
                     }
-                    val showBottomBar = currentDestination?.route in listOf("explore", "library", "local_music", "settings")
+                    val showBottomBar = !isPlayerExpanded && currentDestination?.route in listOf("explore", "library", "local_music", "settings")
                     // Keep the rail persistent in wide layouts; scroll-driven bottom-bar hiding is phone-only.
                     val showNavigationRail = useNavigationRail && showBottomBar
                     val layoutDirection = LocalLayoutDirection.current

@@ -66,6 +66,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -155,6 +156,8 @@ internal fun FullScreenLyricsOverlay(
     modifier: Modifier = Modifier
 ) {
     val consumeClicks = remember { MutableInteractionSource() }
+    val compactLandscapeLyrics = LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
     var showProvidersSheet by remember { mutableStateOf(false) }
     var syncOffsetMs by remember(currentSong?.id) { mutableStateOf(0L) }
     var showSyncControls by remember { mutableStateOf(false) }
@@ -353,7 +356,12 @@ internal fun FullScreenLyricsOverlay(
                         ) {
                             Text(
                                 text = plainLyrics,
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontSize = MaterialTheme.typography.titleLarge.fontSize *
+                                        if (compactLandscapeLyrics) 0.78f else 1f,
+                                    lineHeight = MaterialTheme.typography.titleLarge.lineHeight *
+                                        if (compactLandscapeLyrics) 0.82f else 1f
+                                ),
                                 color = contentColor.copy(alpha = 0.9f)
                             )
                             LyricsMetadataFooter(
