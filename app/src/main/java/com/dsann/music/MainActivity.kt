@@ -427,78 +427,11 @@ class MainActivity : AppCompatActivity() {
                                 navController = currentNavController,
                                 startDestination = if (hasSeenOnboarding) "explore" else "onboarding",
                                 modifier = Modifier.fillMaxSize(),
-                                enterTransition = {
-                                    val initialRoute = initialState.destination.route ?: ""
-                                    val targetRoute = targetState.destination.route ?: ""
-                                    val initialIndex = routeIndices[initialRoute] ?: 0
-                                    val targetIndex = routeIndices[targetRoute] ?: 0
-                                    
-                                    if (targetIndex > initialIndex) {
-                                        slideInHorizontally(
-                                            initialOffsetX = { it },
-                                            animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
-                                        ) + fadeIn(animationSpec = tween(220))
-                                    } else {
-                                        slideInHorizontally(
-                                            initialOffsetX = { -it },
-                                            animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
-                                        ) + fadeIn(animationSpec = tween(220))
-                                    }
-                                },
-                                exitTransition = {
-                                    val initialRoute = initialState.destination.route ?: ""
-                                    val targetRoute = targetState.destination.route ?: ""
-                                    val initialIndex = routeIndices[initialRoute] ?: 0
-                                    val targetIndex = routeIndices[targetRoute] ?: 0
-                                    
-                                    if (targetIndex > initialIndex) {
-                                        slideOutHorizontally(
-                                            targetOffsetX = { -it / 3 },
-                                            animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
-                                        ) + fadeOut(animationSpec = tween(220))
-                                    } else {
-                                        slideOutHorizontally(
-                                            targetOffsetX = { it / 3 },
-                                            animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
-                                        ) + fadeOut(animationSpec = tween(220))
-                                    }
-                                },
-                                popEnterTransition = {
-                                    val initialRoute = initialState.destination.route ?: ""
-                                    val targetRoute = targetState.destination.route ?: ""
-                                    val initialIndex = routeIndices[initialRoute] ?: 0
-                                    val targetIndex = routeIndices[targetRoute] ?: 0
-                                    
-                                    if (targetIndex > initialIndex) {
-                                        slideInHorizontally(
-                                            initialOffsetX = { it },
-                                            animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
-                                        ) + fadeIn(animationSpec = tween(220))
-                                    } else {
-                                        slideInHorizontally(
-                                            initialOffsetX = { -it },
-                                            animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
-                                        ) + fadeIn(animationSpec = tween(220))
-                                    }
-                                },
-                                popExitTransition = {
-                                    val initialRoute = initialState.destination.route ?: ""
-                                    val targetRoute = targetState.destination.route ?: ""
-                                    val initialIndex = routeIndices[initialRoute] ?: 0
-                                    val targetIndex = routeIndices[targetRoute] ?: 0
-                                    
-                                    if (targetIndex > initialIndex) {
-                                        slideOutHorizontally(
-                                            targetOffsetX = { -it / 3 },
-                                            animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
-                                        ) + fadeOut(animationSpec = tween(220))
-                                    } else {
-                                        slideOutHorizontally(
-                                            targetOffsetX = { it / 3 },
-                                            animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
-                                        ) + fadeOut(animationSpec = tween(220))
-                                    }
-                                }
+                                enterTransition = { androidx.compose.animation.EnterTransition.None },
+                                exitTransition = { androidx.compose.animation.ExitTransition.None },
+                                popEnterTransition = { androidx.compose.animation.EnterTransition.None },
+                                popExitTransition = { androidx.compose.animation.ExitTransition.None },
+
                             ) {
                                 composable("onboarding") {
                                     OnboardingScreen(
