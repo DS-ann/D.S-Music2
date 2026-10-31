@@ -1,4 +1,4 @@
-name: Build D.S Music (dsmusic)
+name: Build D.S Music APK (dsmusic)
 
 on:
   push:
@@ -12,15 +12,6 @@ on:
       - "gradle.properties"
       - ".github/workflows/dsmusic-build.yml"
   workflow_dispatch:
-    inputs:
-      build_type:
-        description: Android build variant
-        required: true
-        type: choice
-        options:
-          - release
-          - debug
-        default: release
 
 permissions:
   contents: read
@@ -31,14 +22,14 @@ concurrency:
 
 jobs:
   build:
-    name: Build and upload APK
+    name: Build and upload ARM64 release APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - name: Checkout dsmusic branch
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.ref_name }}
+          ref: dsmusic
 
       - name: Set up JDK 17
         uses: actions/setup-java@v6
@@ -59,23 +50,16 @@ jobs:
       - name: Install Android 17 SDK and Build Tools
         run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0"
 
-      - name: Assemble APK
+      - name: Assemble release APK
         run: |
           set -euo pipefail
-          if [ "${{ inputs.build_type || 'release' }}" = "debug" ]; then
-            gradle --no-daemon --warning-mode all assembleDebug
-            mkdir -p app/build/outputs/apk/dsmusic-artifact
-            cp app/build/outputs/apk/arm64-v8a/debug/*.apk app/build/outputs/apk/dsmusic-artifact/dsmusic-debug.apk
-          else
-            gradle --no-daemon --warning-mode all assembleRelease
-            mkdir -p app/build/outputs/apk/dsmusic-artifact
-            SOURCE_APK="$(find app/build/outputs/apk -type f -name '*arm64-v8a*release*.apk' -o -name '*release-unsigned.apk' | head -n 1)"
-            test -n "$SOURCE_APK"
-            cp "$SOURCE_APK" app/build/outputs/apk/dsmusic-artifact/dsmusic-release-unsigned.apk
-          fi
+          gradle --no-daemon --warning-mode all assembleRelease
+          SOURCE_APK="app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk"
+          test -f "$SOURCE_APK"
+          mkdir -p app/build/outputs/apk/dsmusic-artifact
+          cp "$SOURCE_APK" "$RUNNER_TEMP/dsmusic-release-unsigned.apk"
 
-      - name: Sign release APK with shared D.S-Apps key when available
-        if: ${{ (inputs.build_type == '' || inputs.build_type == 'release') && secrets.BATTERYPULSE_KEYSTORE_BASE64 != '' }}
+      - name: Sign release APK with shared D.S-Apps key when configured
         env:
           SIGNING_KEYSTORE_BASE64: ${{ secrets.BATTERYPULSE_KEYSTORE_BASE64 }}
           SIGNING_KEYSTORE_PASSWORD: ${{ secrets.BATTERYPULSE_STORE_PASSWORD }}
@@ -83,30 +67,38 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.BATTERYPULSE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          KEYSTORE="$RUNNER_TEMP/dsmusic-release-keystore.p12"
-          printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
-          chmod 600 "$KEYSTORE"
-          keytool -list -storetype PKCS12 -keystore "$KEYSTORE" -storepass "$SIGNING_KEYSTORE_PASSWORD" -alias "$SIGNING_KEY_ALIAS" >/dev/null
           BUILD_TOOLS="$ANDROID_HOME/build-tools/37.0.0"
-          SOURCE_APK="app/build/outputs/apk/dsmusic-artifact/dsmusic-release-unsigned.apk"
-          ALIGNED_APK="$RUNNER_TEMP/dsmusic-aligned.apk"
-          "$BUILD_TOOLS/zipalign" -f -p 4 "$SOURCE_APK" "$ALIGNED_APK"
-          "$BUILD_TOOLS/apksigner" sign \
-            --ks "$KEYSTORE" --ks-type PKCS12 --ks-key-alias "$SIGNING_KEY_ALIAS" \
-            --ks-pass env:SIGNING_KEYSTORE_PASSWORD --key-pass env:SIGNING_KEY_PASSWORD \
-            --out app/build/outputs/apk/dsmusic-artifact/dsmusic.apk "$ALIGNED_APK"
-          rm "$SOURCE_APK" "$ALIGNED_APK"
+          SOURCE_APK="$RUNNER_TEMP/dsmusic-release-unsigned.apk"
+          OUTPUT_APK="app/build/outputs/apk/dsmusic-artifact/dsmusic.apk"
 
-      - name: Verify release APK when signing key is configured
-        if: ${{ (inputs.build_type == '' || inputs.build_type == 'release') && secrets.BATTERYPULSE_KEYSTORE_BASE64 != '' }}
-        run: |
-          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose app/build/outputs/apk/dsmusic-artifact/dsmusic.apk
+          if [ -n "${SIGNING_KEYSTORE_BASE64:-}" ]; then
+            : "${SIGNING_KEYSTORE_PASSWORD:?Missing store password secret}"
+            : "${SIGNING_KEY_ALIAS:?Missing key alias secret}"
+            : "${SIGNING_KEY_PASSWORD:?Missing key password secret}"
+            KEYSTORE="$RUNNER_TEMP/dsmusic-release-keystore.p12"
+            ALIGNED_APK="$RUNNER_TEMP/dsmusic-aligned.apk"
+            printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+            chmod 600 "$KEYSTORE"
+            keytool -list -storetype PKCS12 -keystore "$KEYSTORE" \
+              -storepass "$SIGNING_KEYSTORE_PASSWORD" -alias "$SIGNING_KEY_ALIAS" >/dev/null
+            "$BUILD_TOOLS/zipalign" -f -p 4 "$SOURCE_APK" "$ALIGNED_APK"
+            "$BUILD_TOOLS/apksigner" sign \
+              --ks "$KEYSTORE" --ks-type PKCS12 --ks-key-alias "$SIGNING_KEY_ALIAS" \
+              --ks-pass env:SIGNING_KEYSTORE_PASSWORD --key-pass env:SIGNING_KEY_PASSWORD \
+              --out "$OUTPUT_APK" "$ALIGNED_APK"
+            "$BUILD_TOOLS/apksigner" verify --verbose "$OUTPUT_APK"
+            rm -f "$KEYSTORE" "$ALIGNED_APK"
+            echo "Built and verified the signed D.S Music APK."
+          else
+            cp "$SOURCE_APK" "$OUTPUT_APK"
+            echo "::warning::Signing secrets are unavailable; the uploaded release APK is unsigned."
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: D.S-Music-dsmusic-${{ inputs.build_type || 'release' }}
-          path: app/build/outputs/apk/dsmusic-artifact/*.apk
+          name: D.S-Music-dsmusic-ARM64
+          path: app/build/outputs/apk/dsmusic-artifact/dsmusic.apk
           archive: false
           if-no-files-found: error
           retention-days: 14
