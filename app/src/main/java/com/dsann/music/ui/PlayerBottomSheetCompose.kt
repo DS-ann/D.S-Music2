@@ -43,8 +43,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.KeyboardDoubleArrowLeft
+import androidx.compose.material.icons.filled.KeyboardDoubleArrowRight
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
@@ -1863,7 +1863,7 @@ private fun MiniPlayerContentInternal(
     val controlIconSet by miniPlayerPreferences.observeKey("mini_player_control_icons", "Classic")
     val controlShape: Shape = when (controlShapeName) {
         "Rounded" -> RoundedCornerShape(12.dp)
-        "Pill" -> RoundedCornerShape(50.dp)
+        "Pill" -> RoundedCornerShape(20.dp)
         else -> CircleShape
     }
     val miniControlBackgroundColor = if (isDark) Color(0x1AFFFFFF) else Color(0x0D000000)
@@ -1922,7 +1922,7 @@ private fun MiniPlayerContentInternal(
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(
                 onClick = { viewModel.playPreviousSong() },
-                modifier = Modifier.size(40.dp).then(controlBackground)
+                modifier = Modifier.size(width = if (controlShapeName == "Pill") 48.dp else 40.dp, height = 40.dp).then(controlBackground)
             ) {
                 if (controlIconSet == "Classic") {
                     Icon(
@@ -1933,7 +1933,7 @@ private fun MiniPlayerContentInternal(
                     )
                 } else {
                     Icon(
-                        imageVector = if (controlIconSet == "Seek") Icons.Filled.FastRewind else Icons.Filled.ChevronLeft,
+                        imageVector = if (controlIconSet == "Seek") Icons.Filled.KeyboardDoubleArrowLeft else Icons.Filled.ChevronLeft,
                         contentDescription = "Previous",
                         tint = contentColor,
                         modifier = Modifier.size(24.dp)
@@ -1947,7 +1947,7 @@ private fun MiniPlayerContentInternal(
                         if (isPlaying) viewModel.pauseAudio() else viewModel.playAudio()
                     }
                 },
-                modifier = Modifier.size(42.dp).then(controlBackground)
+                modifier = Modifier.size(width = if (controlShapeName == "Pill") 50.dp else 42.dp, height = 42.dp).then(controlBackground)
             ) {
                 if (isLoading) {
                     androidx.compose.material3.CircularProgressIndicator(
@@ -1972,7 +1972,7 @@ private fun MiniPlayerContentInternal(
 
             IconButton(
                 onClick = { viewModel.playNextSong() },
-                modifier = Modifier.size(40.dp).then(controlBackground)
+                modifier = Modifier.size(width = if (controlShapeName == "Pill") 48.dp else 40.dp, height = 40.dp).then(controlBackground)
             ) {
                 if (controlIconSet == "Classic") {
                     Icon(
@@ -1983,7 +1983,7 @@ private fun MiniPlayerContentInternal(
                     )
                 } else {
                     Icon(
-                        imageVector = if (controlIconSet == "Seek") Icons.Filled.FastForward else Icons.Filled.ChevronRight,
+                        imageVector = if (controlIconSet == "Seek") Icons.Filled.KeyboardDoubleArrowRight else Icons.Filled.ChevronRight,
                         contentDescription = "Next",
                         tint = contentColor,
                         modifier = Modifier.size(24.dp)

@@ -64,7 +64,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -629,17 +628,8 @@ fun AdaptiveDetailContainer(
         if (isLandscape) {
         // --- LANDSCAPE TWO-PANE ---
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            // Ambient glass backdrop in landscape mode
+            // Keep the ambient tint without drawing a second blurred copy of the full-size cover.
             if (!thumbnailUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = thumbnailUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { alpha = 0.22f }
-                        .blur(20.dp),
-                    contentScale = ContentScale.Crop
-                )
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -755,22 +745,9 @@ fun AdaptiveDetailContainer(
         }
 
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            // Ambient dynamic blurred background art
+            // Retain the gradient veil but avoid a second full-width artwork draw and blur
+            // pass on every scroll frame.
             if (!thumbnailUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = thumbnailUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(420.dp)
-                        .graphicsLayer { 
-                            alpha = imageAlpha * 0.5f 
-                            translationY = scrollOffset
-                        }
-                        .blur(20.dp),
-                    contentScale = ContentScale.Crop
-                )
-                
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()

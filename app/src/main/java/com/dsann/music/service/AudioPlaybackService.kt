@@ -1669,7 +1669,8 @@ class AudioPlaybackService : MediaSessionService() {
             .setArtist(artist)
         val activeSong = viewModel?.currentSong?.value?.takeIf { it.id.toString() == songId }
         activeSong?.albumName?.takeIf { it.isNotBlank() }?.let { metadataBuilder.setAlbumTitle(it) }
-        
+        activeSong?.thumbnailUrl?.takeIf { it.isNotBlank() }?.let { metadataBuilder.setArtworkUri(it.toUri()) }
+
         // We only compress current cover for the active track to conserve heap space
         if (currentAlbumArtSongId == songId) {
             currentAlbumArt?.let {
@@ -1794,6 +1795,22 @@ class AudioPlaybackService : MediaSessionService() {
         }
     }
 
+    private fun refreshMediaNotification() {
+        if (!::handler.isInitialized) return
+        handler.post {
+            if (mediaSession != null) {
+                try {
+                    // Artwork can arrive after the notification has already been posted.
+                    // Rebuild it so legacy notifications receive their large icon and newer
+                    // System UI sees the updated MediaItem metadata.
+                    triggerNotificationUpdate()
+                } catch (error: Exception) {
+                    Log.w(TAG, "Unable to refresh the media notification artwork", error)
+                }
+            }
+        }
+    }
+
     private fun setSongMetadata(
         songName: String?,
         albumArt: Bitmap?,
@@ -1820,6 +1837,9 @@ class AudioPlaybackService : MediaSessionService() {
             val metadataBuilder = mediaItem.mediaMetadata.buildUpon()
                 .setTitle(currentSongName)
                 .setArtist(activeSong.artist.ifBlank { "Unknown Artist" })
+            activeSong.thumbnailUrl?.takeIf { it.isNotBlank() }?.let {
+                metadataBuilder.setArtworkUri(it.toUri())
+            }
             currentAlbumArt?.let {
                 val stream = java.io.ByteArrayOutputStream()
                 it.compress(Bitmap.CompressFormat.PNG, 100, stream)
@@ -1833,6 +1853,7 @@ class AudioPlaybackService : MediaSessionService() {
                 mediaItem.buildUpon().setMediaMetadata(metadataBuilder.build()).build()
             )
         }
+        refreshMediaNotification()
     }
 
     fun setSongMetadataById(songName: String?, albumId: Long) {

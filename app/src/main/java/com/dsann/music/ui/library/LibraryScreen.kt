@@ -226,7 +226,6 @@ fun LibraryScreen(
     val isLoadingStream by exploreViewModel?.isLoadingStream?.collectAsStateWithLifecycle(false) ?: remember { mutableStateOf(false) }
 
     val localSongs by viewModel.localSongs.collectAsStateWithLifecycle(emptyList())
-    val downloadProgress by SongDownloader.downloadProgress.collectAsStateWithLifecycle(emptyMap())
     val favoriteIds by viewModel.favoriteSongIds.collectAsStateWithLifecycle(emptySet())
     val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
     val lyricsCache = remember(context) { LyricsCacheManager(context.applicationContext) }
@@ -268,10 +267,15 @@ fun LibraryScreen(
         }
     }
 
-    // Refresh the downloaded-songs folder when opened and when an active download finishes.
-    LaunchedEffect(activeTab, downloadProgress.isEmpty()) {
-        if (activeTab == "Downloaded songs" && downloadProgress.isEmpty()) {
-            scanLocalFiles(context, viewModel)
+    // Observe only download completion here. Collecting the complete progress map as Compose
+    // state made every progress tick recompose the entire Library screen.
+    LaunchedEffect(activeTab) {
+        if (activeTab == "Downloaded songs") {
+            SongDownloader.downloadProgress.collect { progress ->
+                if (progress.isEmpty()) {
+                    scanLocalFiles(context, viewModel)
+                }
+            }
         }
     }
 

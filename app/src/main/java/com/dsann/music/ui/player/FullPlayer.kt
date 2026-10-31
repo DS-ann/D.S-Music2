@@ -608,12 +608,6 @@ fun FullPlayerScreen(
     val scrubberThumbStyle by customizeViewModel.scrubberThumbStyle.collectAsStateWithLifecycle()
     val visualizerColor by customizeViewModel.visualizerColor.collectAsStateWithLifecycle()
 
-    LaunchedEffect(playerLayout, uiState.currentSong?.id) {
-        if (playerLayout == "Lyrics" && uiState.currentSong != null && !isLyricsModeEnabled) {
-            viewModel.setLyricsModeEnabled(true)
-        }
-    }
-
     // Handle back button when lyrics mode is enabled
     BackHandler(enabled = isLyricsModeEnabled) {
         viewModel.setLyricsModeEnabled(false)
@@ -860,7 +854,6 @@ fun FullPlayer(
         val artScale = when (playerLayout) {
             "Cover" -> 0.98f
             "Minimal" -> 0.68f
-            "Lyrics" -> 0.78f
             "Vinyl", "Cassette" -> 0.82f
             else -> 0.9f
         }
