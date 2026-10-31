@@ -259,7 +259,7 @@ class MainActivity : AppCompatActivity() {
                         val totalSlideDistPx = bottomNavHeightPx + navigationBarsHeightPx
 
                         // Keep navigation anchored while the player expands and while content scrolls.
-                        val baseTargetTranslation = if (showBottomBar) 0f else totalSlideDistPx
+                        val baseTargetTranslation = if (showBottomBar && isBottomNavVisible) 0f else totalSlideDistPx
 
                         val animatedBaseTranslationState = animateFloatAsState(
                             targetValue = baseTargetTranslation,
