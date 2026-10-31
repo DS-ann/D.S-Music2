@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
@@ -60,6 +61,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dsann.music.model.SongItem
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -125,17 +127,30 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
         searchQuery,
         sortOrder
     ) {
+        // Avoid sorting the entire MediaStore collection for every intermediate keystroke.
+        if (searchQuery.isNotBlank()) delay(140L)
+        val query = searchQuery.trim()
         value = withContext(Dispatchers.Default) {
-            val filtered = localSongs.filter {
-                it.title.contains(searchQuery, ignoreCase = true) ||
-                    it.artist.contains(searchQuery, ignoreCase = true) ||
-                    (it.path?.contains(searchQuery, ignoreCase = true) == true)
+            val filtered = if (query.isEmpty()) {
+                localSongs
+            } else {
+                localSongs.filter {
+                    it.title.contains(query, ignoreCase = true) ||
+                        it.artist.contains(query, ignoreCase = true) ||
+                        (it.path?.contains(query, ignoreCase = true) == true)
+                }
             }
             when (sortOrder) {
-                SortOrder.A_Z -> filtered.sortedBy { it.title.lowercase() }
+                SortOrder.A_Z -> filtered.sortedWith(
+                    Comparator { first, second -> first.title.compareTo(second.title, ignoreCase = true) }
+                )
                 SortOrder.DATE_ADDED -> filtered.sortedByDescending { it.dateAdded }
                 SortOrder.ARTIST -> filtered.sortedWith(
-                    compareBy({ it.artist.lowercase() }, { it.title.lowercase() })
+                    Comparator { first, second ->
+                        val artistOrder = first.artist.compareTo(second.artist, ignoreCase = true)
+                        if (artistOrder != 0) artistOrder
+                        else first.title.compareTo(second.title, ignoreCase = true)
+                    }
                 )
                 SortOrder.DURATION -> filtered.sortedByDescending { it.duration }
             }
@@ -208,186 +223,200 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
             .statusBarsPadding()
             .padding(horizontal = 16.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp, bottom = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        // Keep one lazy scroll owner for the complete screen. The heading, search and
+        // filters scroll with the songs instead of occupying a permanently fixed block.
+        val listState = rememberLazyListState()
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 160.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Local music",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "${localSongs.size} songs on this device",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            IconButton(
-                enabled = !isScanning,
-                onClick = {
-                    scope.launch {
-                        isScanning = true
-                        try {
-                            scanLocalFiles(context, viewModel)
-                        } finally {
-                            isScanning = false
-                        }
-                    }
-                }
-            ) {
-                Icon(Icons.Default.Refresh, contentDescription = "Rescan local music")
-            }
-        }
-
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text("Search local music") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear search")
-                    }
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 6.dp, bottom = 8.dp),
-            shape = CircleShape,
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-            )
-        )
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                enabled = visibleSongsInView.isNotEmpty(),
-                onClick = {
-                    // The queue is scoped to the current folder when folder view is active.
-                    viewModel.setSongList(visibleSongsInView)
-                    viewModel.playSongAtIndex(0)
-                },
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                Spacer(Modifier.padding(horizontal = 2.dp))
-                Text("Play all")
-            }
-            OutlinedButton(
-                enabled = visibleSongsInView.isNotEmpty(),
-                onClick = {
-                    val shuffledLocalSongs = visibleSongsInView.shuffled()
-                    viewModel.setSongList(shuffledLocalSongs)
-                    viewModel.playSongAtIndex(0)
-                },
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Default.Shuffle, contentDescription = null)
-                Spacer(Modifier.padding(horizontal = 2.dp))
-                Text("Shuffle")
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            SortOrder.entries.forEach { order ->
-                FilterChip(
-                    selected = sortOrder == order,
-                    onClick = { sortOrder = order },
-                    label = {
+            item(key = "local_music_header", contentType = "header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp, bottom = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = order.name.replace("_", " "),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            text = "Local music",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
-                    },
-                    border = null,
-                    colors = FilterChipDefaults.filterChipColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                )
-            }
-            FilterChip(
-                selected = showAsFolders,
-                onClick = {
-                    showAsFolders = !showAsFolders
-                    currentFolderPath = storageRootPath
-                },
-                label = { Text("Folders", maxLines = 1) },
-                leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) },
-                border = null,
-                colors = FilterChipDefaults.filterChipColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
-        }
-
-        if (contentIsEmpty) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = 48.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = when {
-                            isScanning -> "Scanning this device…"
-                            searchQuery.isNotBlank() -> "No local songs match that search"
-                            else -> "No local music found"
-                        },
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (!isScanning && localSongs.isEmpty()) {
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedButton(
-                            onClick = {
-                                scope.launch {
-                                    isScanning = true
-                                    try {
-                                        scanLocalFiles(context, viewModel)
-                                    } finally {
-                                        isScanning = false
-                                    }
+                        Text(
+                            text = "${localSongs.size} songs on this device",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(
+                        enabled = !isScanning,
+                        onClick = {
+                            scope.launch {
+                                isScanning = true
+                                try {
+                                    scanLocalFiles(context, viewModel)
+                                } finally {
+                                    isScanning = false
                                 }
                             }
-                        ) {
-                            Text("Scan device")
                         }
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Rescan local music")
                     }
                 }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 160.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
+
+            item(key = "local_music_search", contentType = "search") {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search local music") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp, bottom = 8.dp),
+                    shape = CircleShape,
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
+                )
+            }
+
+            item(key = "local_music_actions", contentType = "actions") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        enabled = visibleSongsInView.isNotEmpty(),
+                        onClick = {
+                            viewModel.setSongList(visibleSongsInView)
+                            viewModel.playSongAtIndex(0)
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        Spacer(Modifier.padding(horizontal = 2.dp))
+                        Text("Play all")
+                    }
+                    OutlinedButton(
+                        enabled = visibleSongsInView.isNotEmpty(),
+                        onClick = {
+                            val shuffledLocalSongs = visibleSongsInView.shuffled()
+                            viewModel.setSongList(shuffledLocalSongs)
+                            viewModel.playSongAtIndex(0)
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.Shuffle, contentDescription = null)
+                        Spacer(Modifier.padding(horizontal = 2.dp))
+                        Text("Shuffle")
+                    }
+                }
+            }
+
+            item(key = "local_music_filters", contentType = "filters") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SortOrder.entries.forEach { order ->
+                        FilterChip(
+                            selected = sortOrder == order,
+                            onClick = { sortOrder = order },
+                            label = {
+                                Text(
+                                    text = order.name.replace("_", " "),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            border = null,
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        )
+                    }
+                    FilterChip(
+                        selected = showAsFolders,
+                        onClick = {
+                            showAsFolders = !showAsFolders
+                            currentFolderPath = storageRootPath
+                        },
+                        label = { Text("Folders", maxLines = 1) },
+                        leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) },
+                        border = null,
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    )
+                }
+            }
+
+            if (contentIsEmpty) {
+                item(key = "local_music_empty", contentType = "empty") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .padding(bottom = 48.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = when {
+                                    isScanning -> "Scanning this device…"
+                                    searchQuery.isNotBlank() -> "No local songs match that search"
+                                    else -> "No local music found"
+                                },
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (!isScanning && localSongs.isEmpty()) {
+                                Spacer(Modifier.height(8.dp))
+                                OutlinedButton(
+                                    onClick = {
+                                        scope.launch {
+                                            isScanning = true
+                                            try {
+                                                scanLocalFiles(context, viewModel)
+                                            } finally {
+                                                isScanning = false
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    Text("Scan device")
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
                 if (showAsFolders && currentFolderPath != storageRootPath) {
-                    item(key = "folder_parent") {
+                    item(key = "folder_parent", contentType = "folder") {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -410,8 +439,13 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                         }
                     }
                 }
+
                 if (showAsFolders) {
-                    items(folderListing.folders, key = { folder -> "folder:${folder.path}" }) { folder ->
+                    items(
+                        items = folderListing.folders,
+                        key = { folder -> "folder:${folder.path}" },
+                        contentType = { "folder" }
+                    ) { folder ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -446,7 +480,12 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                         }
                     }
                 }
-                itemsIndexed(visibleSongsInView, key = { _, song -> "song:${song.id}" }) { index, song ->
+
+                itemsIndexed(
+                    items = visibleSongsInView,
+                    key = { _, song -> "song:${song.id}" },
+                    contentType = { _, _ -> "local-song" }
+                ) { index, song ->
                     val isCurrentLocalSong =
                         currentSong?.videoId.isNullOrEmpty() && currentSong?.id == song.id
                     SongListItem(
@@ -454,10 +493,9 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                         isPlaying = isCurrentLocalSong,
                         isFavorite = favoriteIds.contains(song.id),
                         localIndex = index,
-                        localCount = visibleSongs.size,
+                        localCount = visibleSongsInView.size,
                         onClick = {
-                            // Replace any online queue with this filtered local-only queue.
-                            viewModel.setSongList(visibleSongs)
+                            viewModel.setSongList(visibleSongsInView)
                             viewModel.playSongAtIndex(index)
                         },
                         onLongClick = { }
