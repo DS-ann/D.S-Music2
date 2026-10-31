@@ -2654,7 +2654,10 @@ class AudioPlaybackService : MediaSessionService() {
                 vm.setVideoPlaybackMetadata(
                     com.dsann.music.viewmodel.VideoPlaybackMetadata(
                         title = videoOption.videoTitle?.takeIf { it.isNotBlank() } ?: song.title,
-                        uploader = videoOption.videoUploader?.takeIf { it.isNotBlank() } ?: song.artist
+                        uploader = videoOption.videoUploader?.takeIf { it.isNotBlank() } ?: song.artist,
+                        durationMs = videoOption.durationMs.takeIf { it > 0L } ?: song.duration,
+                        resolution = videoOption.label,
+                        mimeType = videoOption.mimeType
                     )
                 )
                 if (videoOption.usesSeparateAudio) {
