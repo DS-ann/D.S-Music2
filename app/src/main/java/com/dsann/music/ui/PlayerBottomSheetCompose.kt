@@ -807,7 +807,10 @@ fun PlayerBottomSheetCompose(
                                 title = defaultVideoOption.videoTitle?.takeIf { it.isNotBlank() }
                                     ?: currentSong?.title.orEmpty(),
                                 uploader = defaultVideoOption.videoUploader?.takeIf { it.isNotBlank() }
-                                    ?: currentSong?.artist.orEmpty()
+                                    ?: currentSong?.artist.orEmpty(),
+                                durationMs = defaultVideoOption.durationMs,
+                                resolution = defaultVideoOption.label,
+                                mimeType = defaultVideoOption.mimeType
                             )
                         )
                     }
@@ -1659,6 +1662,20 @@ fun PlayerBottomSheetCompose(
                                                                 audioMimeType = option.audioMimeType
                                                             )
                                                             selectedVideoQuality = option.label
+                                                            viewModel.setVideoPlaybackMetadata(
+                                                                com.dsann.music.viewmodel.VideoPlaybackMetadata(
+                                                                    title = option.videoTitle?.takeIf { it.isNotBlank() }
+                                                                        ?: videoPlaybackMetadata?.title
+                                                                        ?: currentSong?.title.orEmpty(),
+                                                                    uploader = option.videoUploader?.takeIf { it.isNotBlank() }
+                                                                        ?: videoPlaybackMetadata?.uploader
+                                                                        ?: currentSong?.artist.orEmpty(),
+                                                                    durationMs = option.durationMs.takeIf { it > 0L }
+                                                                        ?: videoPlaybackMetadata?.durationMs ?: 0L,
+                                                                    resolution = option.label,
+                                                                    mimeType = option.mimeType
+                                                                )
+                                                            )
                                                             showVideoQualityDialog = false
                                                         }
                                                     ) {
