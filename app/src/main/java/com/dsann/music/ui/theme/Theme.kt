@@ -113,11 +113,11 @@ fun SpatialFlowTheme(
                 onSecondaryContainer = Color(0xFFDCE6F7),
                 tertiary = Color(0xFF8CC9D8),
                 onTertiary = Color(0xFF0B2228),
-                background = Color(0xFF121620),
+                background = Color(0xFF080B1B),
                 onBackground = Color(0xFFE9EDF5),
-                surface = Color(0xFF171E29),
+                surface = Color(0xFF0D1126),
                 onSurface = Color(0xFFE9EDF5),
-                surfaceVariant = Color(0xFF263141),
+                surfaceVariant = Color(0xFF192540),
                 onSurfaceVariant = Color(0xFFB7C3D5),
                 surfaceTint = accent,
                 outline = Color(0xFF65748A),
@@ -126,11 +126,11 @@ fun SpatialFlowTheme(
                 onError = Color(0xFF2B080D),
                 errorContainer = Color(0xFF5B2028),
                 onErrorContainer = Color(0xFFFFDADD),
-                surfaceContainerLowest = Color(0xFF0E131B),
-                surfaceContainerLow = Color(0xFF151C26),
-                surfaceContainer = Color(0xFF1B2431),
-                surfaceContainerHigh = Color(0xFF222D3B),
-                surfaceContainerHighest = Color(0xFF2A3747)
+                surfaceContainerLowest = Color(0xFF070A16),
+                surfaceContainerLow = Color(0xFF0B0F20),
+                surfaceContainer = Color(0xFF0D1126),
+                surfaceContainerHigh = Color(0xFF121A31),
+                surfaceContainerHighest = Color(0xFF1B2947)
             )
             if (amoledEnabled) {
                 base.copy(

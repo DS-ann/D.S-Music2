@@ -42,7 +42,7 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
             .memoryCache {
                 MemoryCache.Builder(this)
                     // Keep artwork from crowding playback buffers and Compose state on 2 GB phones.
-                    .maxSizePercent(if (lowRam) 0.06 else 0.11)
+                    .maxSizePercent(if (lowRam) 0.035 else 0.10)
                     .strongReferencesEnabled(true)
                     .weakReferencesEnabled(true)
                     .build()
@@ -50,7 +50,7 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(if (lowRam) 96L * 1024L * 1024L else 160L * 1024L * 1024L)
+                    .maxSizeBytes(if (lowRam) 64L * 1024L * 1024L else 160L * 1024L * 1024L)
                     .build()
             }
             .allowHardware(true)

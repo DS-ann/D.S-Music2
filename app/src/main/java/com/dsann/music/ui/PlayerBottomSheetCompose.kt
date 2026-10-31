@@ -1124,13 +1124,19 @@ fun PlayerBottomSheetCompose(
         // A rotation changes the sheet's coordinate space. Recalculate its Y position using
         // the new height while retaining the previously saved expansion fraction.
         LaunchedEffect(screenHeightPx, containerWidthDp, useNavigationRail) {
-            val fraction = if (viewModel.isPlayerExpanded.value) {
-                1f
-            } else {
-                viewModel.playerExpansionFraction.value.coerceIn(0f, 1f)
-            }
+            // Local sheet state is authoritative. The ViewModel expanded flag is updated
+            // asynchronously and can still be true when the close animation begins.
+            if (pendingSheetAnimation != null ||
+                currentSheetTranslationY.isRunning ||
+                playerContentExpansionFraction.isRunning
+            ) return@LaunchedEffect
+
+            val expanded = currentSheetContentState == PlayerSheetState.EXPANDED
+            val fraction = if (expanded) 1f else 0f
             playerContentExpansionFraction.snapTo(fraction)
-            currentSheetTranslationY.snapTo(sheetCollapsedTargetYState.value * (1f - fraction))
+            currentSheetTranslationY.snapTo(
+                if (expanded) 0f else sheetCollapsedTargetYState.value.coerceIn(0f, screenHeightPx)
+            )
         }
         val visualOvershootScaleY = remember { Animatable(1f) }
         val offsetAnimatable = remember { Animatable(0f) }
@@ -1200,28 +1206,15 @@ fun PlayerBottomSheetCompose(
             animationSpec: AnimationSpec<Float>? = null,
             initialVelocity: Float = 0f
         ) {
-            val expectedBottomNavHeight = if (useNavigationRail || !bottomNavVisible) {
-                0f
-            } else if (dynamicBottomNavHeightState.value > 0f) {
-                dynamicBottomNavHeightState.value
-            } else {
-                with(density) { 75.dp.toPx() }
-            }
-            val expectedBottomGapPx = with(density) {
-                (if (useNavigationRail || !bottomNavVisible) 8.dp else 12.dp).toPx()
-            }
-            val miniPlayerHeightPx = with(density) { miniPlayerHeight.toPx() }
+            // Use the exact measured target. Recalculating dock height here gave the
+            // animation a different destination while the bottom dock was appearing.
             val destY = if (targetExpanded) {
                 0f
             } else {
-                screenHeightPx - miniPlayerHeightPx - expectedBottomNavHeight - expectedBottomGapPx -
-                    (if (useNavigationRail) systemNavigationBottomPx else 0f)
+                sheetCollapsedTargetYState.value.coerceIn(0f, screenHeightPx)
             }
             val destFraction = if (targetExpanded) 1f else 0f
-
-            val collapsedY = screenHeightPx - miniPlayerHeightPx - expectedBottomNavHeight - expectedBottomGapPx -
-                (if (useNavigationRail) systemNavigationBottomPx else 0f)
-            val totalDistance = collapsedY
+            val totalDistance = destY.coerceAtLeast(1f)
             val initialFractionVelocity = if (totalDistance > 0f) {
                 -initialVelocity / totalDistance
             } else 0f
