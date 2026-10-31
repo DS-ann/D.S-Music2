@@ -19,10 +19,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import kotlin.math.max
+import kotlin.math.min
 import androidx.core.view.WindowCompat.getInsetsController
 
 /**
@@ -53,6 +56,54 @@ fun <T> SharedPreferences.observeKey(key: String, defaultValue: T): State<T> {
         onDispose { unregisterOnSharedPreferenceChangeListener(listener) }
     }
     return state
+}
+
+
+/**
+ * Keep accent labels and page markers readable even when users choose a very
+ * dark, very bright, or album-art-derived accent color.
+ */
+private fun mixColor(start: Color, end: Color, fraction: Float): Color {
+    val t = fraction.coerceIn(0f, 1f)
+    return Color(
+        red = start.red + (end.red - start.red) * t,
+        green = start.green + (end.green - start.green) * t,
+        blue = start.blue + (end.blue - start.blue) * t,
+        alpha = start.alpha + (end.alpha - start.alpha) * t
+    )
+}
+
+private fun contrastRatio(first: Color, second: Color): Float {
+    val firstLuminance = first.luminance()
+    val secondLuminance = second.luminance()
+    return (max(firstLuminance, secondLuminance) + 0.05f) /
+        (min(firstLuminance, secondLuminance) + 0.05f)
+}
+
+private fun readableAccent(
+    accent: Color,
+    background: Color,
+    lighten: Boolean
+): Color {
+    if (contrastRatio(accent, background) >= 4.5f) return accent
+    val target = if (lighten) Color.White else Color.Black
+    var low = 0f
+    var high = 1f
+    repeat(20) {
+        val middle = (low + high) / 2f
+        val candidate = mixColor(accent, target, middle)
+        if (contrastRatio(candidate, background) >= 4.5f) high = middle
+        else low = middle
+    }
+    return mixColor(accent, target, high)
+}
+
+private fun readableOnColor(background: Color): Color {
+    return if (contrastRatio(Color.White, background) >= contrastRatio(Color.Black, background)) {
+        Color.White
+    } else {
+        Color.Black
+    }
 }
 
 /**
@@ -100,12 +151,18 @@ fun SpatialFlowTheme(
         }
     }
 
-    val colorScheme = remember(darkTheme, amoledEnabled, accent) {
+    val readablePrimary = remember(darkTheme, amoledEnabled, accent) {
+        val contrastSurface = if (darkTheme) Color(0xFF1B2947) else Color.White
+        readableAccent(accent, contrastSurface, lighten = darkTheme)
+    }
+    val onReadablePrimary = remember(readablePrimary) { readableOnColor(readablePrimary) }
+
+    val colorScheme = remember(darkTheme, amoledEnabled, readablePrimary, onReadablePrimary) {
         if (darkTheme) {
             val base = darkColorScheme(
-                primary = accent,
-                onPrimary = Color(0xFF0B1220),
-                primaryContainer = accent.copy(alpha = 0.19f),
+                primary = readablePrimary,
+                onPrimary = onReadablePrimary,
+                primaryContainer = readablePrimary.copy(alpha = 0.19f),
                 onPrimaryContainer = Color(0xFFE6EDFF),
                 secondary = Color(0xFFB8C6DE),
                 onSecondary = Color(0xFF172131),
@@ -119,7 +176,7 @@ fun SpatialFlowTheme(
                 onSurface = Color(0xFFE9EDF5),
                 surfaceVariant = Color(0xFF192540),
                 onSurfaceVariant = Color(0xFFB7C3D5),
-                surfaceTint = accent,
+                surfaceTint = readablePrimary,
                 outline = Color(0xFF65748A),
                 outlineVariant = Color(0xFF354255),
                 error = Color(0xFFFF8C91),
@@ -147,7 +204,7 @@ fun SpatialFlowTheme(
             lightColorScheme(
                 primary = accent,
                 onPrimary = Color(0xFF0B1220),
-                primaryContainer = accent.copy(alpha = 0.18f),
+                primaryContainer = readablePrimary.copy(alpha = 0.18f),
                 onPrimaryContainer = Color(0xFF17233A),
                 secondary = Color(0xFF536783),
                 onSecondary = Color.White,
