@@ -202,8 +202,8 @@ fun SpatialFlowTheme(
             } else base
         } else {
             lightColorScheme(
-                primary = accent,
-                onPrimary = Color(0xFF0B1220),
+                primary = readablePrimary,
+                onPrimary = onReadablePrimary,
                 primaryContainer = readablePrimary.copy(alpha = 0.18f),
                 onPrimaryContainer = Color(0xFF17233A),
                 secondary = Color(0xFF536783),
@@ -218,7 +218,7 @@ fun SpatialFlowTheme(
                 onSurface = Color(0xFF182131),
                 surfaceVariant = Color(0xFFE5EBF3),
                 onSurfaceVariant = Color(0xFF536176),
-                surfaceTint = accent,
+                surfaceTint = readablePrimary,
                 outline = Color(0xFF7B899B),
                 outlineVariant = Color(0xFFD1D9E4),
                 error = Color(0xFFB32635),
