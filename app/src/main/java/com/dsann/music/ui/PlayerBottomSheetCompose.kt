@@ -305,7 +305,8 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
     containerHeight: Dp,
     onCollapse: () -> Unit,
     onExpand: () -> Unit,
-    dragModifier: Modifier
+    dragModifier: Modifier,
+    miniPlayerHeight: Dp
 ) {
     val currentSong = uiState.currentSong ?: return
     val isPlaying = uiState.isPlaying
@@ -1404,7 +1405,8 @@ fun PlayerBottomSheetCompose(
                                 containerHeight = containerHeight,
                                 onCollapse = { currentSheetContentState = PlayerSheetState.COLLAPSED },
                                 onExpand = { currentSheetContentState = PlayerSheetState.EXPANDED },
-                                dragModifier = verticalDragModifier
+                                dragModifier = verticalDragModifier,
+                                miniPlayerHeight = miniPlayerHeight
                             )
                         }
                     }
