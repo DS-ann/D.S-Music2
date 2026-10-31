@@ -1518,7 +1518,7 @@ fun PlayerBottomSheetCompose(
                                 // Keep the selected artwork outline on the shared cover;
                                 // a second forced rounded clip made custom shapes disagree
                                 // with the visible mini-player progress.
-                                shape = if (isVideoMode) androidx.compose.foundation.shape.RectangleShape else playerArtworkShape
+                                shape = if (isVideoMode) androidx.compose.ui.graphics.RectangleShape else playerArtworkShape
                                 clip = true
                                 shadowElevation = androidx.compose.ui.util.lerp(normalShadow, 6.dp.toPx(), lyricsT)
                                 alpha = artworkAlpha
