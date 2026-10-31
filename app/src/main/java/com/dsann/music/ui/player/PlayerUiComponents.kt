@@ -31,6 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.StateFlow
 import com.dsann.music.R
 import com.dsann.music.data.lyrics.LyricsResult
 import com.dsann.music.model.SongItem
@@ -287,6 +289,8 @@ internal fun PillChip(
 @Composable
 internal fun WavySliderWithLabels(
     currentPositionProvider: () -> Int,
+    currentPositionFlow: StateFlow<Int>,
+    isPlayerVisible: Boolean,
     duration: Int,
     isPlaying: Boolean,
     onSeekTo: (Int) -> Unit,
@@ -305,7 +309,11 @@ internal fun WavySliderWithLabels(
     var isScrubbing by remember { mutableStateOf(false) }
     var sliderScrubPos by remember { mutableFloatStateOf(0f) }
 
-    val currentPosition = currentPositionProvider().coerceAtLeast(0)
+    val currentPosition = if (isPlayerVisible) {
+        currentPositionFlow.collectAsStateWithLifecycle().value
+    } else {
+        currentPositionProvider()
+    }.coerceAtLeast(0)
     // A missing duration is not a one-millisecond track. Treat progress as unknown/zero
     // until Media3 publishes a valid duration, otherwise any restored position renders full.
     val safeDur = duration.takeIf { it > 0 }?.toFloat()
@@ -348,7 +356,7 @@ internal fun WavySliderWithLabels(
             activeTrackColor = activeColor,
             inactiveTrackColor = contentColor.copy(alpha = if (isDark) 0.08f else 0.06f),
             thumbColor = contentColor,
-            isPlaying = isPlaying,
+            isPlaying = isPlaying && isPlayerVisible,
             trackHeight = thickness,
             thumbRadius = when (scrubberThumbStyle) {
                 "Dot", "Ring" -> 7.dp
@@ -358,7 +366,7 @@ internal fun WavySliderWithLabels(
             thumbStyle = scrubberThumbStyle,
             waveAmplitudeWhenPlaying = if (waveEnabled) 6.dp else 0.dp,
             waveLength = 48.dp,
-            isWaveEligible = waveEnabled,
+            isWaveEligible = waveEnabled && isPlayerVisible,
         )
 
         if (playerTimes != "None") {

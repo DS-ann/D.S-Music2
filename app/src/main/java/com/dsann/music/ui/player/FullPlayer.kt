@@ -47,6 +47,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -92,17 +93,19 @@ import com.dsann.music.data.innertube.YouTubeMusic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 private fun PlayerVisualizer(
     style: String,
     isPlaying: Boolean,
     color: Color,
-    colorMode: String = "Accent"
+    colorMode: String = "Accent",
+    isVisible: Boolean
 ) {
     val phase = remember { Animatable(0f) }
-    LaunchedEffect(style, isPlaying) {
-        if (!isPlaying || style == "Off") {
+    LaunchedEffect(style, isPlaying, isVisible) {
+        if (!isVisible || !isPlaying || style == "Off") {
             phase.snapTo(0f)
         } else {
             while (true) {
@@ -572,6 +575,7 @@ fun FullPlayerScreen(
     context: Context,
     onCollapse: () -> Unit,
     dragModifier: Modifier = Modifier,
+    isPlayerVisible: Boolean,
     modifier: Modifier = Modifier
 ) {
     val isLyricsModeEnabled by viewModel.isLyricsModeEnabled.collectAsStateWithLifecycle()
@@ -581,9 +585,10 @@ fun FullPlayerScreen(
     val lyricsError by viewModel.lyricsError.collectAsStateWithLifecycle()
     val providerResults by viewModel.providerResults.collectAsStateWithLifecycle()
     val selectedProvider by viewModel.selectedProvider.collectAsStateWithLifecycle()
-    val currentPositionState = viewModel.currentPosition.collectAsStateWithLifecycle()
-    val currentPositionProvider: () -> Int = remember(currentPositionState) {
-        { currentPositionState.value }
+    // Do not collect playback position at the player root. This screen remains composed
+    // while collapsed; a root subscription used to recompose the entire hidden player every tick.
+    val currentPositionProvider: () -> Int = remember(viewModel) {
+        { viewModel.currentPosition.value }
     }
     val customizeViewModel: SettingsViewModel =
         androidx.lifecycle.viewmodel.compose.viewModel(viewModelStoreOwner = activity)
@@ -643,6 +648,8 @@ fun FullPlayerScreen(
         visualizerColor = visualizerColor,
         onProviderSelected = { viewModel.selectLyricsProvider(it) },
         currentPositionProvider = currentPositionProvider,
+        currentPositionFlow = viewModel.currentPosition,
+        isPlayerVisible = isPlayerVisible,
         onCollapse = onCollapse,
         onPlayPauseClick = {
             if (uiState.isPlaying) viewModel.pauseAudio() else viewModel.playAudio()
@@ -701,6 +708,8 @@ fun FullPlayer(
     isLyricsLoading: Boolean,
     lyricsError: Throwable?,
     currentPositionProvider: () -> Int,
+    currentPositionFlow: StateFlow<Int>,
+    isPlayerVisible: Boolean,
     onCollapse: () -> Unit,
     onPlayPauseClick: () -> Unit,
     onPreviousClick: () -> Unit,
@@ -1004,7 +1013,8 @@ fun FullPlayer(
                         "Cover" -> Color(uiState.playerBackgroundColor)
                         else -> dynamicAccentColor
                     },
-                    colorMode = visualizerColor
+                    colorMode = visualizerColor,
+                    isVisible = isPlayerVisible
                 )
                 Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 10.dp))
             }
@@ -1178,6 +1188,8 @@ fun FullPlayer(
             // Premium Wavy Seek Bar (Isolated)
             WavySliderWithLabels(
                 currentPositionProvider = currentPositionProvider,
+                currentPositionFlow = currentPositionFlow,
+                isPlayerVisible = isPlayerVisible,
                 duration = uiState.duration,
                 isPlaying = uiState.isPlaying,
                 onSeekTo = onSeekTo,
@@ -1195,6 +1207,19 @@ fun FullPlayer(
 
             Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 16.dp))
 
+            val minimalTransport = playerButtonStyle == "Minimal"
+            val transportShape = when (playerButtonStyle) {
+                "Pill" -> CircleShape
+                "Rounded" -> RoundedCornerShape(18.dp)
+                else -> CircleShape
+            }
+            val sideControlColor = if (minimalTransport) Color.Transparent
+                else contentColor.copy(alpha = if (isDark) 0.08f else 0.06f)
+            val sideIconColor = if (minimalTransport) dynamicAccentColor else contentColor
+            val centerControlColor = if (minimalTransport) Color.Transparent else dynamicAccentColor
+            val centerIconColor = if (minimalTransport) dynamicAccentColor
+                else if (isDark) Color(0xFF1C1B1F) else Color.White
+
             androidx.compose.material3.ButtonGroup(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1205,91 +1230,57 @@ fun FullPlayer(
                 val scope = this
                 customItem(
                     buttonGroupContent = {
-                        val interactionSource = remember { MutableInteractionSource() }
-                        val isPressed by interactionSource.collectIsPressedAsState()
-                        val cornerRadius by animateDpAsState(
-                            targetValue = if (isPressed) 12.dp else 28.dp,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            ),
-                            label = "PrevCorner"
-                        )
                         androidx.compose.material3.Button(
                             onClick = onPreviousClick,
                             modifier = with(scope) {
-                                Modifier
-                                    .animateWidth(interactionSource)
-                                    .weight(1f)
-                                    .height(if (compactLandscape) 52.dp else 76.dp)
+                                Modifier.weight(1f).height(if (compactLandscape) 52.dp else 76.dp)
                             },
-                            interactionSource = interactionSource,
-                            shape = RoundedCornerShape(cornerRadius),
+                            shape = transportShape,
                             colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                containerColor = contentColor.copy(alpha = if (isDark) 0.08f else 0.06f),
-                                contentColor = contentColor
+                                containerColor = sideControlColor,
+                                contentColor = sideIconColor
                             ),
                             contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
                         ) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_skip_previous),
-                                    contentDescription = "Previous Song",
-                                    modifier = Modifier.size(36.dp)
-                                )
-                            }
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_skip_previous),
+                                contentDescription = "Previous Song",
+                                modifier = Modifier.size(36.dp),
+                                tint = sideIconColor
+                            )
                         }
                     },
                     menuContent = {}
                 )
                 customItem(
                     buttonGroupContent = {
-                        val interactionSource = remember { MutableInteractionSource() }
-                        val isPressed by interactionSource.collectIsPressedAsState()
-                        val cornerRadius by animateDpAsState(
-                            targetValue = if (isPressed) 12.dp else 28.dp,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            ),
-                            label = "PlayCorner"
-                        )
                         androidx.compose.material3.Button(
                             onClick = { if (!uiState.isLoading) onPlayPauseClick() },
                             modifier = with(scope) {
-                                Modifier
-                                    .animateWidth(interactionSource)
-                                    .weight(1.2f)
-                                    .height(if (compactLandscape) 52.dp else 76.dp)
+                                Modifier.weight(1.2f).height(if (compactLandscape) 52.dp else 76.dp)
                             },
-                            interactionSource = interactionSource,
-                            shape = RoundedCornerShape(cornerRadius),
+                            shape = transportShape,
                             colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                containerColor = dynamicAccentColor,
-                                contentColor = if (isDark) Color(0xFF1C1B1F) else Color.White
+                                containerColor = centerControlColor,
+                                contentColor = centerIconColor
                             ),
                             contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
                         ) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (uiState.isLoading) {
-                                    androidx.compose.material3.CircularProgressIndicator(
-                                        modifier = Modifier.size(32.dp),
-                                        color = if (isDark) Color(0xFF1C1B1F) else Color.White,
-                                        strokeWidth = 3.dp
-                                    )
-                                } else {
-                                    Icon(
-                                        painter = painterResource(id = if (uiState.isPlaying) R.drawable.ic_pause else R.drawable.ic_play),
-                                        contentDescription = if (uiState.isPlaying) "Pause" else "Play",
-                                        modifier = Modifier.size(42.dp)
-                                    )
-                                }
+                            if (uiState.isLoading) {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.size(32.dp),
+                                    color = centerIconColor,
+                                    strokeWidth = 3.dp
+                                )
+                            } else {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (uiState.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
+                                    ),
+                                    contentDescription = if (uiState.isPlaying) "Pause" else "Play",
+                                    modifier = Modifier.size(42.dp),
+                                    tint = centerIconColor
+                                )
                             }
                         }
                     },
@@ -1297,42 +1288,24 @@ fun FullPlayer(
                 )
                 customItem(
                     buttonGroupContent = {
-                        val interactionSource = remember { MutableInteractionSource() }
-                        val isPressed by interactionSource.collectIsPressedAsState()
-                        val cornerRadius by animateDpAsState(
-                            targetValue = if (isPressed) 12.dp else 28.dp,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            ),
-                            label = "NextCorner"
-                        )
                         androidx.compose.material3.Button(
                             onClick = onNextClick,
                             modifier = with(scope) {
-                                Modifier
-                                    .animateWidth(interactionSource)
-                                    .weight(1f)
-                                    .height(if (compactLandscape) 52.dp else 76.dp)
+                                Modifier.weight(1f).height(if (compactLandscape) 52.dp else 76.dp)
                             },
-                            interactionSource = interactionSource,
-                            shape = RoundedCornerShape(cornerRadius),
+                            shape = transportShape,
                             colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                containerColor = contentColor.copy(alpha = if (isDark) 0.08f else 0.06f),
-                                contentColor = contentColor
+                                containerColor = sideControlColor,
+                                contentColor = sideIconColor
                             ),
                             contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
                         ) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_skip_next),
-                                    contentDescription = "Next Song",
-                                    modifier = Modifier.size(36.dp)
-                                )
-                            }
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_skip_next),
+                                contentDescription = "Next Song",
+                                modifier = Modifier.size(36.dp),
+                                tint = sideIconColor
+                            )
                         }
                     },
                     menuContent = {}
@@ -1389,26 +1362,30 @@ fun FullPlayer(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     content = playerControlsContent
                 )
-                LandscapePlayerDetailsPane(
-                    modifier = Modifier.weight(0.46f).fillMaxHeight(),
-                    syncedLyrics = syncedLyrics,
-                    plainLyrics = plainLyrics,
-                    isLyricsLoading = isLyricsLoading,
-                    lyricsError = lyricsError,
-                    currentSong = uiState.currentSong,
-                    songList = songList,
-                    currentSongIndex = currentSongIndex,
-                    currentPositionProvider = currentPositionProvider,
-                    isPlaying = uiState.isPlaying,
-                    contentColor = contentColor,
-                    secondaryColor = contentSecondary,
-                    accentColor = dynamicAccentColor,
-                    selectedProvider = selectedProvider,
-                    providerResults = providerResults,
-                    onSeekTo = onSeekTo,
-                    onFetchLyrics = onFetchLyrics,
-                    onPlayQueueItem = { index -> viewModel.playSongAtIndex(index) }
-                )
+                if (isPlayerVisible) {
+                    LandscapePlayerDetailsPane(
+                        modifier = Modifier.weight(0.46f).fillMaxHeight(),
+                        syncedLyrics = syncedLyrics,
+                        plainLyrics = plainLyrics,
+                        isLyricsLoading = isLyricsLoading,
+                        lyricsError = lyricsError,
+                        currentSong = uiState.currentSong,
+                        songList = songList,
+                        currentSongIndex = currentSongIndex,
+                        currentPositionProvider = currentPositionProvider,
+                        isPlaying = uiState.isPlaying,
+                        contentColor = contentColor,
+                        secondaryColor = contentSecondary,
+                        accentColor = dynamicAccentColor,
+                        selectedProvider = selectedProvider,
+                        providerResults = providerResults,
+                        onSeekTo = onSeekTo,
+                        onFetchLyrics = onFetchLyrics,
+                        onPlayQueueItem = { index -> viewModel.playSongAtIndex(index) }
+                    )
+                } else {
+                    Spacer(Modifier.weight(0.46f).fillMaxHeight())
+                }
             }
         } else {
             Column(

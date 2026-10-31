@@ -317,6 +317,9 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
 ) {
     val currentSong = uiState.currentSong ?: return
     val isPlaying = uiState.isPlaying
+    val isFullPlayerVisible by remember(playerContentExpansionFraction) {
+        derivedStateOf { playerContentExpansionFraction.value >= 0.5f }
+    }
 
     val miniPlayerZIndex by remember {
         derivedStateOf { if (playerContentExpansionFraction.value < 0.5f) 1f else 0f }
@@ -378,6 +381,7 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
             context = context,
             onCollapse = onCollapse,
             dragModifier = dragModifier,
+            isPlayerVisible = isFullPlayerVisible,
             modifier = Modifier.fillMaxSize()
         )
     }
@@ -1729,7 +1733,7 @@ fun PlayerBottomSheetCompose(
                             MiniPlayerArtworkProgressOverlay(
                                 viewModel = viewModel,
                                 accentColor = baseAccentColor,
-                                expansionFraction = playerContentExpansionFraction.value,
+                                expansionFraction = playerContentExpansionFraction,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -1995,9 +1999,14 @@ private fun MiniPlayerContentInternal(
 private fun MiniPlayerArtworkProgressOverlay(
     viewModel: PlayerSharedViewModel,
     accentColor: Color,
-    expansionFraction: Float,
+    expansionFraction: Animatable<Float, AnimationVector1D>,
     modifier: Modifier = Modifier
 ) {
+    val isMiniLayerVisible by remember(expansionFraction) {
+        derivedStateOf { expansionFraction.value < 0.5f }
+    }
+    if (!isMiniLayerVisible) return
+
     val context = LocalContext.current
     val preferences = remember(context) {
         context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
@@ -2017,10 +2026,10 @@ private fun MiniPlayerArtworkProgressOverlay(
         animationSpec = tween(durationMillis = 350, easing = LinearEasing),
         label = "MiniArtworkProgress"
     )
-    val miniAlpha = (1f - expansionFraction * 2f).coerceIn(0f, 1f)
-
     androidx.compose.foundation.Canvas(
-        modifier = modifier.graphicsLayer { alpha = miniAlpha }
+        modifier = modifier.graphicsLayer {
+            alpha = (1f - expansionFraction.value * 2f).coerceIn(0f, 1f)
+        }
     ) {
         val side = size.minDimension
         if (side <= 0f) return@Canvas
