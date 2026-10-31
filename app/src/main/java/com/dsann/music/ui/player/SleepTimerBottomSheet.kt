@@ -1,5 +1,14 @@
 package com.dsann.music.ui.player
 
+import com.dsann.music.ui.theme.DsmusicCard
+import com.dsann.music.ui.theme.DsmusicSurface
+import com.dsann.music.ui.theme.DsmusicListItem
+import com.dsann.music.ui.theme.DsmusicButton
+import com.dsann.music.ui.theme.DsmusicOutlinedButton
+import com.dsann.music.ui.theme.DsmusicTextButton
+import com.dsann.music.ui.theme.DsmusicIconButton
+import com.dsann.music.ui.theme.DsmusicFilterChip
+import com.dsann.music.ui.theme.DsmusicSwitchControl
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.spring
@@ -129,7 +138,7 @@ fun SleepTimerBottomSheet(
                 enter = fadeIn() + expandVertically(),
                 exit = fadeOut() + shrinkVertically()
             ) {
-                Card(
+                DsmusicCard(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                     ),
@@ -171,7 +180,7 @@ fun SleepTimerBottomSheet(
             }
 
             // Grouped Options using ListItems
-            Card(
+            DsmusicCard(
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
@@ -188,7 +197,7 @@ fun SleepTimerBottomSheet(
                         exit = fadeOut() + shrinkVertically()
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            ListItem(
+                            DsmusicListItem(
                                 leadingContent = {
                                     Box(
                                         modifier = Modifier
@@ -255,7 +264,7 @@ fun SleepTimerBottomSheet(
                     }
 
                     // 2. End of Track Toggle Section
-                    ListItem(
+                    DsmusicListItem(
                         checked = sleepTimerMode == PlayerSharedViewModel.SleepTimerMode.END_OF_SONG,
                         onCheckedChange = { isChecked ->
                             onSetEndOfSong(isChecked)
@@ -278,7 +287,7 @@ fun SleepTimerBottomSheet(
                             )
                         },
                         trailingContent = {
-                            androidx.compose.material3.Switch(
+                            androidx.compose.material3.DsmusicSwitchControl(
                                 checked = sleepTimerMode == PlayerSharedViewModel.SleepTimerMode.END_OF_SONG,
                                 onCheckedChange = null
                             )
@@ -301,7 +310,7 @@ fun SleepTimerBottomSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Cancel button on left
-                Button(
+                DsmusicButton(
                     onClick = {
                         onCancelTimer()
                         sliderValue = 1f
@@ -325,7 +334,7 @@ fun SleepTimerBottomSheet(
                 Spacer(modifier = Modifier.width(2.dp))
 
                 // Custom button on right
-                Button(
+                DsmusicButton(
                     onClick = { showTimePicker = true },
                     shape = RoundedCornerShape(
                         topStart = 4.dp,
@@ -358,7 +367,7 @@ fun SleepTimerBottomSheet(
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
             confirmButton = {
-                TextButton(onClick = {
+                DsmusicTextButton(onClick = {
                     val totalMinutes = state.hour * 60 + state.minute
                     if (totalMinutes > 0) {
                         onStartTimer(totalMinutes)
@@ -369,7 +378,7 @@ fun SleepTimerBottomSheet(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) {
+                DsmusicTextButton(onClick = { showTimePicker = false }) {
                     Text("Cancel")
                 }
             },

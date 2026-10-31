@@ -2,6 +2,15 @@
 
 package com.dsann.music.ui.explore
 
+import com.dsann.music.ui.theme.DsmusicCard
+import com.dsann.music.ui.theme.DsmusicSurface
+import com.dsann.music.ui.theme.DsmusicListItem
+import com.dsann.music.ui.theme.DsmusicButton
+import com.dsann.music.ui.theme.DsmusicOutlinedButton
+import com.dsann.music.ui.theme.DsmusicTextButton
+import com.dsann.music.ui.theme.DsmusicIconButton
+import com.dsann.music.ui.theme.DsmusicFilterChip
+import com.dsann.music.ui.theme.DsmusicSwitchControl
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -196,7 +205,7 @@ fun PlaylistDetailView(
                     )
                 }
                 if (playlistPage.isOwned) {
-                    IconButton(
+                    DsmusicIconButton(
                         onClick = {
                             editTitle = playlistPage.playlist.title
                             editDescription = playlistPage.description.orEmpty()
@@ -209,7 +218,7 @@ fun PlaylistDetailView(
                     ) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit playlist")
                     }
-                    IconButton(
+                    DsmusicIconButton(
                         onClick = { confirmDelete = true },
                         enabled = !deleting,
                         modifier = Modifier
@@ -296,7 +305,7 @@ fun PlaylistDetailView(
                 }
             },
             confirmButton = {
-                TextButton(
+                DsmusicTextButton(
                     enabled = editTitle.isNotBlank() && !saving,
                     onClick = {
                         saving = true
@@ -322,7 +331,7 @@ fun PlaylistDetailView(
                 ) { Text(if (saving) "Saving…" else "Save") }
             },
             dismissButton = {
-                TextButton(enabled = !saving, onClick = { editing = false }) { Text("Cancel") }
+                DsmusicTextButton(enabled = !saving, onClick = { editing = false }) { Text("Cancel") }
             }
         )
     }
@@ -335,7 +344,7 @@ fun PlaylistDetailView(
                 Text("Delete “${playlistPage.playlist.title}” from your YouTube Music library? This cannot be undone.")
             },
             confirmButton = {
-                TextButton(
+                DsmusicTextButton(
                     enabled = !deleting,
                     onClick = {
                         if (!deleting) {
@@ -367,7 +376,7 @@ fun PlaylistDetailView(
                 ) { Text(if (deleting) "Deleting…" else "Delete") }
             },
             dismissButton = {
-                TextButton(
+                DsmusicTextButton(
                     enabled = !deleting,
                     onClick = { confirmDelete = false }
                 ) { Text("Cancel") }
@@ -436,7 +445,7 @@ fun ArtistDetailView(
             // Follow/Subscribe Button
             if (onSubscribeClick != null) {
                 val label = if (isSubscribed) "Subscribed" else "Subscribe"
-                FilledTonalButton(
+                DsmusicButton(
                     onClick = {
                         onSubscribeClick(artistPage.artist.browseId)
                     },
@@ -467,7 +476,7 @@ fun ArtistDetailView(
 
             // Start Radio Button
             if (onStartRadioClick != null) {
-                IconButton(
+                DsmusicIconButton(
                     onClick = {
                         val allSongs = artistPage.sections.flatMap { it.items }
                             .filterIsInstance<SearchItem.Song>().map { it.song }
@@ -487,7 +496,7 @@ fun ArtistDetailView(
             }
 
             // Play All Button
-            IconButton(
+            DsmusicIconButton(
                 onClick = {
                     val allSongs = artistPage.sections.flatMap { it.items }
                         .filterIsInstance<SearchItem.Song>().map { it.song }
@@ -707,7 +716,7 @@ fun AdaptiveDetailContainer(
 
             // Floating Back Button (High-contrast visible)
             Box(modifier = Modifier.statusBarsPadding().padding(start = 16.dp, top = 16.dp)) {
-                IconButton(
+                DsmusicIconButton(
                     onClick = onBack,
                     modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
                     shape = IconButtonDefaults.filledShape
@@ -847,7 +856,7 @@ fun AdaptiveDetailContainer(
             Row(
                 modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
-                IconButton(
+                DsmusicIconButton(
                     onClick = onBack,
                     modifier = Modifier.background(Color.Black.copy(alpha = 0.45f), CircleShape)
                 ) {
@@ -918,7 +927,7 @@ fun ArtistTopSongItem(
                 maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
-        IconButton(onClick = onMenuClick) {
+        DsmusicIconButton(onClick = onMenuClick) {
             Icon(Icons.Default.MoreVert, "More", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -1000,7 +1009,7 @@ fun ExpressiveConnectedButtonGroup(
                     ),
                     label = "ShuffleCorner"
                 )
-                androidx.compose.material3.Button(
+                androidx.compose.material3.DsmusicButton(
                     onClick = onShuffleClick,
                     modifier = with(scope) {
                         Modifier
@@ -1046,7 +1055,7 @@ fun ExpressiveConnectedButtonGroup(
                     ),
                     label = "RadioCorner"
                 )
-                androidx.compose.material3.Button(
+                androidx.compose.material3.DsmusicButton(
                     onClick = onRadioClick,
                     modifier = with(scope) {
                         Modifier

@@ -2,6 +2,15 @@
 
 package com.dsann.music.ui
 
+import com.dsann.music.ui.theme.DsmusicCard
+import com.dsann.music.ui.theme.DsmusicSurface
+import com.dsann.music.ui.theme.DsmusicListItem
+import com.dsann.music.ui.theme.DsmusicButton
+import com.dsann.music.ui.theme.DsmusicOutlinedButton
+import com.dsann.music.ui.theme.DsmusicTextButton
+import com.dsann.music.ui.theme.DsmusicIconButton
+import com.dsann.music.ui.theme.DsmusicFilterChip
+import com.dsann.music.ui.theme.DsmusicSwitchControl
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.ContextWrapper
@@ -251,7 +260,7 @@ fun BottomSheetScaffoldContent(
         )
     }
 
-    Surface(
+    DsmusicSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge, // Expressive corner radius
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -459,7 +468,7 @@ fun LocalPlaylistPickerDialog(
                     .heightIn(max = 300.dp)
             ) {
                 // Button to create new playlist
-                Button(
+                DsmusicButton(
                     onClick = onCreateNew,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -489,7 +498,7 @@ fun LocalPlaylistPickerDialog(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         items(playlists) { playlist ->
-                            Surface(
+                            DsmusicSurface(
                                 onClick = { onPlaylistSelected(playlist) },
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp),
@@ -520,7 +529,7 @@ fun LocalPlaylistPickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
+            DsmusicTextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         }
@@ -552,7 +561,7 @@ fun CreateLocalPlaylistDialog(
             )
         },
         confirmButton = {
-            Button(
+            DsmusicButton(
                 onClick = {
                     if (name.isNotBlank()) {
                         onConfirm(name)
@@ -564,7 +573,7 @@ fun CreateLocalPlaylistDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            DsmusicTextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         }
@@ -580,7 +589,7 @@ fun HeaderSection(
 ) {
     if (!isLandscape) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Surface(
+            DsmusicSurface(
                 shape = MaterialTheme.shapes.large,
                 color = MaterialTheme.colorScheme.surfaceVariant
             ) {
@@ -615,7 +624,7 @@ fun HeaderSection(
                 )
             }
 
-            IconButton(
+            DsmusicIconButton(
                 onClick = onEdit,
                 modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
             ) {
@@ -628,7 +637,7 @@ fun HeaderSection(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(contentAlignment = Alignment.BottomEnd) {
-                Surface(
+                DsmusicSurface(
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     tonalElevation = 2.dp
@@ -645,7 +654,7 @@ fun HeaderSection(
                     }
                 }
                 
-                IconButton(
+                DsmusicIconButton(
                     onClick = onEdit,
                     modifier = Modifier
                         .size(32.dp)

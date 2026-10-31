@@ -1,5 +1,14 @@
 package com.dsann.music.ui
 
+import com.dsann.music.ui.theme.DsmusicCard
+import com.dsann.music.ui.theme.DsmusicSurface
+import com.dsann.music.ui.theme.DsmusicListItem
+import com.dsann.music.ui.theme.DsmusicButton
+import com.dsann.music.ui.theme.DsmusicOutlinedButton
+import com.dsann.music.ui.theme.DsmusicTextButton
+import com.dsann.music.ui.theme.DsmusicIconButton
+import com.dsann.music.ui.theme.DsmusicFilterChip
+import com.dsann.music.ui.theme.DsmusicSwitchControl
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -52,7 +61,7 @@ fun AudioFormatChoiceDialogHost() {
                         style = MaterialTheme.typography.bodyMedium
                     )
                     pending.options.forEach { option ->
-                        TextButton(
+                        DsmusicTextButton(
                             onClick = { AudioFormatSelectionCoordinator.select(pending, option) },
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -85,7 +94,7 @@ fun AudioFormatChoiceDialogHost() {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { AudioFormatSelectionCoordinator.cancel(pending) }) {
+                DsmusicTextButton(onClick = { AudioFormatSelectionCoordinator.cancel(pending) }) {
                     Text("Cancel")
                 }
             }

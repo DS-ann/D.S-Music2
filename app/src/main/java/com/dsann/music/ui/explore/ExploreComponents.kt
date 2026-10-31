@@ -2,6 +2,15 @@
  
 package com.dsann.music.ui.explore
 
+import com.dsann.music.ui.theme.DsmusicCard
+import com.dsann.music.ui.theme.DsmusicSurface
+import com.dsann.music.ui.theme.DsmusicListItem
+import com.dsann.music.ui.theme.DsmusicButton
+import com.dsann.music.ui.theme.DsmusicOutlinedButton
+import com.dsann.music.ui.theme.DsmusicTextButton
+import com.dsann.music.ui.theme.DsmusicIconButton
+import com.dsann.music.ui.theme.DsmusicFilterChip
+import com.dsann.music.ui.theme.DsmusicSwitchControl
 import com.dsann.music.SpatialFlowApplication
  
 import androidx.compose.animation.animateContentSize
@@ -447,7 +456,7 @@ fun SearchResultItem(
             when (item) {
                 is SearchItem.Song -> {
                     if (onSongMenuClick != null) {
-                        IconButton(
+                        DsmusicIconButton(
                             onClick = { onSongMenuClick(item.song) },
                             modifier = Modifier.size(36.dp)
                         ) {
@@ -580,7 +589,7 @@ fun SearchTopResultCard(
             }
         }
         if (item is SearchItem.Song && onSongMenuClick != null) {
-            IconButton(onClick = { onSongMenuClick(item.song) }) {
+            DsmusicIconButton(onClick = { onSongMenuClick(item.song) }) {
                 Icon(Icons.Default.MoreVert, "More options")
             }
         } else {
@@ -756,7 +765,7 @@ fun HomeSectionRow(
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (hasSongsOnly || section.title.contains("daily discover", ignoreCase = true)) {
-                    OutlinedButton(
+                    DsmusicOutlinedButton(
                         onClick = {
                             val songs = section.items.filterIsInstance<SearchItem.Song>().map { it.song }
                             if (songs.isNotEmpty()) onSongClick(songs.first())
@@ -774,7 +783,7 @@ fun HomeSectionRow(
                 
                 if (section.browseEndpoint != null) {
                     Spacer(modifier = Modifier.width(8.dp))
-                    IconButton(
+                    DsmusicIconButton(
                         onClick = { onSectionClick(section.browseEndpoint, section.params, section.title) },
                         modifier = Modifier.size(32.dp)
                     ) {
@@ -1372,7 +1381,7 @@ fun HomeSongListItem(
                 overflow = TextOverflow.Ellipsis
             )
         }
-        IconButton(onClick = onMenuClick) {
+        DsmusicIconButton(onClick = onMenuClick) {
             Icon(Icons.Default.MoreVert, "More", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -1497,7 +1506,7 @@ fun OnlineSongBottomSheet(
                     )
                 }
 
-                IconButton(
+                DsmusicIconButton(
                     onClick = {
                         val target = !isFavorite
                         favoritesManager.setFavorite(song.videoId.hashCode().toLong(), target)
@@ -1515,7 +1524,7 @@ fun OnlineSongBottomSheet(
                     )
                 }
 
-                IconButton(onClick = onDismissRequest) {
+                DsmusicIconButton(onClick = onDismissRequest) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",

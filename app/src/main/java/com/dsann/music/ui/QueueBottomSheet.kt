@@ -1,5 +1,14 @@
 package com.dsann.music.ui
 
+import com.dsann.music.ui.theme.DsmusicCard
+import com.dsann.music.ui.theme.DsmusicSurface
+import com.dsann.music.ui.theme.DsmusicListItem
+import com.dsann.music.ui.theme.DsmusicButton
+import com.dsann.music.ui.theme.DsmusicOutlinedButton
+import com.dsann.music.ui.theme.DsmusicTextButton
+import com.dsann.music.ui.theme.DsmusicIconButton
+import com.dsann.music.ui.theme.DsmusicFilterChip
+import com.dsann.music.ui.theme.DsmusicSwitchControl
 import android.annotation.SuppressLint
 import android.content.res.Configuration
 import android.os.Bundle
@@ -149,7 +158,7 @@ fun QueueBottomSheetContent(
         }
     }
 
-    Surface(
+    DsmusicSurface(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (isLandscape) Modifier.fillMaxHeight(0.9f) else Modifier.wrapContentHeight()),
@@ -447,7 +456,7 @@ fun QueueListItem(
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
-    ListItem(
+    DsmusicListItem(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         leadingContent = {
@@ -504,7 +513,7 @@ fun QueueListItem(
         trailingContent = {
             if (showReorderControls) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { showMenu = true }) {
+                    DsmusicIconButton(onClick = { showMenu = true }) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
                             contentDescription = "Options",
@@ -580,7 +589,7 @@ fun QueueSidebarItem(
     icon: @Composable () -> Unit,
     onClick: () -> Unit
 ) {
-    Surface(
+    DsmusicSurface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f) else Color.Transparent,

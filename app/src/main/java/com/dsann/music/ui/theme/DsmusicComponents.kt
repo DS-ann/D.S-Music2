@@ -61,6 +61,7 @@ fun DsmusicSurface(
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     tonalElevation: Any? = null,
     shadowElevation: Any? = null,
+    border: Any? = null,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
