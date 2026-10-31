@@ -2517,7 +2517,7 @@ private fun OnlineAlbumCard(
                         painter = coil.compose.rememberAsyncImagePainter(
                             model = ImageRequest.Builder(LocalContext.current)
                                 .data(album.thumbnailUrl)
-                                .crossfade(true)
+                                .crossfade(!SpatialFlowApplication.isLowRamDevice)
                                 .build()
                         ),
                         contentDescription = null,
@@ -2680,7 +2680,7 @@ private fun OnlineArtistCard(
                     painter = coil.compose.rememberAsyncImagePainter(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(artist.thumbnailUrl)
-                            .crossfade(true)
+                            .crossfade(!SpatialFlowApplication.isLowRamDevice)
                             .build()
                     ),
                     contentDescription = null,
