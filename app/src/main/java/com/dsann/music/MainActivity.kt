@@ -3,6 +3,7 @@
 package com.dsann.music
 
 import android.Manifest
+import android.app.AlertDialog
 import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.content.ComponentName
@@ -30,8 +31,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,13 +49,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -65,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.layout
@@ -99,6 +99,8 @@ import com.dsann.music.ui.explore.ExploreScreen
 import com.dsann.music.ui.explore.GoogleSignInScreen
 import com.dsann.music.ui.library.LibraryScreen
 import com.dsann.music.ui.library.LocalMusicScreen
+import com.dsann.music.ui.theme.DsmusicNavigationBar
+import com.dsann.music.ui.theme.DsmusicNavigationDestination
 import com.dsann.music.ui.theme.SpatialFlowTheme
 import com.dsann.music.ui.theme.observeKey
 import com.dsann.music.ui.onboarding.OnboardingScreen
@@ -108,8 +110,6 @@ import com.dsann.music.update.UpdateManager
 import com.dsann.music.update.VersionUtils
 import com.dsann.music.viewmodel.ExploreViewModel
 import com.dsann.music.viewmodel.PlayerSharedViewModel
-import com.google.android.material.color.DynamicColors
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -171,7 +171,6 @@ class MainActivity : AppCompatActivity() {
             System.currentTimeMillis() - splashStartTime < SPLASH_DURATION
         }
 
-        DynamicColors.applyToActivityIfAvailable(this)
         super.onCreate(savedInstanceState)
 
         setupSystemBars()
@@ -256,7 +255,17 @@ class MainActivity : AppCompatActivity() {
                         val navElevation by animateDpAsState(if (dynamicNavStyle) 8.dp else 3.dp, label = "navElevation")
                         val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-                        NavigationBar(
+                        DsmusicNavigationBar(
+                            destinations = listOf(
+                                DsmusicNavigationDestination("explore", "Explore", R.drawable.ic_explore),
+                                DsmusicNavigationDestination("library", "Library", R.drawable.ic_library_music),
+                                DsmusicNavigationDestination("local_music", "Local Music", R.drawable.ic_music_note),
+                                DsmusicNavigationDestination("settings", "Settings", R.drawable.ic_settings)
+                            ),
+                            currentRoute = currentDestination?.route,
+                            labelsMode = navLabelsMode,
+                            iconSize = navIconSize,
+                            bottomInset = bottomPadding,
                             modifier = Modifier
                                 .graphicsLayer {
                                     val translationY = animatedBaseTranslationState.value
@@ -266,42 +275,20 @@ class MainActivity : AppCompatActivity() {
                                 }
                                 .height(navBarHeight + bottomPadding)
                                 .onGloballyPositioned { coordinates ->
-                                    val height = coordinates.size.height.toFloat()
-                                    playerViewModel.setBottomNavHeight(height)
+                                    playerViewModel.setBottomNavHeight(coordinates.size.height.toFloat())
                                 },
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            tonalElevation = navElevation
-                        ) {
-                            val items = listOf(
-                                Triple("explore", "Explore", R.drawable.ic_explore),
-                                Triple("library", "Library", R.drawable.ic_library_music),
-                                Triple("local_music", "Local Music", R.drawable.ic_music_note),
-                                Triple("settings", "Settings", R.drawable.ic_settings)
-                            )
-                             items.forEach { (route, label, iconResId) ->
-                                val selected = currentDestination?.route == route
-                                NavigationBarItem(
-                                    selected = selected,
-                                    onClick = {
-                                        if (!selected) {
-                                            currentNavController.navigate(route) {
-                                                popUpTo(currentNavController.graph.findStartDestination().id) {
-                                                    saveState = true
-                                                }
-                                                launchSingleTop = true
-                                                restoreState = true
-                                            }
+                            onNavigate = { route ->
+                                if (currentDestination?.route != route) {
+                                    currentNavController.navigate(route) {
+                                        popUpTo(currentNavController.graph.findStartDestination().id) {
+                                            saveState = true
                                         }
-                                    },
-                                    icon = { Icon(painter = painterResource(id = iconResId), contentDescription = label, modifier = Modifier.size(navIconSize)) },
-                                    label = if (navLabelsMode == "Never") null else { { Text(label) } },
-                                    alwaysShowLabel = navLabelsMode == "Always"
-                                )
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
                             }
-                        }
-                        }
-                    }
-                ) { paddingValues ->
+                        )                ) { paddingValues ->
                     val navBackStackEntry by currentNavController.currentBackStackEntryAsState()
                     val currentDestination = navBackStackEntry?.destination
                     val currentRoute = currentDestination?.route
@@ -590,18 +577,19 @@ class MainActivity : AppCompatActivity() {
                                                 .padding(vertical = if (navLabelsMode == "Never") 12.dp else 8.dp),
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
-                                            Icon(
+                                            Image(
                                                 painter = painterResource(id = iconResId),
                                                 contentDescription = label,
-                                                tint = tint,
+                                                colorFilter = ColorFilter.tint(tint),
                                                 modifier = Modifier.size(railIconSize)
                                             )
                                             if (navLabelsMode == "Always" || (navLabelsMode == "Selected" && selected)) {
-                                                Text(
+                                                BasicText(
                                                     text = label,
-                                                    color = tint,
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                        color = tint,
+                                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                                    ),
                                                     maxLines = 1,
                                                     modifier = Modifier.padding(top = 2.dp)
                                                 )
@@ -744,7 +732,7 @@ class MainActivity : AppCompatActivity() {
             message.append("What's New:\n").append(displayLog)
         }
 
-        MaterialAlertDialogBuilder(this)
+        AlertDialog.Builder(this)
             .setTitle("Update Available")
             .setMessage(message.toString())
             .setCancelable(true)
