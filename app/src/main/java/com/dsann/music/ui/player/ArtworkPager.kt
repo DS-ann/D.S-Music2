@@ -1,6 +1,7 @@
 package com.dsann.music.ui.player
 
 import android.content.Context
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,13 +29,17 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import java.io.File
 import coil.compose.AsyncImage
+import coil.imageLoader
+import coil.size.Precision
 import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
 import com.dsann.music.R
 import com.dsann.music.model.SongItem
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import com.dsann.music.ui.theme.observeKey
+import kotlin.math.roundToInt
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ArtworkPager(
     viewModel: PlayerSharedViewModel,
@@ -53,6 +58,40 @@ fun ArtworkPager(
         .observeKey("player_layout", "Standard")
     val artworkShape = remember(artworkShapeName, playerLayout) {
         DsmCoverShapes.forPlayerLayout(playerLayout, artworkShapeName)
+    }
+
+    // Decode covers close to their display size. Full-resolution artwork wastes memory
+    // bandwidth and can cause avoidable bitmap pressure while the pager is moving.
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val artworkTargetSizePx = remember(
+        configuration.screenWidthDp,
+        configuration.screenHeightDp,
+        density.density
+    ) {
+        (minOf(configuration.screenWidthDp, configuration.screenHeightDp) * density.density)
+            .roundToInt()
+            .coerceIn(256, 1024)
+    }
+
+    // Keep the previous and next covers warm in Coil's existing memory/disk caches.
+    val neighborArtworkUrls = remember(songList, currentSongIndex) {
+        listOf(currentSongIndex - 1, currentSongIndex + 1)
+            .mapNotNull { songList.getOrNull(it) }
+            .distinctBy { it.id }
+            .mapNotNull(::resolveArtworkUrl)
+    }
+    LaunchedEffect(neighborArtworkUrls, artworkTargetSizePx) {
+        val loader = context.imageLoader
+        neighborArtworkUrls.forEach { url ->
+            val request = ImageRequest.Builder(context)
+                .data(url.toUri())
+                .size(artworkTargetSizePx, artworkTargetSizePx)
+                .precision(Precision.INEXACT)
+                .crossfade(false)
+                .build()
+            loader.enqueue(request)
+        }
     }
 
     val pagerState = rememberPagerState(
@@ -83,27 +122,21 @@ fun ArtworkPager(
             state = pagerState,
             key = { page -> "${songList.getOrNull(page)?.id ?: currentSong.id}:$page" },
             userScrollEnabled = userScrollEnabled,
+            beyondViewportPageCount = 1,
             modifier = Modifier.fillMaxSize().clip(artworkShape)
         ) { page ->
             val song = if (page == currentSongIndex) currentSong else (songList.getOrNull(page) ?: currentSong)
             val videoId = song.videoId
             val artworkUrl = remember(song.id, song.thumbnailUrl, song.albumId, song.path, videoId) {
-                val thumbnail = song.thumbnailUrl?.takeIf { it.isNotBlank() }
-                when {
-                    thumbnail != null -> SongItem.enhanceThumbnailUrl(thumbnail)
-                    !videoId.isNullOrBlank() -> "https://img.youtube.com/vi/$videoId/hqdefault.jpg"
-                    song.albumId > 0L -> song.getAlbumArtUri()?.toString()
-                    !song.path.isNullOrBlank() && File(song.path!!).isFile ->
-                        song.getAlbumArtUri()?.toString()
-                    else -> null
-                }
+                resolveArtworkUrl(song)
             }
-            val imageRequest = remember(context, artworkUrl) {
+            val imageRequest = remember(context, artworkUrl, artworkTargetSizePx) {
                 artworkUrl?.let {
                     ImageRequest.Builder(context)
                         .data(it.toUri())
-                        .crossfade(true)
-                        .precision(coil.size.Precision.EXACT)
+                        .size(artworkTargetSizePx, artworkTargetSizePx)
+                        .precision(Precision.INEXACT)
+                        .crossfade(false)
                         .build()
                 }
             }
@@ -233,5 +266,18 @@ fun ArtworkPager(
                 }
             }
         }
+    }
+}
+
+
+private fun resolveArtworkUrl(song: SongItem): String? {
+    val thumbnail = song.thumbnailUrl?.takeIf { it.isNotBlank() }
+    val videoId = song.videoId
+    return when {
+        thumbnail != null -> SongItem.enhanceThumbnailUrl(thumbnail)
+        !videoId.isNullOrBlank() -> "https://img.youtube.com/vi/$videoId/hqdefault.jpg"
+        song.albumId > 0L -> song.getAlbumArtUri()?.toString()
+        !song.path.isNullOrBlank() && File(song.path!!).isFile -> song.getAlbumArtUri()?.toString()
+        else -> null
     }
 }

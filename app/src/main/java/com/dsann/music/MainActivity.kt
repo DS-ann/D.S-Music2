@@ -81,7 +81,6 @@ import androidx.core.content.edit
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
@@ -220,20 +219,6 @@ class MainActivity : AppCompatActivity() {
 
                 val isPlayerExpanded by playerViewModel.isPlayerExpanded.collectAsStateWithLifecycle()
 
-    // Hide the Android navigation bar as well as the app's own bottom bar while the
-    // full player is expanded. The system bar can still be revealed temporarily by swipe.
-    LaunchedEffect(isPlayerExpanded) {
-        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-        if (isPlayerExpanded) {
-            insetsController.systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            insetsController.hide(WindowInsetsCompat.Type.navigationBars())
-        } else {
-            insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
-            insetsController.show(WindowInsetsCompat.Type.navigationBars())
-        }
-    }
-
                 var editingSong by remember { mutableStateOf<SongItem?>(null) }
                 val configuration = androidx.compose.ui.platform.LocalConfiguration.current
                 // Match Prism's wide-window breakpoint: phones in landscape and tablets use a side rail.
@@ -246,7 +231,7 @@ class MainActivity : AppCompatActivity() {
                         val navBackStackEntry by currentNavController.currentBackStackEntryAsState()
                         val currentDestination = navBackStackEntry?.destination
 
-                        val showBottomBar = currentDestination?.route in listOf("explore", "library", "local_music", "settings")
+                        val showBottomBar = !isPlayerExpanded && currentDestination?.route in listOf("explore", "library", "local_music", "settings")
 
                         val density = LocalDensity.current
                         val navigationBarsHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
@@ -631,10 +616,14 @@ class MainActivity : AppCompatActivity() {
                             activity = this@MainActivity,
                             viewModel = playerViewModel,
                             modifier = Modifier.layout { measurable, constraints ->
-                                val expansion = playerExpansionFractionState.value.coerceIn(0f, 1f)
-                                val startInsetPx = (railInset.toPx() * (1f - expansion))
-                                    .roundToInt()
-                                    .coerceAtLeast(0)
+                                // Phone layouts have no navigation rail, so their player sheet
+                                // must not subscribe to the 60 Hz expansion value or remeasure every frame.
+                                val startInsetPx = if (useNavigationRail && railInset > 0.dp) {
+                                    val expansion = playerExpansionFractionState.value.coerceIn(0f, 1f)
+                                    (railInset.toPx() * (1f - expansion)).roundToInt().coerceAtLeast(0)
+                                } else {
+                                    0
+                                }
                                 val childMaxWidth = (constraints.maxWidth - startInsetPx).coerceAtLeast(0)
                                 val childMinWidth = (constraints.minWidth - startInsetPx)
                                     .coerceAtLeast(0)

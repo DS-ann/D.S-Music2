@@ -67,7 +67,7 @@ fun WavyMusicSlider(
     val isPressed by interactionSource.collectIsPressedAsState()
     val isInteracting = isDragged || isPressed
 
-    val thumbInteractionFraction by animateFloatAsState(
+    val thumbInteractionFractionState = animateFloatAsState(
         targetValue = if (isInteracting) 1f else 0f,
         animationSpec = tween(250, easing = FastOutSlowInEasing),
         label = "ThumbInteractionAnim"
@@ -83,7 +83,6 @@ fun WavyMusicSlider(
 
     // Infinitely shifting phase when active
     val phaseShiftAnim = remember { Animatable(0f) }
-    val phaseShift = phaseShiftAnim.value
 
 
 
@@ -121,7 +120,7 @@ fun WavyMusicSlider(
         else ((clampedValue - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
 
     // Smoothly animate seeking/playback progress using M3 Expressive Motion physics
-    val animatedNormalizedValue by animateFloatAsState(
+    val animatedNormalizedValueState = animateFloatAsState(
         targetValue = normalizedValue,
         animationSpec = if (normalizedValue == 0f) {
             // Material 3 Slow Spatial spring (Stiffness: 200f, Damping: 0.75f) for hero song transitions
@@ -138,7 +137,6 @@ fun WavyMusicSlider(
         },
         label = "ProgressValueAnim"
     )
-    val renderNormalizedValue = if (isInteracting) normalizedValue else animatedNormalizedValue
 
     val safeSemanticsStep = semanticsProgressStep.coerceIn(0.005f, 0.25f)
     val semanticNormalizedValue = remember(normalizedValue, safeSemanticsStep) {
@@ -199,6 +197,15 @@ fun WavyMusicSlider(
                     val taperDistancePx = 64.dp.toPx()
 
                     onDrawWithContent {
+                        // Read animated state while drawing, not during composition. Animation
+                        // frames now invalidate only this canvas instead of rebuilding the slider UI.
+                        val renderNormalizedValue = if (isInteracting) {
+                            normalizedValue
+                        } else {
+                            animatedNormalizedValueState.value
+                        }
+                        val thumbInteractionFraction = thumbInteractionFractionState.value
+                        val phaseShift = phaseShiftAnim.value
                         val currentProgressPxEndVisual = localTrackStart + localTrackWidth * renderNormalizedValue
                         
                         // 1. Draw Inactive Track

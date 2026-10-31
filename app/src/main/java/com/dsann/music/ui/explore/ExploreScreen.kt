@@ -501,8 +501,16 @@ fun ExploreScreen(
             Box(modifier = Modifier.fillMaxSize().nestedScroll(nestedScrollConnection)) {
                 SharedTransitionLayout {
                     CompositionLocalProvider(LocalSharedTransitionScope provides this) {
-                        val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-                        val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+                        // Keep full-page transitions responsive; the previous default motion
+                        // scheme made heavy list/detail swaps feel unnecessarily slow.
+                        val spatialSpec = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(
+                            durationMillis = 190,
+                            easing = androidx.compose.animation.core.FastOutSlowInEasing
+                        )
+                        val effectsSpec = androidx.compose.animation.core.tween<Float>(
+                            durationMillis = 150,
+                            easing = androidx.compose.animation.core.LinearEasing
+                        )
 
                         AnimatedContent(
                             targetState = currentScreen,

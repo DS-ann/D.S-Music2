@@ -2073,7 +2073,7 @@ private fun MiniPlayerArtworkProgressOverlay(
     } else {
         0f
     }
-    val progress by animateFloatAsState(
+    val progressState = animateFloatAsState(
         targetValue = targetProgress,
         animationSpec = tween(durationMillis = 350, easing = LinearEasing),
         label = "MiniArtworkProgress"
@@ -2085,6 +2085,8 @@ private fun MiniPlayerArtworkProgressOverlay(
     ) {
         val side = size.minDimension
         if (side <= 0f) return@Canvas
+        // Animate the canvas without recomposing the always-visible mini-player layer.
+        val progress = progressState.value
 
         when (style) {
             "Ring" -> {
