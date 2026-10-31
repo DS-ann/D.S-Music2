@@ -83,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dsann.music.MainActivity
+import com.dsann.music.SpatialFlowApplication
 import com.dsann.music.ui.SettingsViewModel
 import com.dsann.music.R
 import com.dsann.music.data.lyrics.LyricLine
@@ -104,6 +105,7 @@ private fun PlayerVisualizer(
     isVisible: Boolean
 ) {
     val phase = remember { Animatable(0f) }
+    val lowRamProfile = SpatialFlowApplication.isLowRamDevice
     LaunchedEffect(style, isPlaying, isVisible) {
         if (!isVisible || !isPlaying || style == "Off") {
             phase.snapTo(0f)
@@ -138,7 +140,7 @@ private fun PlayerVisualizer(
         when (style) {
             // Keep the compact bar style as-is; it is already the strongest visual.
             "Bars" -> {
-                val count = 32
+                val count = if (lowRamProfile) 20 else 32
                 val gap = 3.dp.toPx()
                 val barWidth = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
                 repeat(count) { index ->
@@ -167,8 +169,8 @@ private fun PlayerVisualizer(
                     strokeWidth = 1.dp.toPx()
                 )
 
-                val points = 64
-                repeat(2) { layer ->
+                val points = if (lowRamProfile) 32 else 64
+                repeat(if (lowRamProfile) 1 else 2) { layer ->
                     val path = androidx.compose.ui.graphics.Path()
                     repeat(points + 1) { index ->
                         val fraction = index / points.toFloat()
@@ -192,7 +194,7 @@ private fun PlayerVisualizer(
                     drawPath(
                         path = path,
                         brush = Brush.horizontalGradient(
-                            colors = List(13) { index ->
+                            colors = List(if (lowRamProfile) 7 else 13) { index ->
                                 spectrumColor(index / 12f).copy(
                                     alpha = if (layer == 0) 0.92f else 0.30f
                                 )
@@ -216,7 +218,7 @@ private fun PlayerVisualizer(
                     style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
                 )
 
-                val tickCount = 36
+                val tickCount = if (lowRamProfile) 22 else 36
                 repeat(tickCount) { index ->
                     val angle = index * (6.2831855f / tickCount) - 1.5707963f
                     val level = kotlin.math.abs(
