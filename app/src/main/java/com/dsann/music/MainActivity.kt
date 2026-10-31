@@ -56,6 +56,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
@@ -66,6 +67,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -90,6 +92,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.dsann.music.model.SongItem
 import com.dsann.music.service.AudioPlaybackService
+import com.dsann.music.ui.CachedRootTabLifecycle
 import com.dsann.music.ui.AudioFormatChoiceDialogHost
 import com.dsann.music.ui.PlayerBottomSheetCompose
 import com.dsann.music.ui.SettingsScreenContent
@@ -212,6 +215,8 @@ class MainActivity : AppCompatActivity() {
                 val currentNavController = rememberNavController()
                 val rootTabRoutes = remember { setOf("explore", "search", "library", "local_music", "settings") }
                 val rootTabStateHolder = rememberSaveableStateHolder()
+                // Mount each root page only on its first visit, then keep the whole page cached.
+                val visitedRootTabs = remember { mutableStateListOf<String>() }
                 var lastRootTab by remember { mutableStateOf("explore") }
                 LaunchedEffect(currentNavController) {
                     navController = currentNavController
@@ -313,6 +318,9 @@ class MainActivity : AppCompatActivity() {
                     LaunchedEffect(currentRoute) {
                         if (currentRoute != null && currentRoute in rootTabRoutes) {
                             lastRootTab = currentRoute
+                            if (currentRoute !in visitedRootTabs) {
+                                visitedRootTabs.add(currentRoute)
+                            }
                         }
                     }
                     val activeCachedRootTab = when {
@@ -377,12 +385,29 @@ class MainActivity : AppCompatActivity() {
                                     bottom = finalPadding.coerceAtLeast(0.dp)
                                 )
                         ) {
-                            // Compose only the foreground tab. Inactive screens used to remain
-                            // alive at 1dp/alpha=0, so their effects, animations and non-lifecycle
-                            // work continued consuming CPU while the user was elsewhere.
-                            if (activeCachedRootTab != null) {
-                                rootTabStateHolder.SaveableStateProvider(activeCachedRootTab) {
-                                    when (activeCachedRootTab) {
+                            // Each visited tab stays composed behind the active page. Its local
+                            // lifecycle is lowered to CREATED so Flow collectors/BackHandlers stop
+                            // while scroll positions, list state and nested UI remain warm.
+                            visitedRootTabs.forEach { cachedRoute ->
+                                val tabIsActive = cachedRoute == activeCachedRootTab
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .graphicsLayer { alpha = if (tabIsActive) 1f else 0f }
+                                        .zIndex(if (tabIsActive) 1f else 0f)
+                                        .pointerInput(tabIsActive) {
+                                            if (!tabIsActive) {
+                                                awaitPointerEventScope {
+                                                    while (true) {
+                                                        awaitPointerEvent().changes.forEach { it.consume() }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                ) {
+                                    rootTabStateHolder.SaveableStateProvider(cachedRoute) {
+                                        CachedRootTabLifecycle(active = tabIsActive) {
+                                            when (cachedRoute) {
                                         "explore" -> ExploreScreen(
                                             viewModel = exploreViewModel,
                                             playerSharedViewModel = playerViewModel,
@@ -436,8 +461,10 @@ class MainActivity : AppCompatActivity() {
                                                 }
                                             }
                                         )
-                                        "local_music" -> LocalMusicScreen(viewModel = playerViewModel)
-                                        "settings" -> SettingsScreenContent()
+                                                "local_music" -> LocalMusicScreen(viewModel = playerViewModel)
+                                                "settings" -> SettingsScreenContent()
+                                            }
+                                        }
                                     }
                                 }
                             }

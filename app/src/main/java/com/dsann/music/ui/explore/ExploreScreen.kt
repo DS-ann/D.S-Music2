@@ -1,5 +1,6 @@
 package com.dsann.music.ui.explore
 
+import com.dsann.music.ui.LocalRootTabActive
 import com.dsann.music.ui.theme.DsmusicCard
 import com.dsann.music.ui.theme.DsmusicSurface
 import com.dsann.music.ui.theme.DsmusicListItem
@@ -247,7 +248,9 @@ fun ExploreScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
+    val rootTabActive = LocalRootTabActive.current
+    LaunchedEffect(rootTabActive) {
+        if (!rootTabActive) return@LaunchedEffect
         viewModel.playbackTriggerEvent.collect {
             val song = viewModel.currentOnlineSong.value
             if (song != null) {
@@ -287,7 +290,8 @@ fun ExploreScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(rootTabActive) {
+        if (!rootTabActive) return@LaunchedEffect
         playerSharedViewModel.currentSongIndex.collect { idx ->
             if (idx >= 0) {
                 val queue = viewModel.onlineQueue.value

@@ -4,6 +4,7 @@
 
 package com.dsann.music.ui.library
 
+import com.dsann.music.ui.LocalRootTabActive
 import com.dsann.music.ui.theme.DsmusicCard
 import com.dsann.music.ui.theme.DsmusicSurface
 import com.dsann.music.ui.theme.DsmusicListItem
@@ -281,9 +282,9 @@ fun LibraryScreen(
         }
     }
 
-    // Observe only download completion here. Collecting the complete progress map as Compose
-    // state made every progress tick recompose the entire Library screen.
-    LaunchedEffect(activeTab) {
+    // Observe download completion only while this root tab is active.
+    LaunchedEffect(activeTab, LocalRootTabActive.current) {
+        if (!LocalRootTabActive.current) return@LaunchedEffect
         if (activeTab == "Downloaded songs") {
             SongDownloader.downloadProgress.collect { progress ->
                 if (progress.isEmpty()) {
@@ -293,8 +294,9 @@ fun LibraryScreen(
         }
     }
 
-    // Observe online playback trigger from ExploreViewModel for History/Account pages
-    LaunchedEffect(exploreViewModel) {
+    // Observe online playback triggers only while Library is the active root tab.
+    LaunchedEffect(exploreViewModel, LocalRootTabActive.current) {
+        if (!LocalRootTabActive.current) return@LaunchedEffect
         exploreViewModel?.playbackTriggerEvent?.collect {
             val song = exploreViewModel.currentOnlineSong.value
             if (song != null) {
