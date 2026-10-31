@@ -2426,7 +2426,7 @@ private fun DataSaverRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
             }
         },
         trailingContent = {
-            Switch(
+            DsmusicSwitch(
                 checked = checked,
                 onCheckedChange = onToggle
             )
@@ -2453,7 +2453,7 @@ private fun PauseHistoryRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
             }
         },
         trailingContent = {
-            Switch(
+            DsmusicSwitch(
                 checked = checked,
                 onCheckedChange = onToggle
             )
@@ -3374,7 +3374,7 @@ private fun DynamicNavStyleRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
             }
         },
         trailingContent = {
-            Switch(
+            DsmusicSwitch(
                 checked = checked,
                 onCheckedChange = onToggle
             )
@@ -3401,7 +3401,7 @@ private fun HideNavLabelsRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
             }
         },
         trailingContent = {
-            Switch(
+            DsmusicSwitch(
                 checked = checked,
                 onCheckedChange = onToggle
             )
@@ -3436,7 +3436,7 @@ private fun DynamicAlbumThemeRow(checked: Boolean, onToggle: (Boolean) -> Unit) 
             )
         },
         trailingContent = {
-            Switch(
+            DsmusicSwitch(
                 checked = checked,
                 onCheckedChange = onToggle
             )
@@ -3463,7 +3463,7 @@ private fun AmoledBlackRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
             }
         },
         trailingContent = {
-            Switch(
+            DsmusicSwitch(
                 checked = checked,
                 onCheckedChange = onToggle
             )
@@ -3566,7 +3566,7 @@ private fun AutoplayRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
             }
         },
         trailingContent = {
-            Switch(checked = checked, onCheckedChange = onToggle)
+            DsmusicSwitch(checked = checked, onCheckedChange = onToggle)
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
@@ -3973,13 +3973,13 @@ private fun ThemeRow(isDark: Boolean, onToggle: (Boolean) -> Unit) {
                 style = MaterialTheme.typography.bodyLarge
             )
         },
-        trailingContent = { ThemeSwitch(isDark, onToggle) },
+        trailingContent = { ThemeDsmusicSwitch(isDark, onToggle) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
 }
 
 @Composable
-private fun ThemeSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?) {
+private fun ThemeDsmusicSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?) {
     DsmusicSwitch(checked = checked, onCheckedChange = onCheckedChange)
 }
 
@@ -4061,7 +4061,7 @@ private fun AudioFocusRow(enabled: Boolean, onToggle: (Boolean) -> Unit) {
                 modifier = Modifier.size(24.dp)
             )
         },
-        trailingContent = { Switch(checked = enabled, onCheckedChange = onToggle) },
+        trailingContent = { DsmusicSwitch(checked = enabled, onCheckedChange = onToggle) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
 }
