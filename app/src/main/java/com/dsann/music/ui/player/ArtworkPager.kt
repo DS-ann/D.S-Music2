@@ -83,7 +83,7 @@ fun ArtworkPager(
             state = pagerState,
             key = { page -> "${songList.getOrNull(page)?.id ?: currentSong.id}:$page" },
             userScrollEnabled = userScrollEnabled,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize().clip(artworkShape)
         ) { page ->
             val song = if (page == currentSongIndex) currentSong else (songList.getOrNull(page) ?: currentSong)
             val videoId = song.videoId

@@ -68,7 +68,13 @@ data class VideoPlaybackMetadata(
     val uploader: String,
     val durationMs: Long = 0L,
     val resolution: String? = null,
-    val mimeType: String? = null
+    val mimeType: String? = null,
+    val description: String? = null,
+    val viewCount: Long? = null,
+    val likeCount: Long? = null,
+    val uploadDate: String? = null,
+    val thumbnailUrl: String? = null,
+    val uploaderUrl: String? = null
 )
 
 @HiltViewModel
@@ -452,15 +458,15 @@ class PlayerSharedViewModel @Inject constructor(
                 val currentVideoId = _currentSong.value?.videoId
                 if (currentVideoId != videoId || !isAutoplayEnabled()) return@launch
 
-                var candidates = YouTubeMusic.relatedSongs(videoId).getOrDefault(emptyList())
+                // Continue with a generated radio queue first, as Prism does. The ordinary
+                // Up Next list is a fallback when radio has no new recommendations.
+                var candidates = YouTubeMusic.startRadio(videoId).getOrDefault(emptyList())
                 val existingIds = _songList.value.mapNotNull { it.videoId }.toMutableSet()
                 var fresh = candidates.filter { it.videoId.isNotBlank() && it.videoId !in existingIds }
                     .distinctBy { it.videoId }
 
-                // Some tracks have an empty/duplicate Up Next panel. Fall back to the song's
-                // generated radio mix rather than leaving ExoPlayer permanently in STATE_ENDED.
                 if (fresh.isEmpty()) {
-                    candidates = YouTubeMusic.startRadio(videoId).getOrDefault(emptyList())
+                    candidates = YouTubeMusic.relatedSongs(videoId).getOrDefault(emptyList())
                     fresh = candidates.filter { it.videoId.isNotBlank() && it.videoId !in existingIds }
                         .distinctBy { it.videoId }
                 }

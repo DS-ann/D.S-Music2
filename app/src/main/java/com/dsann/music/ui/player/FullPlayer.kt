@@ -871,7 +871,8 @@ fun FullPlayer(
 
         val density = androidx.compose.ui.platform.LocalDensity.current
         val statusBarTopDp = with(density) { androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(this).toDp() }
-        val minTopOffset = statusBarTopDp + if (compactLandscape) 52.dp else 68.dp
+        val minTopOffset = statusBarTopDp + 68.dp
+        val headerHeight = if (compactLandscape) 40.dp else 56.dp
 
         // Calculate top offset to perfectly match yEndPx in PlayerBottomSheetCompose
         val topOffset = if (useWidePlayer) minTopOffset
@@ -892,7 +893,7 @@ fun FullPlayer(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (compactLandscape) 40.dp else 56.dp),
+                    .height(headerHeight),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -915,7 +916,13 @@ fun FullPlayer(
                 Spacer(modifier = Modifier.size(48.dp))
             }
 
-            Spacer(modifier = Modifier.height(topOffset - minTopOffset))
+            // Parent adds status-bar inset and 12dp vertical padding before this column.
+            // Align the placeholder with the shared artwork layer's root-space Y position.
+            Spacer(
+                modifier = Modifier.height(
+                    (topOffset - (statusBarTopDp + 12.dp + headerHeight)).coerceAtLeast(0.dp)
+                )
+            )
 
             // Album Art Container Placeholder (ArtworkPager is rendered at this absolute position)
             Box(
@@ -1613,6 +1620,25 @@ fun FullPlayer(
                 if (isVideoMode) {
                     videoPlaybackMetadata?.resolution?.takeIf { it.isNotBlank() }?.let {
                         details.add("Resolution" to it)
+                    }
+                    videoPlaybackMetadata?.viewCount?.takeIf { it > 0L }?.let {
+                        details.add("Views" to java.text.NumberFormat.getIntegerInstance()
+                            .format(it) + " views")
+                    }
+                    videoPlaybackMetadata?.likeCount?.takeIf { it > 0L }?.let {
+                        details.add("Likes" to java.text.NumberFormat.getIntegerInstance().format(it))
+                    }
+                    videoPlaybackMetadata?.uploadDate?.takeIf { it.isNotBlank() }?.let {
+                        details.add("Uploaded" to it)
+                    }
+                    videoPlaybackMetadata?.description?.takeIf { it.isNotBlank() }?.let {
+                        details.add("Description" to it)
+                    }
+                    videoPlaybackMetadata?.uploaderUrl?.takeIf { it.isNotBlank() }?.let {
+                        details.add("Uploader URL" to it)
+                    }
+                    song.videoId?.takeIf { it.isNotBlank() }?.let {
+                        details.add("Video URL" to "https://www.youtube.com/watch?v=$it")
                     }
                 } else {
                     onlineStreamMetadata?.audioQuality?.let { details.add("Source audio quality" to it) }

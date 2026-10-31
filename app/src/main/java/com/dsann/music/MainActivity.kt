@@ -144,7 +144,8 @@ class MainActivity : AppCompatActivity() {
         private set
 
     fun hideBottomNavWithAnimation() {
-        isBottomNavVisible = false
+        // Legacy nested-scroll callback: navigation is persistent now.
+        isBottomNavVisible = true
     }
 
     fun showBottomNavWithAnimation() {
@@ -254,7 +255,7 @@ class MainActivity : AppCompatActivity() {
                         val navBackStackEntry by currentNavController.currentBackStackEntryAsState()
                         val currentDestination = navBackStackEntry?.destination
 
-                        val showBottomBar = !isPlayerExpanded && currentDestination?.route in listOf("explore", "library", "local_music", "settings")
+                        val showBottomBar = currentDestination?.route in listOf("explore", "library", "local_music", "settings")
 
                         val density = LocalDensity.current
                         val navigationBarsHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
@@ -263,7 +264,7 @@ class MainActivity : AppCompatActivity() {
                         val totalSlideDistPx = bottomNavHeightPx + navigationBarsHeightPx
 
                         // Keep navigation anchored while the player expands and while content scrolls.
-                        val baseTargetTranslation = if (showBottomBar && isBottomNavVisible) 0f else totalSlideDistPx
+                        val baseTargetTranslation = if (showBottomBar) 0f else totalSlideDistPx
 
                         val animatedBaseTranslationState = animateFloatAsState(
                             targetValue = baseTargetTranslation,

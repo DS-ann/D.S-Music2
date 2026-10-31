@@ -823,7 +823,13 @@ fun PlayerBottomSheetCompose(
                                     ?: currentSong?.artist.orEmpty(),
                                 durationMs = defaultVideoOption.durationMs,
                                 resolution = defaultVideoOption.label,
-                                mimeType = defaultVideoOption.mimeType
+                                mimeType = defaultVideoOption.mimeType,
+                                description = defaultVideoOption.videoDescription,
+                                viewCount = defaultVideoOption.videoViewCount,
+                                likeCount = defaultVideoOption.videoLikeCount,
+                                uploadDate = defaultVideoOption.videoUploadDate,
+                                thumbnailUrl = defaultVideoOption.videoThumbnailUrl,
+                                uploaderUrl = defaultVideoOption.videoUploaderUrl
                             )
                         )
                     }
@@ -1512,7 +1518,7 @@ fun PlayerBottomSheetCompose(
                                 // Keep the selected artwork outline on the shared cover;
                                 // a second forced rounded clip made custom shapes disagree
                                 // with the visible mini-player progress.
-                                shape = playerArtworkShape
+                                shape = if (isVideoMode) androidx.compose.foundation.shape.RectangleShape else playerArtworkShape
                                 clip = true
                                 shadowElevation = androidx.compose.ui.util.lerp(normalShadow, 6.dp.toPx(), lyricsT)
                                 alpha = artworkAlpha
@@ -1603,7 +1609,12 @@ fun PlayerBottomSheetCompose(
                         ) {
                             Box(Modifier.fillMaxSize()) {
                                 if (!isVideoFullscreen) {
-                                    androidx.compose.ui.viewinterop.AndroidView(
+                                    BoxWithConstraints(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        val squareVideoSize = minOf(maxWidth, maxHeight)
+                                        androidx.compose.ui.viewinterop.AndroidView(
                                         factory = { viewContext ->
                                             (android.view.LayoutInflater.from(viewContext)
                                                 .inflate(com.dsann.music.R.layout.view_video_player, null)
@@ -1611,7 +1622,7 @@ fun PlayerBottomSheetCompose(
                                                 player = audioService?.getPlayerInstance()
                                                 useController = true
                                                 controllerShowTimeoutMs = 3000
-                                                resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                                resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                                                 setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                                                 keepScreenOn = true
                                             }
@@ -1619,8 +1630,9 @@ fun PlayerBottomSheetCompose(
                                         update = { playerView ->
                                             playerView.player = audioService?.getPlayerInstance()
                                         },
-                                        modifier = Modifier.fillMaxSize()
+                                        modifier = Modifier.size(squareVideoSize)
                                     )
+                                    }
                                 }
                                 VideoOverlayControls(
                                     qualityLabel = selectedVideoQuality,
@@ -1641,6 +1653,11 @@ fun PlayerBottomSheetCompose(
                                             .fillMaxSize()
                                             .background(Color.Black)
                                     ) {
+                                        BoxWithConstraints(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        val squareVideoSize = minOf(maxWidth, maxHeight)
                                         androidx.compose.ui.viewinterop.AndroidView(
                                             factory = { viewContext ->
                                                 (android.view.LayoutInflater.from(viewContext)
@@ -1649,7 +1666,7 @@ fun PlayerBottomSheetCompose(
                                                 player = audioService?.getPlayerInstance()
                                                 useController = true
                                                 controllerShowTimeoutMs = 3000
-                                                resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                                resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                                                 setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                                                 keepScreenOn = true
                                             }
@@ -1657,8 +1674,9 @@ fun PlayerBottomSheetCompose(
                                             update = { playerView ->
                                                 playerView.player = audioService?.getPlayerInstance()
                                             },
-                                            modifier = Modifier.fillMaxSize()
+                                            modifier = Modifier.size(squareVideoSize)
                                         )
+                                    }
                                         VideoOverlayControls(
                                             qualityLabel = selectedVideoQuality,
                                             qualityEnabled = videoQualityOptions.isNotEmpty() && !videoQualityLoading,
@@ -1702,7 +1720,13 @@ fun PlayerBottomSheetCompose(
                                                                     durationMs = option.durationMs.takeIf { it > 0L }
                                                                         ?: videoPlaybackMetadata?.durationMs ?: 0L,
                                                                     resolution = option.label,
-                                                                    mimeType = option.mimeType
+                                                                    mimeType = option.mimeType,
+                                                                    description = option.videoDescription ?: videoPlaybackMetadata?.description,
+                                                                    viewCount = option.videoViewCount ?: videoPlaybackMetadata?.viewCount,
+                                                                    likeCount = option.videoLikeCount ?: videoPlaybackMetadata?.likeCount,
+                                                                    uploadDate = option.videoUploadDate ?: videoPlaybackMetadata?.uploadDate,
+                                                                    thumbnailUrl = option.videoThumbnailUrl ?: videoPlaybackMetadata?.thumbnailUrl,
+                                                                    uploaderUrl = option.videoUploaderUrl ?: videoPlaybackMetadata?.uploaderUrl
                                                                 )
                                                             )
                                                             showVideoQualityDialog = false

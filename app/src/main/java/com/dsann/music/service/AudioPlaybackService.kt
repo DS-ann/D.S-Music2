@@ -499,6 +499,8 @@ class AudioPlaybackService : MediaSessionService() {
     private var currentAlbumArtSongId: String? = null
     private var artworkRequestGeneration: Long = 0L
     private var lastWidgetProgressUpdateAtMs: Long = 0L
+    private var lastPositionPersistedAtMs: Long = 0L
+    private var lastTelemetryUpdateAtMs: Long = 0L
     private var shouldAutoPlay = false
     private var pendingSeekPos: Long = -1
     
@@ -1480,6 +1482,35 @@ class AudioPlaybackService : MediaSessionService() {
 
         fullTrackCacheJob = serviceScope.launch(Dispatchers.IO) {
             try {
+                // Give ExoPlayer time to establish its rolling buffer before a second reader
+                // starts filling the full-track cache.
+                kotlinx.coroutines.delay(2_000L)
+                val canCacheNow = withContext(Dispatchers.Main) {
+                    if (!player.isPlaying ||
+                        player.currentMediaItem?.mediaId != songId ||
+                        fullTrackCacheKey != cacheKey
+                    ) {
+                        false
+                    } else {
+                        val bufferedAhead = (player.bufferedPosition - player.currentPosition).coerceAtLeast(0L)
+                        val remaining = (player.duration.takeIf { it > 0L && it != C.TIME_UNSET }
+                            ?: durationMs).minus(player.currentPosition).coerceAtLeast(0L)
+                        bufferedAhead >= 8_000L || remaining <= 8_000L
+                    }
+                }
+                if (!canCacheNow) {
+                    withContext(Dispatchers.Main) {
+                        if (fullTrackCacheKey == cacheKey) {
+                            fullTrackCacheKey = null
+                            handler.postDelayed({
+                                if (player.isPlaying && player.currentMediaItem?.mediaId == songId) {
+                                    startCurrentTrackCache()
+                                }
+                            }, 5_000L)
+                        }
+                    }
+                    return@launch
+                }
                 rememberMediaCacheMetadata(
                     applicationContext,
                     cacheKey,
@@ -2039,46 +2070,53 @@ class AudioPlaybackService : MediaSessionService() {
                     val dur = player.duration
                     viewModel?.setCurrentPosition(pos.toInt())
                     if (dur > 0) viewModel?.setDuration(dur.toInt())
-                    
-                    telemetryManager.updateProgress(pos, dur)
-                    
-                    // Secure persistence periodically (approx every 5 seconds at 250ms tick rate = every 20 cycles)
-                    // We use static modulo counter logic.
-                    if (player.isPlaying && (pos / 250) % 20L == 0L) {
-                        com.dsann.music.util.PlaybackStateManager.savePosition(applicationContext, pos)
+
+                    val nowMs = System.currentTimeMillis()
+                    // Telemetry has second-level heartbeat semantics; update it once per second.
+                    if (nowMs - lastTelemetryUpdateAtMs >= 1_000L) {
+                        telemetryManager.updateProgress(pos, dur)
+                        lastTelemetryUpdateAtMs = nowMs
                     }
 
-                    val lyricsModeActive = viewModel?.isLyricsModeEnabled?.value == true
-                    val nowMs = System.currentTimeMillis()
-                    val shouldUpdateWidget = if (lyricsModeActive) {
-                        nowMs - lastWidgetProgressUpdateAtMs >= 1_000L
-                    } else {
-                        pos % 200L < 100L
+                    // Persist a single position snapshot every five seconds. The old modulo test
+                    // could persist repeatedly across the same 250ms boundary.
+                    if (player.isPlaying && nowMs - lastPositionPersistedAtMs >= 5_000L) {
+                        com.dsann.music.util.PlaybackStateManager.savePosition(applicationContext, pos)
+                        lastPositionPersistedAtMs = nowMs
                     }
-                    if (player.isPlaying && shouldUpdateWidget) {
+
+                    if (player.isPlaying && nowMs - lastWidgetProgressUpdateAtMs >= 1_000L) {
                         lastWidgetProgressUpdateAtMs = nowMs
                         updateWidgetProgress(pos, dur)
                     }
 
-                    if (player.isPlaying && crossfadeDurationMs > 0 && dur > 0 && (dur - pos) <= crossfadeDurationMs && !isCrossfading) {
+                    if (player.isPlaying && crossfadeDurationMs > 0 && dur > 0 &&
+                        (dur - pos) <= crossfadeDurationMs && !isCrossfading
+                    ) {
                         startCrossfadeOut()
                     }
 
-                    // Predictive Pre-Caching at 80% playback progression (shuffle-aware)
-                    if (player.isPlaying && dur > 0 && !isNextSongPreCached && (pos.toFloat() / dur.toFloat() >= 0.8f)) {
+                    if (player.isPlaying && dur > 0 && !isNextSongPreCached &&
+                        (pos.toFloat() / dur.toFloat() >= 0.8f)
+                    ) {
                         isNextSongPreCached = true
                         viewModel?.let { vm ->
                             val songs = vm.songList.value
                             val nextIndex = vm.getNextSongIndex()
                             if (nextIndex >= 0 && nextIndex < songs.size) {
-                                val nextSong = songs[nextIndex]
-                                YouTubeMusic.preCacheNextSong(nextSong)
+                                YouTubeMusic.preCacheNextSong(songs[nextIndex])
                             }
                         }
                     }
                 }
-                val progressIntervalMs = if (viewModel?.isLyricsModeEnabled?.value == true && player.isPlaying) 80L else 250L
-                handler.postDelayed(this, progressIntervalMs)
+                // Lyrics remain more responsive than normal playback, without the old 80ms
+                // Compose update cadence that was excessive on slower devices.
+                val intervalMs = if (viewModel?.isLyricsModeEnabled?.value == true && player.isPlaying) {
+                    180L
+                } else {
+                    400L
+                }
+                handler.postDelayed(this, intervalMs)
             }
         }
         handler.post(progressUpdateRunnable)
@@ -2820,7 +2858,13 @@ class AudioPlaybackService : MediaSessionService() {
                         uploader = videoOption.videoUploader?.takeIf { it.isNotBlank() } ?: song.artist,
                         durationMs = videoOption.durationMs.takeIf { it > 0L } ?: song.duration,
                         resolution = videoOption.label,
-                        mimeType = videoOption.mimeType
+                        mimeType = videoOption.mimeType,
+                        description = videoOption.videoDescription,
+                        viewCount = videoOption.videoViewCount,
+                        likeCount = videoOption.videoLikeCount,
+                        uploadDate = videoOption.videoUploadDate,
+                        thumbnailUrl = videoOption.videoThumbnailUrl,
+                        uploaderUrl = videoOption.videoUploaderUrl
                     )
                 )
                 if (videoOption.usesSeparateAudio) {

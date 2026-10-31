@@ -26,7 +26,13 @@ data class VideoStreamOption(
     val audioMimeType: String? = null,
     val videoTitle: String? = null,
     val videoUploader: String? = null,
-    val durationMs: Long = 0L
+    val durationMs: Long = 0L,
+    val videoDescription: String? = null,
+    val videoViewCount: Long? = null,
+    val videoLikeCount: Long? = null,
+    val videoUploadDate: String? = null,
+    val videoThumbnailUrl: String? = null,
+    val videoUploaderUrl: String? = null
 ) {
     val label: String get() = if (height > 0) "${height}p" else resolution.ifBlank { "Unknown quality" }
     val usesSeparateAudio: Boolean get() = !audioUrl.isNullOrBlank()
@@ -425,6 +431,17 @@ object NewPipeStreamExtractor {
             return@withContext emptyList()
         }
 
+        val videoDescription = info.description?.content
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+        val videoViewCount = info.viewCount.takeIf { it > 0L }
+        val videoLikeCount = info.likeCount.takeIf { it > 0L }
+        val videoUploadDate = info.textualUploadDate?.takeIf { it.isNotBlank() }
+        val videoThumbnailUrl = info.thumbnails.lastOrNull()?.url?.let {
+            InnerTubeParser.getHighResThumbnailUrl(it)
+        }
+        val videoUploaderUrl = info.uploaderUrl?.takeIf { it.isNotBlank() }
+
         val muxed = info.videoStreams
             .asSequence()
             .filterNot { it.isVideoOnly }
@@ -438,7 +455,13 @@ object NewPipeStreamExtractor {
                     mimeType = stream.format?.mimeType?.substringBefore(';')?.trim(),
                     videoTitle = info.name,
                     videoUploader = info.uploaderName,
-                    durationMs = (info.duration * 1000L).coerceAtLeast(0L)
+                    durationMs = (info.duration * 1000L).coerceAtLeast(0L),
+                    videoDescription = videoDescription,
+                    videoViewCount = videoViewCount,
+                    videoLikeCount = videoLikeCount,
+                    videoUploadDate = videoUploadDate,
+                    videoThumbnailUrl = videoThumbnailUrl,
+                    videoUploaderUrl = videoUploaderUrl
                 )
             }
             .toList()
@@ -475,7 +498,13 @@ object NewPipeStreamExtractor {
                         audioMimeType = separateAudio.format?.mimeType?.substringBefore(';')?.trim(),
                         videoTitle = info.name,
                         videoUploader = info.uploaderName,
-                        durationMs = (info.duration * 1000L).coerceAtLeast(0L)
+                        durationMs = (info.duration * 1000L).coerceAtLeast(0L),
+                    videoDescription = videoDescription,
+                    videoViewCount = videoViewCount,
+                    videoLikeCount = videoLikeCount,
+                    videoUploadDate = videoUploadDate,
+                    videoThumbnailUrl = videoThumbnailUrl,
+                    videoUploaderUrl = videoUploaderUrl
                     )
                 }
                 .toList()
