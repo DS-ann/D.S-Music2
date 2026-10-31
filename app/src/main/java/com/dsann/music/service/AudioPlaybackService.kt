@@ -453,6 +453,8 @@ class AudioPlaybackService : MediaSessionService() {
     private var cacheAssetsSongId: Long? = null
     private var currentSongName = "D.S Music"
     private var currentAlbumArt: Bitmap? = null
+    private var currentAlbumArtSongId: String? = null
+    private var artworkRequestGeneration: Long = 0L
     private var lastWidgetProgressUpdateAtMs: Long = 0L
     private var shouldAutoPlay = false
     private var pendingSeekPos: Long = -1
@@ -1625,7 +1627,7 @@ class AudioPlaybackService : MediaSessionService() {
         activeSong?.albumName?.takeIf { it.isNotBlank() }?.let { metadataBuilder.setAlbumTitle(it) }
         
         // We only compress current cover for the active track to conserve heap space
-        if (title == currentSongName) {
+        if (currentAlbumArtSongId == songId) {
             currentAlbumArt?.let {
                 val stream = java.io.ByteArrayOutputStream()
                 it.compress(Bitmap.CompressFormat.PNG, 100, stream)
@@ -1702,23 +1704,18 @@ class AudioPlaybackService : MediaSessionService() {
         )
     }
 
-    private fun persistCurrentSongArtwork(bitmap: Bitmap?) {
+    private fun persistCurrentSongArtwork(bitmap: Bitmap?, expectedSongId: String) {
         val artwork = bitmap ?: return
-        val mediaItem = if (isPlayerInitialized) player.currentMediaItem else null
-        val activeSong = viewModel?.currentSong?.value
-        val mediaUri = mediaItem?.localConfiguration?.uri
-        val isRemoteTrack = !activeSong?.videoId.isNullOrBlank() ||
+        if (expectedSongId.isBlank()) return
+        val activeSong = viewModel?.currentSong?.value ?: return
+        // The request's captured song ID, not whichever track is active later, owns this image.
+        if (activeSong.id.toString() != expectedSongId) return
+        val mediaUri = if (isPlayerInitialized) player.currentMediaItem?.localConfiguration?.uri else null
+        val isRemoteTrack = !activeSong.videoId.isNullOrBlank() ||
             mediaUri?.scheme == "http" || mediaUri?.scheme == "https"
         if (!isRemoteTrack) return
-
-        // The image request can finish before ExoPlayer transitions away from the previous
-        // item. The ViewModel already points at the newly selected track, so prefer its stable
-        // ID rather than accidentally attaching the new artwork to the old media item.
-        val songId = activeSong?.id?.toString()?.takeIf { it.isNotBlank() }
-            ?: mediaItem?.mediaId?.takeIf { it.isNotBlank() }
-            ?: return
         serviceScope.launch(Dispatchers.IO) {
-            storeCachedMediaArtwork(applicationContext, songId, artwork)
+            storeCachedMediaArtwork(applicationContext, expectedSongId, artwork)
         }
     }
 
@@ -1753,34 +1750,51 @@ class AudioPlaybackService : MediaSessionService() {
         }
     }
 
-    fun setSongMetadata(songName: String?, albumArt: Bitmap?) {
-        this.currentSongName = songName ?: "D.S Music"
-        this.currentAlbumArt = albumArt?.let { 
-            val size = min(it.width, it.height)
-            Bitmap.createBitmap(it, (it.width - size) / 2, (it.height - size) / 2, size, size).scale(512, 512, true)
-        }
-        persistCurrentSongArtwork(this.currentAlbumArt)
-        val mediaItem = player.currentMediaItem
+    private fun setSongMetadata(
+        songName: String?,
+        albumArt: Bitmap?,
+        expectedSongId: String,
+        requestGeneration: Long
+    ) {
         val activeSong = viewModel?.currentSong?.value
-        // A fast artwork response for the next song must not overwrite the metadata of the
-        // previous MediaItem while stream resolution is still in progress.
-        if (mediaItem != null &&
-            (activeSong == null || mediaItem.mediaId == activeSong.id.toString())
-        ) {
+        if (expectedSongId.isBlank() ||
+            activeSong?.id?.toString() != expectedSongId ||
+            requestGeneration != artworkRequestGeneration
+        ) return
+
+        currentSongName = songName?.takeIf { it.isNotBlank() } ?: activeSong.title
+        currentAlbumArt = albumArt?.let {
+            val size = min(it.width, it.height)
+            Bitmap.createBitmap(it, (it.width - size) / 2, (it.height - size) / 2, size, size)
+                .scale(512, 512, true)
+        }
+        currentAlbumArtSongId = expectedSongId.takeIf { currentAlbumArt != null }
+        persistCurrentSongArtwork(currentAlbumArt, expectedSongId)
+
+        val mediaItem = if (isPlayerInitialized) player.currentMediaItem else null
+        if (mediaItem != null && mediaItem.mediaId == expectedSongId) {
             val metadataBuilder = mediaItem.mediaMetadata.buildUpon()
                 .setTitle(currentSongName)
-                .setArtist(viewModel?.currentSong?.value?.artist ?: "Unknown Artist")
+                .setArtist(activeSong.artist.ifBlank { "Unknown Artist" })
             currentAlbumArt?.let {
                 val stream = java.io.ByteArrayOutputStream()
                 it.compress(Bitmap.CompressFormat.PNG, 100, stream)
-                metadataBuilder.setArtworkData(stream.toByteArray(), androidx.media3.common.MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                metadataBuilder.setArtworkData(
+                    stream.toByteArray(),
+                    androidx.media3.common.MediaMetadata.PICTURE_TYPE_FRONT_COVER
+                )
             }
-            val newItem = mediaItem.buildUpon().setMediaMetadata(metadataBuilder.build()).build()
-            player.replaceMediaItem(0, newItem)
+            player.replaceMediaItem(
+                0,
+                mediaItem.buildUpon().setMediaMetadata(metadataBuilder.build()).build()
+            )
         }
     }
 
     fun setSongMetadataById(songName: String?, albumId: Long) {
+        val expectedSongId = viewModel?.currentSong?.value?.id?.toString() ?: return
+        val requestGeneration = ++artworkRequestGeneration
+        setSongMetadata(songName, null, expectedSongId, requestGeneration)
         serviceScope.launch(Dispatchers.IO) {
             var albumArt: Bitmap? = null
             if (albumId > 0) {
@@ -1794,27 +1808,33 @@ class AudioPlaybackService : MediaSessionService() {
                 } catch (_: Exception) {}
             }
             withContext(Dispatchers.Main) {
-                setSongMetadata(songName, albumArt)
+                setSongMetadata(songName, albumArt, expectedSongId, requestGeneration)
             }
         }
     }
 
     fun setSongMetadataByUrl(songName: String?, url: String?) {
-        if (url.isNullOrEmpty()) {
-            setSongMetadata(songName, null)
-            return
-        }
+        val activeSong = viewModel?.currentSong?.value ?: return
+        val expectedSongId = activeSong.id.toString()
+        val requestGeneration = ++artworkRequestGeneration
+        setSongMetadata(songName, null, expectedSongId, requestGeneration)
+
+        val resolvedUrl = url?.takeIf { it.isNotBlank() }
+            ?: activeSong.videoId?.takeIf { it.isNotBlank() }
+                ?.let { "https://img.youtube.com/vi/$it/hqdefault.jpg" }
+        if (resolvedUrl.isNullOrBlank()) return
+
         com.bumptech.glide.Glide.with(applicationContext)
             .asBitmap()
-            .load(url)
+            .load(resolvedUrl)
             .override(512, 512)
             .into(object : com.bumptech.glide.request.target.CustomTarget<Bitmap>() {
                 override fun onResourceReady(resource: Bitmap, transition: com.bumptech.glide.request.transition.Transition<in Bitmap>?) {
-                    setSongMetadata(songName, resource)
+                    setSongMetadata(songName, resource, expectedSongId, requestGeneration)
                 }
                 override fun onLoadCleared(placeholder: android.graphics.drawable.Drawable?) {}
                 override fun onLoadFailed(errorDrawable: android.graphics.drawable.Drawable?) {
-                    setSongMetadata(songName, null)
+                    setSongMetadata(songName, null, expectedSongId, requestGeneration)
                 }
             })
     }
@@ -2734,8 +2754,18 @@ class AudioPlaybackService : MediaSessionService() {
             
             // Explicitly set channel and properties to match Java example exactly
             notificationBuilder.setSmallIcon(R.drawable.ic_music_note)
-            notificationBuilder.setContentTitle(currentSongName)
-            notificationBuilder.setContentText("Now Playing")
+            val activeMediaItem = player.currentMediaItem
+            val activeMetadata = activeMediaItem?.mediaMetadata
+            val notificationTitle = activeMetadata?.title?.toString()
+                ?.takeIf { it.isNotBlank() } ?: currentSongName
+            val notificationArtist = activeMetadata?.artist?.toString()
+                ?.takeIf { it.isNotBlank() } ?: "Now Playing"
+            val notificationArtwork = currentAlbumArt?.takeIf {
+                !activeMediaItem?.mediaId.isNullOrBlank() &&
+                    currentAlbumArtSongId == activeMediaItem?.mediaId
+            }
+            notificationBuilder.setContentTitle(notificationTitle)
+            notificationBuilder.setContentText(notificationArtist)
             notificationBuilder.setSubText("D.S Music")
             notificationBuilder.setChannelId("audio_playback_channel")
             notificationBuilder.setOngoing(isPlaying)
@@ -2745,9 +2775,7 @@ class AudioPlaybackService : MediaSessionService() {
             notificationBuilder.setShowWhen(false)
             notificationBuilder.setCategory(androidx.core.app.NotificationCompat.CATEGORY_TRANSPORT)
             
-            currentAlbumArt?.let {
-                notificationBuilder.setLargeIcon(it)
-            }
+            notificationBuilder.setLargeIcon(notificationArtwork)
 
             // Order: Mode | Prev | Play | Next | Fav
             notificationBuilder.clearActions()
