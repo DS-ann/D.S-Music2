@@ -1134,7 +1134,7 @@ fun LibraryScreen(
 }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SongListItem(
     song: SongItem,
@@ -1145,88 +1145,92 @@ fun SongListItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
-    val shapes = ListItemDefaults.segmentedShapes(index = localIndex, count = localCount)
-    val defaultBg = MaterialTheme.colorScheme.surfaceContainer
-    val playingBg = MaterialTheme.colorScheme.primaryContainer
+    val context = LocalContext.current
+    val artModel = remember(song) { song.getAlbumArtUri() ?: R.drawable.ic_music_note }
+    val shape = MaterialTheme.shapes.medium
+    val accent = MaterialTheme.colorScheme.primary
+    val titleColor = MaterialTheme.colorScheme.onSurface
+    val secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
 
-    val contentColor = if (isPlaying) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-    val subTextColor = if (isPlaying) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
-    val accentColor = if (isPlaying) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary
-
-    ListItem(
-        onClick = onClick,
-        onLongClick = onLongClick,
-        shapes = shapes,
-        colors = ListItemDefaults.colors(
-            containerColor = if (isPlaying) playingBg else defaultBg,
-            headlineColor = contentColor,
-            supportingColor = subTextColor,
-            leadingIconColor = accentColor
-        ),
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 1.dp),
-        leadingContent = {
-            val context = LocalContext.current
-            val artModel = remember(song) { song.getAlbumArtUri() ?: R.drawable.ic_music_note }
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(artModel)
-                    .crossfade(true)
-                    .error(R.drawable.ic_music_note)
-                    .placeholder(R.drawable.ic_music_note)
-                    .fallback(R.drawable.ic_music_note)
-                    .build(),
-                contentDescription = "Album Art",
-                modifier = Modifier
-                    .size(54.dp)
-                    .clip(MaterialTheme.shapes.medium),
-                contentScale = ContentScale.Crop
+            .padding(horizontal = 10.dp, vertical = 3.dp)
+            .clip(shape)
+            .background(
+                if (isPlaying) accent.copy(alpha = 0.13f)
+                else MaterialTheme.colorScheme.surfaceContainerLow
             )
-        },
-        trailingContent = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                if (isFavorite) {
-                    Icon(
-                        imageVector = Icons.Default.Favorite,
-                        contentDescription = "Favorite",
-                        tint = accentColor,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                if (isPlaying) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Now Playing",
-                        tint = accentColor,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-        },
-        content = {
-            Column {
-                Text(
-                    text = song.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = contentColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = song.artist,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = subTextColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            .then(
+                if (isPlaying) Modifier.border(
+                    1.dp,
+                    accent.copy(alpha = 0.48f),
+                    shape
+                ) else Modifier
+            )
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(artModel)
+                .size(128, 128)
+                .crossfade(false)
+                .error(R.drawable.ic_music_note)
+                .placeholder(R.drawable.ic_music_note)
+                .fallback(R.drawable.ic_music_note)
+                .build(),
+            contentDescription = "Album Art",
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(10.dp)),
+            contentScale = ContentScale.Crop
+        )
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 12.dp, end = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            BasicText(
+                text = song.title,
+                style = MaterialTheme.typography.titleSmall.copy(
+                    color = titleColor,
+                    fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Medium
+                ),
+                maxLines = 1
+            )
+            BasicText(
+                text = song.artist,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color = secondaryColor
+                ),
+                maxLines = 1
+            )
         }
-    )
+
+        if (isFavorite) {
+            Icon(
+                imageVector = Icons.Default.Favorite,
+                contentDescription = "Favorite",
+                tint = accent,
+                modifier = Modifier.padding(end = 7.dp).size(17.dp)
+            )
+        }
+        if (isPlaying) {
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "Now Playing",
+                tint = accent,
+                modifier = Modifier.size(21.dp)
+            )
+        }
+    }
 }
 
 @Composable
@@ -1434,7 +1438,7 @@ private fun UnifiedLibraryCard(item: UnifiedLibraryItem) {
                     painter = coil.compose.rememberAsyncImagePainter(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(item.thumbnailUrl)
-                            .crossfade(true)
+                            .crossfade(false)
                             .build()
                     ),
                     contentDescription = null,
