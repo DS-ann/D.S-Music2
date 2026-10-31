@@ -522,6 +522,27 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         setPlayerButtons(com.dsann.music.util.OrderUtils.move(_playerButtons.value, from, to))
     }
 
+    private val availableSessionButtons = listOf("like", "shuffle", "repeat", "dislike", "back10", "ahead30")
+    private val defaultSessionButtons = listOf("like", "shuffle", "repeat", "back10", "ahead30")
+    private fun readSessionButtons(): List<String> {
+        val stored = prefs.getString("session_buttons", null)
+        val parsed = stored?.split(",")?.map { it.trim().lowercase() }
+            ?.filter { it in availableSessionButtons }?.distinct().orEmpty()
+        return (parsed + defaultSessionButtons.filter { it !in parsed }).take(6)
+            .let { safe -> if (safe.size >= 2) safe else defaultSessionButtons }
+    }
+    private val _sessionButtons = MutableStateFlow(readSessionButtons())
+    val sessionButtons: StateFlow<List<String>> = _sessionButtons.asStateFlow()
+    fun setSessionButtons(buttons: List<String>) {
+        val safe = buttons.filter { it in availableSessionButtons }.distinct().take(6)
+        if (safe.size < 2) return
+        _sessionButtons.value = safe
+        prefs.edit { putString("session_buttons", safe.joinToString(",")) }
+    }
+    fun moveSessionButton(from: Int, to: Int) {
+        setSessionButtons(com.dsann.music.util.OrderUtils.move(_sessionButtons.value, from, to))
+    }
+
     private val _playerTitleAlign = MutableStateFlow(prefs.getString("player_title_align", "Left") ?: "Left")
     val playerTitleAlign: StateFlow<String> = _playerTitleAlign.asStateFlow()
     fun setPlayerTitleAlign(value: String) {
@@ -677,7 +698,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         "theme_mode", KEY_AMOLED_BLACK, KEY_DYNAMIC_ALBUM_THEME, KEY_APPEARANCE_PRESET,
         "custom_accent_color", "ui_corner_style", KEY_PLAYER_ARTWORK_SHAPE, "player_background_style", "mini_player_style",
         "mini_player_control_shape", "mini_player_control_icons", "mini_player_progress",
-        "player_layout", "player_artwork_scale", "player_buttons_pill", "player_buttons", "player_title_align", "player_title_size",
+        "player_layout", "player_artwork_scale", "player_buttons_pill", "player_buttons", "session_buttons", "player_title_align", "player_title_size",
         "player_title_weight", "player_title_scroll", "player_times", "scrubber_style",
         "scrubber_color", "player_visualizer", "player_button_style", "scrubber_thickness",
         "scrubber_thumb_style", "visualizer_color", "lyrics_text_size", "lyrics_alignment",
@@ -742,6 +763,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         setPlayerButtonsPill(look.optBoolean("player_buttons_pill", _playerButtonsPill.value))
         setPlayerButtons(
             look.optString("player_buttons", _playerButtons.value.joinToString(","))
+                .split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        )
+        setSessionButtons(
+            look.optString("session_buttons", _sessionButtons.value.joinToString(","))
                 .split(",").map { it.trim() }.filter { it.isNotEmpty() }
         )
         setPlayerTitleAlign(look.optString("player_title_align", _playerTitleAlign.value))
@@ -1266,6 +1291,7 @@ fun SettingsScreenContent(
     val miniPlayerProgressStyle by viewModel.miniPlayerProgressStyle.collectAsStateWithLifecycle()
     val playerLayout by viewModel.playerLayout.collectAsStateWithLifecycle()
     val playerButtons by viewModel.playerButtons.collectAsStateWithLifecycle()
+    val sessionButtons by viewModel.sessionButtons.collectAsStateWithLifecycle()
     val playerTitleAlign by viewModel.playerTitleAlign.collectAsStateWithLifecycle()
     val playerTitleSize by viewModel.playerTitleSize.collectAsStateWithLifecycle()
     val playerTitleWeight by viewModel.playerTitleWeight.collectAsStateWithLifecycle()
@@ -1508,6 +1534,9 @@ fun SettingsScreenContent(
                 playerButtons = playerButtons,
                 onPlayerButtonsChange = { viewModel.setPlayerButtons(it) },
                 onMovePlayerButton = { from, to -> viewModel.movePlayerButton(from, to) },
+                sessionButtons = sessionButtons,
+                onSessionButtonsChange = { viewModel.setSessionButtons(it) },
+                onMoveSessionButton = { from, to -> viewModel.moveSessionButton(from, to) },
                 playerTitleAlign = playerTitleAlign,
                 onPlayerTitleAlignChange = { viewModel.setPlayerTitleAlign(it) },
                 playerTitleSize = playerTitleSize,
@@ -2586,6 +2615,9 @@ private fun AppearanceScreen(
     playerButtons: List<String>,
     onPlayerButtonsChange: (List<String>) -> Unit,
     onMovePlayerButton: (Int, Int) -> Unit,
+    sessionButtons: List<String>,
+    onSessionButtonsChange: (List<String>) -> Unit,
+    onMoveSessionButton: (Int, Int) -> Unit,
     playerTitleAlign: String,
     onPlayerTitleAlignChange: (String) -> Unit,
     playerTitleSize: String,
@@ -2731,6 +2763,13 @@ private fun AppearanceScreen(
                 selected = playerButtons,
                 onSelectionChanged = onPlayerButtonsChange,
                 onMove = onMovePlayerButton
+            )
+
+            SettingsHeader("Notification & lock-screen controls")
+            SessionButtonsSettings(
+                selected = sessionButtons,
+                onSelectionChanged = onSessionButtonsChange,
+                onMove = onMoveSessionButton
             )
 
             SettingsHeader("Title and times")
@@ -3326,6 +3365,67 @@ private fun SavedLooksEditor(
             }
         }
     }
+}
+
+private val sessionButtonNames = linkedMapOf(
+    "like" to "Like",
+    "shuffle" to "Shuffle",
+    "repeat" to "Repeat",
+    "dislike" to "Not for me",
+    "back10" to "Back 10 seconds",
+    "ahead30" to "Forward 30 seconds"
+)
+
+@Composable
+private fun SessionButtonsSettings(
+    selected: List<String>,
+    onSelectionChanged: (List<String>) -> Unit,
+    onMove: (Int, Int) -> Unit
+) {
+    SettingsGroupCard(listOf {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                "Choose and arrange media-session actions. The first two appear beside playback controls in the notification; compatible controllers can use the full selected set.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            val ordered = selected.filter { it in sessionButtonNames.keys }
+            ordered.forEachIndexed { index, key ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.Checkbox(
+                        checked = true,
+                        onCheckedChange = { enabled ->
+                            if (!enabled && ordered.size > 2) onSelectionChanged(ordered - key)
+                        }
+                    )
+                    Text(sessionButtonNames[key] ?: key, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    TextButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) { Text("↑") }
+                    TextButton(onClick = { onMove(index, index + 1) }, enabled = index < ordered.lastIndex) { Text("↓") }
+                }
+            }
+            sessionButtonNames.filterKeys { it !in ordered }.forEach { (key, label) ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.Checkbox(
+                        checked = false,
+                        enabled = ordered.size < 6,
+                        onCheckedChange = { enabled ->
+                            if (enabled && ordered.size < 6) onSelectionChanged(ordered + key)
+                        }
+                    )
+                    Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (ordered != listOf("like", "shuffle", "repeat", "back10", "ahead30")) {
+                TextButton(
+                    onClick = { onSelectionChanged(listOf("like", "shuffle", "repeat", "back10", "ahead30")) }
+                ) { Text("Restore default order") }
+            }
+        }
+    })
 }
 
 private val playerButtonNames = linkedMapOf(
