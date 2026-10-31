@@ -55,6 +55,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -127,6 +128,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.edit
 import androidx.core.net.toUri
@@ -155,8 +157,11 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.URLEncoder
 import java.text.DecimalFormat
+import org.json.JSONObject
 import kotlin.math.log10
 import kotlin.math.pow
+
+private const val KEY_SAVED_APPEARANCE_LOOKS = "saved_appearance_looks"
 
 private val SmoothSpring = spring<Float>(
     dampingRatio = Spring.DampingRatioNoBouncy,
@@ -596,6 +601,98 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val safe = value.takeIf { it in listOf("Compact", "Comfortable", "Large") } ?: "Comfortable"
         _uiDensity.value = safe
         prefs.edit { putString("ui_density", safe) }
+    }
+
+    // ── Saved appearance Looks ──────────────────────────────────────────────
+    // A Look stores only presentation preferences. Playback, downloads, cache,
+    // account and library settings are deliberately excluded.
+    private val appearanceLookKeys = listOf(
+        "theme_mode", KEY_AMOLED_BLACK, KEY_DYNAMIC_ALBUM_THEME, KEY_APPEARANCE_PRESET,
+        KEY_PLAYER_ARTWORK_SHAPE, "player_background_style", "mini_player_style",
+        "mini_player_control_shape", "mini_player_control_icons", "mini_player_progress",
+        "player_layout", "player_buttons", "player_title_align", "player_title_size",
+        "player_title_weight", "player_title_scroll", "player_times", "scrubber_style",
+        "scrubber_color", "player_visualizer", "player_button_style", "scrubber_thickness",
+        "scrubber_thumb_style", "visualizer_color", "lyrics_text_size", "lyrics_alignment",
+        "lyrics_font_family", "ui_density", "nav_label_mode", "hide_nav_labels",
+        "dynamic_nav_style"
+    )
+
+    private fun readSavedAppearanceLooks(): List<String> = runCatching {
+        val json = JSONObject(prefs.getString(KEY_SAVED_APPEARANCE_LOOKS, "{}") ?: "{}")
+        json.keys().asSequence().toList()
+    }.getOrDefault(emptyList())
+
+    private val _savedAppearanceLooks = MutableStateFlow(readSavedAppearanceLooks())
+    val savedAppearanceLooks: StateFlow<List<String>> = _savedAppearanceLooks.asStateFlow()
+
+    fun saveAppearanceLook(rawName: String) {
+        val name = rawName.trim().replace(Regex("[\\r\\n]"), " ").take(32)
+        if (name.isBlank()) return
+
+        val all = prefs.all
+        val snapshot = JSONObject()
+        appearanceLookKeys.forEach { key ->
+            val value = all[key] ?: return@forEach
+            if (value !is Set<*>) snapshot.put(key, value)
+        }
+
+        val looks = runCatching {
+            JSONObject(prefs.getString(KEY_SAVED_APPEARANCE_LOOKS, "{}") ?: "{}")
+        }.getOrElse { JSONObject() }
+        looks.put(name, snapshot)
+        prefs.edit { putString(KEY_SAVED_APPEARANCE_LOOKS, looks.toString()) }
+        _savedAppearanceLooks.value = looks.keys().asSequence().toList()
+    }
+
+    fun applyAppearanceLook(name: String) {
+        val looks = runCatching {
+            JSONObject(prefs.getString(KEY_SAVED_APPEARANCE_LOOKS, "{}") ?: "{}")
+        }.getOrNull() ?: return
+        val look = looks.optJSONObject(name) ?: return
+
+        setThemeMode(look.optString("theme_mode", _themeMode.value))
+        setAmoledBlack(look.optBoolean(KEY_AMOLED_BLACK, _amoledBlack.value))
+        setDynamicAlbumTheme(look.optBoolean(KEY_DYNAMIC_ALBUM_THEME, _dynamicAlbumTheme.value))
+        setAppearancePreset(look.optString(KEY_APPEARANCE_PRESET, _appearancePreset.value))
+        setPlayerArtworkShape(look.optString(KEY_PLAYER_ARTWORK_SHAPE, _playerArtworkShape.value))
+        setPlayerBackgroundStyle(look.optString("player_background_style", _playerBackgroundStyle.value))
+        setMiniPlayerStyle(look.optString("mini_player_style", _miniPlayerStyle.value))
+        setMiniPlayerControlShape(look.optString("mini_player_control_shape", _miniPlayerControlShape.value))
+        setMiniPlayerControlIcons(look.optString("mini_player_control_icons", _miniPlayerControlIcons.value))
+        setMiniPlayerProgressStyle(look.optString("mini_player_progress", _miniPlayerProgressStyle.value))
+        setPlayerLayout(look.optString("player_layout", _playerLayout.value))
+        setPlayerButtons(
+            look.optString("player_buttons", _playerButtons.value.joinToString(","))
+                .split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        )
+        setPlayerTitleAlign(look.optString("player_title_align", _playerTitleAlign.value))
+        setPlayerTitleSize(look.optString("player_title_size", _playerTitleSize.value))
+        setPlayerTitleWeight(look.optString("player_title_weight", _playerTitleWeight.value))
+        setPlayerTitleScroll(look.optBoolean("player_title_scroll", _playerTitleScroll.value))
+        setPlayerTimes(look.optString("player_times", _playerTimes.value))
+        setScrubberStyle(look.optString("scrubber_style", _scrubberStyle.value))
+        setScrubberColor(look.optString("scrubber_color", _scrubberColor.value))
+        setVisualizerStyle(look.optString("player_visualizer", _visualizerStyle.value))
+        setPlayerButtonStyle(look.optString("player_button_style", _playerButtonStyle.value))
+        setScrubberThickness(look.optDouble("scrubber_thickness", _scrubberThickness.value.toDouble()).toFloat())
+        setScrubberThumbStyle(look.optString("scrubber_thumb_style", _scrubberThumbStyle.value))
+        setVisualizerColor(look.optString("visualizer_color", _visualizerColor.value))
+        setLyricsTextSize(look.optString("lyrics_text_size", _lyricsTextSize.value))
+        setLyricsAlignment(look.optString("lyrics_alignment", _lyricsAlignment.value))
+        setLyricsFontFamily(look.optString("lyrics_font_family", _lyricsFontFamily.value))
+        setUiDensity(look.optString("ui_density", _uiDensity.value))
+        setNavLabelsMode(look.optString("nav_label_mode", _navLabelsMode.value))
+        setDynamicNavStyle(look.optBoolean("dynamic_nav_style", _dynamicNavStyle.value))
+    }
+
+    fun deleteAppearanceLook(name: String) {
+        val looks = runCatching {
+            JSONObject(prefs.getString(KEY_SAVED_APPEARANCE_LOOKS, "{}") ?: "{}")
+        }.getOrNull() ?: return
+        looks.remove(name)
+        prefs.edit { putString(KEY_SAVED_APPEARANCE_LOOKS, looks.toString()) }
+        _savedAppearanceLooks.value = looks.keys().asSequence().toList()
     }
 
     // ── Ignore Short Audio ──────────────────────────────────────────────────
@@ -1075,6 +1172,7 @@ fun SettingsScreenContent(
     val isPlayerExpanded by playerSharedViewModel.isPlayerExpanded.collectAsStateWithLifecycle()
     val amoledBlack by viewModel.amoledBlack.collectAsStateWithLifecycle()
     val dynamicAlbumTheme by viewModel.dynamicAlbumTheme.collectAsStateWithLifecycle()
+    val savedAppearanceLooks by viewModel.savedAppearanceLooks.collectAsStateWithLifecycle()
     val appearancePreset by viewModel.appearancePreset.collectAsStateWithLifecycle()
     val playerArtworkShape by viewModel.playerArtworkShape.collectAsStateWithLifecycle()
     val playerBackgroundStyle by viewModel.playerBackgroundStyle.collectAsStateWithLifecycle()
@@ -1277,6 +1375,10 @@ fun SettingsScreenContent(
                 onAmoledBlackChange = { viewModel.setAmoledBlack(it) },
                 dynamicAlbumTheme = dynamicAlbumTheme,
                 onDynamicAlbumThemeChange = { viewModel.setDynamicAlbumTheme(it) },
+                savedLooks = savedAppearanceLooks,
+                onSaveLook = { viewModel.saveAppearanceLook(it) },
+                onApplyLook = { viewModel.applyAppearanceLook(it) },
+                onDeleteLook = { viewModel.deleteAppearanceLook(it) },
                 appearancePreset = appearancePreset,
                 onAppearancePresetChange = { viewModel.setAppearancePreset(it) },
                 playerArtworkShape = playerArtworkShape,
@@ -2313,6 +2415,10 @@ private fun AppearanceScreen(
     onAmoledBlackChange: (Boolean) -> Unit,
     dynamicAlbumTheme: Boolean,
     onDynamicAlbumThemeChange: (Boolean) -> Unit,
+    savedLooks: List<String>,
+    onSaveLook: (String) -> Unit,
+    onApplyLook: (String) -> Unit,
+    onDeleteLook: (String) -> Unit,
     appearancePreset: String,
     onAppearancePresetChange: (String) -> Unit,
     playerArtworkShape: String,
@@ -2385,6 +2491,13 @@ private fun AppearanceScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+            )
+
+            SavedLooksEditor(
+                looks = savedLooks,
+                onSave = onSaveLook,
+                onApply = onApplyLook,
+                onDelete = onDeleteLook
             )
 
             SettingsHeader("Theme")
@@ -2662,6 +2775,123 @@ private fun AppearanceScreen(
                 }
                 add { DynamicNavStyleRow(dynamicNavStyle, onDynamicNavStyleChange) }
             })
+        }
+    }
+}
+
+@Composable
+private fun SavedLooksEditor(
+    looks: List<String>,
+    onSave: (String) -> Unit,
+    onApply: (String) -> Unit,
+    onDelete: (String) -> Unit
+) {
+    var showSaveDialog by remember { mutableStateOf(false) }
+    var lookName by remember { mutableStateOf("") }
+    val accent = MaterialTheme.colorScheme.primary
+    val surface = MaterialTheme.colorScheme.surfaceContainerLow
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text("Your Looks", style = MaterialTheme.typography.titleLarge, color = textColor)
+        Text(
+            "Save the complete visual setup — colors, player, lyrics, typography and navigation — then switch between looks in one tap.",
+            style = MaterialTheme.typography.bodySmall,
+            color = secondary
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                .background(surface).clickable { lookName = ""; showSaveDialog = true }
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Save current look", style = MaterialTheme.typography.titleSmall, color = textColor)
+                Text("Create a reusable appearance preset", style = MaterialTheme.typography.bodySmall, color = secondary)
+            }
+            Text("+", style = MaterialTheme.typography.headlineSmall, color = accent)
+        }
+        if (looks.isEmpty()) {
+            Text("No saved looks yet. Save your current setup to create your first one.", style = MaterialTheme.typography.bodySmall, color = secondary)
+        } else {
+            looks.forEach { name ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                        .background(surface).padding(start = 14.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(name, style = MaterialTheme.typography.titleSmall, color = textColor, maxLines = 1)
+                        Text("Saved appearance", style = MaterialTheme.typography.bodySmall, color = secondary)
+                    }
+                    Box(
+                        Modifier.clip(RoundedCornerShape(50)).background(accent.copy(alpha = 0.16f))
+                            .clickable { onApply(name) }.padding(horizontal = 13.dp, vertical = 8.dp)
+                    ) {
+                        Text("Apply", style = MaterialTheme.typography.labelMedium, color = accent)
+                    }
+                    Box(
+                        Modifier.padding(start = 6.dp).clip(RoundedCornerShape(50))
+                            .clickable { onDelete(name) }.padding(horizontal = 10.dp, vertical = 8.dp)
+                    ) {
+                        Text("Delete", style = MaterialTheme.typography.labelMedium, color = secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    if (showSaveDialog) {
+        Dialog(onDismissRequest = { showSaveDialog = false }) {
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text("Save this Look", style = MaterialTheme.typography.titleLarge, color = textColor)
+                Text(
+                    "Your current colors, player layout, controls, lyrics and navigation will be saved together.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = secondary
+                )
+                BasicTextField(
+                    value = lookName,
+                    onValueChange = { lookName = it.take(32) },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = textColor),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                        .background(surface).padding(horizontal = 14.dp, vertical = 13.dp),
+                    decorationBox = { inner ->
+                        Box {
+                            if (lookName.isEmpty()) {
+                                Text("Look name", color = secondary, style = MaterialTheme.typography.bodyLarge)
+                            }
+                            inner()
+                        }
+                    }
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.align(Alignment.End)) {
+                    Box(
+                        Modifier.clip(RoundedCornerShape(50)).clickable { showSaveDialog = false }
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                    ) { Text("Cancel", color = secondary, style = MaterialTheme.typography.labelLarge) }
+                    Box(
+                        Modifier.clip(RoundedCornerShape(50))
+                            .background(if (lookName.isBlank()) accent.copy(alpha = 0.28f) else accent)
+                            .clickable(enabled = lookName.isNotBlank()) {
+                                onSave(lookName.trim())
+                                showSaveDialog = false
+                            }
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) { Text("Save", color = Color(0xFF0B1220), style = MaterialTheme.typography.labelLarge) }
+                }
+            }
         }
     }
 }
