@@ -45,6 +45,8 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -1947,12 +1949,19 @@ private fun MiniPlayerContentInternal(
                     androidx.compose.material3.CircularProgressIndicator(
                         modifier = Modifier.size(20.dp), color = contentColor, strokeWidth = 2.dp
                     )
-                } else {
+                } else if (controlIconSet == "Classic") {
                     Icon(
                         painter = painterResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play),
                         contentDescription = "Play/Pause",
                         tint = contentColor,
                         modifier = Modifier.size(20.dp)
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = "Play/Pause",
+                        tint = contentColor,
+                        modifier = Modifier.size(23.dp)
                     )
                 }
             }

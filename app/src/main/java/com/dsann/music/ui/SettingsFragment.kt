@@ -2580,8 +2580,8 @@ private fun AppearanceScreen(
                 },
                 {
                     SettingsChoiceRow(
-                        title = "Mini-player skip icons",
-                        description = "Choose classic skip, chevron or seek-style previous and next icons.",
+                        title = "Mini-player icon set",
+                        description = "Choose classic, chevron or seek-style icons for previous, play/pause and next.",
                         selected = miniPlayerControlIcons,
                         options = listOf("Classic", "Chevron", "Seek"),
                         onSelected = onMiniPlayerControlIconsChange
