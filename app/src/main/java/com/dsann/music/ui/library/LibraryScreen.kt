@@ -661,6 +661,35 @@ fun LibraryScreen(
                                     list
                                 }
 
+                                // Precompute each song's position within its heading group once.
+                                // Calculating this by scanning the list inside every LazyColumn row
+                                // made large date/artist groups increasingly expensive to scroll.
+                                val groupedSongPositions = remember(sortedAndGrouped) {
+                                    buildMap<Long, Pair<Int, Int>> {
+                                        var cursor = 0
+                                        while (cursor < sortedAndGrouped.size) {
+                                            if (sortedAndGrouped[cursor] !is String) {
+                                                cursor++
+                                                continue
+                                            }
+                                            val sectionStart = cursor + 1
+                                            var sectionEnd = sectionStart
+                                            while (
+                                                sectionEnd < sortedAndGrouped.size &&
+                                                sortedAndGrouped[sectionEnd] is SongItem
+                                            ) {
+                                                sectionEnd++
+                                            }
+                                            val sectionCount = sectionEnd - sectionStart
+                                            for (songIndex in sectionStart until sectionEnd) {
+                                                val song = sortedAndGrouped[songIndex] as SongItem
+                                                put(song.id, (songIndex - sectionStart) to sectionCount)
+                                            }
+                                            cursor = sectionEnd
+                                        }
+                                    }
+                                }
+
                                 if (sortedAndGrouped.isEmpty()) {
                                     Box(
                                         modifier = Modifier
@@ -685,7 +714,16 @@ fun LibraryScreen(
                                         contentPadding = PaddingValues(bottom = 160.dp),
                                         verticalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
-                                        itemsIndexed(sortedAndGrouped) { index, item ->
+                                        itemsIndexed(
+                                            items = sortedAndGrouped,
+                                            key = { _, item ->
+                                                if (item is SongItem) "downloaded-song:${item.id}"
+                                                else "downloaded-section:$item"
+                                            },
+                                            contentType = { _, item ->
+                                                if (item is SongItem) "downloaded-song" else "section-header"
+                                            }
+                                        ) { index, item ->
                                             if (item is String) {
                                                 Text(
                                                     text = item,
@@ -700,23 +738,8 @@ fun LibraryScreen(
                                                 val isPlaying = currentSong?.id == item.id
                                                 val isFav = favoriteIds.contains(item.id)
 
-                                                // Calculate segment position
-                                                var sectionStartIndex = index
-                                                for (i in index - 1 downTo 0) {
-                                                    if (sortedAndGrouped[i] is String) {
-                                                        sectionStartIndex = i + 1
-                                                        break
-                                                    }
-                                                    if (i == 0) sectionStartIndex = 0
-                                                }
-
-                                                var count = 0
-                                                for (i in sectionStartIndex until sortedAndGrouped.size) {
-                                                    if (sortedAndGrouped[i] is String) break
-                                                    count++
-                                                }
-
-                                                val localIndex = index - sectionStartIndex
+                                                val (localIndex, count) =
+                                                    groupedSongPositions[item.id] ?: (0 to 1)
 
                                                 // SwipeToDismissBox implementation
                                                 val dismissState = rememberSwipeToDismissBoxState(
