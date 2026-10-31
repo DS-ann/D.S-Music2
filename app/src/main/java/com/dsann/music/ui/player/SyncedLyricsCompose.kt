@@ -1,5 +1,7 @@
 package com.dsann.music.ui.player
 
+import com.dsann.music.SpatialFlowApplication
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -751,19 +753,24 @@ private fun InterludeItem(
         label = "InterludeProgress"
     )
 
-    val infiniteTransition = rememberInfiniteTransition(label = "InterludeBreathing")
-    val breatheScale by infiniteTransition.animateFloat(
-        initialValue = 0.82f,
-        targetValue = 1.18f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = 1400,
-                easing = FastOutSlowInEasing
+    val breatheScale = if (SpatialFlowApplication.isLowRamDevice) {
+        1f
+    } else {
+        val infiniteTransition = rememberInfiniteTransition(label = "InterludeBreathing")
+        val animatedScale by infiniteTransition.animateFloat(
+            initialValue = 0.82f,
+            targetValue = 1.18f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(
+                    durationMillis = 1400,
+                    easing = FastOutSlowInEasing
+                ),
+                repeatMode = RepeatMode.Reverse
             ),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "BreathScale"
-    )
+            label = "BreathScale"
+        )
+        animatedScale
+    }
 
     val iconAlpha by animateFloatAsState(
         targetValue = if (isActive) 0.85f else 0.25f,

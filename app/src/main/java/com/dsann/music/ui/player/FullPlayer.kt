@@ -107,13 +107,15 @@ private fun PlayerVisualizer(
 ) {
     val phase = remember { Animatable(0f) }
     val lowRamProfile = SpatialFlowApplication.isLowRamDevice
-    LaunchedEffect(style, isPlaying, isVisible) {
-        if (!isVisible || !isPlaying || style == "Off") {
-            phase.snapTo(0f)
-        } else {
-            while (true) {
-                phase.animateTo(1f, animationSpec = tween(900, easing = LinearEasing))
-                phase.snapTo(0f)
+    LaunchedEffect(style, isPlaying, isVisible, lowRamProfile) {
+        when {
+            !isVisible || !isPlaying || style == "Off" -> phase.snapTo(0f)
+            lowRamProfile -> phase.snapTo(0.42f)
+            else -> {
+                while (true) {
+                    phase.animateTo(1f, animationSpec = tween(900, easing = LinearEasing))
+                    phase.snapTo(0f)
+                }
             }
         }
     }
@@ -903,7 +905,13 @@ fun FullPlayer(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onCollapse) {
+                Box(
+                    modifier = Modifier.size(46.dp)
+                        .clip(CircleShape)
+                        .background(contentColor.copy(alpha = 0.08f))
+                        .clickable(onClick = onCollapse),
+                    contentAlignment = Alignment.Center
+                ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_keyboard_arrow_down),
                         contentDescription = "Collapse Player",
