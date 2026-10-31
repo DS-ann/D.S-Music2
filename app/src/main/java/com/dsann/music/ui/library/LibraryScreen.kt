@@ -110,6 +110,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -585,80 +586,106 @@ fun LibraryScreen(
                                 Spacer(modifier = Modifier.height(6.dp))
 
                                 // Keep this folder scoped to files saved by SpatialFlow's downloader.
-                                val sourceSongs = remember(localSongs, activeTab) {
-                                    localSongs.filter(::isSpatialFlowDownloadedSong)
-                                }
-
-                                // Filter, Sort, and Group local songs
-                                val filteredSongs = remember(sourceSongs, searchQuery) {
-                                    sourceSongs.filter {
-                                        it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true)
+                                // Build the download list away from the UI thread. Large libraries
+                                // used to filter, sort and group synchronously during composition,
+                                // which stalled both first display and every search/sort change.
+                                val sourceSongs by produceState(
+                                    initialValue = emptyList<SongItem>(),
+                                    localSongs,
+                                    activeTab
+                                ) {
+                                    value = withContext(Dispatchers.Default) {
+                                        localSongs.filter(::isSpatialFlowDownloadedSong)
                                     }
                                 }
 
-                                val sortedAndGrouped = remember(filteredSongs, sortOrder) {
-                                    if (filteredSongs.isEmpty()) return@remember emptyList()
-
-                                    val sorted = when (sortOrder) {
-                                        SortOrder.A_Z -> filteredSongs.sortedWith(compareBy { it.title.lowercase() })
-                                        SortOrder.DATE_ADDED -> filteredSongs.sortedWith(compareByDescending { it.dateAdded })
-                                        SortOrder.ARTIST -> filteredSongs.sortedWith(compareBy { it.artist.lowercase() })
-                                        SortOrder.DURATION -> filteredSongs.sortedWith(compareByDescending { it.duration })
-                                    }
-
-                                    val groups = LinkedHashMap<String, MutableList<SongItem>>()
-                                    when (sortOrder) {
-                                        SortOrder.A_Z -> {
-                                            for (song in sorted) {
-                                                val header = if (song.title.isEmpty()) "#" else {
-                                                    val char = song.title.uppercase().first()
-                                                    if (char.isLetter()) char.toString() else "#"
-                                                }
-                                                groups.getOrPut(header) { mutableListOf() }.add(song)
-                                            }
-                                        }
-                                        SortOrder.DATE_ADDED -> {
-                                            for (song in sorted) {
-                                                val diff = (System.currentTimeMillis() / 1000) - song.dateAdded
-                                                val days = diff / (60 * 60 * 24)
-                                                val header = when {
-                                                    days < 1 -> "Today"
-                                                    days < 2 -> "Yesterday"
-                                                    days < 7 -> "This Week"
-                                                    days < 30 -> "This Month"
-                                                    days < 365 -> "This Year"
-                                                    else -> "Older"
-                                                }
-                                                groups.getOrPut(header) { mutableListOf() }.add(song)
-                                            }
-                                        }
-                                        SortOrder.ARTIST -> {
-                                            for (song in sorted) {
-                                                val header = song.artist.ifBlank { "Unknown Artist" }
-                                                groups.getOrPut(header) { mutableListOf() }.add(song)
-                                            }
-                                        }
-                                        SortOrder.DURATION -> {
-                                            for (song in sorted) {
-                                                val min = song.duration / 60000
-                                                val header = when {
-                                                    min < 2 -> "Under 2 min"
-                                                    min < 4 -> "2-4 min"
-                                                    min < 6 -> "4-6 min"
-                                                    min < 10 -> "6-10 min"
-                                                    else -> "Over 10 min"
-                                                }
-                                                groups.getOrPut(header) { mutableListOf() }.add(song)
-                                            }
+                                val filteredSongs by produceState(
+                                    initialValue = emptyList<SongItem>(),
+                                    sourceSongs,
+                                    searchQuery
+                                ) {
+                                    if (searchQuery.isNotBlank()) delay(120L)
+                                    val query = searchQuery.trim()
+                                    value = withContext(Dispatchers.Default) {
+                                        if (query.isEmpty()) sourceSongs else sourceSongs.filter {
+                                            it.title.contains(query, ignoreCase = true) ||
+                                                it.artist.contains(query, ignoreCase = true)
                                         }
                                     }
+                                }
 
-                                    val list = mutableListOf<Any>()
-                                    for ((header, groupSongs) in groups) {
-                                        list.add(header)
-                                        list.addAll(groupSongs)
+                                val sortedAndGrouped by produceState<List<Any>>(
+                                    initialValue = emptyList(),
+                                    filteredSongs,
+                                    sortOrder
+                                ) {
+                                    value = withContext(Dispatchers.Default) {
+                                        if (filteredSongs.isEmpty()) {
+                                            emptyList()
+                                        } else {
+                                            val sorted = when (sortOrder) {
+                                                SortOrder.A_Z -> filteredSongs.sortedWith(compareBy { it.title.lowercase() })
+                                                SortOrder.DATE_ADDED -> filteredSongs.sortedWith(compareByDescending { it.dateAdded })
+                                                SortOrder.ARTIST -> filteredSongs.sortedWith(compareBy { it.artist.lowercase() })
+                                                SortOrder.DURATION -> filteredSongs.sortedWith(compareByDescending { it.duration })
+                                            }
+
+                                            val groups = LinkedHashMap<String, MutableList<SongItem>>()
+                                            when (sortOrder) {
+                                                SortOrder.A_Z -> {
+                                                    for (song in sorted) {
+                                                        val header = if (song.title.isEmpty()) "#" else {
+                                                            val char = song.title.uppercase().first()
+                                                            if (char.isLetter()) char.toString() else "#"
+                                                        }
+                                                        groups.getOrPut(header) { mutableListOf() }.add(song)
+                                                    }
+                                                }
+                                                SortOrder.DATE_ADDED -> {
+                                                    val nowSeconds = System.currentTimeMillis() / 1000
+                                                    for (song in sorted) {
+                                                        val diff = (nowSeconds - song.dateAdded).coerceAtLeast(0L)
+                                                        val days = diff / (60 * 60 * 24)
+                                                        val header = when {
+                                                            days < 1 -> "Today"
+                                                            days < 2 -> "Yesterday"
+                                                            days < 7 -> "This Week"
+                                                            days < 30 -> "This Month"
+                                                            days < 365 -> "This Year"
+                                                            else -> "Older"
+                                                        }
+                                                        groups.getOrPut(header) { mutableListOf() }.add(song)
+                                                    }
+                                                }
+                                                SortOrder.ARTIST -> {
+                                                    for (song in sorted) {
+                                                        val header = song.artist.ifBlank { "Unknown Artist" }
+                                                        groups.getOrPut(header) { mutableListOf() }.add(song)
+                                                    }
+                                                }
+                                                SortOrder.DURATION -> {
+                                                    for (song in sorted) {
+                                                        val minutes = song.duration / 60000
+                                                        val header = when {
+                                                            minutes < 2 -> "Under 2 min"
+                                                            minutes < 4 -> "2-4 min"
+                                                            minutes < 6 -> "4-6 min"
+                                                            minutes < 10 -> "6-10 min"
+                                                            else -> "Over 10 min"
+                                                        }
+                                                        groups.getOrPut(header) { mutableListOf() }.add(song)
+                                                    }
+                                                }
+                                            }
+
+                                            buildList<Any> {
+                                                for ((header, groupSongs) in groups) {
+                                                    add(header)
+                                                    addAll(groupSongs)
+                                                }
+                                            }
+                                        }
                                     }
-                                    list
                                 }
 
                                 // Precompute each song's position within its heading group once.
