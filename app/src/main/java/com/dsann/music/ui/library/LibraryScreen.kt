@@ -2071,6 +2071,16 @@ private fun OnlinePlaylistCard(
     onClick: () -> Unit,
     onDelete: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
+    val thumbnailRequest = remember(context, playlist.thumbnailUrl) {
+        playlist.thumbnailUrl?.takeIf { it.isNotBlank() }?.let { url ->
+            ImageRequest.Builder(context)
+                .data(url)
+                .crossfade(false)
+                .build()
+        }
+    }
+
     if (asList) {
         ListItem(
             headlineContent = {
@@ -2082,7 +2092,7 @@ private fun OnlinePlaylistCard(
             leadingContent = {
                 if (!playlist.thumbnailUrl.isNullOrBlank()) {
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(playlist.thumbnailUrl).crossfade(false).build(),
+                        model = thumbnailRequest,
                         contentDescription = null,
                         modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)),
                         contentScale = ContentScale.Crop
@@ -2127,13 +2137,8 @@ private fun OnlinePlaylistCard(
                     .weight(1f)
             ) {
                 if (playlist.thumbnailUrl?.isNotEmpty() == true) {
-                    androidx.compose.foundation.Image(
-                        painter = coil.compose.rememberAsyncImagePainter(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(playlist.thumbnailUrl)
-                                .crossfade(true)
-                                .build()
-                        ),
+                    AsyncImage(
+                        model = thumbnailRequest,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
