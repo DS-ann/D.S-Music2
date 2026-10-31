@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -228,19 +230,27 @@ fun DsmusicFilterChip(
     leadingIcon: (@Composable () -> Unit)? = null,
     trailingIcon: (@Composable () -> Unit)? = null
 ) {
-    val accent = MaterialTheme.colorScheme.primary
+    val scheme = MaterialTheme.colorScheme
     Row(
         modifier = modifier.clip(shape)
-            .background(if (selected) accent.copy(alpha = 0.17f) else MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(1.dp, if (selected) accent.copy(alpha = 0.52f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), shape)
+            .background(if (selected) scheme.primary else scheme.surfaceContainerLow)
+            .border(
+                1.dp,
+                if (selected) scheme.primary else scheme.outlineVariant.copy(alpha = 0.42f),
+                shape
+            )
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 13.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        leadingIcon?.invoke()
-        label()
-        trailingIcon?.invoke()
+        CompositionLocalProvider(
+            LocalContentColor provides if (selected) scheme.onPrimary else scheme.onSurfaceVariant
+        ) {
+            leadingIcon?.invoke()
+            label()
+            trailingIcon?.invoke()
+        }
     }
 }
 
@@ -261,7 +271,7 @@ fun DsmusicSwitchControl(
         contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
     ) {
         Box(Modifier.size(if (checked) 20.dp else 18.dp).clip(CircleShape)
-            .background(if (checked) Color(0xFF0B1220) else MaterialTheme.colorScheme.onSurfaceVariant))
+            .background(if (checked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant))
     }
 }
 
