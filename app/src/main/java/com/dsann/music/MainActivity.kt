@@ -206,6 +206,8 @@ class MainActivity : AppCompatActivity() {
                     if (prefs.getBoolean("hide_nav_labels", false)) "Never" else "Always"
                 )
                 val dynamicNavStyle by prefs.observeKey("dynamic_nav_style", false)
+                val navBarStyle by prefs.observeKey("nav_bar_style", "Floating")
+                val navBarSize by prefs.observeKey("nav_bar_size", "Standard")
                 val hasSeenOnboarding by prefs.observeKey("has_seen_onboarding_1_8", false)
 
                 val currentNavController = rememberNavController()
@@ -234,7 +236,12 @@ class MainActivity : AppCompatActivity() {
 
                         val density = LocalDensity.current
                         val navigationBarsHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
-                        val bottomNavHeight = 80.dp
+                        val configuredNavHeight = when (navBarSize) {
+                            "Compact" -> 56.dp
+                            "Tall" -> 76.dp
+                            else -> 66.dp
+                        }
+                        val bottomNavHeight = if (dynamicNavStyle) 64.dp else configuredNavHeight
                         val bottomNavHeightPx = with(density) { bottomNavHeight.toPx() }
                         val totalSlideDistPx = bottomNavHeightPx + navigationBarsHeightPx
 
@@ -250,9 +257,13 @@ class MainActivity : AppCompatActivity() {
                             label = "BottomNavTranslationY"
                         )
 
-                        val navBarHeight by animateDpAsState(if (dynamicNavStyle) 64.dp else 80.dp, label = "navBarHeight")
-                        val navIconSize by animateDpAsState(if (dynamicNavStyle) 34.dp else 26.dp, label = "navIconSize")
-                        val navElevation by animateDpAsState(if (dynamicNavStyle) 8.dp else 3.dp, label = "navElevation")
+                        val navBarHeight by animateDpAsState(bottomNavHeight, label = "navBarHeight")
+                        val configuredIconSize = when (navBarSize) {
+                            "Compact" -> 22.dp
+                            "Tall" -> 30.dp
+                            else -> 26.dp
+                        }
+                        val navIconSize by animateDpAsState(if (dynamicNavStyle) 30.dp else configuredIconSize, label = "navIconSize")
                         val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
                         DsmusicNavigationBar(
@@ -266,6 +277,7 @@ class MainActivity : AppCompatActivity() {
                             labelsMode = navLabelsMode,
                             iconSize = navIconSize,
                             bottomInset = bottomPadding,
+                            barStyle = navBarStyle,
                             modifier = Modifier
                                 .graphicsLayer {
                                     val translationY = animatedBaseTranslationState.value
