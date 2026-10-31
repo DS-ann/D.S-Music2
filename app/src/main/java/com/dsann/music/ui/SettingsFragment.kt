@@ -704,7 +704,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         setAmoledBlack(look.optBoolean(KEY_AMOLED_BLACK, _amoledBlack.value))
         setDynamicAlbumTheme(look.optBoolean(KEY_DYNAMIC_ALBUM_THEME, _dynamicAlbumTheme.value))
         setAppearancePreset(look.optString(KEY_APPEARANCE_PRESET, _appearancePreset.value))
-        setCustomAccentColor(look.optString("custom_accent_color", _customAccentColor.value))
+        val savedCustomAccent = look.optString("custom_accent_color", _customAccentColor.value)
+            .trim().uppercase().let { if (it.startsWith("#")) it else "#$it" }
+        if (savedCustomAccent.matches(Regex("#[0-9A-F]{6}"))
+            && runCatching { android.graphics.Color.parseColor(savedCustomAccent) }.isSuccess
+        ) {
+            _customAccentColor.value = savedCustomAccent
+            prefs.edit { putString("custom_accent_color", savedCustomAccent) }
+        }
         setUiCornerStyle(look.optString("ui_corner_style", _uiCornerStyle.value))
         setPlayerArtworkShape(look.optString(KEY_PLAYER_ARTWORK_SHAPE, _playerArtworkShape.value))
         setPlayerBackgroundStyle(look.optString("player_background_style", _playerBackgroundStyle.value))
