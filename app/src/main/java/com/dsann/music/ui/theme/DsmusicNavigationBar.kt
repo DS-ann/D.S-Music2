@@ -64,6 +64,7 @@ fun DsmusicNavigationBar(
     val verticalInset = if (barStyle == "Floating") 4.dp else 0.dp
     Row(
         modifier = modifier
+            .fillMaxWidth()
             .padding(horizontal = horizontalInset, vertical = verticalInset)
             .clip(dockShape)
             .background(if (barStyle == "Minimal") Color.Transparent else surface)
