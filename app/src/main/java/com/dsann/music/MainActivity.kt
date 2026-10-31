@@ -229,10 +229,8 @@ class MainActivity : AppCompatActivity() {
                         val bottomNavHeightPx = with(density) { bottomNavHeight.toPx() }
                         val totalSlideDistPx = bottomNavHeightPx + navigationBarsHeightPx
 
-                        val playerExpansionFractionState = playerViewModel.playerExpansionFraction.collectAsState()
-
-                        // This is the target for general bottom nav visibility (like scrolling or settings screen)
-                        val baseTargetTranslation = if (showBottomBar && isBottomNavVisible) 0f else totalSlideDistPx
+                        // Keep navigation anchored while the player expands and while content scrolls.
+                        val baseTargetTranslation = if (showBottomBar) 0f else totalSlideDistPx
 
                         val animatedBaseTranslationState = animateFloatAsState(
                             targetValue = baseTargetTranslation,
@@ -245,13 +243,10 @@ class MainActivity : AppCompatActivity() {
 
                         // Monitor translations without triggering recomposition every frame
                         LaunchedEffect(totalSlideDistPx) {
-                            snapshotFlow {
-                                val currentBase = animatedBaseTranslationState.value
-                                val currentFraction = playerExpansionFractionState.value
-                                (currentBase + (totalSlideDistPx * currentFraction)).coerceAtMost(totalSlideDistPx)
-                            }.collect { translationY ->
-                                playerViewModel.setBottomNavTranslationY(translationY)
-                            }
+                            snapshotFlow { animatedBaseTranslationState.value }
+                                .collect { translationY ->
+                                    playerViewModel.setBottomNavTranslationY(translationY)
+                                }
                         }
 
                         val navBarHeight by animateDpAsState(if (dynamicNavStyle) 64.dp else 80.dp, label = "navBarHeight")
@@ -262,9 +257,8 @@ class MainActivity : AppCompatActivity() {
                         NavigationBar(
                             modifier = Modifier
                                 .graphicsLayer {
-                                    val currentBase = animatedBaseTranslationState.value
-                                    val currentFraction = playerExpansionFractionState.value
-                                    val translationY = (currentBase + (totalSlideDistPx * currentFraction)).coerceAtMost(totalSlideDistPx)
+                                    val translationY = animatedBaseTranslationState.value
+                                        .coerceIn(0f, totalSlideDistPx)
                                     this.translationY = translationY
                                     this.alpha = if (translationY >= totalSlideDistPx - 1f) 0f else 1f
                                 }
@@ -335,7 +329,7 @@ class MainActivity : AppCompatActivity() {
                     )
 
                     // Base padding target not considering expansion
-                    val baseTargetPadding = if (!useNavigationRail && showBottomBar && isBottomNavVisible) {
+                    val baseTargetPadding = if (!useNavigationRail && showBottomBar) {
                         paddingValues.calculateBottomPadding()
                     } else {
                         0.dp
