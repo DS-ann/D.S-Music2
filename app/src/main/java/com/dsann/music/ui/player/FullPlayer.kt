@@ -982,8 +982,9 @@ fun FullPlayer(
                         color = contentSecondary,
                         maxLines = 1,
                         textAlign = if (playerTitleAlign == "Centered") androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
-                        modifier = (if (playerTitleScroll) Modifier.basicMarqueeWithFadedEdges() else Modifier)
-                            .clickable {
+                        modifier = (if (playerTitleScroll && isPlayerVisible) {
+                            Modifier.basicMarqueeWithFadedEdges()
+                        } else Modifier).clickable {
                                 val song = uiState.currentSong
                                 if (song != null) {
                                     onArtistClick(song.artistId, song.artist)
