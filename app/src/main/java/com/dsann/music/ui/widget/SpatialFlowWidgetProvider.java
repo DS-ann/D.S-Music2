@@ -21,8 +21,6 @@ import com.dsann.music.R;
 import com.dsann.music.model.SongItem;
 
 import java.util.Objects;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * Base Widget Provider for D.S Music.
@@ -31,13 +29,6 @@ import java.util.concurrent.Executors;
 public class SpatialFlowWidgetProvider extends AppWidgetProvider {
 
     private static final String TAG = "SpatialFlowWidget";
-    private static final ExecutorService PROGRESS_UPDATE_EXECUTOR =
-            Executors.newSingleThreadExecutor(runnable -> {
-                Thread thread = new Thread(runnable, "D.S-Music-WidgetProgress");
-                thread.setDaemon(true);
-                return thread;
-            });
-
     // Intent Actions from AudioPlaybackService (must match exactly)
     private static final String ACTION_PLAY = "com.dsann.music.ACTION_PLAY";
     private static final String ACTION_PAUSE = "com.dsann.music.ACTION_PAUSE";
@@ -100,10 +91,10 @@ public class SpatialFlowWidgetProvider extends AppWidgetProvider {
     }
 
     public static void updateAllWidgetsPartial(Context context, int position, int duration, String currentLyric) {
-        Context appContext = context.getApplicationContext();
-        PROGRESS_UPDATE_EXECUTOR.execute(() -> {
+        final Context appContext = context.getApplicationContext();
+        final AppWidgetManager manager = AppWidgetManager.getInstance(appContext);
+        new Handler(Looper.getMainLooper()).post(() -> {
             try {
-                AppWidgetManager manager = AppWidgetManager.getInstance(appContext);
                 int[] mediumIds = manager.getAppWidgetIds(
                         new ComponentName(appContext, WidgetMediumProvider.class));
                 for (int id : mediumIds) {
@@ -118,7 +109,7 @@ public class SpatialFlowWidgetProvider extends AppWidgetProvider {
                             appContext, manager, id, position, duration, null, R.layout.widget_large);
                 }
             } catch (Exception error) {
-                Log.w(TAG, "Background widget progress update failed", error);
+                Log.w(TAG, "Widget progress update failed", error);
             }
         });
     }
