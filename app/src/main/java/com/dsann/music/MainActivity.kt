@@ -220,10 +220,10 @@ class MainActivity : AppCompatActivity() {
                 // or Settings does not rebuild the whole screen. CachedRootTabLifecycle suspends
                 // lifecycle-aware collectors and decorative work while a tab is inactive.
                 val isLegacyAndroid6 = Build.VERSION.SDK_INT <= Build.VERSION_CODES.M
-                // Hidden roots still incur Compose measurement/layout even when alpha is zero.
-                // Keep the current and most recently used tab alive on API 23; SaveableStateHolder
-                // preserves the older tab's saveable UI state when its root is evicted.
-                val maxRetainedRootTabs = if (isLegacyAndroid6) 2 else rootTabRoutes.size
+                // An alpha-zero Compose root still participates in measurement and layout.
+                // On API 23 retain only the active root; SaveableStateHolder restores the
+                // previous tab's saveable state without keeping its full UI tree alive.
+                val maxRetainedRootTabs = if (isLegacyAndroid6) 1 else rootTabRoutes.size
                 val visitedRootTabs = remember { mutableStateListOf<String>() }
                 var lastRootTab by remember { mutableStateOf("explore") }
                 LaunchedEffect(currentNavController) {
