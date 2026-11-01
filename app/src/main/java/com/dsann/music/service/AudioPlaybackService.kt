@@ -2084,7 +2084,9 @@ class AudioPlaybackService : MediaSessionService() {
                     // Persist a single position snapshot every five seconds. The old modulo test
                     // could persist repeatedly across the same 250ms boundary.
                     if (player.isPlaying && nowMs - lastPositionPersistedAtMs >= 5_000L) {
-                        com.dsann.music.util.PlaybackStateManager.savePosition(applicationContext, pos)
+                        serviceScope.launch(Dispatchers.IO) {
+                            com.dsann.music.util.PlaybackStateManager.savePosition(applicationContext, pos)
+                        }
                         lastPositionPersistedAtMs = nowMs
                     }
 
