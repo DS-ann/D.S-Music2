@@ -22,7 +22,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
-import com.dsann.music.SpatialFlowApplication
 import kotlin.math.*
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -31,6 +30,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.setProgress
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 /**
  * A highly optimized, custom Bezier curve wavy slider.
@@ -86,20 +86,20 @@ fun WavyMusicSlider(
 
 
 
-    val continuousWaveMotionEnabled = !SpatialFlowApplication.isLowRamDevice
-    LaunchedEffect(shouldShowWave, waveAnimationDuration, continuousWaveMotionEnabled) {
-        if (shouldShowWave && waveAnimationDuration > 0 && continuousWaveMotionEnabled) {
+    LaunchedEffect(shouldShowWave, waveAnimationDuration) {
+        if (shouldShowWave && waveAnimationDuration > 0) {
+            // Draw-only wave motion at a fixed 24 fps. This avoids a 60 fps Compose
+            // animation workload while keeping the wave active on every Android version.
             val fullRotation = (2 * PI).toFloat()
-            while (shouldShowWave) {
-                val start = (phaseShiftAnim.value % fullRotation).let { if (it < 0f) it + fullRotation else it }
-                phaseShiftAnim.snapTo(start)
-                phaseShiftAnim.animateTo(
-                    targetValue = start + fullRotation,
-                    animationSpec = tween(durationMillis = waveAnimationDuration, easing = LinearEasing)
-                )
+            val frameDelayMs = 42L
+            val phaseStep = fullRotation * frameDelayMs / waveAnimationDuration.toFloat()
+            var phase = phaseShiftAnim.value
+            while (true) {
+                phase = (phase + phaseStep) % fullRotation
+                phaseShiftAnim.snapTo(phase)
+                delay(frameDelayMs)
             }
         } else {
-            // Preserve the custom wave track as a static shape on constrained devices.
             phaseShiftAnim.snapTo(0f)
         }
     }
@@ -126,21 +126,7 @@ fun WavyMusicSlider(
     // Smoothly animate seeking/playback progress using M3 Expressive Motion physics
     val animatedNormalizedValueState = animateFloatAsState(
         targetValue = normalizedValue,
-        animationSpec = if (SpatialFlowApplication.isLowRamDevice) {
-            snap()
-        } else if (normalizedValue == 0f) {
-            // Material 3 Slow Spatial spring (Stiffness: 200f, Damping: 0.75f) for hero song transitions
-            spring(
-                dampingRatio = 0.75f,
-                stiffness = 200f
-            )
-        } else {
-            // Material 3 Default Effects spring (Stiffness: 380f, Damping: 1.0f) for linear playback interpolation
-            spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = 380f
-            )
-        },
+        animationSpec = tween(durationMillis = 320, easing = LinearEasing),
         label = "ProgressValueAnim"
     )
 
