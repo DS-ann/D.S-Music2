@@ -109,6 +109,30 @@ private fun PlayerVisualizer(
     isVisible: Boolean
 ) {
     val phase = remember { Animatable(0f) }
+    val wavePaths = remember { arrayOf(
+        androidx.compose.ui.graphics.Path(),
+        androidx.compose.ui.graphics.Path()
+    ) }
+    val wavePrimaryBrush = remember(colorMode, color) {
+        val colors = if (colorMode == "Spectrum") {
+            List(13) { index ->
+                Color.hsv(index / 12f * 300f, 0.78f, 0.96f).copy(alpha = 0.92f)
+            }
+        } else {
+            listOf(color.copy(alpha = 0.92f), color.copy(alpha = 0.92f))
+        }
+        Brush.horizontalGradient(colors)
+    }
+    val waveSecondaryBrush = remember(colorMode, color) {
+        val colors = if (colorMode == "Spectrum") {
+            List(13) { index ->
+                Color.hsv(index / 12f * 300f, 0.78f, 0.96f).copy(alpha = 0.30f)
+            }
+        } else {
+            listOf(color.copy(alpha = 0.30f), color.copy(alpha = 0.30f))
+        }
+        Brush.horizontalGradient(colors)
+    }
     // The visualizer is a draw-only animation. A consistent 24 fps cadence avoids
     // 60 fps Compose invalidations while keeping it animated on Android 6 as well.
     LaunchedEffect(style, isPlaying, isVisible) {
@@ -176,9 +200,10 @@ private fun PlayerVisualizer(
                     strokeWidth = 1.dp.toPx()
                 )
 
-                val points = 64
+                val points = 48
                 repeat(2) { layer ->
-                    val path = androidx.compose.ui.graphics.Path()
+                    val path = wavePaths[layer]
+                    path.reset()
                     repeat(points + 1) { index ->
                         val fraction = index / points.toFloat()
                         val x = size.width * fraction
@@ -200,13 +225,7 @@ private fun PlayerVisualizer(
                     }
                     drawPath(
                         path = path,
-                        brush = Brush.horizontalGradient(
-                            colors = List(13) { index ->
-                                spectrumColor(index / 12f).copy(
-                                    alpha = if (layer == 0) 0.92f else 0.30f
-                                )
-                            }
-                        ),
+                        brush = if (layer == 0) wavePrimaryBrush else waveSecondaryBrush,
                         style = androidx.compose.ui.graphics.drawscope.Stroke(
                             width = if (layer == 0) 1.8.dp.toPx() else 1.dp.toPx(),
                             cap = androidx.compose.ui.graphics.StrokeCap.Round
