@@ -3,6 +3,7 @@ package com.dsann.music.ui.theme
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -15,6 +16,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -100,6 +102,7 @@ data class DsmusicTypography(
     val titleLarge: TextStyle = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold),
     val titleMedium: TextStyle = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Medium),
     val titleSmall: TextStyle = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium),
+    val titleSmallEmphasized: TextStyle = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold),
     val bodyLarge: TextStyle = TextStyle(fontSize = 16.sp, lineHeight = 24.sp),
     val bodyMedium: TextStyle = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
     val bodySmall: TextStyle = TextStyle(fontSize = 12.sp, lineHeight = 16.sp),
@@ -168,7 +171,17 @@ data class DsmusicListItemColors(
     val headlineColor: Color,
     val supportingColor: Color,
     val leadingIconColor: Color,
-    val trailingIconColor: Color
+    val trailingIconColor: Color,
+    val selectedContainerColor: Color = containerColor,
+    val selectedContentColor: Color = headlineColor,
+    val selectedLeadingContentColor: Color = leadingIconColor,
+    val selectedTrailingContentColor: Color = trailingIconColor,
+    val supportingContentColor: Color = supportingColor,
+    val selectedSupportingContentColor: Color = supportingColor,
+    val disabledContainerColor: Color = containerColor,
+    val disabledContentColor: Color = headlineColor.copy(alpha = 0.4f),
+    val disabledLeadingContentColor: Color = leadingIconColor.copy(alpha = 0.4f),
+    val disabledTrailingContentColor: Color = trailingIconColor.copy(alpha = 0.4f)
 )
 
 data class DsmusicTextFieldColors(
@@ -217,6 +230,12 @@ object ButtonDefaults {
         containerColor: Color = DsmusicTheme.colorScheme.primaryContainer,
         contentColor: Color = DsmusicTheme.colorScheme.onPrimaryContainer
     ) = DsmusicButtonColors(containerColor, contentColor, containerColor.copy(alpha = 0.45f), contentColor.copy(alpha = 0.55f))
+    @Composable fun outlinedButtonColors(
+        containerColor: Color = Color.Transparent,
+        contentColor: Color = DsmusicTheme.colorScheme.primary,
+        disabledContainerColor: Color = Color.Transparent,
+        disabledContentColor: Color = DsmusicTheme.colorScheme.onSurfaceVariant
+    ) = DsmusicButtonColors(containerColor, contentColor, disabledContainerColor, disabledContentColor)
 }
 
 object CardDefaults {
@@ -237,8 +256,24 @@ object ListItemDefaults {
         supportingColor: Color = DsmusicTheme.colorScheme.onSurfaceVariant,
         leadingIconColor: Color = DsmusicTheme.colorScheme.onSurfaceVariant,
         trailingIconColor: Color = DsmusicTheme.colorScheme.onSurfaceVariant,
-        overlineColor: Color = DsmusicTheme.colorScheme.onSurfaceVariant
-    ) = DsmusicListItemColors(containerColor, headlineColor, supportingColor, leadingIconColor, trailingIconColor)
+        overlineColor: Color = DsmusicTheme.colorScheme.onSurfaceVariant,
+        selectedContainerColor: Color = containerColor,
+        selectedContentColor: Color = headlineColor,
+        selectedLeadingContentColor: Color = leadingIconColor,
+        selectedTrailingContentColor: Color = trailingIconColor,
+        supportingContentColor: Color = supportingColor,
+        selectedSupportingContentColor: Color = supportingColor,
+        disabledContainerColor: Color = containerColor,
+        disabledContentColor: Color = headlineColor.copy(alpha = 0.4f),
+        disabledLeadingContentColor: Color = leadingIconColor.copy(alpha = 0.4f),
+        disabledTrailingContentColor: Color = trailingIconColor.copy(alpha = 0.4f)
+    ) = DsmusicListItemColors(
+        containerColor, headlineColor, supportingColor, leadingIconColor, trailingIconColor,
+        selectedContainerColor, selectedContentColor, selectedLeadingContentColor, selectedTrailingContentColor,
+        supportingContentColor, selectedSupportingContentColor, disabledContainerColor, disabledContentColor,
+        disabledLeadingContentColor, disabledTrailingContentColor
+    )
+    fun shapes(): DsmusicListItemShapes = DsmusicListItemShapes()
     fun segmentedShapes(index: Int, count: Int): DsmusicListItemShapes = DsmusicListItemShapes(
         RoundedCornerShape(
             topStart = if (index == 0) 14.dp else 4.dp,
@@ -371,6 +406,9 @@ object BottomSheetDefaults {
 }
 
 object WavyProgressIndicatorDefaults {
+    val ProgressAnimationSpec: androidx.compose.animation.core.FiniteAnimationSpec<Float> = tween(durationMillis = 240)
+    val LinearDeterminateWavelength: Dp = 48.dp
+    fun indicatorAmplitude(progress: Float): Float = 0.2f + 0.8f * progress.coerceIn(0f, 1f)
     @Composable fun colors(indicatorColor: Color = DsmusicTheme.colorScheme.primary, trackColor: Color = DsmusicTheme.colorScheme.surfaceVariant) = Pair(indicatorColor, trackColor)
 }
 
@@ -452,8 +490,8 @@ fun Icon(painter: Painter, contentDescription: String? = null, modifier: Modifie
 }
 
 @Composable
-fun IconButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable BoxScope.() -> Unit) {
-    DsmusicIconButton(onClick = onClick, modifier = modifier, enabled = enabled, content = content)
+fun IconButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, interactionSource: MutableInteractionSource? = null, content: @Composable BoxScope.() -> Unit) {
+    DsmusicIconButton(onClick = onClick, modifier = modifier, enabled = enabled, interactionSource = interactionSource, content = content)
 }
 
 @Composable
@@ -466,8 +504,9 @@ fun Button(
     elevation: Dp? = null,
     border: androidx.compose.foundation.BorderStroke? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+    interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit
-) = DsmusicButton(onClick, modifier, enabled, shape, colors, border, contentPadding, elevation, content = content)
+) = DsmusicButton(onClick, modifier, enabled, shape, colors, border, contentPadding, elevation, interactionSource, content)
 
 @Composable
 fun OutlinedButton(
@@ -478,8 +517,9 @@ fun OutlinedButton(
     colors: DsmusicButtonColors = DsmusicButtonColors(Color.Transparent, DsmusicTheme.colorScheme.primary, Color.Transparent, DsmusicTheme.colorScheme.onSurfaceVariant),
     border: androidx.compose.foundation.BorderStroke? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+    interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit
-) = DsmusicOutlinedButton(onClick, modifier, enabled, shape, colors, border, contentPadding, content = content)
+) = DsmusicOutlinedButton(onClick, modifier, enabled, shape, colors, border, contentPadding, interactionSource, content)
 
 @Composable
 fun FilledTonalButton(
@@ -489,8 +529,9 @@ fun FilledTonalButton(
     shape: androidx.compose.ui.graphics.Shape = ButtonDefaults.shape,
     colors: DsmusicButtonColors = ButtonDefaults.filledTonalButtonColors(),
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+    interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit
-) = DsmusicButton(onClick, modifier, enabled, shape, colors, null, contentPadding, null, content = content)
+) = DsmusicButton(onClick, modifier, enabled, shape, colors, null, contentPadding, null, interactionSource, content)
 
 @Composable
 fun TextButton(
@@ -499,8 +540,9 @@ fun TextButton(
     enabled: Boolean = true,
     colors: DsmusicButtonColors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = DsmusicTheme.colorScheme.primary, disabledContainerColor = Color.Transparent),
     contentPadding: PaddingValues = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+    interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit
-) = DsmusicTextButton(onClick, modifier, enabled, colors, contentPadding, null, content)
+) = DsmusicTextButton(onClick, modifier, enabled, colors, contentPadding, interactionSource, content)
 
 @Composable
 fun Card(
@@ -585,6 +627,27 @@ fun Switch(
     val thumb = if (checked) colors.checkedThumbColor else colors.uncheckedThumbColor
     val track = if (checked) colors.checkedTrackColor else colors.uncheckedTrackColor
     DsmusicSwitchControl(checked, onCheckedChange, modifier, enabled, colors)
+}
+
+@Composable
+fun Checkbox(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val scheme = DsmusicTheme.colorScheme
+    Box(
+        modifier = modifier.size(24.dp).clip(RoundedCornerShape(5.dp))
+            .background(if (checked) scheme.primary else Color.Transparent)
+            .border(1.6.dp, if (checked) scheme.primary else scheme.outline, RoundedCornerShape(5.dp))
+            .clickable(enabled = enabled && onCheckedChange != null) { onCheckedChange?.invoke(!checked) },
+        contentAlignment = Alignment.Center
+    ) {
+        if (checked) Canvas(Modifier.size(16.dp)) {
+            val path = androidx.compose.ui.graphics.Path().apply {
+                moveTo(size.width * 0.18f, size.height * 0.52f)
+                lineTo(size.width * 0.42f, size.height * 0.76f)
+                lineTo(size.width * 0.84f, size.height * 0.24f)
+            }
+            drawPath(path, scheme.onPrimary, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+        }
+    }
 }
 
 @Composable
@@ -1048,18 +1111,22 @@ fun ToggleButton(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    interactionSource: MutableInteractionSource? = null,
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(10.dp),
+    shapes: androidx.compose.ui.graphics.Shape? = null,
     colors: DsmusicButtonColors = ToggleButtonDefaults.toggleButtonColors(),
+    contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 9.dp),
     content: @Composable RowScope.() -> Unit
 ) {
+    val actualShape = shapes ?: shape
     val background = if (checked) colors.containerColor else Color.Transparent
     val foreground = if (checked) colors.contentColor else DsmusicTheme.colorScheme.onSurface
     Row(
-        modifier = modifier.clip(shape)
+        modifier = modifier.clip(actualShape)
             .background(background)
-            .border(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.48f), shape)
-            .clickable(enabled = enabled) { onCheckedChange(!checked) }
-            .padding(horizontal = 12.dp, vertical = 9.dp),
+            .border(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.48f), actualShape)
+            .clickable(enabled = enabled, interactionSource = interactionSource, indication = null) { onCheckedChange(!checked) }
+            .padding(contentPadding),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
