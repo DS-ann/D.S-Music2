@@ -23,7 +23,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import android.os.Build
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -745,7 +747,13 @@ fun HomeSectionRow(
 ) {
     val hasSongsOnly = section.items.isNotEmpty() && section.items.all { it is SearchItem.Song }
 
-    Column(modifier = Modifier.padding(vertical = 4.dp).animateContentSize()) {
+    // Android 6 struggles with animating the measured height of nested lazy rows.
+    // Keep the layout stable there; newer versions retain the section resize animation.
+    val sectionResizeAnimation =
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) Modifier
+        else Modifier.animateContentSize()
+
+    Column(modifier = Modifier.padding(vertical = 4.dp).then(sectionResizeAnimation)) {
         // Universal Section Header
         Row(
             modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
@@ -1139,20 +1147,28 @@ fun HomeSectionRow(
                 if (hasSongsOnly) {
                     val songItems = section.items.filterIsInstance<SearchItem.Song>()
                     val chunkedSongs = songItems.chunked(4)
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        itemsIndexed(items = chunkedSongs, key = { idx, _ -> "song-col-$idx-${section.title}" }) { _, songChunk ->
-                            Column(modifier = Modifier.width(320.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                songChunk.forEach { item ->
-                                    HomeSongListItem(
-                                        song = item.song,
-                                        isPlaying = item.song.videoId == currentOnlineSong?.videoId,
-                                        onTouchDown = { onSongTouchDown(item.song) },
-                                        onClick = { onSongClick(item.song) },
-                                        onMenuClick = { onSongMenuClick(item.song) }
-                                    )
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                        // Two four-song columns should fit inside the current viewport.
+                        // A fixed 320dp width pushed the second column beyond phone screens.
+                        val songColumnWidth = ((maxWidth - 48.dp) / 2f).coerceAtLeast(120.dp)
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            itemsIndexed(items = chunkedSongs, key = { idx, _ -> "song-col-$idx-${section.title}" }) { _, songChunk ->
+                                Column(
+                                    modifier = Modifier.width(songColumnWidth),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    songChunk.forEach { item ->
+                                        HomeSongListItem(
+                                            song = item.song,
+                                            isPlaying = item.song.videoId == currentOnlineSong?.videoId,
+                                            onTouchDown = { onSongTouchDown(item.song) },
+                                            onClick = { onSongClick(item.song) },
+                                            onMenuClick = { onSongMenuClick(item.song) }
+                                        )
+                                    }
                                 }
                             }
                         }
