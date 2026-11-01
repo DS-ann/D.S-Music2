@@ -796,6 +796,8 @@ fun PlayerBottomSheetCompose(
             DsmCoverShapes.forPlayerLayout(playerLayout, playerArtworkShapeName)
         }
         val miniPlayerStyle by playerPreferences.observeKey("mini_player_style", "Card")
+        val navBarSize by playerPreferences.observeKey("nav_bar_size", "Standard")
+        val dynamicNavStyle by playerPreferences.observeKey("dynamic_nav_style", false)
         
         // Playback state observers combined into stable UI model
         val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
@@ -984,17 +986,34 @@ fun PlayerBottomSheetCompose(
         val containerWidthDp = maxWidth
         val screenHeightPx = with(density) { containerHeight.toPx() }
         val systemNavigationBottomPx = WindowInsets.navigationBars.getBottom(density).toFloat()
-        // Material Scaffold measures this player inside its content slot. When the app
-        // bottom navigation is visible, that slot already ends at the navigation bar's
-        // top edge; subtracting the nav height here would create a second, erroneous gap.
+        // Scaffold draws its bottom bar over the full-screen body. Use its measured
+        // height (including the system navigation inset) exactly once when positioning
+        // the mini player; the fallback mirrors the same nav-size settings before first measure.
         val bottomNavVisible = bottomNavigationVisible
         val dynamicBottomNavHeightState = viewModel.bottomNavHeight.collectAsStateWithLifecycle()
+        val configuredNavBarHeight = if (dynamicNavStyle) {
+            64.dp
+        } else {
+            when (navBarSize) {
+                "Compact" -> 56.dp
+                "Tall" -> 76.dp
+                else -> 68.dp
+            }
+        }
+        val fallbackBottomNavHeightPx = with(density) { configuredNavBarHeight.toPx() } +
+            systemNavigationBottomPx
         val sheetCollapsedTargetYState = remember(
-            screenHeightPx, density, useNavigationRail, miniPlayerHeight, bottomNavVisible
+            screenHeightPx, density, useNavigationRail, miniPlayerHeight,
+            bottomNavVisible, fallbackBottomNavHeightPx
         ) {
             derivedStateOf {
                 val miniPlayerHeightPx = with(density) { miniPlayerHeight.toPx() }
-                val bottomInsetPx = if (bottomNavVisible) 0f else systemNavigationBottomPx
+                val bottomInsetPx = if (bottomNavVisible) {
+                    dynamicBottomNavHeightState.value.takeIf { it > 0f }
+                        ?: fallbackBottomNavHeightPx
+                } else {
+                    systemNavigationBottomPx
+                }
                 val bottomGapPx = with(density) {
                     if (bottomNavVisible) 4.dp.toPx() else 8.dp.toPx()
                 }
