@@ -126,7 +126,11 @@ fun WavyMusicSlider(
     // Interpolate the service's periodic progress updates without a spring restart on every tick.
     val animatedNormalizedValueState = animateFloatAsState(
         targetValue = normalizedValue,
-        animationSpec = tween(durationMillis = 320, easing = LinearEasing),
+        animationSpec = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) {
+            snap()
+        } else {
+            tween(durationMillis = 320, easing = LinearEasing)
+        },
         label = "ProgressValueAnim"
     )
 
