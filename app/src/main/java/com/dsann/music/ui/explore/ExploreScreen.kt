@@ -151,6 +151,7 @@ val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun Modifier.sharedElementIfAvailable(key: String): Modifier {
+    if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) return this
     val sharedScope = LocalSharedTransitionScope.current
     val animatedScope = LocalAnimatedVisibilityScope.current
     return if (sharedScope != null && animatedScope != null) {

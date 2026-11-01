@@ -1043,6 +1043,7 @@ class PlayerSharedViewModel @Inject constructor(
         
         val request = ImageRequest.Builder(appContext)
             .data(artworkSource)
+            .size(72, 72)
             .allowHardware(false) // Hardware Bitmaps are not allowed for Palette extraction!
             .build()
             

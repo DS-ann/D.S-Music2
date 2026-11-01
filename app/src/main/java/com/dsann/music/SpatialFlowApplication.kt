@@ -5,6 +5,7 @@ import android.app.ActivityManager
 import android.app.Application
 import android.content.ComponentCallbacks2
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
 import coil.ImageLoader
@@ -53,7 +54,7 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
                     .maxSizeBytes(if (lowRam) 96L * 1024L * 1024L else 160L * 1024L * 1024L)
                     .build()
             }
-            .allowHardware(true)
+            .allowHardware(!lowRam && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             .allowRgb565(true)
             .diskCachePolicy(CachePolicy.ENABLED)
             .memoryCachePolicy(CachePolicy.ENABLED)
@@ -95,11 +96,17 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
         // Treat devices with up to 4 GiB physical RAM as constrained so the
         // lightweight image, animation and artwork-cache profile is actually used.
         val physicalMemoryLimit = 4L * 1024L * 1024L * 1024L
-        isLowRamDevice = activityManager?.isLowRamDevice == true ||
+        val legacyAndroid = Build.VERSION.SDK_INT <= Build.VERSION_CODES.M
+        isLowRamDevice = legacyAndroid || activityManager?.isLowRamDevice == true ||
             (memoryInfo.totalMem > 0L && memoryInfo.totalMem <= physicalMemoryLimit)
+        val performanceProfile = when {
+            legacyAndroid -> "legacy-android-6"
+            isLowRamDevice -> "constrained-memory"
+            else -> "standard"
+        }
         Log.i(
             "SpatialFlowApplication",
-            "Performance profile: ${if (isLowRamDevice) "constrained-memory" else "standard"} " +
+            "Performance profile: $performanceProfile " +
                 "(${memoryInfo.totalMem / (1024L * 1024L)} MiB RAM)"
         )
 

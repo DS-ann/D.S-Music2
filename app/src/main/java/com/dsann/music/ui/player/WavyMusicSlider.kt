@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
+import com.dsann.music.SpatialFlowApplication
 import kotlin.math.*
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -86,8 +87,9 @@ fun WavyMusicSlider(
 
 
 
-    LaunchedEffect(shouldShowWave, waveAnimationDuration) {
-        if (shouldShowWave && waveAnimationDuration > 0) {
+    val continuousWaveMotionEnabled = !SpatialFlowApplication.isLowRamDevice
+    LaunchedEffect(shouldShowWave, waveAnimationDuration, continuousWaveMotionEnabled) {
+        if (shouldShowWave && waveAnimationDuration > 0 && continuousWaveMotionEnabled) {
             val fullRotation = (2 * PI).toFloat()
             while (shouldShowWave) {
                 val start = (phaseShiftAnim.value % fullRotation).let { if (it < 0f) it + fullRotation else it }
@@ -97,6 +99,9 @@ fun WavyMusicSlider(
                     animationSpec = tween(durationMillis = waveAnimationDuration, easing = LinearEasing)
                 )
             }
+        } else {
+            // Preserve the custom wave track as a static shape on constrained devices.
+            phaseShiftAnim.snapTo(0f)
         }
     }
 

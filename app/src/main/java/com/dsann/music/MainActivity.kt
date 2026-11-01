@@ -215,7 +215,10 @@ class MainActivity : AppCompatActivity() {
                 val currentNavController = rememberNavController()
                 val rootTabRoutes = remember { setOf("explore", "search", "library", "local_music", "settings") }
                 val rootTabStateHolder = rememberSaveableStateHolder()
-                // Mount each root page only on its first visit, then keep the whole page cached.
+                // Android 6 devices cannot afford five large live Compose roots. Preserve
+                // the active tab and one recent tab there; the state holder retains saveable
+                // list positions and form state for pages that leave the live composition.
+                val maxRetainedRootTabs = if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) 2 else rootTabRoutes.size
                 val visitedRootTabs = remember { mutableStateListOf<String>() }
                 var lastRootTab by remember { mutableStateOf("explore") }
                 LaunchedEffect(currentNavController) {
@@ -318,8 +321,11 @@ class MainActivity : AppCompatActivity() {
                     LaunchedEffect(currentRoute) {
                         if (currentRoute != null && currentRoute in rootTabRoutes) {
                             lastRootTab = currentRoute
-                            if (currentRoute !in visitedRootTabs) {
-                                visitedRootTabs.add(currentRoute)
+                            visitedRootTabs.remove(currentRoute)
+                            visitedRootTabs.add(currentRoute)
+                            while (visitedRootTabs.size > maxRetainedRootTabs) {
+                                val leastRecentlyUsed = visitedRootTabs.firstOrNull { it != currentRoute } ?: break
+                                visitedRootTabs.remove(leastRecentlyUsed)
                             }
                         }
                     }
@@ -385,9 +391,9 @@ class MainActivity : AppCompatActivity() {
                                     bottom = finalPadding.coerceAtLeast(0.dp)
                                 )
                         ) {
-                            // Each visited tab stays composed behind the active page. Its local
-                            // lifecycle is lowered to CREATED so Flow collectors/BackHandlers stop
-                            // while scroll positions, list state and nested UI remain warm.
+                            // Only the active tab and the recent cache stay composed. On Android 6,
+                            // old roots are evicted to reduce repeated layout, draw and memory work;
+                            // rememberSaveableStateHolder restores their saveable UI state on return.
                             visitedRootTabs.forEach { cachedRoute ->
                                 val tabIsActive = cachedRoute == activeCachedRootTab
                                 Box(
