@@ -150,10 +150,10 @@ fun DsmusicButton(
     content: @Composable RowScope.() -> Unit
 ) {
     val scheme = MaterialTheme.colorScheme
-    val backgroundColor = colors?.containerColor(enabled)?.value
-        ?: if (enabled) scheme.primary else scheme.surfaceVariant
-    val foregroundColor = colors?.contentColor(enabled)?.value
-        ?: if (enabled) scheme.onPrimary else scheme.onSurfaceVariant
+    // ButtonColors hides its resolved values in the Material3 version used here.
+    // Keep this launcher-style control theme-driven and use public color-scheme tokens.
+    val backgroundColor = if (enabled) scheme.primary else scheme.surfaceVariant
+    val foregroundColor = if (enabled) scheme.onPrimary else scheme.onSurfaceVariant
     Row(
         modifier = modifier.defaultMinSize(minHeight = 40.dp).clip(shape)
             .background(backgroundColor)
@@ -188,9 +188,8 @@ fun DsmusicOutlinedButton(
     content: @Composable RowScope.() -> Unit
 ) {
     val scheme = MaterialTheme.colorScheme
-    val backgroundColor = colors?.containerColor(enabled)?.value ?: scheme.surfaceContainerLow
-    val foregroundColor = colors?.contentColor(enabled)?.value
-        ?: if (enabled) scheme.onSurface else scheme.onSurfaceVariant
+    val backgroundColor = scheme.surfaceContainerLow
+    val foregroundColor = if (enabled) scheme.onSurface else scheme.onSurfaceVariant
     Row(
         modifier = modifier.defaultMinSize(minHeight = 40.dp).clip(shape)
             .background(backgroundColor)
@@ -222,7 +221,8 @@ fun DsmusicTextButton(
     interactionSource: Any? = null,
     content: @Composable RowScope.() -> Unit
 ) {
-    val contentColor = colors?.contentColor(enabled)?.value ?: MaterialTheme.colorScheme.primary
+    val contentColor = if (enabled) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.onSurfaceVariant
     Row(
         modifier = modifier.clip(RoundedCornerShape(10.dp))
             .clickable(enabled = enabled, onClick = onClick).padding(contentPadding),
