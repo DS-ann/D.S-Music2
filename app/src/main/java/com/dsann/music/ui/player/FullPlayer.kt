@@ -114,7 +114,16 @@ private fun PlayerVisualizer(
     LaunchedEffect(style, isPlaying, isVisible, lowRamProfile) {
         when {
             !isVisible || !isPlaying || style == "Off" -> phase.snapTo(0f)
-            lowRamProfile -> phase.snapTo(0.42f)
+            lowRamProfile -> {
+                // Keep a real animation on legacy devices, but update at a bounded
+                // cadence instead of scheduling a full 60 fps animation.
+                var frame = 0
+                while (true) {
+                    phase.snapTo((frame % 12) / 12f)
+                    frame++
+                    delay(85L)
+                }
+            }
             else -> {
                 while (true) {
                     phase.animateTo(1f, animationSpec = tween(900, easing = LinearEasing))
@@ -886,10 +895,12 @@ fun FullPlayer(
 
         val density = androidx.compose.ui.platform.LocalDensity.current
         val statusBarTopDp = with(density) { androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(this).toDp() }
+        // Shared-artwork target: keep the portrait and landscape player content
+        // slightly lower to avoid the top-heavy layout reported on compact phones.
         val minTopOffset = statusBarTopDp + when {
-            compactLandscape && useWidePlayer -> 76.dp
-            compactLandscape -> 52.dp
-            else -> 68.dp
+            compactLandscape && useWidePlayer -> 84.dp
+            compactLandscape -> 60.dp
+            else -> 76.dp
         }
         val headerHeight = if (compactLandscape) 40.dp else 56.dp
 
