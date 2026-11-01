@@ -187,6 +187,20 @@ fun WavyMusicSlider(
                     val localTrackEnd = canvasWidth - thumbRadiusPx
                     val localTrackWidth = (localTrackEnd - localTrackStart).coerceAtLeast(0f)
                     val taperDistancePx = 64.dp.toPx()
+                    val activeTrackBrush = Brush.horizontalGradient(
+                        colors = listOf(
+                            activeTrackColor.copy(alpha = 0.35f),
+                            activeTrackColor
+                        ),
+                        startX = localTrackStart,
+                        endX = localTrackEnd.coerceAtLeast(localTrackStart + 1f)
+                    )
+                    val activeTrackStroke = Stroke(
+                        width = trackHeightPx,
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round,
+                        miter = 1f
+                    )
 
                     onDrawWithContent {
                         // Read animated state while drawing, not during composition. Animation
@@ -224,15 +238,6 @@ fun WavyMusicSlider(
                         // 2. Draw Active Track (Sinusoidal Wave / Line) with Spatial Gradient
                         if (renderNormalizedValue > 0f) {
                             val activeTrackVisualEnd = currentProgressPxEndVisual - (thumbGapPx * thumbInteractionFraction)
-
-                            val activeGradient = Brush.linearGradient(
-                                colors = listOf(
-                                    activeTrackColor.copy(alpha = 0.35f),
-                                    activeTrackColor
-                                ),
-                                start = Offset(localTrackStart, localCenterY),
-                                end = Offset(activeTrackVisualEnd.coerceAtLeast(localTrackStart), localCenterY)
-                            )
 
                             if (waveAmplitudePxInternal > 0.01f && waveFrequency > 0f) {
                                 wavePath.reset()
@@ -278,19 +283,14 @@ fun WavyMusicSlider(
 
                                     drawPath(
                                         path = wavePath,
-                                        brush = activeGradient,
-                                        style = Stroke(
-                                            width = trackHeightPx,
-                                            cap = StrokeCap.Round,
-                                            join = StrokeJoin.Round,
-                                            miter = 1f
-                                        )
+                                        brush = activeTrackBrush,
+                                        style = activeTrackStroke
                                     )
                                 }
                             } else {
                                 if (activeTrackVisualEnd > localTrackStart) {
                                     drawLine(
-                                        brush = activeGradient,
+                                        brush = activeTrackBrush,
                                         start = Offset(localTrackStart, localCenterY),
                                         end = Offset(activeTrackVisualEnd, localCenterY),
                                         strokeWidth = trackHeightPx,
