@@ -1077,20 +1077,13 @@ fun FullPlayer(
                         if (playerButtonsPill) contentColor.copy(alpha = if (isDark) 0.075f else 0.055f)
                         else Color.Transparent
                     )
+                    // Let horizontalScroll own the viewport. The previous custom layout
+                    // expanded and negatively offset the row, which could clip the last chip.
+                    .horizontalScroll(rememberScrollState())
                     .padding(
                         horizontal = if (playerButtonsPill) 8.dp else 0.dp,
                         vertical = if (playerButtonsPill) 5.dp else 0.dp
-                    )
-                    .layout { measurable, constraints ->
-                        val pad = 20.dp.roundToPx()
-                        val placeable = measurable.measure(
-                            constraints.copy(maxWidth = constraints.maxWidth + 2 * pad)
-                        )
-                        layout(placeable.width - 2 * pad, placeable.height) {
-                            placeable.place(-pad, 0)
-                        }
-                    }
-                    .horizontalScroll(rememberScrollState()),
+                    ),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
