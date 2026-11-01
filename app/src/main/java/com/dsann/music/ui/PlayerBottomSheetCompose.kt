@@ -557,7 +557,7 @@ class SheetVerticalDragGestureHandler(
                         targetValue = 1f,
                         animationSpec = spring(
                             dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.Stiffness.VeryLow
+                            stiffness = Spring.StiffnessVeryLow
                         )
                     )
                 }
