@@ -2090,7 +2090,11 @@ class AudioPlaybackService : MediaSessionService() {
 
                     if (player.isPlaying && nowMs - lastWidgetProgressUpdateAtMs >= 1_000L) {
                         lastWidgetProgressUpdateAtMs = nowMs
-                        updateWidgetProgress(pos, dur)
+                        // Lyrics lookup and RemoteViews preparation are not playback-clock work.
+                        // Keep both away from the main-looper progress callback.
+                        serviceScope.launch(Dispatchers.Default) {
+                            updateWidgetProgress(pos, dur)
+                        }
                     }
 
                     if (player.isPlaying && crossfadeDurationMs > 0 && dur > 0 &&
