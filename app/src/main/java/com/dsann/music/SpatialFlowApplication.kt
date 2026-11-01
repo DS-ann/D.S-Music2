@@ -1,10 +1,7 @@
 package com.dsann.music
 
-import android.annotation.SuppressLint
-import android.app.ActivityManager
 import android.app.Application
 import android.content.ComponentCallbacks2
-import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
@@ -27,23 +24,18 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
         lateinit var instance: SpatialFlowApplication
             private set
 
-        /** Shared low-memory profile used by Compose screens to avoid expensive decoration. */
-        @Volatile
-        var isLowRamDevice: Boolean = false
-            private set
     }
 
     @Volatile
     private var activeImageLoader: ImageLoader? = null
 
     override fun newImageLoader(): ImageLoader {
-        val lowRam = isLowRamDevice
         val builder = ImageLoader.Builder(this)
             .okHttpClient { InnerTubeClient.httpClient }
             .memoryCache {
                 MemoryCache.Builder(this)
                     // Keep artwork from crowding playback buffers and Compose state on 2 GB phones.
-                    .maxSizePercent(if (lowRam) 0.06 else 0.11)
+                    .maxSizePercent(0.06)
                     .strongReferencesEnabled(true)
                     .weakReferencesEnabled(true)
                     .build()
@@ -51,18 +43,17 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(if (lowRam) 96L * 1024L * 1024L else 160L * 1024L * 1024L)
+                    .maxSizeBytes(96L * 1024L * 1024L)
                     .build()
             }
-            .allowHardware(!lowRam && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            .allowHardware(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             .allowRgb565(true)
             .diskCachePolicy(CachePolicy.ENABLED)
             .memoryCachePolicy(CachePolicy.ENABLED)
             .networkCachePolicy(CachePolicy.ENABLED)
 
-        // Crossfades keep two artwork bitmaps alive during the transition. Avoid them
-        // on low-RAM devices; the image still uses the same decoded-size and disk caches.
-        if (lowRam) builder.crossfade(false) else builder.crossfade(80)
+        // Avoid retaining both old and new artwork bitmaps during every transition.
+        builder.crossfade(false)
 
         return builder.build().also { activeImageLoader = it }
     }
@@ -84,32 +75,9 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
         activeImageLoader?.memoryCache?.clear()
     }
 
-    @SuppressLint("VisibleForTests")
     override fun onCreate() {
         super.onCreate()
         instance = this
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-        val memoryInfo = ActivityManager.MemoryInfo()
-        activityManager?.getMemoryInfo(memoryInfo)
-
-        // Android's isLowRamDevice flag is often false on retail 3 GB phones.
-        // Treat devices with up to 4 GiB physical RAM as constrained so the
-        // lightweight image, animation and artwork-cache profile is actually used.
-        val physicalMemoryLimit = 4L * 1024L * 1024L * 1024L
-        val legacyAndroid = Build.VERSION.SDK_INT <= Build.VERSION_CODES.M
-        isLowRamDevice = legacyAndroid || activityManager?.isLowRamDevice == true ||
-            (memoryInfo.totalMem > 0L && memoryInfo.totalMem <= physicalMemoryLimit)
-        val performanceProfile = when {
-            legacyAndroid -> "legacy-android-6"
-            isLowRamDevice -> "constrained-memory"
-            else -> "standard"
-        }
-        Log.i(
-            "SpatialFlowApplication",
-            "Performance profile: $performanceProfile " +
-                "(${memoryInfo.totalMem / (1024L * 1024L)} MiB RAM)"
-        )
-
         // Defer stream extractor and cache maintenance initialization until after first draw.
         val appContext = applicationContext
         Thread({
