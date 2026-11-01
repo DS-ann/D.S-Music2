@@ -127,7 +127,9 @@ fun WavyMusicSlider(
     // Smoothly animate seeking/playback progress using M3 Expressive Motion physics
     val animatedNormalizedValueState = animateFloatAsState(
         targetValue = normalizedValue,
-        animationSpec = if (normalizedValue == 0f) {
+        animationSpec = if (SpatialFlowApplication.isLowRamDevice) {
+            snap()
+        } else if (normalizedValue == 0f) {
             // Material 3 Slow Spatial spring (Stiffness: 200f, Damping: 0.75f) for hero song transitions
             spring(
                 dampingRatio = 0.75f,

@@ -26,6 +26,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -218,7 +219,10 @@ class MainActivity : AppCompatActivity() {
                 // Android 6 devices cannot afford five large live Compose roots. Preserve
                 // the active tab and one recent tab there; the state holder retains saveable
                 // list positions and form state for pages that leave the live composition.
-                val maxRetainedRootTabs = if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) 2 else rootTabRoutes.size
+                val isLegacyAndroid6 = Build.VERSION.SDK_INT <= Build.VERSION_CODES.M
+                // API 23 has far less CPU/GPU headroom: keep only the active root composed.
+                // rememberSaveableStateHolder preserves scroll and form state when a tab is revisited.
+                val maxRetainedRootTabs = if (isLegacyAndroid6) 1 else rootTabRoutes.size
                 val visitedRootTabs = remember { mutableStateListOf<String>() }
                 var lastRootTab by remember { mutableStateOf("explore") }
                 LaunchedEffect(currentNavController) {
@@ -257,20 +261,28 @@ class MainActivity : AppCompatActivity() {
 
                         val animatedBaseTranslationState = animateFloatAsState(
                             targetValue = baseTargetTranslation,
-                            animationSpec = spring(
+                            animationSpec = if (isLegacyAndroid6) snap() else spring(
                                 dampingRatio = 0.85f,
                                 stiffness = Spring.StiffnessLow
                             ),
                             label = "BottomNavTranslationY"
                         )
 
-                        val navBarHeight by animateDpAsState(bottomNavHeight, label = "navBarHeight")
+                        val navBarHeight by animateDpAsState(
+                            bottomNavHeight,
+                            animationSpec = if (isLegacyAndroid6) snap() else spring(stiffness = Spring.StiffnessMediumLow),
+                            label = "navBarHeight"
+                        )
                         val configuredIconSize = when (navBarSize) {
                             "Compact" -> 22.dp
                             "Tall" -> 30.dp
                             else -> 26.dp
                         }
-                        val navIconSize by animateDpAsState(if (dynamicNavStyle) 30.dp else configuredIconSize, label = "navIconSize")
+                        val navIconSize by animateDpAsState(
+                            if (dynamicNavStyle) 30.dp else configuredIconSize,
+                            animationSpec = if (isLegacyAndroid6) snap() else spring(stiffness = Spring.StiffnessMediumLow),
+                            label = "navIconSize"
+                        )
                         val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
                         DsmusicNavigationBar(
@@ -348,7 +360,7 @@ class MainActivity : AppCompatActivity() {
                     val railStartPadding = railSystemInset + 12.dp
                     val railInsetState = animateDpAsState(
                         targetValue = if (showNavigationRail) railSystemInset + 88.dp else 0.dp,
-                        animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
+                        animationSpec = if (isLegacyAndroid6) snap() else spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
                         label = "NavigationRailInset"
                     )
                     // Springs can overshoot their zero target slightly. Never feed a
@@ -369,7 +381,7 @@ class MainActivity : AppCompatActivity() {
 
                     val animatedBasePaddingState = animateDpAsState(
                         targetValue = baseTargetPadding,
-                        animationSpec = spring(
+                        animationSpec = if (isLegacyAndroid6) snap() else spring(
                             dampingRatio = 0.85f,
                             stiffness = Spring.StiffnessLow
                         ),
@@ -539,6 +551,7 @@ class MainActivity : AppCompatActivity() {
                         if (showNavigationRail) {
                             val railIconSize by animateDpAsState(
                                 if (dynamicNavStyle) 34.dp else 26.dp,
+                                animationSpec = if (isLegacyAndroid6) snap() else spring(stiffness = Spring.StiffnessMediumLow),
                                 label = "RailIconSize"
                             )
                             Column(

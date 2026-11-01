@@ -551,17 +551,22 @@ class SheetVerticalDragGestureHandler(
             } else {
                 val dynamicDamping = collapseSpringDampingForFraction(currentFraction)
 
-                // Gelatinous Squash & Stretch Bounce Trigger
-                launch {
-                    val initialSquash = collapseInitialSquashForFraction(currentFraction)
-                    visualOvershootScaleY.snapTo(initialSquash)
-                    visualOvershootScaleY.animateTo(
-                        targetValue = 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessVeryLow
+                // The decorative overshoot creates an extra animated graphics layer.
+                // Skip it on API 23 / constrained devices; keep the sheet's main drag motion.
+                if (com.dsann.music.SpatialFlowApplication.isLowRamDevice) {
+                    visualOvershootScaleY.snapTo(1f)
+                } else {
+                    launch {
+                        val initialSquash = collapseInitialSquashForFraction(currentFraction)
+                        visualOvershootScaleY.snapTo(initialSquash)
+                        visualOvershootScaleY.animateTo(
+                            targetValue = 1f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessVeryLow
+                            )
                         )
-                    )
+                    }
                 }
 
                 onAnimateSheet(
@@ -640,10 +645,8 @@ class MiniPlayerDismissGestureHandler(
             MiniDismissDragPhase.SNAPPING -> {
                 offsetJob?.cancel()
                 offsetJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                    offsetAnimatable.animateTo(
-                        targetValue = accumulatedDragX,
-                        animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessLow)
-                    )
+                    // Follow the finger directly; animating every drag delta adds latency.
+                    offsetAnimatable.snapTo(accumulatedDragX)
                 }
                 dragPhase = MiniDismissDragPhase.FREE_DRAG
             }
@@ -651,10 +654,9 @@ class MiniPlayerDismissGestureHandler(
             MiniDismissDragPhase.FREE_DRAG -> {
                 offsetJob?.cancel()
                 offsetJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                    offsetAnimatable.animateTo(
-                        targetValue = accumulatedDragX,
-                        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessHigh)
-                    )
+                    // A drag is already a continuous input; snap instead of spawning
+                    // another spring animation for every pointer event.
+                    offsetAnimatable.snapTo(accumulatedDragX)
                 }
             }
             else -> Unit
