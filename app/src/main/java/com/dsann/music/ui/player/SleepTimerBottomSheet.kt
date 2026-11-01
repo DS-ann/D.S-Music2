@@ -319,7 +319,7 @@ fun SleepTimerBottomSheet(
                         topEnd = 4.dp,
                         bottomEnd = 4.dp
                     ),
-                    colors = ButtonDefaults.filledTonalDsmusicButtonColors(),
+                    colors = ButtonDefaults.filledTonalButtonColors(),
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp)

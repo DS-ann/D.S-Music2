@@ -770,7 +770,7 @@ fun HomeSectionRow(
                         modifier = Modifier.height(32.dp),
                         shape = CircleShape,
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                        colors = ButtonDefaults.outlinedDsmusicButtonColors(
+                        colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = DsmusicTheme.colorScheme.onBackground
                         )
                     ) {

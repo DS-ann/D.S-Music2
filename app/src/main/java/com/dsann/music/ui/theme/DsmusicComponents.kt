@@ -92,22 +92,27 @@ fun DsmusicListItem(
     leadingContent: (@Composable () -> Unit)? = null,
     trailingContent: (@Composable () -> Unit)? = null,
     contentPadding: PaddingValues? = null,
-    colors: Any? = null,
-    shapes: Any? = null,
+    colors: DsmusicListItemColors? = null,
+    shapes: Shape? = null,
+    selected: Boolean = false,
     verticalAlignment: Alignment.Vertical = Alignment.CenterVertically,
     checked: Boolean? = null,
     onCheckedChange: ((Boolean) -> Unit)? = null,
     content: (@Composable () -> Unit)? = null
 ) {
     val paddingValues = contentPadding ?: PaddingValues(horizontal = 13.dp, vertical = 10.dp)
+    val itemShape = shapes ?: RoundedCornerShape(14.dp)
+    val scheme = DsmusicTheme.colorScheme
+    val itemBackground = when {
+        colors == null -> scheme.surfaceContainerLow
+        selected -> colors.selectedContainerColor
+        else -> colors.containerColor
+    }
+    val itemBorder = scheme.outlineVariant.copy(alpha = 0.34f)
     Row(
-        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
-            .background(DsmusicTheme.colorScheme.surfaceContainerLow)
-            .border(
-                1.dp,
-                DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.34f),
-                RoundedCornerShape(14.dp)
-            )
+        modifier = modifier.fillMaxWidth().clip(itemShape)
+            .background(itemBackground)
+            .border(1.dp, itemBorder, itemShape)
             .then(
                 when {
                     onClick != null -> Modifier.clickable(onClick = onClick)
@@ -120,16 +125,48 @@ fun DsmusicListItem(
         verticalAlignment = verticalAlignment,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        leadingContent?.let { Box(contentAlignment = Alignment.Center) { it() } }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            overlineContent?.invoke()
-            when {
-                headlineContent != null -> headlineContent()
-                content != null -> content()
+        leadingContent?.let {
+            val leadingColor = when {
+                colors == null -> scheme.onSurfaceVariant
+                selected -> colors.selectedLeadingContentColor
+                else -> colors.leadingIconColor
             }
-            supportingContent?.invoke()
+            CompositionLocalProvider(LocalDsmusicContentColor provides leadingColor) {
+                Box(contentAlignment = Alignment.Center) { it() }
+            }
         }
-        trailingContent?.let { Box(contentAlignment = Alignment.Center) { it() } }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            overlineContent?.let {
+                CompositionLocalProvider(LocalDsmusicContentColor provides scheme.onSurfaceVariant) { it() }
+            }
+            CompositionLocalProvider(
+                LocalDsmusicContentColor provides when {
+                    colors == null -> scheme.onSurface
+                    selected -> colors.selectedContentColor
+                    else -> colors.headlineColor
+                }
+            ) {
+                when {
+                    headlineContent != null -> headlineContent()
+                    content != null -> content()
+                }
+            }
+            supportingContent?.let {
+                CompositionLocalProvider(
+                    LocalDsmusicContentColor provides (colors?.supportingContentColor ?: scheme.onSurfaceVariant)
+                ) { it() }
+            }
+        }
+        trailingContent?.let {
+            val trailingColor = when {
+                colors == null -> scheme.onSurfaceVariant
+                selected -> colors.selectedTrailingContentColor
+                else -> colors.trailingIconColor
+            }
+            CompositionLocalProvider(LocalDsmusicContentColor provides trailingColor) {
+                Box(contentAlignment = Alignment.Center) { it() }
+            }
+        }
     }
 }
 
@@ -147,8 +184,7 @@ fun DsmusicButton(
     content: @Composable RowScope.() -> Unit
 ) {
     val scheme = DsmusicTheme.colorScheme
-    // DsmusicButtonColors hides its resolved values in the Material3 version used here.
-    // Keep this launcher-style control theme-driven and use public color-scheme tokens.
+    // Resolve enabled and disabled colours from the D.S Music scheme.
     val backgroundColor = if (enabled) colors?.containerColor ?: scheme.primary
         else colors?.disabledContainerColor ?: scheme.surfaceVariant
     val foregroundColor = if (enabled) colors?.contentColor ?: scheme.onPrimary

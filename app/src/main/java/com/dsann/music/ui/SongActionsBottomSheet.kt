@@ -413,7 +413,7 @@ fun DestructiveActionRow(
             },
             interactionSource = addInteraction,
             modifier = Modifier.weight(1f).fillMaxHeight(),
-            colors = ToggleButtonDefaults.toggleDsmusicButtonColors(
+            colors = ToggleButtonDefaults.toggleButtonColors(
                 containerColor = DsmusicTheme.colorScheme.secondaryContainer,
                 contentColor = DsmusicTheme.colorScheme.onSecondaryContainer
             )
@@ -432,7 +432,7 @@ fun DestructiveActionRow(
             },
             interactionSource = deleteInteraction,
             modifier = Modifier.weight(1f).fillMaxHeight(),
-            colors = ToggleButtonDefaults.toggleDsmusicButtonColors(
+            colors = ToggleButtonDefaults.toggleButtonColors(
                 containerColor = DsmusicTheme.colorScheme.errorContainer,
                 contentColor = DsmusicTheme.colorScheme.onErrorContainer
             )
@@ -744,7 +744,7 @@ fun ActionButtonRow1(
                 .fillMaxHeight()
                 .zIndex(if (playPressed) 1f else 0f),
             shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-            colors = ToggleButtonDefaults.toggleDsmusicButtonColors(
+            colors = ToggleButtonDefaults.toggleButtonColors(
                 containerColor = DsmusicTheme.colorScheme.primaryContainer,
                 contentColor = DsmusicTheme.colorScheme.onPrimaryContainer
             )
@@ -769,7 +769,7 @@ fun ActionButtonRow1(
                 .fillMaxHeight()
                 .zIndex(if (favPressed) 1f else 0f),
             shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
-            colors = ToggleButtonDefaults.toggleDsmusicButtonColors(
+            colors = ToggleButtonDefaults.toggleButtonColors(
                 containerColor = DsmusicTheme.colorScheme.secondaryContainer,
                 checkedContentColor = Color(0xFFE91E63)
             )
@@ -791,7 +791,7 @@ fun ActionButtonRow1(
                 .fillMaxHeight()
                 .zIndex(if (sharePressed) 1f else 0f),
             shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-            colors = ToggleButtonDefaults.toggleDsmusicButtonColors(
+            colors = ToggleButtonDefaults.toggleButtonColors(
                 containerColor = DsmusicTheme.colorScheme.tertiaryContainer,
                 contentColor = DsmusicTheme.colorScheme.onTertiaryContainer
             )
@@ -831,7 +831,7 @@ fun ActionButtonRow2(
                 .height(72.dp)
                 .zIndex(if (queuePressed) 1f else 0f),
             shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-            colors = ToggleButtonDefaults.toggleDsmusicButtonColors(
+            colors = ToggleButtonDefaults.toggleButtonColors(
                 containerColor = DsmusicTheme.colorScheme.secondaryContainer,
                 contentColor = DsmusicTheme.colorScheme.onSecondaryContainer,
                 checkedContainerColor = DsmusicTheme.colorScheme.secondary,
@@ -878,7 +878,7 @@ fun ActionButtonRow2(
                 .height(72.dp)
                 .zIndex(if (nextPressed) 1f else 0f),
             shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
-            colors = ToggleButtonDefaults.toggleDsmusicButtonColors(
+            colors = ToggleButtonDefaults.toggleButtonColors(
                 containerColor = DsmusicTheme.colorScheme.tertiaryContainer,
                 contentColor = DsmusicTheme.colorScheme.onTertiaryContainer,
                 checkedContainerColor = DsmusicTheme.colorScheme.tertiary,
@@ -930,7 +930,7 @@ fun ActionButtonRow2(
                 .height(72.dp)
                 .zIndex(if (downloadPressed) 1f else 0f),
             shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-            colors = ToggleButtonDefaults.toggleDsmusicButtonColors(
+            colors = ToggleButtonDefaults.toggleButtonColors(
                 containerColor = if (isOnline) DsmusicTheme.colorScheme.primaryContainer else DsmusicTheme.colorScheme.surfaceVariant,
                 contentColor = if (isOnline) DsmusicTheme.colorScheme.onPrimaryContainer else DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                 checkedContainerColor = DsmusicTheme.colorScheme.primary,

@@ -257,10 +257,13 @@ object ListItemDefaults {
         leadingIconColor: Color = DsmusicTheme.colorScheme.onSurfaceVariant,
         trailingIconColor: Color = DsmusicTheme.colorScheme.onSurfaceVariant,
         overlineColor: Color = DsmusicTheme.colorScheme.onSurfaceVariant,
+        contentColor: Color? = null,
+        leadingContentColor: Color? = null,
+        trailingContentColor: Color? = null,
         selectedContainerColor: Color = containerColor,
-        selectedContentColor: Color = headlineColor,
-        selectedLeadingContentColor: Color = leadingIconColor,
-        selectedTrailingContentColor: Color = trailingIconColor,
+        selectedContentColor: Color = contentColor ?: headlineColor,
+        selectedLeadingContentColor: Color = leadingContentColor ?: leadingIconColor,
+        selectedTrailingContentColor: Color = trailingContentColor ?: trailingIconColor,
         supportingContentColor: Color = supportingColor,
         selectedSupportingContentColor: Color = supportingColor,
         disabledContainerColor: Color = containerColor,
@@ -268,7 +271,7 @@ object ListItemDefaults {
         disabledLeadingContentColor: Color = leadingIconColor.copy(alpha = 0.4f),
         disabledTrailingContentColor: Color = trailingIconColor.copy(alpha = 0.4f)
     ) = DsmusicListItemColors(
-        containerColor, headlineColor, supportingColor, leadingIconColor, trailingIconColor,
+        containerColor, contentColor ?: headlineColor, supportingColor, leadingContentColor ?: leadingIconColor, trailingContentColor ?: trailingIconColor,
         selectedContainerColor, selectedContentColor, selectedLeadingContentColor, selectedTrailingContentColor,
         supportingContentColor, selectedSupportingContentColor, disabledContainerColor, disabledContentColor,
         disabledLeadingContentColor, disabledTrailingContentColor
@@ -800,7 +803,7 @@ fun NavigationBar(
 }
 
 @Composable
-fun NavigationBarItem(
+fun RowScope.NavigationBarItem(
     selected: Boolean,
     onClick: () -> Unit,
     icon: @Composable () -> Unit,

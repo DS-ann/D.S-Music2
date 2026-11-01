@@ -450,7 +450,7 @@ fun ArtistDetailView(
                     },
                     shape = CircleShape,
                     modifier = Modifier.height(38.dp),
-                    colors = ButtonDefaults.filledTonalDsmusicButtonColors(
+                    colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = if (isSubscribed) {
                             DsmusicTheme.colorScheme.surfaceVariant
                         } else {
