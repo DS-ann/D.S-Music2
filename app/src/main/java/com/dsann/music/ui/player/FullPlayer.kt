@@ -139,11 +139,16 @@ private fun PlayerVisualizer(
         if (!isVisible || !isPlaying || style == "Off") {
             phase.snapTo(0f)
         } else {
+            // API 23 devices have substantially less CPU headroom for Compose drawing.
+            // Keep the same visualizer styles, but lower their redraw cadence on Android 6.
+            val legacyDevice = android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M
+            val frameDelayMs = if (legacyDevice) 84L else 42L
+            val frameCount = if (legacyDevice) 12 else 24
             var frame = 0
             while (true) {
-                phase.snapTo((frame % 24) / 24f)
+                phase.snapTo((frame % frameCount) / frameCount.toFloat())
                 frame++
-                delay(42L)
+                delay(frameDelayMs)
             }
         }
     }
@@ -171,7 +176,7 @@ private fun PlayerVisualizer(
         when (style) {
             // Keep the compact bar style as-is; it is already the strongest visual.
             "Bars" -> {
-                val count = 32
+                val count = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 16 else 32
                 val gap = 3.dp.toPx()
                 val barWidth = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
                 repeat(count) { index ->
@@ -200,7 +205,7 @@ private fun PlayerVisualizer(
                     strokeWidth = 1.dp.toPx()
                 )
 
-                val points = 48
+                val points = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 24 else 48
                 repeat(2) { layer ->
                     val path = wavePaths[layer]
                     path.reset()
@@ -244,7 +249,7 @@ private fun PlayerVisualizer(
                     style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
                 )
 
-                val tickCount = 36
+                val tickCount = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 18 else 36
                 repeat(tickCount) { index ->
                     val angle = index * (6.2831855f / tickCount) - 1.5707963f
                     val level = kotlin.math.abs(
