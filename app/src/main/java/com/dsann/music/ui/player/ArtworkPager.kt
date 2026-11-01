@@ -36,7 +36,6 @@ import coil.size.Precision
 import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
 import com.dsann.music.R
-import com.dsann.music.SpatialFlowApplication
 import com.dsann.music.model.SongItem
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import com.dsann.music.ui.theme.observeKey
@@ -67,17 +66,16 @@ fun ArtworkPager(
     // bandwidth and can cause avoidable bitmap pressure while the pager is moving.
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
-    val lowRamProfile = SpatialFlowApplication.isLowRamDevice
+    // A consistent decode ceiling avoids oversized bitmaps and repeated resampling
+    // across all devices, without disabling artwork features based on a RAM heuristic.
     val artworkTargetSizePx = remember(
         configuration.screenWidthDp,
         configuration.screenHeightDp,
-        density.density,
-        lowRamProfile
+        density.density
     ) {
-        val maxArtworkDimension = if (lowRamProfile) 768 else 1024
         (minOf(configuration.screenWidthDp, configuration.screenHeightDp) * density.density)
             .roundToInt()
-            .coerceIn(256, maxArtworkDimension)
+            .coerceIn(256, 768)
     }
 
     // Keep the previous and next covers warm in Coil's existing memory/disk caches.
