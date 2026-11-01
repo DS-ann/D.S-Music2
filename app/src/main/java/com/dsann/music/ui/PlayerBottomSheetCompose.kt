@@ -550,22 +550,16 @@ class SheetVerticalDragGestureHandler(
             } else {
                 val dynamicDamping = collapseSpringDampingForFraction(currentFraction)
 
-                // The decorative overshoot creates an extra animated graphics layer.
-                // Skip it on API 23 / constrained devices; keep the sheet's main drag motion.
-                if (com.dsann.music.SpatialFlowApplication.isLowRamDevice) {
-                    visualOvershootScaleY.snapTo(1f)
-                } else {
-                    launch {
-                        val initialSquash = collapseInitialSquashForFraction(currentFraction)
-                        visualOvershootScaleY.snapTo(initialSquash)
-                        visualOvershootScaleY.animateTo(
-                            targetValue = 1f,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessVeryLow
-                            )
+                launch {
+                    val initialSquash = collapseInitialSquashForFraction(currentFraction)
+                    visualOvershootScaleY.snapTo(initialSquash)
+                    visualOvershootScaleY.animateTo(
+                        targetValue = 1f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.Stiffness.VeryLow
                         )
-                    }
+                    )
                 }
 
                 onAnimateSheet(
