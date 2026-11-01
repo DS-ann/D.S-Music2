@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Shuffle
 import com.dsann.music.ui.theme.ButtonDefaults
+import com.dsann.music.ui.theme.animateWidth
 import com.dsann.music.ui.theme.FilledTonalButton
 import com.dsann.music.ui.theme.HorizontalDivider
 import com.dsann.music.ui.theme.Icon
