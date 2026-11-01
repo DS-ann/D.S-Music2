@@ -2118,12 +2118,14 @@ class AudioPlaybackService : MediaSessionService() {
                         }
                     }
                 }
-                // Lyrics remain more responsive than normal playback, without the old 80ms
-                // Compose update cadence that was excessive on slower devices.
-                val intervalMs = if (viewModel?.isLyricsModeEnabled?.value == true && player.isPlaying) {
-                    180L
-                } else {
-                    400L
+                // API 23 devices have substantially less CPU headroom. Publishing playback
+                // position every 400ms invalidates the always-mounted player overlay even when
+                // the user is browsing another tab. Keep legacy UI state updates to 1Hz.
+                // Lyrics retain a faster clock because line synchronization is user-visible.
+                val intervalMs = when {
+                    viewModel?.isLyricsModeEnabled?.value == true && player.isPlaying -> 180L
+                    Build.VERSION.SDK_INT <= Build.VERSION_CODES.M -> 1_000L
+                    else -> 400L
                 }
                 handler.postDelayed(this, intervalMs)
             }
