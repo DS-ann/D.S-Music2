@@ -21,6 +21,8 @@ import com.dsann.music.R;
 import com.dsann.music.model.SongItem;
 
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Base Widget Provider for D.S Music.
@@ -29,6 +31,12 @@ import java.util.Objects;
 public class SpatialFlowWidgetProvider extends AppWidgetProvider {
 
     private static final String TAG = "SpatialFlowWidget";
+    private static final ExecutorService PROGRESS_UPDATE_EXECUTOR =
+            Executors.newSingleThreadExecutor(runnable -> {
+                Thread thread = new Thread(runnable, "D.S-Music-WidgetProgress");
+                thread.setDaemon(true);
+                return thread;
+            });
 
     // Intent Actions from AudioPlaybackService (must match exactly)
     private static final String ACTION_PLAY = "com.dsann.music.ACTION_PLAY";
@@ -92,18 +100,25 @@ public class SpatialFlowWidgetProvider extends AppWidgetProvider {
     }
 
     public static void updateAllWidgetsPartial(Context context, int position, int duration, String currentLyric) {
-        AppWidgetManager manager = AppWidgetManager.getInstance(context);
-        new Handler(Looper.getMainLooper()).post(() -> {
-            // Update Medium Progress
-            int[] mediumIds = manager.getAppWidgetIds(new ComponentName(context, WidgetMediumProvider.class));
-            for (int id : mediumIds) {
-                updateWidgetProgress(context, manager, id, position, duration, currentLyric, R.layout.widget_medium);
-            }
+        Context appContext = context.getApplicationContext();
+        PROGRESS_UPDATE_EXECUTOR.execute(() -> {
+            try {
+                AppWidgetManager manager = AppWidgetManager.getInstance(appContext);
+                int[] mediumIds = manager.getAppWidgetIds(
+                        new ComponentName(appContext, WidgetMediumProvider.class));
+                for (int id : mediumIds) {
+                    updateWidgetProgress(
+                            appContext, manager, id, position, duration, currentLyric, R.layout.widget_medium);
+                }
 
-            // Update Large Progress
-            int[] largeIds = manager.getAppWidgetIds(new ComponentName(context, WidgetLargeProvider.class));
-            for (int id : largeIds) {
-                updateWidgetProgress(context, manager, id, position, duration, null, R.layout.widget_large);
+                int[] largeIds = manager.getAppWidgetIds(
+                        new ComponentName(appContext, WidgetLargeProvider.class));
+                for (int id : largeIds) {
+                    updateWidgetProgress(
+                            appContext, manager, id, position, duration, null, R.layout.widget_large);
+                }
+            } catch (Exception error) {
+                Log.w(TAG, "Background widget progress update failed", error);
             }
         });
     }
