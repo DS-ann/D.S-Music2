@@ -991,33 +991,21 @@ fun PlayerBottomSheetCompose(
         // the mini player; the fallback mirrors the same nav-size settings before first measure.
         val bottomNavVisible = bottomNavigationVisible
         val dynamicBottomNavHeightState = viewModel.bottomNavHeight.collectAsStateWithLifecycle()
-        val configuredNavBarHeight = if (dynamicNavStyle) {
-            64.dp
-        } else {
-            when (navBarSize) {
-                "Compact" -> 56.dp
-                "Tall" -> 76.dp
-                else -> 68.dp
-            }
+        // This composable is measured inside the Scaffold content area. On phones,
+        // Scaffold has already removed the bottom navigation bar from that area, so
+        // subtracting its measured height here a second time lifts the mini-player.
+        // Only wide layouts without a bottom bar need the system bottom inset reserved.
+        val miniPlayerBottomInsetPx = if (useNavigationRail) systemNavigationBottomPx else 0f
+        val miniPlayerBottomGapPx = with(density) {
+            if (useNavigationRail) 8.dp.toPx() else 4.dp.toPx()
         }
-        val fallbackBottomNavHeightPx = with(density) { configuredNavBarHeight.toPx() } +
-            systemNavigationBottomPx
         val sheetCollapsedTargetYState = remember(
             screenHeightPx, density, useNavigationRail, miniPlayerHeight,
-            bottomNavVisible, fallbackBottomNavHeightPx
+            systemNavigationBottomPx
         ) {
             derivedStateOf {
                 val miniPlayerHeightPx = with(density) { miniPlayerHeight.toPx() }
-                val bottomInsetPx = if (bottomNavVisible) {
-                    dynamicBottomNavHeightState.value.takeIf { it > 0f }
-                        ?: fallbackBottomNavHeightPx
-                } else {
-                    systemNavigationBottomPx
-                }
-                val bottomGapPx = with(density) {
-                    if (bottomNavVisible) 4.dp.toPx() else 8.dp.toPx()
-                }
-                (screenHeightPx - miniPlayerHeightPx - bottomInsetPx - bottomGapPx)
+                (screenHeightPx - miniPlayerHeightPx - miniPlayerBottomInsetPx - miniPlayerBottomGapPx)
                     .coerceIn(0f, screenHeightPx)
             }
         }
