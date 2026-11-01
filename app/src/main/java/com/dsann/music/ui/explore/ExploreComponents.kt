@@ -141,7 +141,7 @@ fun ShimmerModifier(
 
 fun Modifier.shimmerEffect(): Modifier = composed {
     // Hidden cached tabs keep placeholders static; visible tabs animate normally.
-    if (!LocalRootTabActive.current) {
+    if (!LocalRootTabActive.current || Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
         this.background(DsmusicTheme.colorScheme.surfaceContainerHigh)
     } else {
         var positionInRoot by remember { mutableStateOf(Offset.Zero) }
@@ -181,7 +181,7 @@ fun AnimatedEqualizerBars(
     modifier: Modifier = Modifier,
     color: Color = DsmusicTheme.colorScheme.primary
 ) {
-    if (!LocalRootTabActive.current) {
+    if (!LocalRootTabActive.current || Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
         Row(
             modifier = modifier,
             horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -375,7 +375,7 @@ fun SearchResultItem(
                 contentScale = ContentScale.Crop
             )
             if (isLoading) {
-                val shimmerAlpha = if (LocalRootTabActive.current) {
+                val shimmerAlpha = if (LocalRootTabActive.current && Build.VERSION.SDK_INT > Build.VERSION_CODES.M) {
                     val loadingTransition = rememberInfiniteTransition(label = "loading_shimmer")
                     val animatedAlpha by loadingTransition.animateFloat(
                         initialValue = 0.3f, targetValue = 0.7f,
@@ -679,7 +679,7 @@ fun BentoCell(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImage(
-                model = rememberExploreImageRequest(thumbnailUrl, 512),
+                model = rememberExploreImageRequest(thumbnailUrl, if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) 384 else 512),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
@@ -901,7 +901,7 @@ fun HomeSectionRow(
                                         }
                                 ) {
                                     AsyncImage(
-                                        model = rememberExploreImageRequest(thumbnailUrl, 512),
+                                        model = rememberExploreImageRequest(thumbnailUrl, if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) 256 else 512),
                                         contentDescription = null,
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = ContentScale.Crop
@@ -989,7 +989,7 @@ fun HomeSectionRow(
                                 }
                         ) {
                             AsyncImage(
-                                model = rememberExploreImageRequest(thumbnailUrl, 512),
+                                model = rememberExploreImageRequest(thumbnailUrl, if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) 384 else 512),
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
