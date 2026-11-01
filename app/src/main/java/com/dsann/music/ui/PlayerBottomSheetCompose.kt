@@ -777,6 +777,7 @@ private fun androidx.compose.foundation.layout.BoxScope.VideoOverlayControls(
 fun PlayerBottomSheetCompose(
     activity: MainActivity,
     viewModel: PlayerSharedViewModel,
+    bottomNavigationVisible: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -989,41 +990,22 @@ fun PlayerBottomSheetCompose(
         val containerWidthDp = maxWidth
         val screenHeightPx = with(density) { containerHeight.toPx() }
         val systemNavigationBottomPx = WindowInsets.navigationBars.getBottom(density).toFloat()
-        // Use the actual nav visibility boolean rather than publishing every animation frame
-        // through the shared player ViewModel. It changes only when the user hides/shows the bar.
-        val bottomNavVisible = activity.isBottomNavVisible
+        // Material Scaffold measures this player inside its content slot. When the app
+        // bottom navigation is visible, that slot already ends at the navigation bar's
+        // top edge; subtracting the nav height here would create a second, erroneous gap.
+        val bottomNavVisible = bottomNavigationVisible
         val dynamicBottomNavHeightState = viewModel.bottomNavHeight.collectAsStateWithLifecycle()
-        
-        // Zero-Recomposition logic: calculating layout targets inside derivedStateOf
-        // This ensures the composable body doesn't re-run for every pixel of nav bar scroll
         val sheetCollapsedTargetYState = remember(
             screenHeightPx, density, useNavigationRail, miniPlayerHeight, bottomNavVisible
         ) {
             derivedStateOf {
-                val bottomNavHeightPx = if (useNavigationRail) {
-                    0f
-                } else if (dynamicBottomNavHeightState.value > 0f) {
-                    dynamicBottomNavHeightState.value
-                } else {
-                    with(density) { 75.dp.toPx() }
-                }
                 val miniPlayerHeightPx = with(density) { miniPlayerHeight.toPx() }
-                
-                // Keep the floating mini player closer to the bottom dock.
-                val bottomNavVisibilityFraction = if (useNavigationRail || !bottomNavVisible) 1f else 0f
-                val currentBottomGapPx = with(density) {
-                    if (useNavigationRail) 6.dp.toPx()
-                    else lerp(8.dp, 6.dp, bottomNavVisibilityFraction).toPx()
+                val bottomInsetPx = if (bottomNavVisible) 0f else systemNavigationBottomPx
+                val bottomGapPx = with(density) {
+                    if (bottomNavVisible) 4.dp.toPx() else 8.dp.toPx()
                 }
-                
-                // Ensure the mini player stops at the bottom margin and doesn't follow the nav bar into the abyss
-                val effectiveBottomNavHeight = if (useNavigationRail || !bottomNavVisible) {
-                    0f
-                } else {
-                    bottomNavHeightPx
-                }
-                screenHeightPx - miniPlayerHeightPx - effectiveBottomNavHeight - currentBottomGapPx -
-                    (if (useNavigationRail) systemNavigationBottomPx else 0f)
+                (screenHeightPx - miniPlayerHeightPx - bottomInsetPx - bottomGapPx)
+                    .coerceIn(0f, screenHeightPx)
             }
         }
 
