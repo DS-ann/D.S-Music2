@@ -577,24 +577,32 @@ fun Surface(
 @Composable
 fun ListItem(
     modifier: Modifier = Modifier,
-    headlineContent: @Composable () -> Unit,
+    headlineContent: @Composable () -> Unit = {},
     supportingContent: (@Composable () -> Unit)? = null,
     overlineContent: (@Composable () -> Unit)? = null,
     leadingContent: (@Composable () -> Unit)? = null,
     trailingContent: (@Composable () -> Unit)? = null,
     colors: DsmusicListItemColors = ListItemDefaults.colors(),
     shapes: DsmusicListItemShapes = DsmusicListItemShapes(),
+    selected: Boolean = false,
+    onClick: (() -> Unit)? = null,
+    interactionSource: MutableInteractionSource? = null,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 13.dp, vertical = 10.dp),
     tonalElevation: Dp = 0.dp,
-    shadowElevation: Dp = 0.dp
+    shadowElevation: Dp = 0.dp,
+    content: @Composable () -> Unit = headlineContent
 ) {
-    CompositionLocalProvider(LocalDsmusicContentColor provides colors.headlineColor) {
+    val headlineColor = if (selected) colors.selectedContentColor else colors.headlineColor
+    CompositionLocalProvider(LocalDsmusicContentColor provides headlineColor) {
         DsmusicListItem(
             modifier = modifier,
-            headlineContent = headlineContent,
+            onClick = onClick,
+            headlineContent = content,
             overlineContent = overlineContent,
-            supportingContent = supportingContent?.let { { CompositionLocalProvider(LocalDsmusicContentColor provides colors.supportingColor) { it() } } },
+            supportingContent = supportingContent?.let { { CompositionLocalProvider(LocalDsmusicContentColor provides colors.supportingContentColor) { it() } } },
             leadingContent = leadingContent,
             trailingContent = trailingContent,
+            contentPadding = contentPadding,
             colors = colors,
             shapes = shapes.shape
         )
@@ -670,6 +678,30 @@ fun HorizontalDivider(modifier: Modifier = Modifier, thickness: Dp = 1.dp, color
     Box(modifier.fillMaxWidth().height(thickness).background(color))
 }
 
+interface ButtonGroupScope : RowScope {
+    @Composable fun customItem(buttonGroupContent: @Composable RowScope.() -> Unit, menuContent: @Composable () -> Unit = {})
+}
+
+@Composable
+fun ButtonGroup(
+    modifier: Modifier = Modifier,
+    expandedRatio: Float = 0.3f,
+    overflowIndicator: @Composable () -> Unit = {},
+    content: @Composable ButtonGroupScope.() -> Unit
+) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        val rowScope = this
+        val groupScope = object : ButtonGroupScope, RowScope by rowScope {
+            @Composable override fun customItem(buttonGroupContent: @Composable RowScope.() -> Unit, menuContent: @Composable () -> Unit) {
+                Row(Modifier.weight(1f)) { buttonGroupContent() }
+            }
+        }
+        groupScope.content()
+    }
+}
+
+fun Modifier.animateWidth(interactionSource: MutableInteractionSource): Modifier = this
+
 @Composable
 fun Scaffold(
     modifier: Modifier = Modifier,
@@ -719,6 +751,77 @@ fun TopAppBar(
         }
         CompositionLocalProvider(LocalDsmusicContentColor provides colors.actionIconContentColor) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), content = actions)
+        }
+    }
+}
+
+@Composable
+fun FloatingActionButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    shape: androidx.compose.ui.graphics.Shape = CircleShape,
+    containerColor: Color = DsmusicTheme.colorScheme.primaryContainer,
+    contentColor: Color = DsmusicTheme.colorScheme.onPrimaryContainer,
+    elevation: Dp = 0.dp,
+    interactionSource: MutableInteractionSource? = null,
+    content: @Composable RowScope.() -> Unit
+) {
+    DsmusicButton(onClick, modifier, true, shape, DsmusicButtonColors(containerColor, contentColor, containerColor, contentColor), null, PaddingValues(16.dp), elevation, interactionSource, content)
+}
+
+data class DsmusicNavigationBarItemColors(
+    val selectedIconColor: Color,
+    val unselectedIconColor: Color,
+    val selectedTextColor: Color,
+    val unselectedTextColor: Color,
+    val indicatorColor: Color
+)
+
+object NavigationBarItemDefaults {
+    @Composable fun colors(
+        selectedIconColor: Color = DsmusicTheme.colorScheme.primary,
+        unselectedIconColor: Color = DsmusicTheme.colorScheme.onSurfaceVariant,
+        selectedTextColor: Color = selectedIconColor,
+        unselectedTextColor: Color = unselectedIconColor,
+        indicatorColor: Color = DsmusicTheme.colorScheme.primaryContainer
+    ) = DsmusicNavigationBarItemColors(selectedIconColor, unselectedIconColor, selectedTextColor, unselectedTextColor, indicatorColor)
+}
+
+@Composable
+fun NavigationBar(
+    modifier: Modifier = Modifier,
+    containerColor: Color = DsmusicTheme.colorScheme.surface,
+    contentColor: Color = DsmusicTheme.colorScheme.onSurface,
+    tonalElevation: Dp = 0.dp,
+    windowInsets: WindowInsets = WindowInsets(0, 0, 0, 0),
+    content: @Composable RowScope.() -> Unit
+) {
+    Row(modifier.fillMaxWidth().background(containerColor).padding(horizontal = 8.dp, vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), content = content)
+}
+
+@Composable
+fun NavigationBarItem(
+    selected: Boolean,
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    label: (@Composable () -> Unit)? = null,
+    alwaysShowLabel: Boolean = true,
+    colors: DsmusicNavigationBarItemColors = NavigationBarItemDefaults.colors()
+) {
+    val iconColor = if (selected) colors.selectedIconColor else colors.unselectedIconColor
+    Column(
+        modifier = modifier.weight(1f).clip(RoundedCornerShape(12.dp))
+            .background(if (selected) colors.indicatorColor.copy(alpha = 0.32f) else Color.Transparent)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        CompositionLocalProvider(LocalDsmusicContentColor provides iconColor) { icon() }
+        if (label != null && (selected || alwaysShowLabel)) {
+            CompositionLocalProvider(LocalDsmusicContentColor provides if (selected) colors.selectedTextColor else colors.unselectedTextColor) { label() }
         }
     }
 }
@@ -1104,6 +1207,19 @@ fun CircularWavyProgressIndicator(progress: Float, modifier: Modifier = Modifier
 fun LinearWavyProgressIndicator(progress: Float, modifier: Modifier = Modifier, colors: Pair<Color, Color> = WavyProgressIndicatorDefaults.colors()) {
     LinearProgressIndicator(progress, modifier, colors.first, colors.second)
 }
+@Composable
+fun LinearWavyProgressIndicator(
+    progress: () -> Float,
+    modifier: Modifier = Modifier,
+    color: Color = DsmusicTheme.colorScheme.primary,
+    trackColor: Color = DsmusicTheme.colorScheme.surfaceVariant,
+    stroke: Stroke = Stroke(3f),
+    trackStroke: Stroke = stroke,
+    wavelength: Dp = 48.dp,
+    amplitude: (Float) -> Float = { 1f }
+) {
+    LinearProgressIndicator(progress(), modifier, color, trackColor)
+}
 
 @Composable
 fun ToggleButton(
@@ -1146,14 +1262,16 @@ interface SnackbarVisuals {
 class SnackbarHostState {
     var currentSnackbarData by mutableStateOf<DsmusicSnackbarData?>(null)
         private set
-    suspend fun showSnackbar(message: String, actionLabel: String? = null, withDismissAction: Boolean = false, duration: SnackbarDuration = SnackbarDuration.Short): SnackbarResult {
-        currentSnackbarData = DsmusicSnackbarData(object : SnackbarVisuals {
+    suspend fun showSnackbar(message: String, actionLabel: String? = null, withDismissAction: Boolean = false, duration: SnackbarDuration = SnackbarDuration.Short): SnackbarResult =
+        showSnackbar(object : SnackbarVisuals {
             override val message = message
             override val actionLabel = actionLabel
             override val withDismissAction = withDismissAction
             override val duration = duration
         })
-        if (duration != SnackbarDuration.Indefinite) delay(if (duration == SnackbarDuration.Long) 3500L else 2000L)
+    suspend fun showSnackbar(visuals: SnackbarVisuals): SnackbarResult {
+        currentSnackbarData = DsmusicSnackbarData(visuals)
+        if (visuals.duration != SnackbarDuration.Indefinite) delay(if (visuals.duration == SnackbarDuration.Long) 3500L else 2000L)
         currentSnackbarData = null
         return SnackbarResult.Dismissed
     }
@@ -1187,6 +1305,8 @@ class SwipeToDismissBoxState(private val confirmValueChange: (SwipeToDismissBoxV
         private set
     var dismissDirection by mutableStateOf(SwipeToDismissBoxValue.Settled)
     var dragOffset by mutableFloatStateOf(0f)
+    var dragWidth by mutableFloatStateOf(1f)
+    val progress: Float get() = (kotlin.math.abs(dragOffset) / dragWidth.coerceAtLeast(1f)).coerceIn(0f, 1f)
     fun settle(direction: SwipeToDismissBoxValue) {
         dismissDirection = direction
         if (confirmValueChange(direction)) currentValue = direction
@@ -1208,7 +1328,7 @@ fun SwipeToDismissBox(
     Box(
         modifier = modifier.pointerInput(state, enableDismissFromStartToEnd, enableDismissFromEndToStart) {
             detectDragGestures(
-                onDrag = { change, amount -> change.consume(); state.dragOffset = (state.dragOffset + amount.x).coerceIn(-size.width.toFloat(), size.width.toFloat()) },
+                onDrag = { change, amount -> change.consume(); state.dragWidth = size.width.toFloat().coerceAtLeast(1f); state.dragOffset = (state.dragOffset + amount.x).coerceIn(-size.width.toFloat(), size.width.toFloat()) },
                 onDragEnd = {
                     val threshold = with(density) { 72.dp.toPx() }
                     val direction = when {
@@ -1246,15 +1366,13 @@ fun TimePicker(state: DsmusicTimePickerState, modifier: Modifier = Modifier) {
 fun ExtendedFloatingActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(18.dp),
     icon: @Composable () -> Unit = {},
-    text: @Composable () -> Unit,
     containerColor: Color = DsmusicTheme.colorScheme.primaryContainer,
     contentColor: Color = DsmusicTheme.colorScheme.onPrimaryContainer,
-    elevation: Dp = 0.dp
+    elevation: Dp = 0.dp,
+    interactionSource: MutableInteractionSource? = null,
+    content: @Composable RowScope.() -> Unit
 ) {
-    DsmusicButton(onClick, modifier, true, RoundedCornerShape(18.dp), DsmusicButtonColors(containerColor, contentColor, containerColor, contentColor), null, PaddingValues(horizontal = 18.dp, vertical = 12.dp)) {
-        icon()
-        Spacer(Modifier.width(8.dp))
-        text()
-    }
+    DsmusicButton(onClick, modifier, true, shape, DsmusicButtonColors(containerColor, contentColor, containerColor, contentColor), null, PaddingValues(horizontal = 18.dp, vertical = 12.dp), elevation, interactionSource, content)
 }
