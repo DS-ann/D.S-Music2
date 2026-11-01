@@ -216,13 +216,11 @@ class MainActivity : AppCompatActivity() {
                 val currentNavController = rememberNavController()
                 val rootTabRoutes = remember { setOf("explore", "search", "library", "local_music", "settings") }
                 val rootTabStateHolder = rememberSaveableStateHolder()
-                // Android 6 devices cannot afford five large live Compose roots. Preserve
-                // the active tab and one recent tab there; the state holder retains saveable
-                // list positions and form state for pages that leave the live composition.
+                // Keep every visited root tab composed so returning to Library, Explore,
+                // or Settings does not rebuild the whole screen. CachedRootTabLifecycle suspends
+                // lifecycle-aware collectors and decorative work while a tab is inactive.
                 val isLegacyAndroid6 = Build.VERSION.SDK_INT <= Build.VERSION_CODES.M
-                // API 23 has far less CPU/GPU headroom: keep only the active root composed.
-                // rememberSaveableStateHolder preserves scroll and form state when a tab is revisited.
-                val maxRetainedRootTabs = if (isLegacyAndroid6) 1 else rootTabRoutes.size
+                val maxRetainedRootTabs = rootTabRoutes.size
                 val visitedRootTabs = remember { mutableStateListOf<String>() }
                 var lastRootTab by remember { mutableStateOf("explore") }
                 LaunchedEffect(currentNavController) {
