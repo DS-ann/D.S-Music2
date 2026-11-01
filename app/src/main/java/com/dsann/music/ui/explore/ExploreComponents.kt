@@ -10,7 +10,6 @@ import com.dsann.music.ui.theme.DsmusicTextButton
 import com.dsann.music.ui.theme.DsmusicIconButton
 import com.dsann.music.ui.theme.DsmusicFilterChip
 import com.dsann.music.ui.theme.DsmusicSwitchControl
-import com.dsann.music.SpatialFlowApplication
  
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
@@ -139,9 +138,8 @@ fun ShimmerModifier(
 }
 
 fun Modifier.shimmerEffect(): Modifier = composed {
-    // A static placeholder on low-memory devices avoids an infinite animation and
-    // per-frame position/draw invalidations while the feed is loading.
-    if (SpatialFlowApplication.isLowRamDevice || !LocalRootTabActive.current) {
+    // Hidden cached tabs keep placeholders static; visible tabs animate normally.
+    if (!LocalRootTabActive.current) {
         this.background(DsmusicTheme.colorScheme.surfaceContainerHigh)
     } else {
         var positionInRoot by remember { mutableStateOf(Offset.Zero) }
@@ -181,7 +179,7 @@ fun AnimatedEqualizerBars(
     modifier: Modifier = Modifier,
     color: Color = DsmusicTheme.colorScheme.primary
 ) {
-    if (!LocalRootTabActive.current || SpatialFlowApplication.isLowRamDevice) {
+    if (!LocalRootTabActive.current) {
         Row(
             modifier = modifier,
             horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -375,7 +373,7 @@ fun SearchResultItem(
                 contentScale = ContentScale.Crop
             )
             if (isLoading) {
-                val shimmerAlpha = if (LocalRootTabActive.current && !SpatialFlowApplication.isLowRamDevice) {
+                val shimmerAlpha = if (LocalRootTabActive.current) {
                     val loadingTransition = rememberInfiniteTransition(label = "loading_shimmer")
                     val animatedAlpha by loadingTransition.animateFloat(
                         initialValue = 0.3f, targetValue = 0.7f,
