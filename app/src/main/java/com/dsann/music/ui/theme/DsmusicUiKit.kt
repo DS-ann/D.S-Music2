@@ -467,7 +467,7 @@ fun Button(
     border: androidx.compose.foundation.BorderStroke? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
     content: @Composable RowScope.() -> Unit
-) = DsmusicButton(onClick, modifier, enabled, shape, colors, border, contentPadding, elevation, content)
+) = DsmusicButton(onClick, modifier, enabled, shape, colors, border, contentPadding, elevation, content = content)
 
 @Composable
 fun OutlinedButton(
@@ -479,7 +479,7 @@ fun OutlinedButton(
     border: androidx.compose.foundation.BorderStroke? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
     content: @Composable RowScope.() -> Unit
-) = DsmusicOutlinedButton(onClick, modifier, enabled, shape, colors, border, contentPadding, content)
+) = DsmusicOutlinedButton(onClick, modifier, enabled, shape, colors, border, contentPadding, content = content)
 
 @Composable
 fun FilledTonalButton(
@@ -490,7 +490,7 @@ fun FilledTonalButton(
     colors: DsmusicButtonColors = ButtonDefaults.filledTonalButtonColors(),
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
     content: @Composable RowScope.() -> Unit
-) = DsmusicButton(onClick, modifier, enabled, shape, colors, null, contentPadding, null, content)
+) = DsmusicButton(onClick, modifier, enabled, shape, colors, null, contentPadding, null, content = content)
 
 @Composable
 fun TextButton(
@@ -589,13 +589,14 @@ fun Switch(
 
 @Composable
 fun RadioButton(selected: Boolean, onClick: (() -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val scheme = DsmusicTheme.colorScheme
     Box(
         modifier = modifier.size(24.dp).clip(CircleShape).clickable(enabled = enabled && onClick != null) { onClick?.invoke() }.padding(4.dp),
         contentAlignment = Alignment.Center
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            drawCircle(color = if (selected) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.outline, style = Stroke(width = 2.dp.toPx()))
-            if (selected) drawCircle(color = DsmusicTheme.colorScheme.primary, radius = size.minDimension * 0.25f)
+            drawCircle(color = if (selected) scheme.primary else scheme.outline, style = Stroke(width = 2.dp.toPx()))
+            if (selected) drawCircle(color = scheme.primary, radius = size.minDimension * 0.25f)
         }
     }
 }
@@ -748,8 +749,9 @@ object PullToRefreshDefaults {
 }
 @Composable
 private fun PullRefreshIndicator(modifier: Modifier, active: Boolean) {
-    if (active) Box(modifier.padding(8.dp).size(24.dp).clip(CircleShape).background(DsmusicTheme.colorScheme.primary.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.size(16.dp)) { drawArc(DsmusicTheme.colorScheme.primary, -90f, 270f, false, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round)) }
+    val accent = DsmusicTheme.colorScheme.primary
+    if (active) Box(modifier.padding(8.dp).size(24.dp).clip(CircleShape).background(accent.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.size(16.dp)) { drawArc(accent, -90f, 270f, false, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round)) }
     }
 }
 @Composable
