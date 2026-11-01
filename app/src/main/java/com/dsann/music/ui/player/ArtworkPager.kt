@@ -126,9 +126,8 @@ fun ArtworkPager(
             state = pagerState,
             key = { page -> "${songList.getOrNull(page)?.id ?: currentSong.id}:$page" },
             userScrollEnabled = userScrollEnabled,
-            // Neighbour images are prefetched into Coil above; avoid also retaining
-            // extra pager page compositions on constrained-memory devices.
-            beyondViewportPageCount = if (lowRamProfile) 0 else 1,
+            // Neighbour covers are already prefetched into Coil; compose only the visible page.
+            beyondViewportPageCount = 0,
             modifier = Modifier.fillMaxSize().clip(artworkShape)
         ) { page ->
             val song = if (page == currentSongIndex) currentSong else (songList.getOrNull(page) ?: currentSong)
