@@ -362,7 +362,7 @@ object TopAppBarDefaults {
     fun exitUntilCollapsedScrollBehavior() = DsmusicTopAppBarScrollBehavior()
 }
 data class DsmusicTopAppBarColors(val containerColor: Color, val titleContentColor: Color, val navigationIconContentColor: Color, val actionIconContentColor: Color)
-class DsmusicTopAppBarScrollBehavior
+class DsmusicTopAppBarScrollBehavior { val nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection = object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {} }
 
 object BottomSheetDefaults {
     @Composable fun DragHandle(modifier: Modifier = Modifier, color: Color = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), width: Dp = 32.dp, height: Dp = 4.dp) {
@@ -600,8 +600,6 @@ fun RadioButton(selected: Boolean, onClick: (() -> Unit)?, modifier: Modifier = 
     }
 }
 
-@Composable
-fun IconButtonDefaultsFilledPlaceholder() {}
 
 @Composable
 fun HorizontalDivider(modifier: Modifier = Modifier, thickness: Dp = 1.dp, color: Color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)) {
@@ -696,7 +694,6 @@ fun AlertDialog(
 
 class DsmusicSheetState(val skipPartiallyExpanded: Boolean = true) {
     var isVisible by mutableStateOf(true)
-        private set
     suspend fun hide() { isVisible = false }
     suspend fun show() { isVisible = true }
     suspend fun expand() { isVisible = true }
@@ -1041,6 +1038,31 @@ fun CircularWavyProgressIndicator(progress: Float, modifier: Modifier = Modifier
 @Composable
 fun LinearWavyProgressIndicator(progress: Float, modifier: Modifier = Modifier, colors: Pair<Color, Color> = WavyProgressIndicatorDefaults.colors()) {
     LinearProgressIndicator(progress, modifier, colors.first, colors.second)
+}
+
+@Composable
+fun ToggleButton(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(10.dp),
+    colors: DsmusicButtonColors = ToggleButtonDefaults.toggleButtonColors(),
+    content: @Composable RowScope.() -> Unit
+) {
+    val background = if (checked) colors.containerColor else Color.Transparent
+    val foreground = if (checked) colors.contentColor else DsmusicTheme.colorScheme.onSurface
+    Row(
+        modifier = modifier.clip(shape)
+            .background(background)
+            .border(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.48f), shape)
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CompositionLocalProvider(LocalDsmusicContentColor provides foreground) { content() }
+    }
 }
 
 data class DsmusicSnackbarData(val visuals: SnackbarVisuals)
