@@ -34,7 +34,7 @@ class SpatialFlowApplication : Application(), ImageLoaderFactory {
             .okHttpClient { InnerTubeClient.httpClient }
             .memoryCache {
                 MemoryCache.Builder(this)
-                    // Keep artwork from crowding playback buffers and Compose state on 2 GB phones.
+                    // Keep the image cache compact so artwork does not crowd playback buffers or UI state.
                     .maxSizePercent(0.06)
                     .strongReferencesEnabled(true)
                     .weakReferencesEnabled(true)
