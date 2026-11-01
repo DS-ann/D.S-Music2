@@ -39,6 +39,8 @@ import com.dsann.music.util.SongDownloader
 import com.dsann.music.viewmodel.lyrics.PlayerLyricsStateController
 import com.google.gson.JsonElement
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -214,47 +216,72 @@ class PlayerSharedViewModel @Inject constructor(
     private fun trackHistoryForSong(song: SongItem) {
         trackHistoryJob?.cancel()
         trackHistoryJob = bgScope.launch(Dispatchers.IO) {
-            try {
-                val prefs = appContext.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
-                if (prefs.getBoolean("pause_history", false)) {
-                    Log.d("PlayerSharedViewModel", "History tracking is paused, skipping local history logging for: ${song.title}")
-                    return@launch
-                }
+            val prefs = appContext.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+            if (prefs.getBoolean("pause_history", false)) {
+                Log.d("PlayerSharedViewModel", "History tracking is paused, skipping local history logging for: ${song.title}")
+                return@launch
+            }
 
-                var accumulatedMs = 0L
-                var insertedId: Long? = null
-                
-                while (true) {
+            var accumulatedMs = 0L
+            var lastPersistedMs = 0L
+            var insertedId: Long? = null
+            var wasPlaying = false
+
+            suspend fun persistHistoryProgress() {
+                val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                val historyEvent = HistoryEventEntity(
+                    eventId = insertedId ?: 0L,
+                    songId = song.videoId ?: song.id.toString(),
+                    title = song.title,
+                    artist = song.artist,
+                    duration = accumulatedMs,
+                    thumbnailUrl = song.thumbnailUrl ?: song.path,
+                    timestamp = System.currentTimeMillis(),
+                    hourOfDay = hour
+                )
+                val rowId = playlistDao.insertHistoryEvent(historyEvent)
+                if (insertedId == null) {
+                    insertedId = rowId
+                    Log.d("PlayerSharedViewModel", "Logged listening history for: ${song.title}")
+                }
+                lastPersistedMs = accumulatedMs
+            }
+
+            try {
+                while (kotlinx.coroutines.currentCoroutineContext().isActive) {
                     delay(1000.milliseconds)
-                    if (_isPlaying.value) {
-                        accumulatedMs += 1000L
-                        
-                        if (accumulatedMs >= 2000L) {
-                            val calendar = Calendar.getInstance()
-                            val hour = calendar.get(Calendar.HOUR_OF_DAY)
-                            
-                            val historyEvent = HistoryEventEntity(
-                                eventId = insertedId ?: 0L,
-                                songId = song.videoId ?: song.id.toString(),
-                                title = song.title,
-                                artist = song.artist,
-                                duration = accumulatedMs,
-                                thumbnailUrl = song.thumbnailUrl ?: song.path,
-                                timestamp = System.currentTimeMillis(),
-                                hourOfDay = hour
-                            )
-                            val rowId = playlistDao.insertHistoryEvent(historyEvent)
-                            if (insertedId == null) {
-                                insertedId = rowId
-                                Log.d("PlayerSharedViewModel", "Successfully logged initial play event for: ${song.title}")
-                            } else {
-                                Log.d("PlayerSharedViewModel", "Updated real-time listening duration for ${song.title} to: ${accumulatedMs / 1000}s")
+                    val playing = _isPlaying.value
+                    if (playing) accumulatedMs += 1000L
+
+                    // Do not replace the same Room row every second. A 15-second checkpoint
+                    // keeps crash recovery useful while avoiding continuous DB invalidations
+                    // and history-flow recomputation during playback.
+                    val firstCheckpoint = insertedId == null && accumulatedMs >= 2000L
+                    val periodicCheckpoint = insertedId != null &&
+                        accumulatedMs - lastPersistedMs >= HISTORY_PROGRESS_PERSIST_INTERVAL_MS
+                    // Flush promptly on pause so short listening sessions are not left stale.
+                    val pauseCheckpoint = wasPlaying && !playing &&
+                        accumulatedMs >= 2000L && accumulatedMs > lastPersistedMs
+
+                    if (firstCheckpoint || periodicCheckpoint || pauseCheckpoint) {
+                        persistHistoryProgress()
+                    }
+                    wasPlaying = playing
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.e("PlayerSharedViewModel", "Error logging history: ${error.message}", error)
+            } finally {
+                // Preserve the final few seconds when the song changes or the ViewModel is cleared.
+                if (accumulatedMs >= 2000L && accumulatedMs > lastPersistedMs) {
+                    withContext(kotlinx.coroutines.NonCancellable) {
+                        runCatching { persistHistoryProgress() }
+                            .onFailure { error ->
+                                Log.e("PlayerSharedViewModel", "Failed to flush final listening history: ${error.message}", error)
                             }
-                        }
                     }
                 }
-            } catch (e: Exception) {
-                Log.e("PlayerSharedViewModel", "Error logging history: ${e.message}")
             }
         }
     }
@@ -299,6 +326,7 @@ class PlayerSharedViewModel @Inject constructor(
         const val REPEAT_OFF = 0
         const val REPEAT_ALL = 1
         const val REPEAT_ONE = 2
+        private const val HISTORY_PROGRESS_PERSIST_INTERVAL_MS = 15_000L
     }
 
     private val shuffleRandom = Random()
