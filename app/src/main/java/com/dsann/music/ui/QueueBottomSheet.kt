@@ -569,7 +569,7 @@ fun QueueListItem(
                 }
             }
         },
-        shapes = shapes,
+        shapes = shapes.shape,
         colors = ListItemDefaults.colors(
             containerColor = if (isPlaying) {
                 DsmusicTheme.colorScheme.primary.copy(alpha = 0.18f)

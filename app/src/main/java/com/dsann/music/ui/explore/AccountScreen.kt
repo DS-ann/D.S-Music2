@@ -269,7 +269,7 @@ fun AccountSettingsSection(
                     trailingContent = {
                         DsmusicSwitchControl(checked = syncEnabled, onCheckedChange = null)
                     },
-                    shapes = ListItemDefaults.segmentedShapes(index = 0, count = 2),
+                    shapes = ListItemDefaults.segmentedShapes(index = 0, count = 2).shape,
                     colors = ListItemDefaults.colors(containerColor = DsmusicTheme.colorScheme.surfaceContainer),
                     content = {
                         Column {
@@ -282,7 +282,7 @@ fun AccountSettingsSection(
                 DsmusicListItem(
                     onClick = { showTokenAlert = true },
                     leadingContent = { Icon(Icons.Default.VpnKey, null) },
-                    shapes = ListItemDefaults.segmentedShapes(index = 1, count = 2),
+                    shapes = ListItemDefaults.segmentedShapes(index = 1, count = 2).shape,
                     colors = ListItemDefaults.colors(containerColor = DsmusicTheme.colorScheme.surfaceContainer),
                     content = {
                         Column {
