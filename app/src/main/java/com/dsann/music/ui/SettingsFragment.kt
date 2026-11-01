@@ -1,9 +1,4 @@
 @file:Suppress("DEPRECATION")
-@file:OptIn(
-    ExperimentalMaterial3ExpressiveApi::class,
-    ExperimentalMaterial3Api::class
-)
-
 package com.dsann.music.ui
 
 import com.dsann.music.ui.theme.DsmusicPageHeading
