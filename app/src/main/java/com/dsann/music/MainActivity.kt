@@ -370,7 +370,14 @@ class MainActivity : AppCompatActivity() {
                     // Read the high-frequency expansion state during measurement rather than
                     // composition. This keeps each animation frame from recomposing the entire
                     // root navigation tree and all retained tab hosts.
-                    val playerExpansionFractionState = playerViewModel.playerExpansionFraction.collectAsState()
+                    // Only the navigation rail needs the per-frame expansion value.
+                    // Collecting it on phones invalidates the retained root tabs at 60 fps
+                    // during every player-sheet animation, with no layout benefit.
+                    val playerExpansionFractionState = if (useNavigationRail) {
+                        playerViewModel.playerExpansionFraction.collectAsState()
+                    } else {
+                        remember { mutableStateOf(0f) }
+                    }
 
                     // Base padding target not considering expansion
                     val baseTargetPadding = if (!useNavigationRail && showBottomBar) {
