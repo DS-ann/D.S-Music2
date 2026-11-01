@@ -269,14 +269,14 @@ class PlayerSharedViewModel @Inject constructor(
                     }
                     wasPlaying = playing
                 }
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 Log.e("PlayerSharedViewModel", "Error logging history: ${error.message}", error)
             } finally {
                 // Preserve the final few seconds when the song changes or the ViewModel is cleared.
                 if (accumulatedMs >= 2000L && accumulatedMs > lastPersistedMs) {
-                    withContext(kotlinx.coroutines.NonCancellable) {
+                    withContext(NonCancellable) {
                         runCatching { persistHistoryProgress() }
                             .onFailure { error ->
                                 Log.e("PlayerSharedViewModel", "Failed to flush final listening history: ${error.message}", error)
