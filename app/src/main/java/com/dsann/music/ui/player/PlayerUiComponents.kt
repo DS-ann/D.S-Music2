@@ -341,7 +341,8 @@ internal fun WavySliderWithLabels(
             "Bold" -> 6.dp
             else -> 4.dp
         } * scrubberThickness.coerceIn(0.6f, 2f)
-        val waveEnabled = scrubberStyle == "Waveform"
+        val waveEnabled = scrubberStyle == "Waveform" &&
+            android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.M
         WavyMusicSlider(
             value = if (isScrubbing && safeDur != null) sliderScrubPos else progressRatio,
             onValueChange = {
