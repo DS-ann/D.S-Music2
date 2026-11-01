@@ -1,5 +1,4 @@
-@file:OptIn(ExperimentalMaterial3ExpressiveApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
- 
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 package com.dsann.music.ui.explore
 
 import com.dsann.music.ui.theme.DsmusicCard
