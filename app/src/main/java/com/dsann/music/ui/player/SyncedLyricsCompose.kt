@@ -1,6 +1,5 @@
 package com.dsann.music.ui.player
 
-import com.dsann.music.SpatialFlowApplication
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
@@ -199,34 +198,13 @@ internal fun SyncedLyricsCompose(
             }
         }
 
-        if (SpatialFlowApplication.isLowRamDevice) {
-            // A 25 Hz clock is sufficient for lyric highlighting and reduces state
-            // invalidation on 3–4 GB phones. The service position remains authoritative,
-            // so a pause, seek or buffering jump is reflected on the next tick.
-            while (true) {
-                delay(40L)
-                val actualMs = currentPositionProvider().coerceAtLeast(0)
-                if (lyricClock.intValue != actualMs) lyricClock.intValue = actualMs
-            }
-        } else {
-            var lastFrameNanos = 0L
-            while (true) {
-                withFrameNanos { frameNanos ->
-                    val actualMs = currentPositionProvider().coerceAtLeast(0).toDouble()
-                    if (lastFrameNanos == 0L) {
-                        shownMs = actualMs
-                    } else {
-                        val elapsedMs = (frameNanos - lastFrameNanos).coerceAtLeast(0L) / 1_000_000.0
-                        shownMs += elapsedMs
-                        val errorMs = actualMs - shownMs
-                        // Large differences are seeks/buffering; small differences are corrected gently.
-                        shownMs = if (abs(errorMs) > 220.0) actualMs else shownMs + errorMs * 0.12
-                    }
-                    lastFrameNanos = frameNanos
-                    val nextPosition = shownMs.roundToInt().coerceAtLeast(0)
-                    if (lyricClock.intValue != nextPosition) lyricClock.intValue = nextPosition
-                }
-            }
+        // A fixed 25 Hz clock keeps karaoke highlighting responsive without making
+        // every display frame trigger a lyrics-list state update on slower phones.
+        while (true) {
+            delay(40L)
+            val actualMs = currentPositionProvider().coerceAtLeast(0)
+            shownMs = actualMs.toDouble()
+            if (lyricClock.intValue != actualMs) lyricClock.intValue = actualMs
         }
     }
     val lyricPositionProvider = remember(lyricClock) { { lyricClock.intValue } }
@@ -764,24 +742,19 @@ private fun InterludeItem(
         label = "InterludeProgress"
     )
 
-    val breatheScale = if (SpatialFlowApplication.isLowRamDevice) {
-        1f
-    } else {
-        val infiniteTransition = rememberInfiniteTransition(label = "InterludeBreathing")
-        val animatedScale by infiniteTransition.animateFloat(
-            initialValue = 0.82f,
-            targetValue = 1.18f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(
-                    durationMillis = 1400,
-                    easing = FastOutSlowInEasing
-                ),
-                repeatMode = RepeatMode.Reverse
+    val infiniteTransition = rememberInfiniteTransition(label = "InterludeBreathing")
+    val breatheScale by infiniteTransition.animateFloat(
+        initialValue = 0.82f,
+        targetValue = 1.18f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 1400,
+                easing = FastOutSlowInEasing
             ),
-            label = "BreathScale"
-        )
-        animatedScale
-    }
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "BreathScale"
+    )
 
     val iconAlpha by animateFloatAsState(
         targetValue = if (isActive) 0.85f else 0.25f,
