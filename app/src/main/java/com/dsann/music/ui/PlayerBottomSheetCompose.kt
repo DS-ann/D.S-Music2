@@ -796,8 +796,6 @@ fun PlayerBottomSheetCompose(
             DsmCoverShapes.forPlayerLayout(playerLayout, playerArtworkShapeName)
         }
         val miniPlayerStyle by playerPreferences.observeKey("mini_player_style", "Card")
-        val navBarSize by playerPreferences.observeKey("nav_bar_size", "Standard")
-        val dynamicNavStyle by playerPreferences.observeKey("dynamic_nav_style", false)
         
         // Playback state observers combined into stable UI model
         val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
