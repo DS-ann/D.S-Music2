@@ -1009,11 +1009,11 @@ fun PlayerBottomSheetCompose(
                 }
                 val miniPlayerHeightPx = with(density) { miniPlayerHeight.toPx() }
                 
-                // Dynamically adjust gap: 12dp when BottomNav is visible, 8dp when hidden
+                // Keep the floating mini player closer to the bottom dock.
                 val bottomNavVisibilityFraction = if (useNavigationRail || !bottomNavVisible) 1f else 0f
                 val currentBottomGapPx = with(density) {
-                    if (useNavigationRail) 8.dp.toPx()
-                    else lerp(12.dp, 8.dp, bottomNavVisibilityFraction).toPx()
+                    if (useNavigationRail) 6.dp.toPx()
+                    else lerp(8.dp, 6.dp, bottomNavVisibilityFraction).toPx()
                 }
                 
                 // Ensure the mini player stops at the bottom margin and doesn't follow the nav bar into the abyss
@@ -1542,9 +1542,9 @@ fun PlayerBottomSheetCompose(
                                 val minTopOffsetDp = with(density) { statusBarTopPx.toDp() } +
                                     when {
                                         configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE &&
-                                            useWidePlayer -> 76.dp
-                                        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE -> 52.dp
-                                        else -> 68.dp
+                                            useWidePlayer -> 84.dp
+                                        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE -> 60.dp
+                                        else -> 76.dp
                                     }
                                 val topOffsetDp = if (useWidePlayer) {
                                     minTopOffsetDp
