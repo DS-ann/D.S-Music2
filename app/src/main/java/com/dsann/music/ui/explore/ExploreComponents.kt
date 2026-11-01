@@ -108,6 +108,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Precision
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import com.dsann.music.data.innertube.HomeSection
 import com.dsann.music.data.innertube.OnlineAlbum
@@ -1449,8 +1451,13 @@ fun OnlineSongBottomSheet(
     onRemoveFromCache: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val downloadProgress by SongDownloader.downloadProgress.collectAsState()
-    val isSongDownloading = downloadProgress.containsKey(song.videoId)
+    // Each row observes only its own download state. Collecting the entire progress map
+    // made every visible song card recompose on every byte-progress update for any song.
+    val isSongDownloading by remember(song.videoId) {
+        SongDownloader.downloadProgress
+            .map { progress -> song.videoId in progress }
+            .distinctUntilChanged()
+    }.collectAsState(initial = false)
     val favoritesManager = remember { FavoritesManager(context) }
     var isFavorite by remember(song.videoId) { mutableStateOf(favoritesManager.isFavorite(song.videoId.hashCode().toLong())) }
 
