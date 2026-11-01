@@ -6,10 +6,6 @@ import android.app.Activity
 import android.content.ContextWrapper
 import android.content.SharedPreferences
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Shapes
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -159,7 +155,7 @@ fun SpatialFlowTheme(
 
     val colorScheme = remember(darkTheme, amoledEnabled, readablePrimary, onReadablePrimary) {
         if (darkTheme) {
-            val base = darkColorScheme(
+            val base = DsmusicColorScheme(
                 primary = readablePrimary,
                 onPrimary = onReadablePrimary,
                 primaryContainer = readablePrimary.copy(alpha = 0.19f),
@@ -201,7 +197,7 @@ fun SpatialFlowTheme(
                 )
             } else base
         } else {
-            lightColorScheme(
+            DsmusicColorScheme(
                 primary = readablePrimary,
                 onPrimary = onReadablePrimary,
                 primaryContainer = readablePrimary.copy(alpha = 0.18f),
@@ -260,7 +256,7 @@ fun SpatialFlowTheme(
     }
 
     CompositionLocalProvider(LocalDensity provides adjustedDensity) {
-        MaterialTheme(
+        DsmusicThemeProvider(
             colorScheme = colorScheme,
             typography = Typography,
             shapes = remember(uiCornerStyle) {
@@ -269,7 +265,7 @@ fun SpatialFlowTheme(
                     "Round" -> listOf(9.dp, 14.dp, 20.dp, 26.dp, 32.dp)
                     else -> listOf(5.dp, 9.dp, 13.dp, 18.dp, 24.dp)
                 }
-                Shapes(
+                DsmusicShapes(
                     extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(xs),
                     small = androidx.compose.foundation.shape.RoundedCornerShape(sm),
                     medium = androidx.compose.foundation.shape.RoundedCornerShape(md),

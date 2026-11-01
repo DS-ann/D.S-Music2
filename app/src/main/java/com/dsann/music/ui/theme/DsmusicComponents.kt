@@ -20,9 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ButtonColors
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -48,11 +45,11 @@ fun DsmusicCard(
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val outline = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f)
+    val outline = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.28f)
     Column(
         modifier = modifier
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(DsmusicTheme.colorScheme.surfaceContainerLow)
             .border(BorderStroke(1.dp, outline.copy(alpha = 0.62f)), shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         content = content
@@ -63,8 +60,8 @@ fun DsmusicCard(
 fun DsmusicSurface(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(16.dp),
-    color: Color = MaterialTheme.colorScheme.surfaceContainer,
-    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    color: Color = DsmusicTheme.colorScheme.surfaceContainer,
+    contentColor: Color = DsmusicTheme.colorScheme.onSurface,
     tonalElevation: Any? = null,
     shadowElevation: Any? = null,
     border: Any? = null,
@@ -74,12 +71,12 @@ fun DsmusicSurface(
     Box(
         modifier = modifier.clip(shape).background(color)
             .border(
-                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)),
+                BorderStroke(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)),
                 shape
             )
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {
-        CompositionLocalProvider(LocalContentColor provides contentColor) {
+        CompositionLocalProvider(LocalDsmusicContentColor provides contentColor) {
             content()
         }
     }
@@ -105,10 +102,10 @@ fun DsmusicListItem(
     val paddingValues = contentPadding ?: PaddingValues(horizontal = 13.dp, vertical = 10.dp)
     Row(
         modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(DsmusicTheme.colorScheme.surfaceContainerLow)
             .border(
                 1.dp,
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.34f),
+                DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.34f),
                 RoundedCornerShape(14.dp)
             )
             .then(
@@ -142,15 +139,15 @@ fun DsmusicButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     shape: Shape = RoundedCornerShape(14.dp),
-    colors: ButtonColors? = null,
+    colors: DsmusicButtonColors? = null,
     border: BorderStroke? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
     elevation: Any? = null,
     interactionSource: Any? = null,
     content: @Composable RowScope.() -> Unit
 ) {
-    val scheme = MaterialTheme.colorScheme
-    // ButtonColors hides its resolved values in the Material3 version used here.
+    val scheme = DsmusicTheme.colorScheme
+    // DsmusicButtonColors hides its resolved values in the Material3 version used here.
     // Keep this launcher-style control theme-driven and use public color-scheme tokens.
     val backgroundColor = if (enabled) colors?.containerColor ?: scheme.primary
         else colors?.disabledContainerColor ?: scheme.surfaceVariant
@@ -171,7 +168,7 @@ fun DsmusicButton(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        CompositionLocalProvider(LocalContentColor provides foregroundColor) {
+        CompositionLocalProvider(LocalDsmusicContentColor provides foregroundColor) {
             content()
         }
     }
@@ -183,13 +180,13 @@ fun DsmusicOutlinedButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     shape: Shape = RoundedCornerShape(14.dp),
-    colors: ButtonColors? = null,
+    colors: DsmusicButtonColors? = null,
     border: BorderStroke? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
     interactionSource: Any? = null,
     content: @Composable RowScope.() -> Unit
 ) {
-    val scheme = MaterialTheme.colorScheme
+    val scheme = DsmusicTheme.colorScheme
     val backgroundColor = if (enabled) colors?.containerColor ?: scheme.surfaceContainerLow
         else colors?.disabledContainerColor ?: scheme.surfaceContainerLow
     val foregroundColor = if (enabled) colors?.contentColor ?: scheme.onSurface
@@ -209,7 +206,7 @@ fun DsmusicOutlinedButton(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        CompositionLocalProvider(LocalContentColor provides foregroundColor) {
+        CompositionLocalProvider(LocalDsmusicContentColor provides foregroundColor) {
             content()
         }
     }
@@ -220,20 +217,20 @@ fun DsmusicTextButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    colors: ButtonColors? = null,
+    colors: DsmusicButtonColors? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
     interactionSource: Any? = null,
     content: @Composable RowScope.() -> Unit
 ) {
-    val contentColor = if (enabled) colors?.contentColor ?: MaterialTheme.colorScheme.primary
-        else colors?.disabledContentColor ?: MaterialTheme.colorScheme.onSurfaceVariant
+    val contentColor = if (enabled) colors?.contentColor ?: DsmusicTheme.colorScheme.primary
+        else colors?.disabledContentColor ?: DsmusicTheme.colorScheme.onSurfaceVariant
     Row(
         modifier = modifier.clip(RoundedCornerShape(10.dp))
             .clickable(enabled = enabled, onClick = onClick).padding(contentPadding),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        CompositionLocalProvider(LocalContentColor provides contentColor) { content() }
+        CompositionLocalProvider(LocalDsmusicContentColor provides contentColor) { content() }
     }
 }
 
@@ -268,7 +265,7 @@ fun DsmusicFilterChip(
     leadingIcon: (@Composable () -> Unit)? = null,
     trailingIcon: (@Composable () -> Unit)? = null
 ) {
-    val scheme = MaterialTheme.colorScheme
+    val scheme = DsmusicTheme.colorScheme
     Row(
         modifier = modifier.clip(shape)
             .background(if (selected) scheme.primary else scheme.surfaceContainerLow)
@@ -283,7 +280,7 @@ fun DsmusicFilterChip(
         verticalAlignment = Alignment.CenterVertically
     ) {
         CompositionLocalProvider(
-            LocalContentColor provides if (selected) scheme.onPrimary else scheme.onSurfaceVariant
+            LocalDsmusicContentColor provides if (selected) scheme.onPrimary else scheme.onSurfaceVariant
         ) {
             leadingIcon?.invoke()
             label()
@@ -300,16 +297,16 @@ fun DsmusicSwitchControl(
     enabled: Boolean = true,
     colors: Any? = null
 ) {
-    val accent = MaterialTheme.colorScheme.primary
+    val accent = DsmusicTheme.colorScheme.primary
     Box(
         modifier = modifier.size(width = 44.dp, height = 26.dp).clip(CircleShape)
-            .background(if (checked && enabled) accent else MaterialTheme.colorScheme.surfaceVariant)
+            .background(if (checked && enabled) accent else DsmusicTheme.colorScheme.surfaceVariant)
             .clickable(enabled = enabled && onCheckedChange != null) { onCheckedChange?.invoke(!checked) }
             .padding(horizontal = 3.dp),
         contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
     ) {
         Box(Modifier.size(if (checked) 20.dp else 18.dp).clip(CircleShape)
-            .background(if (checked && enabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant))
+            .background(if (checked && enabled) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant))
     }
 }
 
@@ -344,27 +341,27 @@ fun DsmusicPageHeading(
                 .width(4.dp)
                 .height(if (subtitle == null) 42.dp else 48.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(MaterialTheme.colorScheme.primary)
+                .background(DsmusicTheme.colorScheme.primary)
         )
         Column(
             modifier = Modifier.padding(start = 12.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
-            androidx.compose.material3.Text(
+            Text(
                 text = kicker.uppercase(),
-                style = MaterialTheme.typography.labelMedium.copy(
-                    color = MaterialTheme.colorScheme.primary,
+                style = DsmusicTheme.typography.labelMedium.copy(
+                    color = DsmusicTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.7.sp
                 ),
                 maxLines = 1
             )
-            androidx.compose.material3.Text(
+            Text(
                 text = title,
-                style = MaterialTheme.typography.headlineMedium.copy(
+                style = DsmusicTheme.typography.headlineMedium.copy(
                     fontSize = titleSize,
                     lineHeight = titleLineHeight,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = DsmusicTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.sp
                 ),
@@ -372,10 +369,10 @@ fun DsmusicPageHeading(
                 overflow = TextOverflow.Ellipsis
             )
             if (subtitle != null) {
-                androidx.compose.material3.Text(
+                Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = DsmusicTheme.typography.bodyMedium.copy(
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 20.sp
                     ),
                     maxLines = 1

@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,9 +50,9 @@ fun DsmusicNavigationBar(
     modifier: Modifier = Modifier,
     onNavigate: (String) -> Unit
 ) {
-    val surface = MaterialTheme.colorScheme.surfaceContainer
-    val selectedColor = MaterialTheme.colorScheme.primary
-    val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val surface = DsmusicTheme.colorScheme.surfaceContainer
+    val selectedColor = DsmusicTheme.colorScheme.primary
+    val inactiveColor = DsmusicTheme.colorScheme.onSurfaceVariant
 
     val dockShape = when (barStyle) {
         "Docked" -> RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)

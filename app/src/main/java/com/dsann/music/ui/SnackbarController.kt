@@ -1,7 +1,7 @@
 package com.dsann.music.ui
 
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarVisuals
+import com.dsann.music.ui.theme.SnackbarDuration
+import com.dsann.music.ui.theme.SnackbarVisuals
 import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
