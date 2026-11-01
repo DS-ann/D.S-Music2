@@ -39,21 +39,27 @@ private val DsmusicPanelShape = RoundedCornerShape(18.dp)
 fun DsmusicCard(
     modifier: Modifier = Modifier,
     shape: Shape = DsmusicPanelShape,
-    colors: Any? = null,
+    colors: DsmusicCardColors? = null,
     elevation: Any? = null,
     border: Any? = null,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val outline = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.28f)
+    val scheme = DsmusicTheme.colorScheme
+    val containerColor = colors?.containerColor ?: scheme.surfaceContainerLow
+    val contentColor = colors?.contentColor ?: scheme.onSurface
+    val outline = scheme.outlineVariant.copy(alpha = 0.28f)
     Column(
         modifier = modifier
             .clip(shape)
-            .background(DsmusicTheme.colorScheme.surfaceContainerLow)
+            .background(containerColor)
             .border(BorderStroke(1.dp, outline.copy(alpha = 0.62f)), shape)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        content = content
-    )
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+    ) {
+        CompositionLocalProvider(LocalDsmusicContentColor provides contentColor) {
+            content()
+        }
+    }
 }
 
 @Composable
@@ -296,18 +302,28 @@ fun DsmusicFilterChip(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     shape: Shape = RoundedCornerShape(10.dp),
-    colors: Any? = null,
+    colors: DsmusicButtonColors? = null,
     border: Any? = null,
     leadingIcon: (@Composable () -> Unit)? = null,
     trailingIcon: (@Composable () -> Unit)? = null
 ) {
     val scheme = DsmusicTheme.colorScheme
+    val background = when {
+        !enabled -> colors?.disabledContainerColor ?: scheme.surfaceVariant
+        selected -> colors?.containerColor ?: scheme.primary
+        else -> scheme.surfaceContainerLow
+    }
+    val foreground = when {
+        !enabled -> colors?.disabledContentColor ?: scheme.onSurfaceVariant
+        selected -> colors?.contentColor ?: scheme.onPrimary
+        else -> scheme.onSurfaceVariant
+    }
     Row(
         modifier = modifier.clip(shape)
-            .background(if (selected) scheme.primary else scheme.surfaceContainerLow)
+            .background(background)
             .border(
                 1.dp,
-                if (selected) scheme.primary else scheme.outlineVariant.copy(alpha = 0.42f),
+                if (selected && enabled) scheme.primary else scheme.outlineVariant.copy(alpha = 0.42f),
                 shape
             )
             .clickable(enabled = enabled, onClick = onClick)
@@ -315,9 +331,7 @@ fun DsmusicFilterChip(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        CompositionLocalProvider(
-            LocalDsmusicContentColor provides if (selected) scheme.onPrimary else scheme.onSurfaceVariant
-        ) {
+        CompositionLocalProvider(LocalDsmusicContentColor provides foreground) {
             leadingIcon?.invoke()
             label()
             trailingIcon?.invoke()
@@ -331,18 +345,27 @@ fun DsmusicSwitchControl(
     onCheckedChange: ((Boolean) -> Unit)?,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    colors: Any? = null
+    colors: DsmusicSwitchColors? = null
 ) {
-    val accent = DsmusicTheme.colorScheme.primary
+    val scheme = DsmusicTheme.colorScheme
+    val trackColor = when {
+        checked && enabled -> colors?.checkedTrackColor ?: scheme.primary
+        checked -> colors?.disabledCheckedTrackColor ?: scheme.surfaceVariant
+        else -> colors?.uncheckedTrackColor ?: scheme.surfaceVariant
+    }
+    val thumbColor = when {
+        checked && enabled -> colors?.checkedThumbColor ?: scheme.onPrimary
+        else -> colors?.uncheckedThumbColor ?: scheme.onSurfaceVariant
+    }
     Box(
         modifier = modifier.size(width = 44.dp, height = 26.dp).clip(CircleShape)
-            .background(if (checked && enabled) accent else DsmusicTheme.colorScheme.surfaceVariant)
+            .background(trackColor)
+            .border(1.dp, if (checked && enabled) trackColor else scheme.outlineVariant, CircleShape)
             .clickable(enabled = enabled && onCheckedChange != null) { onCheckedChange?.invoke(!checked) }
             .padding(horizontal = 3.dp),
         contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
     ) {
-        Box(Modifier.size(if (checked) 20.dp else 18.dp).clip(CircleShape)
-            .background(if (checked && enabled) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant))
+        Box(Modifier.size(if (checked) 20.dp else 18.dp).clip(CircleShape).background(thumbColor))
     }
 }
 
