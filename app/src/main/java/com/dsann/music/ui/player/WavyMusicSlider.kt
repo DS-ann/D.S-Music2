@@ -123,7 +123,7 @@ fun WavyMusicSlider(
     val normalizedValue = if (valueRange.endInclusive == valueRange.start) 0f
         else ((clampedValue - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
 
-    // Smoothly animate seeking/playback progress using M3 Expressive Motion physics
+    // Interpolate the service's periodic progress updates without a spring restart on every tick.
     val animatedNormalizedValueState = animateFloatAsState(
         targetValue = normalizedValue,
         animationSpec = tween(durationMillis = 320, easing = LinearEasing),
