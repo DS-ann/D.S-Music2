@@ -630,6 +630,7 @@ class MainActivity : AppCompatActivity() {
                         PlayerBottomSheetCompose(
                             activity = this@MainActivity,
                             viewModel = playerViewModel,
+                            bottomNavigationVisible = showBottomBar,
                             modifier = Modifier.layout { measurable, constraints ->
                                 // Phone layouts have no navigation rail, so their player sheet
                                 // must not subscribe to the 60 Hz expansion value or remeasure every frame.
