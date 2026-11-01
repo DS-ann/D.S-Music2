@@ -1371,11 +1371,24 @@ fun ExtendedFloatingActionButton(
     modifier: Modifier = Modifier,
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(18.dp),
     icon: @Composable () -> Unit = {},
+    text: (@Composable () -> Unit)? = null,
     containerColor: Color = DsmusicTheme.colorScheme.primaryContainer,
     contentColor: Color = DsmusicTheme.colorScheme.onPrimaryContainer,
     elevation: Dp = 0.dp,
     interactionSource: MutableInteractionSource? = null,
-    content: @Composable RowScope.() -> Unit
+    content: @Composable RowScope.() -> Unit = {}
 ) {
-    DsmusicButton(onClick, modifier, true, shape, DsmusicButtonColors(containerColor, contentColor, containerColor, contentColor), null, PaddingValues(horizontal = 18.dp, vertical = 12.dp), elevation, interactionSource, content)
+    DsmusicButton(
+        onClick, modifier, true, shape,
+        DsmusicButtonColors(containerColor, contentColor, containerColor, contentColor),
+        null, PaddingValues(horizontal = 18.dp, vertical = 12.dp), elevation, interactionSource
+    ) {
+        if (text != null) {
+            icon()
+            Spacer(Modifier.width(8.dp))
+            text()
+        } else {
+            content()
+        }
+    }
 }
