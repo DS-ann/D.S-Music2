@@ -155,7 +155,6 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.dsann.music.MainActivity
-import com.dsann.music.SpatialFlowApplication
 import com.dsann.music.R
 import com.dsann.music.data.db.PlaylistEntity
 import com.dsann.music.data.lyrics.MetadataRepair
@@ -2364,7 +2363,7 @@ private fun SongsTabContent(nestedScrollConnection: androidx.compose.ui.input.ne
                                     painter = coil.compose.rememberAsyncImagePainter(
                                         model = ImageRequest.Builder(LocalContext.current)
                                             .data(song.thumbnailUrl)
-                                            .crossfade(!SpatialFlowApplication.isLowRamDevice)
+                                            .crossfade(false)
                                             .build()
                                     ),
                                     contentDescription = null,
@@ -2523,7 +2522,7 @@ private fun OnlineAlbumCard(
                         painter = coil.compose.rememberAsyncImagePainter(
                             model = ImageRequest.Builder(LocalContext.current)
                                 .data(album.thumbnailUrl)
-                                .crossfade(!SpatialFlowApplication.isLowRamDevice)
+                                .crossfade(false)
                                 .build()
                         ),
                         contentDescription = null,
@@ -2686,7 +2685,7 @@ private fun OnlineArtistCard(
                     painter = coil.compose.rememberAsyncImagePainter(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(artist.thumbnailUrl)
-                            .crossfade(!SpatialFlowApplication.isLowRamDevice)
+                            .crossfade(false)
                             .build()
                     ),
                     contentDescription = null,
