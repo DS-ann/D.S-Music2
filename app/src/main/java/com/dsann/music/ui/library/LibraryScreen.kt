@@ -88,36 +88,34 @@ import androidx.compose.material.icons.filled.Podcasts
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberSwipeToDismissBoxState
+import com.dsann.music.ui.theme.AlertDialog
+import com.dsann.music.ui.theme.Button
+import com.dsann.music.ui.theme.ButtonDefaults
+import com.dsann.music.ui.theme.Card
+import com.dsann.music.ui.theme.CardDefaults
+import com.dsann.music.ui.theme.FilterChip
+import com.dsann.music.ui.theme.FilterChipDefaults
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.IconButton
+import com.dsann.music.ui.theme.ListItem
+import com.dsann.music.ui.theme.ListItemDefaults
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.ModalBottomSheet
+import com.dsann.music.ui.theme.OutlinedButton
+import com.dsann.music.ui.theme.OutlinedTextField
+import com.dsann.music.ui.theme.OutlinedTextFieldDefaults
+import com.dsann.music.ui.theme.Scaffold
+import com.dsann.music.ui.theme.SnackbarHost
+import com.dsann.music.ui.theme.SnackbarHostState
+import com.dsann.music.ui.theme.Surface
+import com.dsann.music.ui.theme.SwipeToDismissBox
+import com.dsann.music.ui.theme.SwipeToDismissBoxValue
+import com.dsann.music.ui.theme.Text
+import com.dsann.music.ui.theme.TextButton
+import com.dsann.music.ui.theme.PullToRefreshBox
+import com.dsann.music.ui.theme.rememberPullToRefreshState
+import com.dsann.music.ui.theme.rememberModalBottomSheetState
+import com.dsann.music.ui.theme.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -194,7 +192,7 @@ enum class SortOrder {
     DURATION
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
+
 @Composable
 fun LibraryScreen(
     viewModel: PlayerSharedViewModel,
@@ -379,7 +377,7 @@ fun LibraryScreen(
 
     Scaffold(
         // snackbarHost = { SnackbarHost(hostState = snackbarHostState) }, // Replaced by global SnackbarController
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = DsmusicTheme.colorScheme.background
     ) { paddingValues ->
         Box(
             modifier = Modifier
@@ -409,7 +407,7 @@ fun LibraryScreen(
                         if (activeTab == "Playlists" || activeTab == "Albums" || activeTab == "Artists") {
                             Box(
                                 Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                    .background(DsmusicTheme.colorScheme.surfaceContainerLow)
                                     .clickable {
                                         when (activeTab) {
                                             "Playlists" -> playlistsAsList = !playlistsAsList
@@ -422,7 +420,7 @@ fun LibraryScreen(
                                 Icon(
                                     imageVector = if (currentCollectionAsList) Icons.Default.GridView else Icons.Default.ViewList,
                                     contentDescription = if (currentCollectionAsList) "Show as grid" else "Show as list",
-                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    tint = DsmusicTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(21.dp)
                                 )
                             }
@@ -430,14 +428,14 @@ fun LibraryScreen(
 
                         Box(
                             Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                .background(DsmusicTheme.colorScheme.surfaceContainerLow)
                                 .clickable { activeTab = "History" },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.ic_history),
                                 contentDescription = "Listening History",
-                                tint = MaterialTheme.colorScheme.onSurface,
+                                tint = DsmusicTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(21.dp)
                             )
                         }
@@ -458,14 +456,14 @@ fun LibraryScreen(
                         } else {
                             Box(
                                 Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                    .background(DsmusicTheme.colorScheme.surfaceContainerLow)
                                     .clickable { showAccountScreen = true },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.AccountCircle,
                                     contentDescription = "Account Settings",
-                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    tint = DsmusicTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(25.dp)
                                 )
                             }
@@ -505,7 +503,7 @@ fun LibraryScreen(
                             label = {
                                 Text(
                                     label,
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = DsmusicTheme.typography.labelMedium,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
                                 )
                             }
@@ -554,31 +552,31 @@ fun LibraryScreen(
                                     modifier = Modifier.fillMaxWidth()
                                         .padding(horizontal = 16.dp, vertical = 6.dp)
                                         .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f), CircleShape)
+                                        .background(DsmusicTheme.colorScheme.surfaceContainerLow)
+                                        .border(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.42f), CircleShape)
                                         .padding(horizontal = 15.dp, vertical = 12.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
                                         Icons.Default.Search,
                                         contentDescription = "Search local songs",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(21.dp)
                                     )
                                     Box(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                                         if (searchQuery.isEmpty()) {
                                             Text(
                                                 "Search local songs...",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                style = DsmusicTheme.typography.bodyMedium,
+                                                color = DsmusicTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
                                         BasicTextField(
                                             value = searchQuery,
                                             onValueChange = { searchQuery = it },
                                             singleLine = true,
-                                            textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                                color = MaterialTheme.colorScheme.onSurface
+                                            textStyle = DsmusicTheme.typography.bodyMedium.copy(
+                                                color = DsmusicTheme.colorScheme.onSurface
                                             ),
                                             modifier = Modifier.fillMaxWidth()
                                         )
@@ -592,7 +590,7 @@ fun LibraryScreen(
                                             Icon(
                                                 Icons.Default.Clear,
                                                 contentDescription = "Clear search",
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.size(18.dp)
                                             )
                                         }
@@ -612,17 +610,17 @@ fun LibraryScreen(
                                         Box(
                                             modifier = Modifier.clip(RoundedCornerShape(9.dp))
                                                 .background(
-                                                    if (isSel) MaterialTheme.colorScheme.primaryContainer
-                                                    else MaterialTheme.colorScheme.surfaceContainerLow
+                                                    if (isSel) DsmusicTheme.colorScheme.primaryContainer
+                                                    else DsmusicTheme.colorScheme.surfaceContainerLow
                                                 )
                                                 .clickable { sortOrder = order }
                                                 .padding(horizontal = 13.dp, vertical = 9.dp)
                                         ) {
                                             BasicText(
                                                 text = order.name.replace("_", " "),
-                                                style = MaterialTheme.typography.labelMedium.copy(
-                                                    color = if (isSel) MaterialTheme.colorScheme.onPrimaryContainer
-                                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                style = DsmusicTheme.typography.labelMedium.copy(
+                                                    color = if (isSel) DsmusicTheme.colorScheme.onPrimaryContainer
+                                                        else DsmusicTheme.colorScheme.onSurfaceVariant,
                                                     fontWeight = FontWeight.SemiBold
                                                 )
                                             )
@@ -777,7 +775,7 @@ fun LibraryScreen(
                                                 activeTab == "Downloaded songs" -> "No downloaded songs yet. Downloaded tracks will appear here."
                                                 else -> "Scan device files to load songs"
                                             },
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = DsmusicTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 } else {
@@ -801,9 +799,9 @@ fun LibraryScreen(
                                             if (item is String) {
                                                 Text(
                                                     text = item,
-                                                    style = MaterialTheme.typography.titleSmall,
+                                                    style = DsmusicTheme.typography.titleSmall,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
                                                     modifier = Modifier
                                                         .fillMaxWidth()
                                                         .padding(horizontal = 20.dp, vertical = 10.dp)
@@ -842,8 +840,8 @@ fun LibraryScreen(
                                                     state = dismissState,
                                                     backgroundContent = {
                                                         val color = when (dismissState.dismissDirection) {
-                                                            SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primaryContainer
-                                                            SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.secondaryContainer
+                                                            SwipeToDismissBoxValue.StartToEnd -> DsmusicTheme.colorScheme.primaryContainer
+                                                            SwipeToDismissBoxValue.EndToStart -> DsmusicTheme.colorScheme.secondaryContainer
                                                             else -> Color.Transparent
                                                         }
                                                         val icon = when (dismissState.dismissDirection) {
@@ -883,9 +881,9 @@ fun LibraryScreen(
                                                                             alpha = p.coerceIn(0.3f, 1.0f)
                                                                         },
                                                                     tint = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) {
-                                                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                                                        DsmusicTheme.colorScheme.onPrimaryContainer
                                                                     } else {
-                                                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                                                        DsmusicTheme.colorScheme.onSecondaryContainer
                                                                     }
                                                                 )
                                                             }
@@ -1160,10 +1158,10 @@ fun SongListItem(
 ) {
     val context = LocalContext.current
     val artModel = remember(song) { song.getAlbumArtUri() ?: R.drawable.ic_music_note }
-    val shape = MaterialTheme.shapes.medium
-    val accent = MaterialTheme.colorScheme.primary
-    val titleColor = MaterialTheme.colorScheme.onSurface
-    val secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val shape = DsmusicTheme.shapes.medium
+    val accent = DsmusicTheme.colorScheme.primary
+    val titleColor = DsmusicTheme.colorScheme.onSurface
+    val secondaryColor = DsmusicTheme.colorScheme.onSurfaceVariant
 
     Row(
         modifier = Modifier
@@ -1172,7 +1170,7 @@ fun SongListItem(
             .clip(shape)
             .background(
                 if (isPlaying) accent.copy(alpha = 0.13f)
-                else MaterialTheme.colorScheme.surfaceContainerLow
+                else DsmusicTheme.colorScheme.surfaceContainerLow
             )
             .then(
                 if (isPlaying) Modifier.border(
@@ -1212,7 +1210,7 @@ fun SongListItem(
         ) {
             BasicText(
                 text = song.title,
-                style = MaterialTheme.typography.titleSmall.copy(
+                style = DsmusicTheme.typography.titleSmall.copy(
                     color = titleColor,
                     fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Medium
                 ),
@@ -1220,7 +1218,7 @@ fun SongListItem(
             )
             BasicText(
                 text = song.artist,
-                style = MaterialTheme.typography.bodySmall.copy(
+                style = DsmusicTheme.typography.bodySmall.copy(
                     color = secondaryColor
                 ),
                 maxLines = 1
@@ -1364,7 +1362,7 @@ private fun UnifiedLibraryContent(
 
     if (unifiedItems.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No items found in your library", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("No items found in your library", color = DsmusicTheme.colorScheme.onSurfaceVariant)
         }
     } else {
         LazyVerticalGrid(
@@ -1419,14 +1417,14 @@ private fun libraryCardGradient(title: String): List<Color> {
 private fun DsmusicLibraryListTile(
     title: String,
     subtitle: String,
-    iconBackground: Color = MaterialTheme.colorScheme.primaryContainer,
+    iconBackground: Color = DsmusicTheme.colorScheme.primaryContainer,
     onClick: () -> Unit,
     iconContent: @Composable () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(15.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .background(DsmusicTheme.colorScheme.surfaceContainer)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1441,8 +1439,8 @@ private fun DsmusicLibraryListTile(
             Text(title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = DsmusicTheme.typography.bodySmall,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1467,7 +1465,7 @@ private fun DsmusicLibraryGridTile(
     ) {
         Box(
             modifier = Modifier.fillMaxWidth().weight(1f)
-                .background(MaterialTheme.colorScheme.primaryContainer),
+                .background(DsmusicTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center,
             content = { iconContent() }
         )
@@ -1542,25 +1540,25 @@ private fun UnifiedLibraryCard(item: UnifiedLibraryItem) {
         Text(
             item.title,
             fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.bodyMedium,
+            style = DsmusicTheme.typography.bodyMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = DsmusicTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             item.subtitle,
-            style = MaterialTheme.typography.bodySmall,
+            style = DsmusicTheme.typography.bodySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = DsmusicTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
+
 @Composable
 private fun PlaylistsTabContent(
     nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection,
@@ -1613,8 +1611,8 @@ private fun PlaylistsTabContent(
                         } else {
                             "You are signed out. This playlist will be stored on this device."
                         },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = DsmusicTheme.typography.bodySmall,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
                     )
                 }
             },
@@ -1679,7 +1677,7 @@ private fun PlaylistsTabContent(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background)
+                    .background(DsmusicTheme.colorScheme.background)
             ) {
                 Row(
                     modifier = Modifier
@@ -1691,7 +1689,7 @@ private fun PlaylistsTabContent(
                     DsmusicIconButton(onClick = { showCachePlaylist = false }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to playlists")
                     }
-                    Text("Cache", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Cache", style = DsmusicTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
                 StreamCacheTabContent(
                     context = context,
@@ -1717,12 +1715,12 @@ private fun PlaylistsTabContent(
                 Text(
                     "Playlists",
                     modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = DsmusicTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
                 )
                 DsmusicIconButton(onClick = { showCreatePlaylistDialog = true }) {
-                    Icon(Icons.Default.Add, contentDescription = "Create playlist", tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Default.Add, contentDescription = "Create playlist", tint = DsmusicTheme.colorScheme.primary)
                 }
             }
 
@@ -1744,16 +1742,16 @@ private fun PlaylistsTabContent(
                             subtitle = "Cached audio, artwork and lyrics",
                             onClick = { showCachePlaylist = true }
                         ) {
-                            Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Icon(Icons.Default.Folder, null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
                         }
                     } else {
                         DsmusicLibraryGridTile(
                             title = "Cache",
-                            backgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            iconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            backgroundColor = DsmusicTheme.colorScheme.surfaceContainerHigh,
+                            iconColor = DsmusicTheme.colorScheme.onPrimaryContainer,
                             onClick = { showCachePlaylist = true }
                         ) {
-                            Icon(Icons.Default.Folder, null, modifier = Modifier.size(42.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Icon(Icons.Default.Folder, null, modifier = Modifier.size(42.dp), tint = DsmusicTheme.colorScheme.onPrimaryContainer)
                         }
                     }
                 }
@@ -1763,19 +1761,19 @@ private fun PlaylistsTabContent(
                         DsmusicLibraryListTile(
                             title = "Create playlist",
                             subtitle = "New playlist",
-                            iconBackground = MaterialTheme.colorScheme.secondaryContainer,
+                            iconBackground = DsmusicTheme.colorScheme.secondaryContainer,
                             onClick = { showCreatePlaylistDialog = true }
                         ) {
-                            Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                            Icon(Icons.Default.Add, null, tint = DsmusicTheme.colorScheme.onSecondaryContainer)
                         }
                     } else {
                         DsmusicLibraryGridTile(
                             title = "Create playlist",
-                            backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
-                            iconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            backgroundColor = DsmusicTheme.colorScheme.secondaryContainer,
+                            iconColor = DsmusicTheme.colorScheme.onSecondaryContainer,
                             onClick = { showCreatePlaylistDialog = true }
                         ) {
-                            Icon(Icons.Default.Add, null, modifier = Modifier.size(42.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                            Icon(Icons.Default.Add, null, modifier = Modifier.size(42.dp), tint = DsmusicTheme.colorScheme.onSecondaryContainer)
                         }
                     }
                 }
@@ -1791,20 +1789,20 @@ private fun PlaylistsTabContent(
                             subtitle = "On this device",
                             onClick = { selectedLocalPlaylist = playlist }
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
                         }
                     } else {
                         DsmusicLibraryGridTile(
                             title = playlist.title,
-                            backgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            iconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            backgroundColor = DsmusicTheme.colorScheme.surfaceContainerHigh,
+                            iconColor = DsmusicTheme.colorScheme.onPrimaryContainer,
                             onClick = { selectedLocalPlaylist = playlist }
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.PlaylistPlay,
                                 null,
                                 modifier = Modifier.size(42.dp),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                tint = DsmusicTheme.colorScheme.onPrimaryContainer
                             )
                         }
                     }
@@ -1878,7 +1876,7 @@ private fun LocalPlaylistDetailsScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(DsmusicTheme.colorScheme.background)
         ) {
             Box(
                 modifier = Modifier
@@ -1889,7 +1887,7 @@ private fun LocalPlaylistDetailsScreen(
                             colors = listOf(
                                 artworkColor.copy(alpha = 0.72f),
                                 artworkColor.copy(alpha = 0.32f),
-                                MaterialTheme.colorScheme.background
+                                DsmusicTheme.colorScheme.background
                             )
                         )
                     )
@@ -1907,15 +1905,15 @@ private fun LocalPlaylistDetailsScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back to Library",
-                            tint = MaterialTheme.colorScheme.onSurface
+                            tint = DsmusicTheme.colorScheme.onSurface
                         )
                     }
                     Text(
                         playlist.title,
                         modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = DsmusicTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = DsmusicTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1928,7 +1926,7 @@ private fun LocalPlaylistDetailsScreen(
                         Icon(
                             Icons.Default.Delete,
                             contentDescription = "Delete playlist",
-                            tint = MaterialTheme.colorScheme.error
+                            tint = DsmusicTheme.colorScheme.error
                         )
                     }
                 }
@@ -1950,7 +1948,7 @@ private fun LocalPlaylistDetailsScreen(
                                 modifier = Modifier
                                     .size(196.dp)
                                     .clip(RoundedCornerShape(22.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                    .background(DsmusicTheme.colorScheme.surfaceContainerHigh),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (!artworkUrl.isNullOrBlank()) {
@@ -1967,7 +1965,7 @@ private fun LocalPlaylistDetailsScreen(
                                     Icon(
                                         Icons.AutoMirrored.Filled.PlaylistPlay,
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(72.dp)
                                     )
                                 }
@@ -1975,8 +1973,8 @@ private fun LocalPlaylistDetailsScreen(
                             Spacer(Modifier.height(18.dp))
                             Text(
                                 "${songs.size} songs • On this device",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = DsmusicTheme.typography.bodyMedium,
+                                color = DsmusicTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 4.dp)
                             )
                             if (songs.isNotEmpty()) {
@@ -2017,9 +2015,9 @@ private fun LocalPlaylistDetailsScreen(
                         Text(
                             "Songs",
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = DsmusicTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = DsmusicTheme.colorScheme.onSurface
                         )
                     }
 
@@ -2031,7 +2029,7 @@ private fun LocalPlaylistDetailsScreen(
                             ) {
                                 Text(
                                     "This playlist is empty",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -2047,7 +2045,7 @@ private fun LocalPlaylistDetailsScreen(
                                     .padding(horizontal = 12.dp, vertical = 4.dp)
                                     .clip(RoundedCornerShape(14.dp)),
                                 shape = RoundedCornerShape(14.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f)
+                                color = DsmusicTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f)
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -2064,7 +2062,7 @@ private fun LocalPlaylistDetailsScreen(
                                         modifier = Modifier
                                             .size(50.dp)
                                             .clip(RoundedCornerShape(9.dp))
-                                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                            .background(DsmusicTheme.colorScheme.surfaceContainerHigh),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (!song.thumbnailUrl.isNullOrBlank()) {
@@ -2078,7 +2076,7 @@ private fun LocalPlaylistDetailsScreen(
                                             Icon(
                                                 Icons.Default.MusicNote,
                                                 null,
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                tint = DsmusicTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
                                     }
@@ -2089,14 +2087,14 @@ private fun LocalPlaylistDetailsScreen(
                                             fontWeight = FontWeight.SemiBold,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            color = DsmusicTheme.colorScheme.onSurface
                                         )
                                         Text(
                                             song.artist,
-                                            style = MaterialTheme.typography.bodySmall,
+                                            style = DsmusicTheme.typography.bodySmall,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = DsmusicTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                     DsmusicIconButton(
@@ -2110,7 +2108,7 @@ private fun LocalPlaylistDetailsScreen(
                                         Icon(
                                             Icons.Default.Close,
                                             contentDescription = "Remove song",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            tint = DsmusicTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -2145,7 +2143,7 @@ private fun OnlinePlaylistCard(
                 Text(playlist.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             },
             supportingContent = {
-                Text(playlist.songCount ?: "Playlist", color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                Text(playlist.songCount ?: "Playlist", color = DsmusicTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             },
             leadingContent = {
                 if (!playlist.thumbnailUrl.isNullOrBlank()) {
@@ -2157,14 +2155,14 @@ private fun OnlinePlaylistCard(
                     )
                 } else {
                     Box(
-                        Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.primaryContainer),
+                        Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(DsmusicTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
                     }
                 }
             },
-            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            colors = ListItemDefaults.colors(containerColor = DsmusicTheme.colorScheme.surfaceContainer),
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick)
         )
         return
@@ -2175,7 +2173,7 @@ private fun OnlinePlaylistCard(
             .height(220.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+        colors = CardDefaults.cardColors(containerColor = DsmusicTheme.colorScheme.surfaceContainerHigh)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(
@@ -2194,13 +2192,13 @@ private fun OnlinePlaylistCard(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.primaryContainer),
+                            .background(DsmusicTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             Icons.Default.MusicNote,
                             null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            tint = DsmusicTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(48.dp)
                         )
                     }
@@ -2210,15 +2208,15 @@ private fun OnlinePlaylistCard(
                 Text(
                     playlist.title,
                     fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = DsmusicTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = DsmusicTheme.colorScheme.onSurface
                 )
                 Text(
                     playlist.songCount ?: "Playlist",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = DsmusicTheme.typography.bodySmall,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
                 )
             }
@@ -2251,9 +2249,9 @@ private fun PodcastsTabContent(nestedScrollConnection: androidx.compose.ui.input
     ) {
         Text(
             "Your Subscribed Podcasts",
-            style = MaterialTheme.typography.titleMedium,
+            style = DsmusicTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = DsmusicTheme.colorScheme.onSurface
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -2275,14 +2273,14 @@ private fun PodcastsTabContent(nestedScrollConnection: androidx.compose.ui.input
                         modifier = Modifier
                             .size(80.dp)
                             .alpha(0.6f),
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = DsmusicTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         "No podcasts found",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = DsmusicTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = DsmusicTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -2331,9 +2329,9 @@ private fun SongsTabContent(nestedScrollConnection: androidx.compose.ui.input.ne
     ) {
         Text(
             "Liked Songs (YT Music)",
-            style = MaterialTheme.typography.titleMedium,
+            style = DsmusicTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = DsmusicTheme.colorScheme.onSurface
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -2345,7 +2343,7 @@ private fun SongsTabContent(nestedScrollConnection: androidx.compose.ui.input.ne
                     .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No online songs found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("No online songs found", color = DsmusicTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             LazyColumn(
@@ -2359,7 +2357,7 @@ private fun SongsTabContent(nestedScrollConnection: androidx.compose.ui.input.ne
                 items(onlineSongs) { song ->
                     DsmusicListItem(
                         headlineContent = { Text(song.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        supportingContent = { Text(song.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        supportingContent = { Text(song.artist, color = DsmusicTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         leadingContent = {
                             if (song.thumbnailUrl?.isNotEmpty() == true) {
                                 androidx.compose.foundation.Image(
@@ -2379,7 +2377,7 @@ private fun SongsTabContent(nestedScrollConnection: androidx.compose.ui.input.ne
                                 Icon(Icons.Default.MusicNote, null, modifier = Modifier.size(48.dp))
                             }
                         },
-                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                        colors = ListItemDefaults.colors(containerColor = DsmusicTheme.colorScheme.surfaceContainer),
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
                             .clickable {
@@ -2435,9 +2433,9 @@ private fun AlbumsTabContent(
     ) {
         Text(
             "YT Music Albums",
-            style = MaterialTheme.typography.titleMedium,
+            style = DsmusicTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = DsmusicTheme.colorScheme.onSurface
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -2449,7 +2447,7 @@ private fun AlbumsTabContent(
                     .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No online albums found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("No online albums found", color = DsmusicTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             LazyVerticalGrid(
@@ -2483,7 +2481,7 @@ private fun OnlineAlbumCard(
     if (asList) {
         DsmusicListItem(
             headlineContent = { Text(album.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            supportingContent = { Text(album.artists.firstOrNull()?.name ?: "Unknown Artist", color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) },
+            supportingContent = { Text(album.artists.firstOrNull()?.name ?: "Unknown Artist", color = DsmusicTheme.colorScheme.onSurfaceVariant, maxLines = 1) },
             leadingContent = {
                 if (!album.thumbnailUrl.isNullOrBlank()) {
                     AsyncImage(
@@ -2494,14 +2492,14 @@ private fun OnlineAlbumCard(
                     )
                 } else {
                     Box(
-                        Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.primaryContainer),
+                        Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(DsmusicTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Album, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Icon(Icons.Default.Album, null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
                     }
                 }
             },
-            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            colors = ListItemDefaults.colors(containerColor = DsmusicTheme.colorScheme.surfaceContainer),
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick)
         )
         return
@@ -2512,7 +2510,7 @@ private fun OnlineAlbumCard(
             .height(220.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+        colors = CardDefaults.cardColors(containerColor = DsmusicTheme.colorScheme.surfaceContainerHigh)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(
@@ -2536,13 +2534,13 @@ private fun OnlineAlbumCard(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.primaryContainer),
+                            .background(DsmusicTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             Icons.Default.Album,
                             null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            tint = DsmusicTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(48.dp)
                         )
                     }
@@ -2552,15 +2550,15 @@ private fun OnlineAlbumCard(
                 Text(
                     album.title,
                     fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = DsmusicTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = DsmusicTheme.colorScheme.onSurface
                 )
                 Text(
                     album.artists.firstOrNull()?.name ?: "Unknown Artist",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = DsmusicTheme.typography.bodySmall,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
                 )
             }
@@ -2596,9 +2594,9 @@ private fun ArtistsTabContent(
     ) {
         Text(
             "Followed Artists (YT Music)",
-            style = MaterialTheme.typography.titleMedium,
+            style = DsmusicTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = DsmusicTheme.colorScheme.onSurface
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -2610,7 +2608,7 @@ private fun ArtistsTabContent(
                     .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No online artists found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("No online artists found", color = DsmusicTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             LazyVerticalGrid(
@@ -2644,7 +2642,7 @@ private fun OnlineArtistCard(
     if (asList) {
         DsmusicListItem(
             headlineContent = { Text(artist.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            supportingContent = { Text("Artist", color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) },
+            supportingContent = { Text("Artist", color = DsmusicTheme.colorScheme.onSurfaceVariant, maxLines = 1) },
             leadingContent = {
                 if (!artist.thumbnailUrl.isNullOrBlank()) {
                     AsyncImage(
@@ -2655,14 +2653,14 @@ private fun OnlineArtistCard(
                     )
                 } else {
                     Box(
-                        Modifier.size(56.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                        Modifier.size(56.dp).clip(CircleShape).background(DsmusicTheme.colorScheme.surfaceContainerHigh),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Default.Person, null, tint = DsmusicTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             },
-            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            colors = ListItemDefaults.colors(containerColor = DsmusicTheme.colorScheme.surfaceContainer),
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick)
         )
         return
@@ -2680,7 +2678,7 @@ private fun OnlineArtistCard(
                 .aspectRatio(1f)
                 .fillMaxWidth()
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                .background(DsmusicTheme.colorScheme.surfaceContainerHigh),
             contentAlignment = Alignment.Center
         ) {
             if (artist.thumbnailUrl?.isNotEmpty() == true) {
@@ -2703,7 +2701,7 @@ private fun OnlineArtistCard(
                     Icon(
                         imageVector = Icons.Default.Person,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(48.dp)
                     )
                 }
@@ -2713,19 +2711,19 @@ private fun OnlineArtistCard(
         Text(
             artist.title,
             fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.bodyMedium,
+            style = DsmusicTheme.typography.bodyMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = DsmusicTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             "Artist",
-            style = MaterialTheme.typography.bodySmall,
+            style = DsmusicTheme.typography.bodySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = DsmusicTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
     }
@@ -2926,13 +2924,13 @@ private fun RecapTabContent(
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 Text(
                     "Replay",
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = DsmusicTheme.typography.headlineMedium,
                     fontWeight = FontWeight.ExtraBold
                 )
                 Text(
                     "Your listening, recapped on this device",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -2964,7 +2962,7 @@ private fun RecapTabContent(
                         Icon(
                             Icons.Default.BarChart,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                            tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
                             modifier = Modifier.size(56.dp)
                         )
                         Spacer(Modifier.height(12.dp))
@@ -2972,8 +2970,8 @@ private fun RecapTabContent(
                         Text(
                             "Songs you play will appear here with listening time, top artists and your most-played tracks.",
                             textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                            style = DsmusicTheme.typography.bodyMedium
                         )
                     }
                 }
@@ -2987,9 +2985,9 @@ private fun RecapTabContent(
                         .background(
                             Brush.linearGradient(
                                 listOf(
-                                    MaterialTheme.colorScheme.primaryContainer,
-                                    MaterialTheme.colorScheme.tertiaryContainer,
-                                    MaterialTheme.colorScheme.secondaryContainer
+                                    DsmusicTheme.colorScheme.primaryContainer,
+                                    DsmusicTheme.colorScheme.tertiaryContainer,
+                                    DsmusicTheme.colorScheme.secondaryContainer
                                 )
                             )
                         )
@@ -2998,45 +2996,45 @@ private fun RecapTabContent(
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
                             selectedPeriod.uppercase(),
-                            style = MaterialTheme.typography.labelLarge,
+                            style = DsmusicTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             totalListenText,
-                            style = MaterialTheme.typography.displayMedium,
+                            style = DsmusicTheme.typography.displayMedium,
                             fontWeight = FontWeight.Black,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = DsmusicTheme.colorScheme.onSurface
                         )
                         Text(
                             "listened",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = DsmusicTheme.typography.titleMedium,
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
                             Column {
-                                Text(filteredEvents.size.toString(), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                                Text("plays", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(filteredEvents.size.toString(), fontWeight = FontWeight.Bold, style = DsmusicTheme.typography.titleLarge)
+                                Text("plays", style = DsmusicTheme.typography.labelSmall, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                             }
                             Column {
-                                Text(topSongs.size.toString(), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                                Text("songs", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(topSongs.size.toString(), fontWeight = FontWeight.Bold, style = DsmusicTheme.typography.titleLarge)
+                                Text("songs", style = DsmusicTheme.typography.labelSmall, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                             }
                             Column {
-                                Text(activeDays.toString(), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                                Text("active days", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(activeDays.toString(), fontWeight = FontWeight.Bold, style = DsmusicTheme.typography.titleLarge)
+                                Text("active days", style = DsmusicTheme.typography.labelSmall, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         Text(
                             "Peak listening time · " + peakHabit,
-                            style = MaterialTheme.typography.labelLarge,
+                            style = DsmusicTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = DsmusicTheme.colorScheme.onSurface
                         )
                         topSongs.firstOrNull()?.let { first ->
                             Row(
                                 Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.42f))
+                                    .background(DsmusicTheme.colorScheme.surface.copy(alpha = 0.42f))
                                     .padding(10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -3050,15 +3048,15 @@ private fun RecapTabContent(
                                 } else {
                                     Box(
                                         Modifier.size(54.dp).clip(RoundedCornerShape(10.dp))
-                                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                                            .background(DsmusicTheme.colorScheme.surfaceVariant),
                                         contentAlignment = Alignment.Center
                                     ) { Icon(Icons.Default.MusicNote, null) }
                                 }
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text("Your #1 song", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Your #1 song", style = DsmusicTheme.typography.labelSmall, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                                     Text(first.title, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(first.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                    Text(first.artist, style = DsmusicTheme.typography.bodySmall, color = DsmusicTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                                 }
                             }
                         }
@@ -3122,19 +3120,19 @@ private fun RecapTabContent(
                         Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                         verticalArrangement = Arrangement.spacedBy(9.dp)
                     ) {
-                        Text("Listening by month", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Listening by month", style = DsmusicTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         val maximum = monthly.maxOfOrNull { it.totalMs }?.coerceAtLeast(1L) ?: 1L
                         monthly.forEach { month ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(month.label, modifier = Modifier.width(48.dp), style = MaterialTheme.typography.labelSmall)
+                                Text(month.label, modifier = Modifier.width(48.dp), style = DsmusicTheme.typography.labelSmall)
                                 Box(
                                     Modifier.weight(1f).height(9.dp).clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .background(DsmusicTheme.colorScheme.surfaceVariant)
                                 ) {
                                     Box(
                                         Modifier.fillMaxWidth((month.totalMs.toFloat() / maximum).coerceIn(0f, 1f))
                                             .fillMaxHeight()
-                                            .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                            .background(DsmusicTheme.colorScheme.primary, CircleShape)
                                     )
                                 }
                             }
@@ -3148,7 +3146,7 @@ private fun RecapTabContent(
                         Text(
                             "Top artists",
                             modifier = Modifier.padding(start = 20.dp, bottom = 8.dp),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = DsmusicTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         LazyRow(
@@ -3171,7 +3169,7 @@ private fun RecapTabContent(
                                     } else {
                                         Box(
                                             Modifier.size(88.dp).clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                                                .background(DsmusicTheme.colorScheme.secondaryContainer),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(Icons.Default.Person, null, modifier = Modifier.size(36.dp))
@@ -3181,8 +3179,8 @@ private fun RecapTabContent(
                                     Text(artist.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     Text(
                                         artist.sessions.toString() + " plays",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        style = DsmusicTheme.typography.labelSmall,
+                                        color = DsmusicTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -3194,7 +3192,7 @@ private fun RecapTabContent(
                 Text(
                     "Top songs",
                     modifier = Modifier.padding(start = 20.dp, top = 8.dp),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = DsmusicTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -3211,9 +3209,9 @@ private fun RecapTabContent(
                     Text(
                         (index + 1).toString(),
                         modifier = Modifier.width(32.dp),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = if (index < 3) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = DsmusicTheme.typography.titleLarge,
+                        color = if (index < 3) DsmusicTheme.colorScheme.primary
+                            else DsmusicTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.SemiBold
                     )
                     if (!item.thumbnailUrl.isNullOrBlank()) {
@@ -3226,21 +3224,21 @@ private fun RecapTabContent(
                     } else {
                         Box(
                             Modifier.size(52.dp).clip(RoundedCornerShape(10.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                                .background(DsmusicTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center
                         ) { Icon(Icons.Default.MusicNote, null) }
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(item.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(item.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        Text(item.artist, style = DsmusicTheme.typography.bodySmall, color = DsmusicTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        Text((item.totalMs / 60_000L).toString() + " min", style = MaterialTheme.typography.labelMedium)
+                        Text((item.totalMs / 60_000L).toString() + " min", style = DsmusicTheme.typography.labelMedium)
                         Text(
                             item.sessions.toString() + " plays",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = DsmusicTheme.typography.labelSmall,
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -3465,7 +3463,7 @@ private suspend fun readCacheTabSnapshot(
     )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 private fun StreamCacheTabContent(
@@ -3556,18 +3554,18 @@ private fun StreamCacheTabContent(
                         )
                         Text(
                             "Cache",
-                            style = MaterialTheme.typography.headlineMedium,
+                            style = DsmusicTheme.typography.headlineMedium,
                             fontWeight = FontWeight.ExtraBold
                         )
                         Text(
                             "D.S Music · ${cacheEntries.size} songs",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = DsmusicTheme.typography.bodyMedium,
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             "Available offline",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary
+                            style = DsmusicTheme.typography.labelMedium,
+                            color = DsmusicTheme.colorScheme.primary
                         )
                     }
                     Row(
@@ -3593,7 +3591,7 @@ private fun StreamCacheTabContent(
                             Text("Shuffle")
                         }
                     }
-                    androidx.compose.material3.HorizontalDivider()
+                    com.dsann.music.ui.theme.HorizontalDivider()
                 }
             }
         } else {
@@ -3602,11 +3600,11 @@ private fun StreamCacheTabContent(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text("Cache", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Cache", style = DsmusicTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
                         "Your offline playlist",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = DsmusicTheme.typography.bodySmall,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -3623,13 +3621,13 @@ private fun StreamCacheTabContent(
                         Icons.Default.MusicNote,
                         contentDescription = null,
                         modifier = Modifier.size(42.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = DsmusicTheme.colorScheme.onSurfaceVariant
                     )
-                    Text("No cached songs yet", style = MaterialTheme.typography.titleMedium)
+                    Text("No cached songs yet", style = DsmusicTheme.typography.titleMedium)
                     Text(
                         "A song appears here after its full audio, cover art, and lyrics are cached on this device.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = DsmusicTheme.typography.bodyMedium,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -3656,8 +3654,8 @@ private fun StreamCacheTabContent(
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            color = if (isCurrentSong) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurface
+                            color = if (isCurrentSong) DsmusicTheme.colorScheme.primary
+                                else DsmusicTheme.colorScheme.onSurface
                         )
                     },
                     supportingContent = {
@@ -3665,18 +3663,18 @@ private fun StreamCacheTabContent(
                             if (isCurrentSong) "${item.artist} · Now playing" else item.artist,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                     },
                     trailingContent = {
                         Icon(
                             if (isCurrentSong) Icons.Filled.PlayArrow else Icons.AutoMirrored.Filled.PlaylistPlay,
                             contentDescription = if (isCurrentSong) "Now playing" else "Play cached song",
-                            tint = if (isCurrentSong) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (isCurrentSong) DsmusicTheme.colorScheme.primary
+                                else DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                     },
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    colors = ListItemDefaults.colors(containerColor = DsmusicTheme.colorScheme.surfaceContainerLow),
                     modifier = Modifier.fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .combinedClickable(

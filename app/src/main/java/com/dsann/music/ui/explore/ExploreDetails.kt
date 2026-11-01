@@ -50,20 +50,19 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.dsann.music.ui.theme.ButtonDefaults
+import com.dsann.music.ui.theme.FilledTonalButton
+import com.dsann.music.ui.theme.HorizontalDivider
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.IconButton
+import com.dsann.music.ui.theme.OutlinedTextField
+import com.dsann.music.ui.theme.IconButtonDefaults
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.AlertDialog
+import com.dsann.music.ui.theme.DropdownMenu
+import com.dsann.music.ui.theme.DropdownMenuItem
+import com.dsann.music.ui.theme.Text
+import com.dsann.music.ui.theme.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -136,7 +135,7 @@ fun AlbumDetailView(
         item {
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
             )
         }
         itemsIndexed(
@@ -214,7 +213,7 @@ fun PlaylistDetailView(
                         },
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .background(DsmusicTheme.colorScheme.surfaceVariant)
                     ) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit playlist")
                     }
@@ -223,12 +222,12 @@ fun PlaylistDetailView(
                         enabled = !deleting,
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.72f))
+                            .background(DsmusicTheme.colorScheme.errorContainer.copy(alpha = 0.72f))
                     ) {
                         Icon(
                             Icons.Default.Delete,
                             contentDescription = "Delete playlist",
-                            tint = MaterialTheme.colorScheme.error
+                            tint = DsmusicTheme.colorScheme.error
                         )
                     }
                 }
@@ -238,7 +237,7 @@ fun PlaylistDetailView(
         item {
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
             )
         }
         itemsIndexed(
@@ -278,7 +277,7 @@ fun PlaylistDetailView(
                         maxLines = 4,
                         enabled = !saving
                     )
-                    Text("Who can see it", style = MaterialTheme.typography.labelLarge)
+                    Text("Who can see it", style = DsmusicTheme.typography.labelLarge)
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         listOf(
                             "PRIVATE" to "Private · only you",
@@ -293,7 +292,7 @@ fun PlaylistDetailView(
                                     .padding(horizontal = 8.dp, vertical = 7.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                androidx.compose.material3.RadioButton(
+                                com.dsann.music.ui.theme.RadioButton(
                                     selected = editPrivacy == value,
                                     onClick = { editPrivacy = value },
                                     enabled = !saving
@@ -451,23 +450,23 @@ fun ArtistDetailView(
                     },
                     shape = CircleShape,
                     modifier = Modifier.height(38.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
+                    colors = ButtonDefaults.filledTonalDsmusicButtonColors(
                         containerColor = if (isSubscribed) {
-                            MaterialTheme.colorScheme.surfaceVariant
+                            DsmusicTheme.colorScheme.surfaceVariant
                         } else {
-                            MaterialTheme.colorScheme.primaryContainer
+                            DsmusicTheme.colorScheme.primaryContainer
                         },
                         contentColor = if (isSubscribed) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                            DsmusicTheme.colorScheme.onSurfaceVariant
                         } else {
-                            MaterialTheme.colorScheme.onPrimaryContainer
+                            DsmusicTheme.colorScheme.onPrimaryContainer
                         }
                     )
                 ) {
                     Text(
                         label,
                         fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.labelLarge
+                        style = DsmusicTheme.typography.labelLarge
                     )
                 }
             }
@@ -483,12 +482,12 @@ fun ArtistDetailView(
                         if (allSongs.isNotEmpty()) onStartRadioClick(allSongs.random().videoId)
                     },
                     modifier = Modifier.size(40.dp)
-                        .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
+                        .background(DsmusicTheme.colorScheme.secondaryContainer, CircleShape)
                 ) {
                     Icon(
                         painter = painterResource(id = com.dsann.music.R.drawable.ic_radio),
                         contentDescription = "Start Radio",
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        tint = DsmusicTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -503,11 +502,11 @@ fun ArtistDetailView(
                     if (allSongs.isNotEmpty()) onSongClick(allSongs.first(), allSongs, 0)
                 },
                 modifier = Modifier.size(56.dp)
-                    .background(MaterialTheme.colorScheme.onBackground, CircleShape)
+                    .background(DsmusicTheme.colorScheme.onBackground, CircleShape)
             ) {
                 Icon(painter = painterResource(id = com.dsann.music.R.drawable.ic_play)
                     , "Play All",
-                    tint = MaterialTheme.colorScheme.background,
+                    tint = DsmusicTheme.colorScheme.background,
                     modifier = Modifier.size(28.dp))
             }
         }
@@ -521,8 +520,8 @@ fun ArtistDetailView(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Top songs", style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        Text("Top songs", style = DsmusicTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold, color = DsmusicTheme.colorScheme.onBackground)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.clickable {
@@ -536,19 +535,19 @@ fun ArtistDetailView(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape)
+                                    .background(DsmusicTheme.colorScheme.surfaceContainerHigh, CircleShape)
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) {
                                 Text(
                                     text = if (section.browseEndpoint != null) "See all" else "Play all",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    style = DsmusicTheme.typography.labelMedium,
+                                    color = DsmusicTheme.colorScheme.onSurface,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
                             Spacer(modifier = Modifier.width(4.dp))
                             Icon(Icons.Default.ChevronRight, "See all",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                                tint = DsmusicTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                         }
                     }
                 }
@@ -636,13 +635,13 @@ fun AdaptiveDetailContainer(
     ) {
         if (isLandscape) {
         // --- LANDSCAPE TWO-PANE ---
-        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Box(modifier = Modifier.fillMaxSize().background(DsmusicTheme.colorScheme.background)) {
             // Keep the ambient tint without drawing a second blurred copy of the full-size cover.
             if (!thumbnailUrl.isNullOrBlank()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.88f))
+                        .background(DsmusicTheme.colorScheme.background.copy(alpha = 0.88f))
                 )
             }
             
@@ -682,9 +681,9 @@ fun AdaptiveDetailContainer(
                     item {
                         Text(
                             text = title,
-                            style = MaterialTheme.typography.displaySmall,
+                            style = DsmusicTheme.typography.displaySmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground,
+                            color = DsmusicTheme.colorScheme.onBackground,
                             modifier = if (sharedElementKey != null) {
                                 Modifier.sharedElementIfAvailable("title-$sharedElementKey")
                             } else Modifier
@@ -692,8 +691,8 @@ fun AdaptiveDetailContainer(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = subtitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                            style = DsmusicTheme.typography.titleMedium,
+                            color = DsmusicTheme.colorScheme.primary.copy(alpha = 0.8f),
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(modifier = Modifier.height(16.dp))
@@ -718,13 +717,13 @@ fun AdaptiveDetailContainer(
             Box(modifier = Modifier.statusBarsPadding().padding(start = 16.dp, top = 16.dp)) {
                 DsmusicIconButton(
                     onClick = onBack,
-                    modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                    modifier = Modifier.background(DsmusicTheme.colorScheme.surfaceVariant, CircleShape),
                     shape = IconButtonDefaults.filledShape
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack, 
                         contentDescription = "Back", 
-                        tint = MaterialTheme.colorScheme.onSurface
+                        tint = DsmusicTheme.colorScheme.onSurface
                     )
 
 
@@ -753,7 +752,7 @@ fun AdaptiveDetailContainer(
             }
         }
 
-        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Box(modifier = Modifier.fillMaxSize().background(DsmusicTheme.colorScheme.background)) {
             // Retain the gradient veil but avoid a second full-width artwork draw and blur
             // pass on every scroll frame.
             if (!thumbnailUrl.isNullOrBlank()) {
@@ -767,9 +766,9 @@ fun AdaptiveDetailContainer(
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.2f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.6f),
-                                    MaterialTheme.colorScheme.background
+                                    DsmusicTheme.colorScheme.background.copy(alpha = 0.2f),
+                                    DsmusicTheme.colorScheme.background.copy(alpha = 0.6f),
+                                    DsmusicTheme.colorScheme.background
                                 )
                             )
                         )
@@ -801,7 +800,7 @@ fun AdaptiveDetailContainer(
                                 colors = listOf(
                                     Color.Black.copy(alpha = 0.4f),
                                     Color.Transparent,
-                                    MaterialTheme.colorScheme.background
+                                    DsmusicTheme.colorScheme.background
                                 )
                             )
                         )
@@ -819,9 +818,9 @@ fun AdaptiveDetailContainer(
                     Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)) {
                         Text(
                             text = title,
-                            style = MaterialTheme.typography.displayMedium,
+                            style = DsmusicTheme.typography.displayMedium,
                             fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onBackground,
+                            color = DsmusicTheme.colorScheme.onBackground,
                             modifier = if (sharedElementKey != null) {
                                 Modifier.sharedElementIfAvailable("title-$sharedElementKey")
                             } else Modifier
@@ -830,8 +829,8 @@ fun AdaptiveDetailContainer(
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = subtitle,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                style = DsmusicTheme.typography.titleMedium,
+                                color = DsmusicTheme.colorScheme.primary.copy(alpha = 0.8f),
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -900,12 +899,12 @@ fun ArtistTopSongItem(
             if (isPlaying) {
                 Box(
                     modifier = Modifier.fillMaxSize()
-                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f)),
+                        .background(DsmusicTheme.colorScheme.scrim.copy(alpha = 0.45f)),
                     contentAlignment = Alignment.Center
                 ) {
                     AnimatedEqualizerBars(
                         modifier = Modifier.size(24.dp).height(16.dp),
-                        color = MaterialTheme.colorScheme.inverseOnSurface
+                        color = DsmusicTheme.colorScheme.inverseOnSurface
                     )
                 }
             }
@@ -914,21 +913,21 @@ fun ArtistTopSongItem(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = song.title,
-                style = MaterialTheme.typography.bodyLarge,
+                style = DsmusicTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
-                color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                color = if (isPlaying) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onBackground,
                 maxLines = 1, overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "${song.artist}${song.duration?.let { " • $it" } ?: ""}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = DsmusicTheme.typography.bodyMedium,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
         DsmusicIconButton(onClick = onMenuClick) {
-            Icon(Icons.Default.MoreVert, "More", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Default.MoreVert, "More", tint = DsmusicTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -940,7 +939,7 @@ fun ArtistTopSongItem(
 fun DetailScreenSkeleton() {
     Column(
         modifier = Modifier.fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(DsmusicTheme.colorScheme.background)
             .padding(16.dp)
     ) {
         Spacer(modifier = Modifier.height(24.dp))
@@ -980,7 +979,7 @@ fun DetailScreenSkeleton() {
  * Renders standard M3 Expressive buttons utilizing native shape morphing
  * and native width animation on click/interaction.
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 fun ExpressiveConnectedButtonGroup(
     onShuffleClick: () -> Unit,
@@ -988,7 +987,7 @@ fun ExpressiveConnectedButtonGroup(
     modifier: Modifier = Modifier
 ) {
 
-    androidx.compose.material3.ButtonGroup(
+    com.dsann.music.ui.theme.ButtonGroup(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
@@ -1020,8 +1019,8 @@ fun ExpressiveConnectedButtonGroup(
                     interactionSource = interactionSource,
                     shape = RoundedCornerShape(cornerRadius),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        containerColor = DsmusicTheme.colorScheme.primary,
+                        contentColor = DsmusicTheme.colorScheme.onPrimary
                     ),
                     contentPadding = PaddingValues(0.dp)
                 ) {
@@ -1066,8 +1065,8 @@ fun ExpressiveConnectedButtonGroup(
                     interactionSource = interactionSource,
                     shape = RoundedCornerShape(cornerRadius),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        containerColor = DsmusicTheme.colorScheme.secondaryContainer,
+                        contentColor = DsmusicTheme.colorScheme.onSecondaryContainer
                     ),
                     contentPadding = PaddingValues(0.dp)
                 ) {
@@ -1131,7 +1130,7 @@ fun SectionDetailView(
             item {
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                    color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                 )
             }
             itemsIndexed(
@@ -1168,7 +1167,7 @@ fun SectionDetailView(
             item {
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                    color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                 )
             }
 

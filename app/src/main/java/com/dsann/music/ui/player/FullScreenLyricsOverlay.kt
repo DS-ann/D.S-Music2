@@ -36,18 +36,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
+import com.dsann.music.ui.theme.CircularProgressIndicator
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.IconButton
+import com.dsann.music.ui.theme.ListItem
+import com.dsann.music.ui.theme.ListItemDefaults
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.ModalBottomSheet
+import com.dsann.music.ui.theme.Text
+import com.dsann.music.ui.theme.TextButton
+import com.dsann.music.ui.theme.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -129,7 +127,7 @@ private fun Modifier.circularRevealFrom(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
 internal fun FullScreenLyricsOverlay(
     currentSong: SongItem?,
@@ -251,7 +249,7 @@ internal fun FullScreenLyricsOverlay(
                     ) {
                         Text(
                             text = "LYRICS",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = DsmusicTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = contentColor.copy(alpha = 0.5f),
                             letterSpacing = 1.sp
@@ -286,7 +284,7 @@ internal fun FullScreenLyricsOverlay(
                             if (lyricTypeBadge != null) {
                                 Text(
                                     text = " • $lyricTypeBadge",
-                                    style = MaterialTheme.typography.labelSmall,
+                                    style = DsmusicTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = contentColor.copy(alpha = 0.4f),
                                     letterSpacing = 1.sp
@@ -296,7 +294,7 @@ internal fun FullScreenLyricsOverlay(
                     }
                     Text(
                         text = currentSong?.title ?: "Unknown Title",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = DsmusicTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = contentColor,
                         maxLines = 1,
@@ -356,10 +354,10 @@ internal fun FullScreenLyricsOverlay(
                         ) {
                             Text(
                                 text = plainLyrics,
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontSize = MaterialTheme.typography.titleLarge.fontSize *
+                                style = DsmusicTheme.typography.titleLarge.copy(
+                                    fontSize = DsmusicTheme.typography.titleLarge.fontSize *
                                         if (compactLandscapeLyrics) 0.78f else 1f,
-                                    lineHeight = MaterialTheme.typography.titleLarge.lineHeight *
+                                    lineHeight = DsmusicTheme.typography.titleLarge.lineHeight *
                                         if (compactLandscapeLyrics) 0.82f else 1f
                                 ),
                                 color = contentColor.copy(alpha = 0.9f)
@@ -447,7 +445,7 @@ internal fun FullScreenLyricsOverlay(
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(28.dp))
-                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.94f))
+                            .background(DsmusicTheme.colorScheme.surface.copy(alpha = 0.94f))
                             .horizontalScroll(rememberScrollState())
                             .padding(horizontal = 4.dp, vertical = 2.dp),
                         horizontalArrangement = Arrangement.spacedBy(0.dp),
@@ -474,8 +472,8 @@ internal fun FullScreenLyricsOverlay(
                             ) {
                                 Text(
                                     text = label,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    style = MaterialTheme.typography.labelMedium,
+                                    color = DsmusicTheme.colorScheme.onSurface,
+                                    style = DsmusicTheme.typography.labelMedium,
                                     maxLines = 1
                                 )
                             }
@@ -490,13 +488,13 @@ internal fun FullScreenLyricsOverlay(
                     },
                     modifier = Modifier
                         .clip(RoundedCornerShape(24.dp))
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.88f))
+                        .background(DsmusicTheme.colorScheme.surface.copy(alpha = 0.88f))
                 ) {
                     val offsetLabel = String.format(java.util.Locale.US, "%+.1fs", syncOffsetMs / 1000f)
                     Text(
                         text = if (syncOffsetMs == 0L) "LYRICS SYNC" else "SYNC $offsetLabel",
-                        color = MaterialTheme.colorScheme.onSurface,
-                        style = MaterialTheme.typography.labelMedium,
+                        color = DsmusicTheme.colorScheme.onSurface,
+                        style = DsmusicTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -505,7 +503,7 @@ internal fun FullScreenLyricsOverlay(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 private fun ProvidersSelector(
     providerResults: Map<String, LyricsResult>,
@@ -553,7 +551,7 @@ private fun ProvidersSelector(
     ) {
         Text(
             text = "LYRICS PROVIDERS",
-            style = MaterialTheme.typography.labelSmall,
+            style = DsmusicTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             color = contentColor.copy(alpha = 0.5f),
             letterSpacing = 1.sp,
@@ -677,11 +675,11 @@ private fun ProvidersSelector(
             label = "refind_button_corners"
         )
 
-        androidx.compose.material3.Button(
+        com.dsann.music.ui.theme.Button(
             onClick = onRefindClick,
             interactionSource = buttonInteractionSource,
             shape = RoundedCornerShape(buttonCornerRadius),
-            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+            colors = com.dsann.music.ui.theme.ButtonDefaults.buttonColors(
                 containerColor = accentColor,
                 contentColor = Color.Black
             ),
@@ -702,7 +700,7 @@ private fun ProvidersSelector(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Refind Lyrics",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = DsmusicTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black
                 )

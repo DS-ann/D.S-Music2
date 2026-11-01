@@ -15,10 +15,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.dsann.music.ui.theme.AlertDialog
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.Text
+import com.dsann.music.ui.theme.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -58,7 +58,7 @@ fun AudioFormatChoiceDialogHost() {
                     Text(
                         "The requested format (${pending.requestedFormat.uppercase()}) isn't available for ${pending.songTitle}. " +
                             "Choose one of the formats this track actually offers. Your Settings preference won't be changed.",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = DsmusicTheme.typography.bodyMedium
                     )
                     pending.options.forEach { option ->
                         DsmusicTextButton(
@@ -68,7 +68,7 @@ fun AudioFormatChoiceDialogHost() {
                             Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                                 Text(
                                     option.formatLabel,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    color = DsmusicTheme.colorScheme.onSurface,
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
@@ -85,8 +85,8 @@ fun AudioFormatChoiceDialogHost() {
                                             append(android.text.format.Formatter.formatFileSize(context, it))
                                         }
                                     },
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodySmall
+                                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                    style = DsmusicTheme.typography.bodySmall
                                 )
                             }
                         }

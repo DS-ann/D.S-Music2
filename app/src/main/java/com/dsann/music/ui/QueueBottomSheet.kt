@@ -47,19 +47,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.ListItemShapes
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.dsann.music.ui.theme.DropdownMenu
+import com.dsann.music.ui.theme.DropdownMenuItem
+import com.dsann.music.ui.theme.HorizontalDivider
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.IconButton
+import com.dsann.music.ui.theme.ListItem
+import com.dsann.music.ui.theme.ListItemDefaults
+import com.dsann.music.ui.theme.ListItemShapes
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.Surface
+import com.dsann.music.ui.theme.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -100,7 +98,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 class QueueBottomSheet : BottomSheetDialogFragment() {
 
     private lateinit var viewModel: PlayerSharedViewModel
@@ -127,7 +125,7 @@ class QueueBottomSheet : BottomSheetDialogFragment() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun QueueBottomSheetContent(
     viewModel: PlayerSharedViewModel
@@ -163,7 +161,7 @@ fun QueueBottomSheetContent(
             .fillMaxWidth()
             .then(if (isLandscape) Modifier.fillMaxHeight(0.9f) else Modifier.wrapContentHeight()),
         shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = DsmusicTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 6.dp
     ) {
         Column(
@@ -179,7 +177,7 @@ fun QueueBottomSheetContent(
                     .width(48.dp)
                     .height(6.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.outlineVariant)
+                    .background(DsmusicTheme.colorScheme.outlineVariant)
             )
 
             if (!isLandscape) {
@@ -196,22 +194,22 @@ fun QueueBottomSheetContent(
                 ) {
                     Text(
                         text = "Up Next",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = DsmusicTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = DsmusicTheme.colorScheme.onSurface
                     )
 
                     Text(
                         text = "${displayedSongs.size} tracks",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = DsmusicTheme.typography.labelMedium,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
                 HorizontalDivider(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                    color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                 )
 
                 // Content Area
@@ -232,13 +230,13 @@ fun QueueBottomSheetContent(
                                 painter = painterResource(id = R.drawable.ic_queue_music),
                                 contentDescription = null,
                                 modifier = Modifier.size(72.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 "Your queue is empty",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = DsmusicTheme.typography.titleMedium,
+                                color = DsmusicTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     } else {
@@ -316,27 +314,27 @@ fun QueueBottomSheetContent(
                         Column {
                             Text(
                                 text = "Audio Queue",
-                                style = MaterialTheme.typography.headlineSmall.copy(
+                                style = DsmusicTheme.typography.headlineSmall.copy(
                                     fontWeight = FontWeight.ExtraBold,
                                     letterSpacing = (-0.5).sp
                                 ),
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = DsmusicTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "${displayedSongs.size} tracks loaded",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = DsmusicTheme.typography.bodySmall,
+                                color = DsmusicTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = FontWeight.Bold
                             )
                         }
 
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        HorizontalDivider(color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                         Text(
                             text = "VIEW SOURCE",
-                            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.5.sp),
+                            style = DsmusicTheme.typography.labelSmall.copy(letterSpacing = 1.5.sp),
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = DsmusicTheme.colorScheme.primary
                         )
 
                         QueueSidebarItem(
@@ -369,13 +367,13 @@ fun QueueBottomSheetContent(
                                     painter = painterResource(id = R.drawable.ic_queue_music),
                                     contentDescription = null,
                                     modifier = Modifier.size(60.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                    tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Text(
                                     "Queue is empty",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    style = DsmusicTheme.typography.titleMedium,
+                                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         } else {
@@ -440,7 +438,7 @@ fun QueueBottomSheetContent(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 fun QueueListItem(
     song: SongItem,
@@ -496,7 +494,7 @@ fun QueueListItem(
                 text = song.title,
                 fontWeight = if (isPlaying) FontWeight.ExtraBold else FontWeight.SemiBold,
                 fontSize = 16.sp,
-                color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                color = if (isPlaying) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -505,7 +503,7 @@ fun QueueListItem(
             Text(
                 text = song.artist,
                 fontSize = 13.sp,
-                color = if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (isPlaying) DsmusicTheme.colorScheme.primary.copy(alpha = 0.8f) else DsmusicTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -517,7 +515,7 @@ fun QueueListItem(
                         Icon(
                             imageVector = Icons.Default.MoreVert,
                             contentDescription = "Options",
-                            tint = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (isPlaying) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -546,7 +544,7 @@ fun QueueListItem(
                     Icon(
                         imageVector = Icons.Default.Menu,
                         contentDescription = "Drag to reorder",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                         modifier = Modifier
                             .size(32.dp)
                             .padding(4.dp)
@@ -574,7 +572,7 @@ fun QueueListItem(
         shapes = shapes,
         colors = ListItemDefaults.colors(
             containerColor = if (isPlaying) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                DsmusicTheme.colorScheme.primary.copy(alpha = 0.18f)
             } else {
                 Color.Transparent
             }
@@ -592,8 +590,8 @@ fun QueueSidebarItem(
     DsmusicSurface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
-        color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f) else Color.Transparent,
-        contentColor = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (isSelected) DsmusicTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f) else Color.Transparent,
+        contentColor = if (isSelected) DsmusicTheme.colorScheme.onSecondaryContainer else DsmusicTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -604,7 +602,7 @@ fun QueueSidebarItem(
             icon()
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodyMedium,
+                style = DsmusicTheme.typography.bodyMedium,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

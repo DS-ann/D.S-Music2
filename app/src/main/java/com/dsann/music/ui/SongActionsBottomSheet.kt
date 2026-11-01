@@ -77,20 +77,19 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ButtonGroupDefaults
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.ToggleButton
-import androidx.compose.material3.ToggleButtonDefaults
+import com.dsann.music.ui.theme.AlertDialog
+import com.dsann.music.ui.theme.Button
+import com.dsann.music.ui.theme.ButtonDefaults
+import com.dsann.music.ui.theme.ButtonGroupDefaults
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.IconButton
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.OutlinedTextField
+import com.dsann.music.ui.theme.Surface
+import com.dsann.music.ui.theme.Text
+import com.dsann.music.ui.theme.TextButton
+import com.dsann.music.ui.theme.ToggleButton
+import com.dsann.music.ui.theme.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -131,7 +130,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 class SongActionsBottomSheet : BottomSheetDialogFragment() {
 
     private var song: SongItem? = null
@@ -193,7 +192,7 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
 
 enum class BottomSheetTab { OPTIONS, INFO }
 
-@OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun BottomSheetScaffoldContent(
     song: SongItem?,
@@ -262,8 +261,8 @@ fun BottomSheetScaffoldContent(
 
     DsmusicSurface(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge, // Expressive corner radius
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = DsmusicTheme.shapes.extraLarge, // Expressive corner radius
+        color = DsmusicTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 6.dp
     ) {
         Column(
@@ -279,7 +278,7 @@ fun BottomSheetScaffoldContent(
                     .width(48.dp)
                     .height(6.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.outlineVariant)
+                    .background(DsmusicTheme.colorScheme.outlineVariant)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -391,7 +390,7 @@ fun OptionsContent(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 fun DestructiveActionRow(
     song: SongItem?,
@@ -414,14 +413,14 @@ fun DestructiveActionRow(
             },
             interactionSource = addInteraction,
             modifier = Modifier.weight(1f).fillMaxHeight(),
-            colors = ToggleButtonDefaults.toggleButtonColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+            colors = ToggleButtonDefaults.toggleDsmusicButtonColors(
+                containerColor = DsmusicTheme.colorScheme.secondaryContainer,
+                contentColor = DsmusicTheme.colorScheme.onSecondaryContainer
             )
         ) {
-            Icon(Icons.Default.PlaylistAdd, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            Icon(Icons.Default.PlaylistAdd, null, tint = DsmusicTheme.colorScheme.onSecondaryContainer)
             Spacer(Modifier.width(8.dp))
-            Text("Add to Playlist", style = MaterialTheme.typography.labelLarge, fontFamily = GoogleSansFlex, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text("Add to Playlist", style = DsmusicTheme.typography.labelLarge, fontFamily = GoogleSansFlex, color = DsmusicTheme.colorScheme.onSecondaryContainer)
         }
 
         // Delete Button
@@ -433,14 +432,14 @@ fun DestructiveActionRow(
             },
             interactionSource = deleteInteraction,
             modifier = Modifier.weight(1f).fillMaxHeight(),
-            colors = ToggleButtonDefaults.toggleButtonColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.onErrorContainer
+            colors = ToggleButtonDefaults.toggleDsmusicButtonColors(
+                containerColor = DsmusicTheme.colorScheme.errorContainer,
+                contentColor = DsmusicTheme.colorScheme.onErrorContainer
             )
         ) {
-            Icon(Icons.Filled.DeleteOutline, null, tint = MaterialTheme.colorScheme.onErrorContainer)
+            Icon(Icons.Filled.DeleteOutline, null, tint = DsmusicTheme.colorScheme.onErrorContainer)
             Spacer(Modifier.width(8.dp))
-            Text("Delete", style = MaterialTheme.typography.labelLarge, fontFamily = GoogleSansFlex, color = MaterialTheme.colorScheme.onErrorContainer)
+            Text("Delete", style = DsmusicTheme.typography.labelLarge, fontFamily = GoogleSansFlex, color = DsmusicTheme.colorScheme.onErrorContainer)
         }
     }
 }
@@ -458,7 +457,7 @@ fun LocalPlaylistPickerDialog(
             Text(
                 "Add to Playlist",
                 fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleLarge
+                style = DsmusicTheme.typography.titleLarge
             )
         },
         text = {
@@ -471,7 +470,7 @@ fun LocalPlaylistPickerDialog(
                 DsmusicButton(
                     onClick = onCreateNew,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
+                    colors = ButtonDefaults.buttonColors(containerColor = DsmusicTheme.colorScheme.primaryContainer, contentColor = DsmusicTheme.colorScheme.onPrimaryContainer)
                 ) {
                     Icon(Icons.Default.Add, null)
                     Spacer(Modifier.width(8.dp))
@@ -488,8 +487,8 @@ fun LocalPlaylistPickerDialog(
                     ) {
                         Text(
                             "No playlists yet",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = DsmusicTheme.typography.bodyMedium,
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 } else {
@@ -502,7 +501,7 @@ fun LocalPlaylistPickerDialog(
                                 onClick = { onPlaylistSelected(playlist) },
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                color = DsmusicTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -511,15 +510,15 @@ fun LocalPlaylistPickerDialog(
                                     Icon(
                                         Icons.Default.PlaylistPlay,
                                         null,
-                                        tint = MaterialTheme.colorScheme.primary,
+                                        tint = DsmusicTheme.colorScheme.primary,
                                         modifier = Modifier.size(24.dp)
                                     )
                                     Spacer(Modifier.width(16.dp))
                                     Text(
                                         playlist.title,
                                         fontWeight = FontWeight.SemiBold,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        style = DsmusicTheme.typography.bodyLarge,
+                                        color = DsmusicTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -548,7 +547,7 @@ fun CreateLocalPlaylistDialog(
             Text(
                 "New Playlist",
                 fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleLarge
+                style = DsmusicTheme.typography.titleLarge
             )
         },
         text = {
@@ -590,8 +589,8 @@ fun HeaderSection(
     if (!isLandscape) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             DsmusicSurface(
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceVariant
+                shape = DsmusicTheme.shapes.large,
+                color = DsmusicTheme.colorScheme.surfaceVariant
             ) {
                 if (bitmap != null) {
                     Image(bitmap.asImageBitmap(), null, Modifier.size(84.dp), contentScale = ContentScale.Crop)
@@ -610,7 +609,7 @@ fun HeaderSection(
             Column(Modifier.weight(1f)) {
                 Text(
                     song?.title ?: "Unknown",
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = DsmusicTheme.typography.headlineSmall,
                     fontFamily = GoogleSansFlex,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,
@@ -618,15 +617,15 @@ fun HeaderSection(
                 )
                 Text(
                     song?.artist ?: "Unknown Artist",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = DsmusicTheme.typography.bodyMedium,
                     fontFamily = GoogleSansFlex,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
 
             DsmusicIconButton(
                 onClick = onEdit,
-                modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                modifier = Modifier.background(DsmusicTheme.colorScheme.surfaceVariant, CircleShape)
             ) {
                 Icon(Icons.Filled.Edit, null)
             }
@@ -639,7 +638,7 @@ fun HeaderSection(
             Box(contentAlignment = Alignment.BottomEnd) {
                 DsmusicSurface(
                     shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    color = DsmusicTheme.colorScheme.surfaceVariant,
                     tonalElevation = 2.dp
                 ) {
                     if (bitmap != null) {
@@ -659,12 +658,12 @@ fun HeaderSection(
                     modifier = Modifier
                         .size(32.dp)
                         .offset(x = 6.dp, y = 6.dp)
-                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                        .background(DsmusicTheme.colorScheme.primaryContainer, CircleShape)
                 ) {
                     Icon(
                         Icons.Filled.Edit,
                         null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        tint = DsmusicTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -674,7 +673,7 @@ fun HeaderSection(
             
             Text(
                 song?.title ?: "Unknown",
-                style = MaterialTheme.typography.titleMedium,
+                style = DsmusicTheme.typography.titleMedium,
                 fontFamily = GoogleSansFlex,
                 fontWeight = FontWeight.ExtraBold,
                 textAlign = TextAlign.Center,
@@ -684,9 +683,9 @@ fun HeaderSection(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 song?.artist ?: "Unknown Artist",
-                style = MaterialTheme.typography.bodySmall,
+                style = DsmusicTheme.typography.bodySmall,
                 fontFamily = GoogleSansFlex,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -695,7 +694,7 @@ fun HeaderSection(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 fun ActionButtonRow1(
     song: SongItem?,
@@ -745,15 +744,15 @@ fun ActionButtonRow1(
                 .fillMaxHeight()
                 .zIndex(if (playPressed) 1f else 0f),
             shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-            colors = ToggleButtonDefaults.toggleButtonColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            colors = ToggleButtonDefaults.toggleDsmusicButtonColors(
+                containerColor = DsmusicTheme.colorScheme.primaryContainer,
+                contentColor = DsmusicTheme.colorScheme.onPrimaryContainer
             )
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.PlayArrow, null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                Icon(Icons.Filled.PlayArrow, null, modifier = Modifier.size(28.dp), tint = DsmusicTheme.colorScheme.onPrimaryContainer)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Play", color = MaterialTheme.colorScheme.onPrimaryContainer, fontSize = 20.sp, fontWeight = FontWeight.Medium, fontFamily = GoogleSansFlex)
+                Text("Play", color = DsmusicTheme.colorScheme.onPrimaryContainer, fontSize = 20.sp, fontWeight = FontWeight.Medium, fontFamily = GoogleSansFlex)
             }
         }
 
@@ -770,15 +769,15 @@ fun ActionButtonRow1(
                 .fillMaxHeight()
                 .zIndex(if (favPressed) 1f else 0f),
             shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
-            colors = ToggleButtonDefaults.toggleButtonColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            colors = ToggleButtonDefaults.toggleDsmusicButtonColors(
+                containerColor = DsmusicTheme.colorScheme.secondaryContainer,
                 checkedContentColor = Color(0xFFE91E63)
             )
         ) {
             Icon(
                 imageVector = if (favLocal) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                 contentDescription = null,
-                tint = if (favLocal) Color(0xFFE91E63) else MaterialTheme.colorScheme.onSecondaryContainer,
+                tint = if (favLocal) Color(0xFFE91E63) else DsmusicTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier.size(32.dp)
             )
         }
@@ -792,17 +791,17 @@ fun ActionButtonRow1(
                 .fillMaxHeight()
                 .zIndex(if (sharePressed) 1f else 0f),
             shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-            colors = ToggleButtonDefaults.toggleButtonColors(
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+            colors = ToggleButtonDefaults.toggleDsmusicButtonColors(
+                containerColor = DsmusicTheme.colorScheme.tertiaryContainer,
+                contentColor = DsmusicTheme.colorScheme.onTertiaryContainer
             )
         ) {
-            Icon(Icons.Filled.Share, null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onTertiaryContainer)
+            Icon(Icons.Filled.Share, null, modifier = Modifier.size(32.dp), tint = DsmusicTheme.colorScheme.onTertiaryContainer)
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 fun ActionButtonRow2(
     song: SongItem?,
@@ -832,11 +831,11 @@ fun ActionButtonRow2(
                 .height(72.dp)
                 .zIndex(if (queuePressed) 1f else 0f),
             shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-            colors = ToggleButtonDefaults.toggleButtonColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                checkedContainerColor = MaterialTheme.colorScheme.secondary,
-                checkedContentColor = MaterialTheme.colorScheme.onSecondary
+            colors = ToggleButtonDefaults.toggleDsmusicButtonColors(
+                containerColor = DsmusicTheme.colorScheme.secondaryContainer,
+                contentColor = DsmusicTheme.colorScheme.onSecondaryContainer,
+                checkedContainerColor = DsmusicTheme.colorScheme.secondary,
+                checkedContentColor = DsmusicTheme.colorScheme.onSecondary
             ),
             contentPadding = PaddingValues(0.dp)
         ) {
@@ -847,13 +846,13 @@ fun ActionButtonRow2(
                 Icon(
                     painter = painterResource(id = R.drawable.ic_queue_music),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    tint = DsmusicTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "Queue",
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    color = DsmusicTheme.colorScheme.onSecondaryContainer,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     fontFamily = GoogleSansFlex
@@ -879,11 +878,11 @@ fun ActionButtonRow2(
                 .height(72.dp)
                 .zIndex(if (nextPressed) 1f else 0f),
             shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
-            colors = ToggleButtonDefaults.toggleButtonColors(
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                checkedContainerColor = MaterialTheme.colorScheme.tertiary,
-                checkedContentColor = MaterialTheme.colorScheme.onTertiary
+            colors = ToggleButtonDefaults.toggleDsmusicButtonColors(
+                containerColor = DsmusicTheme.colorScheme.tertiaryContainer,
+                contentColor = DsmusicTheme.colorScheme.onTertiaryContainer,
+                checkedContainerColor = DsmusicTheme.colorScheme.tertiary,
+                checkedContentColor = DsmusicTheme.colorScheme.onTertiary
             ),
             contentPadding = PaddingValues(0.dp)
         ) {
@@ -894,13 +893,13 @@ fun ActionButtonRow2(
                 Icon(
                     painter = painterResource(id = R.drawable.ic_skip_next),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                    tint = DsmusicTheme.colorScheme.onTertiaryContainer,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "Next",
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    color = DsmusicTheme.colorScheme.onTertiaryContainer,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     fontFamily = GoogleSansFlex
@@ -931,11 +930,11 @@ fun ActionButtonRow2(
                 .height(72.dp)
                 .zIndex(if (downloadPressed) 1f else 0f),
             shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-            colors = ToggleButtonDefaults.toggleButtonColors(
-                containerColor = if (isOnline) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = if (isOnline) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                checkedContainerColor = MaterialTheme.colorScheme.primary,
-                checkedContentColor = MaterialTheme.colorScheme.onPrimary
+            colors = ToggleButtonDefaults.toggleDsmusicButtonColors(
+                containerColor = if (isOnline) DsmusicTheme.colorScheme.primaryContainer else DsmusicTheme.colorScheme.surfaceVariant,
+                contentColor = if (isOnline) DsmusicTheme.colorScheme.onPrimaryContainer else DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                checkedContainerColor = DsmusicTheme.colorScheme.primary,
+                checkedContentColor = DsmusicTheme.colorScheme.onPrimary
             ),
             contentPadding = PaddingValues(0.dp)
         ) {
@@ -974,7 +973,7 @@ fun ExpressiveTabSwitcher(selectedTab: BottomSheetTab, onTabSelected: (BottomShe
             .width(320.dp)
             .height(56.dp)
             .clip(RoundedCornerShape(28.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(DsmusicTheme.colorScheme.surfaceVariant)
     ) {
         Box(
             modifier = Modifier
@@ -983,7 +982,7 @@ fun ExpressiveTabSwitcher(selectedTab: BottomSheetTab, onTabSelected: (BottomShe
                 .fillMaxHeight()
                 .padding(4.dp)
                 .clip(RoundedCornerShape(24.dp))
-                .background(MaterialTheme.colorScheme.primary)
+                .background(DsmusicTheme.colorScheme.primary)
         )
 
         Row(modifier = Modifier.fillMaxSize()) {
@@ -998,13 +997,13 @@ fun ExpressiveTabSwitcher(selectedTab: BottomSheetTab, onTabSelected: (BottomShe
                     Icon(
                         imageVector = Icons.Filled.Menu,
                         contentDescription = null,
-                        tint = if (selectedTab == BottomSheetTab.OPTIONS) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = if (selectedTab == BottomSheetTab.OPTIONS) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "OPTIONS",
-                        color = if (selectedTab == BottomSheetTab.OPTIONS) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (selectedTab == BottomSheetTab.OPTIONS) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = GoogleSansFlex
@@ -1023,13 +1022,13 @@ fun ExpressiveTabSwitcher(selectedTab: BottomSheetTab, onTabSelected: (BottomShe
                     Icon(
                         imageVector = Icons.Filled.Info,
                         contentDescription = null,
-                        tint = if (selectedTab == BottomSheetTab.INFO) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = if (selectedTab == BottomSheetTab.INFO) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "INFO",
-                        color = if (selectedTab == BottomSheetTab.INFO) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (selectedTab == BottomSheetTab.INFO) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = GoogleSansFlex
@@ -1327,14 +1326,14 @@ fun InfoRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .background(DsmusicTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = DsmusicTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(24.dp)
         )
         Spacer(modifier = Modifier.width(16.dp))
@@ -1343,7 +1342,7 @@ fun InfoRow(
         ) {
             Text(
                 text = label,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                color = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 fontFamily = GoogleSansFlex
@@ -1351,7 +1350,7 @@ fun InfoRow(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = value,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = DsmusicTheme.colorScheme.onSurface,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Normal,
                 maxLines = 3,

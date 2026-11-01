@@ -42,16 +42,16 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
+import com.dsann.music.ui.theme.Button
+import com.dsann.music.ui.theme.FilterChip
+import com.dsann.music.ui.theme.FilterChipDefaults
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.IconButton
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.OutlinedButton
+import com.dsann.music.ui.theme.OutlinedTextField
+import com.dsann.music.ui.theme.OutlinedTextFieldDefaults
+import com.dsann.music.ui.theme.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -293,8 +293,8 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                     shape = CircleShape,
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        focusedBorderColor = DsmusicTheme.colorScheme.primary,
+                        unfocusedBorderColor = DsmusicTheme.colorScheme.outlineVariant
                     )
                 )
             }
@@ -355,9 +355,9 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                             },
                             border = null,
                             colors = FilterChipDefaults.filterChipColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                containerColor = DsmusicTheme.colorScheme.surfaceContainerHigh,
+                                selectedContainerColor = DsmusicTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = DsmusicTheme.colorScheme.onPrimaryContainer
                             )
                         )
                     }
@@ -371,9 +371,9 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                         leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) },
                         border = null,
                         colors = FilterChipDefaults.filterChipColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            containerColor = DsmusicTheme.colorScheme.surfaceContainerHigh,
+                            selectedContainerColor = DsmusicTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = DsmusicTheme.colorScheme.onPrimaryContainer
                         )
                     )
                 }
@@ -395,7 +395,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                                     searchQuery.isNotBlank() -> "No local songs match that search"
                                     else -> "No local music found"
                                 },
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = DsmusicTheme.colorScheme.onSurfaceVariant
                             )
                             if (!isScanning && localSongs.isEmpty()) {
                                 Spacer(Modifier.height(8.dp))
@@ -433,8 +433,8 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                                 Text("..", fontWeight = FontWeight.SemiBold)
                                 Text(
                                     text = if (parentFolderPath == storageRootPath) "Internal storage" else parentFolderPath.substringAfter(storageRootPath).trimStart('/'),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = DsmusicTheme.typography.bodySmall,
+                                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -460,7 +460,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                             Icon(
                                 Icons.Default.Folder,
                                 contentDescription = "Folder",
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = DsmusicTheme.colorScheme.primary
                             )
                             Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                                 Text(
@@ -471,14 +471,14 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                                 )
                                 Text(
                                     text = "${folder.songCount} songs",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    style = DsmusicTheme.typography.bodySmall,
+                                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             Icon(
                                 Icons.Default.ChevronRight,
                                 contentDescription = "Open folder",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = DsmusicTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }

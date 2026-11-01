@@ -52,16 +52,15 @@ import androidx.compose.material.icons.filled.KeyboardDoubleArrowLeft
 import androidx.compose.material.icons.filled.KeyboardDoubleArrowRight
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularWavyProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.WavyProgressIndicatorDefaults
+import com.dsann.music.ui.theme.AlertDialog
+import com.dsann.music.ui.theme.CircularWavyProgressIndicator
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.IconButton
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.Surface
+import com.dsann.music.ui.theme.Text
+import com.dsann.music.ui.theme.TextButton
+import com.dsann.music.ui.theme.WavyProgressIndicatorDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -773,7 +772,7 @@ private fun androidx.compose.foundation.layout.BoxScope.VideoOverlayControls(
 // 7. STEP 7: THE MASTER ASSEMBLY CONTAINER
 // ==========================================
 @SuppressLint("ConfigurationScreenWidthHeight")
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PlayerBottomSheetCompose(
     activity: MainActivity,
@@ -871,7 +870,7 @@ fun PlayerBottomSheetCompose(
         val playerBackgroundColor by viewModel.playerBackgroundColor.collectAsStateWithLifecycle()
         val likesCount by viewModel.likesCountFlow.collectAsStateWithLifecycle()
         val isDark = isSystemInDarkTheme()
-        val themePlayerSurface = MaterialTheme.colorScheme.surface
+        val themePlayerSurface = DsmusicTheme.colorScheme.surface
         val dynamicBgColor = remember(playerBackgroundColor, isDark, playerBackgroundStyle, themePlayerSurface) {
             when (playerBackgroundStyle) {
                 "Theme" -> themePlayerSurface
@@ -909,14 +908,14 @@ fun PlayerBottomSheetCompose(
                 title = {
                     Text(
                         text = "Sign in Required",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = DsmusicTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                 },
                 text = {
                     Text(
                         text = "To like or dislike songs on YouTube Music, please connect your account in Settings. This enables full synchronization of liked tracks and personalization algorithms.",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = DsmusicTheme.typography.bodyMedium
                     )
                 },
                 confirmButton = {
@@ -1830,7 +1829,7 @@ fun PlayerBottomSheetCompose(
         }
 
         // Global Dynamic Snackbar
-        val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+        val snackbarHostState = remember { com.dsann.music.ui.theme.SnackbarHostState() }
         
         LaunchedEffect(Unit) {
             com.dsann.music.ui.SnackbarController.events.collect { event ->
@@ -1850,7 +1849,7 @@ fun PlayerBottomSheetCompose(
                 .fillMaxSize()
                 .zIndex(100f) // Keep Snackbar always on top
         ) {
-            androidx.compose.material3.SnackbarHost(
+            com.dsann.music.ui.theme.SnackbarHost(
                 hostState = snackbarHostState,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -1887,10 +1886,10 @@ fun PlayerBottomSheetCompose(
                         IntOffset(0, -bottomOffsetPx.roundToInt())
                     }
             ) { data ->
-                androidx.compose.material3.Snackbar(
+                com.dsann.music.ui.theme.Snackbar(
                     modifier = Modifier.padding(horizontal = 16.dp),
-                    containerColor = MaterialTheme.colorScheme.inverseSurface,
-                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                    containerColor = DsmusicTheme.colorScheme.inverseSurface,
+                    contentColor = DsmusicTheme.colorScheme.inverseOnSurface,
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     val customVisuals = data.visuals as? com.dsann.music.ui.CustomSnackbarVisuals
@@ -1903,7 +1902,7 @@ fun PlayerBottomSheetCompose(
                                 imageVector = customVisuals.iconVector,
                                 contentDescription = null,
                                 modifier = Modifier.size(22.dp),
-                                tint = MaterialTheme.colorScheme.inversePrimary
+                                tint = DsmusicTheme.colorScheme.inversePrimary
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                         } else if (customVisuals?.iconResId != null) {
@@ -1911,13 +1910,13 @@ fun PlayerBottomSheetCompose(
                                 painter = painterResource(id = customVisuals.iconResId),
                                 contentDescription = null,
                                 modifier = Modifier.size(22.dp),
-                                tint = MaterialTheme.colorScheme.inversePrimary
+                                tint = DsmusicTheme.colorScheme.inversePrimary
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                         }
                         Text(
                             text = data.visuals.message,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = DsmusicTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -1999,7 +1998,7 @@ private fun MiniPlayerContentInternal(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = currentSong.title,
-                style = MaterialTheme.typography.bodyMedium.copy(
+                style = DsmusicTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.Bold,
                     color = contentColor
                 ),
@@ -2009,7 +2008,7 @@ private fun MiniPlayerContentInternal(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = currentSong.artist,
-                style = MaterialTheme.typography.bodySmall.copy(
+                style = DsmusicTheme.typography.bodySmall.copy(
                     color = contentSecondary
                 ),
                 maxLines = 1,
@@ -2052,7 +2051,7 @@ private fun MiniPlayerContentInternal(
                 modifier = controlModifier(centerControlWidth)
             ) {
                 if (isLoading) {
-                    androidx.compose.material3.CircularProgressIndicator(
+                    com.dsann.music.ui.theme.CircularProgressIndicator(
                         modifier = Modifier.size(20.dp), color = contentColor, strokeWidth = 2.dp
                     )
                 } else if (controlIconSet == "Classic") {

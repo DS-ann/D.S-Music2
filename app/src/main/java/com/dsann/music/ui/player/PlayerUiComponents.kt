@@ -9,9 +9,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -140,7 +140,7 @@ internal fun SplitLikeDislikeChip(
             )
             Text(
                 text = displayLikesText,
-                style = MaterialTheme.typography.labelMedium,
+                style = DsmusicTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 12.sp,
                 color = if (isLiked) accentColor else contentColor.copy(alpha = 0.8f)
@@ -276,7 +276,7 @@ internal fun PillChip(
             if (!minimal) {
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = DsmusicTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 12.sp,
                     color = tintColor
@@ -380,7 +380,7 @@ internal fun WavySliderWithLabels(
                     text = if (playerTimes == "Both" || playerTimes == "Elapsed") {
                         formatDuration(displayPos.toLong())
                     } else "",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = DsmusicTheme.typography.labelSmall,
                     color = contentSecondary
                 )
                 Text(
@@ -389,7 +389,7 @@ internal fun WavySliderWithLabels(
                         "Time left" -> "-${formatDuration((duration - displayPos).coerceAtLeast(0).toLong())}"
                         else -> ""
                     },
-                    style = MaterialTheme.typography.labelSmall,
+                    style = DsmusicTheme.typography.labelSmall,
                     color = contentSecondary
                 )
             }
@@ -417,7 +417,7 @@ internal fun LyricsMetadataFooter(
     val albumName = activeResult?.matchedAlbum
 
     val mutedColor = contentColor.copy(alpha = 0.35f)
-    val metaStyle = MaterialTheme.typography.labelSmall.copy(
+    val metaStyle = DsmusicTheme.typography.labelSmall.copy(
         fontWeight = FontWeight.Normal,
         letterSpacing = 0.3.sp,
         color = mutedColor

@@ -55,12 +55,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.IconButton
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -426,7 +424,7 @@ private fun LandscapePlayerDetailsPane(
                     text = label,
                     color = if (selected) accentColor else secondaryColor,
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = DsmusicTheme.typography.labelLarge,
                     modifier = Modifier
                         .background(
                             if (selected) accentColor.copy(alpha = 0.14f) else Color.Transparent,
@@ -440,7 +438,7 @@ private fun LandscapePlayerDetailsPane(
             Text(
                 text = if (showQueue) songList.size.toString() + " tracks" else currentSong?.artist.orEmpty(),
                 color = secondaryColor,
-                style = MaterialTheme.typography.labelSmall,
+                style = DsmusicTheme.typography.labelSmall,
                 maxLines = 1
             )
         }
@@ -473,7 +471,7 @@ private fun LandscapePlayerDetailsPane(
                             Text(
                                 text = line,
                                 color = contentColor.copy(alpha = 0.88f),
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = DsmusicTheme.typography.bodyLarge,
                                 modifier = Modifier.padding(vertical = 5.dp)
                             )
                         }
@@ -489,7 +487,7 @@ private fun LandscapePlayerDetailsPane(
                         Text(
                             text = if (isLyricsLoading) "Finding lyrics…" else "Lyrics",
                             color = contentColor,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = DsmusicTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(Modifier.height(8.dp))
@@ -500,7 +498,7 @@ private fun LandscapePlayerDetailsPane(
                                 else -> "Lyrics will appear here when available."
                             },
                             color = secondaryColor,
-                            style = MaterialTheme.typography.bodyMedium
+                            style = DsmusicTheme.typography.bodyMedium
                         )
                         if (!isLyricsLoading) {
                             Spacer(Modifier.height(14.dp))
@@ -544,14 +542,14 @@ private fun LandscapePlayerDetailsPane(
                                 Text(
                                     text = song.title,
                                     color = if (isCurrent) accentColor else contentColor,
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = DsmusicTheme.typography.bodyMedium,
                                     fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                                     maxLines = 1
                                 )
                                 Text(
                                     text = song.artist,
                                     color = secondaryColor,
-                                    style = MaterialTheme.typography.labelSmall,
+                                    style = DsmusicTheme.typography.labelSmall,
                                     maxLines = 1
                                 )
                             }
@@ -559,7 +557,7 @@ private fun LandscapePlayerDetailsPane(
                                 Text(
                                     text = "PLAYING",
                                     color = accentColor,
-                                    style = MaterialTheme.typography.labelSmall,
+                                    style = DsmusicTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -575,7 +573,7 @@ private fun LandscapePlayerDetailsPane(
  * Stateful wrapper for the FullPlayer UI component.
  * Decouples the UI component from ViewModel, Activity, and direct permission handling.
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
+
 @Composable
 fun FullPlayerScreen(
     activity: MainActivity,
@@ -704,10 +702,7 @@ fun FullPlayerScreen(
  * Does not depend on ViewModels or Activities, ensuring great previewability and testability.
  */
 @SuppressLint("ConfigurationScreenWidthHeight")
-@OptIn(
-    ExperimentalMaterial3ExpressiveApi::class,
-    ExperimentalMaterial3Api::class
-)
+
 @Composable
 fun FullPlayer(
     viewModel: PlayerSharedViewModel,
@@ -777,7 +772,7 @@ fun FullPlayer(
         }
     }
 
-    val themePlayerBackground = MaterialTheme.colorScheme.background
+    val themePlayerBackground = DsmusicTheme.colorScheme.background
     val backgroundBrush = remember(
         uiState.playerBackgroundColor,
         isDark,
@@ -938,7 +933,7 @@ fun FullPlayer(
 
                 Text(
                     text = "NOW PLAYING",
-                    style = MaterialTheme.typography.labelLarge,
+                    style = DsmusicTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = contentSecondary
                 )
@@ -990,7 +985,7 @@ fun FullPlayer(
                         } else {
                             uiState.currentSong?.title ?: "Unknown Title"
                         },
-                        style = MaterialTheme.typography.headlineMediumEmphasized,
+                        style = DsmusicTheme.typography.headlineMediumEmphasized,
                         fontSize = titleSize,
                         fontWeight = titleWeight,
                         color = contentColor,
@@ -1008,7 +1003,7 @@ fun FullPlayer(
                         } else {
                             uiState.currentSong?.artist ?: "Unknown Artist"
                         },
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = DsmusicTheme.typography.bodyMedium,
                         color = contentSecondary,
                         maxLines = 1,
                         textAlign = if (playerTitleAlign == "Centered") androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
@@ -1322,7 +1317,7 @@ fun FullPlayer(
                     contentAlignment = Alignment.Center
                 ) {
                     if (uiState.isLoading) {
-                        androidx.compose.material3.CircularProgressIndicator(
+                        com.dsann.music.ui.theme.CircularProgressIndicator(
                             modifier = Modifier.size(30.dp),
                             color = centerIconColor,
                             strokeWidth = 2.5.dp
@@ -1704,9 +1699,9 @@ fun FullPlayer(
                     song.lufs?.let { details.add("LUFS" to it.toString()) }
                         ?: details.add("Loudness" to "Not analyzed")
                 }
-                androidx.compose.material3.AlertDialog(
+                com.dsann.music.ui.theme.AlertDialog(
                     onDismissRequest = { showSongInfoDialog = false },
-                    title = { Text(if (isVideoMode) "Video information" else "Song information", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
+                    title = { Text(if (isVideoMode) "Video information" else "Song information", style = DsmusicTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
                     text = {
                         Column(
                             modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)
@@ -1716,12 +1711,12 @@ fun FullPlayer(
                             details.forEach { (label, value) ->
                                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                                     Text(label, modifier = Modifier.width(100.dp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        style = DsmusicTheme.typography.labelMedium,
+                                        color = DsmusicTheme.colorScheme.onSurfaceVariant)
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(value, modifier = Modifier.weight(1f),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface)
+                                        style = DsmusicTheme.typography.bodySmall,
+                                        color = DsmusicTheme.colorScheme.onSurface)
                                 }
                             }
                         }

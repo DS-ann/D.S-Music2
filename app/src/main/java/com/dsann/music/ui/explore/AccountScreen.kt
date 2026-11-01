@@ -33,24 +33,22 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.VpnKey
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import com.dsann.music.ui.theme.AlertDialog
+import com.dsann.music.ui.theme.Button
+import com.dsann.music.ui.theme.ButtonDefaults
+import com.dsann.music.ui.theme.Card
+import com.dsann.music.ui.theme.CardDefaults
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.IconButton
+import com.dsann.music.ui.theme.ListItem
+import com.dsann.music.ui.theme.ListItemDefaults
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.Scaffold
+import com.dsann.music.ui.theme.Switch
+import com.dsann.music.ui.theme.Text
+import com.dsann.music.ui.theme.TextButton
+import com.dsann.music.ui.theme.TopAppBar
+import com.dsann.music.ui.theme.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -77,7 +75,7 @@ import com.dsann.music.viewmodel.AccountViewModel
 /**
  * Dedicated account portal presenting library details and core auth instrumentation 
  */
-@OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
 fun AccountScreen(
     viewModel: AccountViewModel,
@@ -113,7 +111,7 @@ fun AccountScreen(
         Box(modifier = Modifier
             .fillMaxSize()
             .padding(padding)
-            .background(MaterialTheme.colorScheme.surface)) {
+            .background(DsmusicTheme.colorScheme.surface)) {
             AccountSettingsSection(
                 viewModel = viewModel,
                 userProfile = userProfile,
@@ -126,7 +124,7 @@ fun AccountScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 fun AccountSettingsSection(
     viewModel: AccountViewModel,
@@ -158,7 +156,7 @@ fun AccountSettingsSection(
                     modifier = Modifier
                         .size(112.dp)
                         .clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                        .background(DsmusicTheme.colorScheme.surfaceContainerHigh),
                     contentAlignment = Alignment.Center
                 ) {
                     if (isLoggedIn && !userProfile?.avatarUrl.isNullOrEmpty()) {
@@ -173,22 +171,22 @@ fun AccountSettingsSection(
                             Icons.Default.PersonOutline,
                             contentDescription = null,
                             modifier = Modifier.size(56.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
                 Spacer(modifier = Modifier.height(20.dp))
                 Text(
                     text = accountName,
-                    style = MaterialTheme.typography.headlineMedium.copy(letterSpacing = (-0.5).sp),
+                    style = DsmusicTheme.typography.headlineMedium.copy(letterSpacing = (-0.5).sp),
                     fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = DsmusicTheme.colorScheme.onSurface
                 )
                 if (isLoggedIn) {
                     Text(
                         text = userProfile?.email ?: "YouTube Music Connected",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
+                        style = DsmusicTheme.typography.labelLarge,
+                        color = DsmusicTheme.colorScheme.primary,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
@@ -200,7 +198,7 @@ fun AccountSettingsSection(
                 Column {
                     Text(
                         text = "Recent Listening History", 
-                        style = MaterialTheme.typography.titleLarge, 
+                        style = DsmusicTheme.typography.titleLarge, 
                         fontWeight = FontWeight.Bold, 
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
@@ -222,7 +220,7 @@ fun AccountSettingsSection(
                                         .fillMaxWidth()
                                         .aspectRatio(1f),
                                     shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                    colors = CardDefaults.cardColors(containerColor = DsmusicTheme.colorScheme.surfaceVariant)
                                 ) {
                                     if (!song.thumbnailUrl.isNullOrEmpty()) {
                                         AsyncImage(
@@ -233,22 +231,22 @@ fun AccountSettingsSection(
                                         )
                                     } else {
                                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                            Icon(Icons.Default.MusicNote, null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                                            Icon(Icons.Default.MusicNote, null, modifier = Modifier.size(32.dp), tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                                         }
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = song.title,
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = DsmusicTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = song.artist,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = DsmusicTheme.typography.bodySmall,
+                                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -272,11 +270,11 @@ fun AccountSettingsSection(
                         DsmusicSwitchControl(checked = syncEnabled, onCheckedChange = null)
                     },
                     shapes = ListItemDefaults.segmentedShapes(index = 0, count = 2),
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                    colors = ListItemDefaults.colors(containerColor = DsmusicTheme.colorScheme.surfaceContainer),
                     content = {
                         Column {
-                            Text("Sync Playlists", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.titleMedium)
-                            Text("Auto-update library states with remote servers", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Sync Playlists", fontWeight = FontWeight.Medium, style = DsmusicTheme.typography.titleMedium)
+                            Text("Auto-update library states with remote servers", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 )
@@ -285,11 +283,11 @@ fun AccountSettingsSection(
                     onClick = { showTokenAlert = true },
                     leadingContent = { Icon(Icons.Default.VpnKey, null) },
                     shapes = ListItemDefaults.segmentedShapes(index = 1, count = 2),
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                    colors = ListItemDefaults.colors(containerColor = DsmusicTheme.colorScheme.surfaceContainer),
                     content = {
                         Column {
-                            Text("Diagnostics Tool", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.titleMedium)
-                            Text("Inspect background security context", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Diagnostics Tool", fontWeight = FontWeight.Medium, style = DsmusicTheme.typography.titleMedium)
+                            Text("Inspect background security context", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 )
@@ -304,8 +302,8 @@ fun AccountSettingsSection(
                     onClick = { viewModel.logout(); onClose() },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        containerColor = DsmusicTheme.colorScheme.errorContainer,
+                        contentColor = DsmusicTheme.colorScheme.onErrorContainer
                     ),
                     shape = RoundedCornerShape(20.dp)
                 ) {
@@ -319,8 +317,8 @@ fun AccountSettingsSection(
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(20.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        containerColor = DsmusicTheme.colorScheme.primary,
+                        contentColor = DsmusicTheme.colorScheme.onPrimary
                     )
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Login, null)
@@ -335,7 +333,7 @@ fun AccountSettingsSection(
         AlertDialog(
             onDismissRequest = { showTokenAlert = false },
             title = { Text("Authentication Signature") },
-            text = { Text(token, fontSize = 11.sp, style = MaterialTheme.typography.labelSmall) },
+            text = { Text(token, fontSize = 11.sp, style = DsmusicTheme.typography.labelSmall) },
             confirmButton = {
                 DsmusicTextButton(onClick = { showTokenAlert = false }) { Text("Done") }
             }

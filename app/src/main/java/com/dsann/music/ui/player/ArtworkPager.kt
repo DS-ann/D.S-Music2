@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.DsmusicTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -257,8 +257,8 @@ fun ArtworkPager(
                             .background(
                                 Brush.verticalGradient(
                                     colors = listOf(
-                                        MaterialTheme.colorScheme.surfaceVariant,
-                                        MaterialTheme.colorScheme.surfaceContainerHighest
+                                        DsmusicTheme.colorScheme.surfaceVariant,
+                                        DsmusicTheme.colorScheme.surfaceContainerHighest
                                     )
                                 )
                             ),
@@ -267,7 +267,7 @@ fun ArtworkPager(
                         Icon(
                             painter = painterResource(id = R.drawable.ic_music_note),
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             modifier = Modifier.size(96.dp)
                         )
                     }

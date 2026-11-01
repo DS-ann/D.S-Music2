@@ -7,10 +7,9 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.Slider
+import com.dsann.music.ui.theme.SliderDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -37,7 +36,7 @@ import kotlin.math.roundToInt
  * A highly optimized, custom Bezier curve wavy slider.
  * Flattens out automatically during user scrub operations to aid tracking visual precision.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun WavyMusicSlider(
@@ -50,9 +49,9 @@ fun WavyMusicSlider(
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     trackHeight: Dp = 4.dp,
     thumbRadius: Dp = 10.dp,
-    activeTrackColor: Color = MaterialTheme.colorScheme.primary,
-    inactiveTrackColor: Color = MaterialTheme.colorScheme.surfaceVariant,
-    thumbColor: Color = MaterialTheme.colorScheme.primary,
+    activeTrackColor: Color = DsmusicTheme.colorScheme.primary,
+    inactiveTrackColor: Color = DsmusicTheme.colorScheme.surfaceVariant,
+    thumbColor: Color = DsmusicTheme.colorScheme.primary,
     waveAmplitudeWhenPlaying: Dp = 2.5.dp,
     waveLength: Dp = 48.dp,
     waveAnimationDuration: Int = 2200,

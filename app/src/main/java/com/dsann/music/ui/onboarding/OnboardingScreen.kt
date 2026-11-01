@@ -56,19 +56,18 @@ package com.dsann.music.ui.onboarding
     import androidx.compose.material.icons.filled.Notifications
     import androidx.compose.material.icons.filled.Search
     import androidx.compose.material.icons.filled.Settings
-    import androidx.compose.material3.Card
-    import androidx.compose.material3.CardDefaults
-    import androidx.compose.material3.ExperimentalMaterial3Api
-    import androidx.compose.material3.FloatingActionButton
-    import androidx.compose.material3.FloatingActionButtonDefaults
-    import androidx.compose.material3.Icon
-    import androidx.compose.material3.MaterialTheme
-    import androidx.compose.material3.NavigationBar
-    import androidx.compose.material3.NavigationBarItem
-    import androidx.compose.material3.Scaffold
-    import androidx.compose.material3.Surface
-    import androidx.compose.material3.Switch
-    import androidx.compose.material3.Text
+    import com.dsann.music.ui.theme.Card
+    import com.dsann.music.ui.theme.CardDefaults
+        import com.dsann.music.ui.theme.FloatingActionButton
+    import com.dsann.music.ui.theme.FloatingActionButtonDefaults
+    import com.dsann.music.ui.theme.Icon
+    import com.dsann.music.ui.theme.DsmusicTheme
+    import com.dsann.music.ui.theme.NavigationBar
+    import com.dsann.music.ui.theme.NavigationBarItem
+    import com.dsann.music.ui.theme.Scaffold
+    import com.dsann.music.ui.theme.Surface
+    import com.dsann.music.ui.theme.Switch
+    import com.dsann.music.ui.theme.Text
     import androidx.compose.runtime.Composable
     import androidx.compose.runtime.LaunchedEffect
     import androidx.compose.runtime.getValue
@@ -249,7 +248,7 @@ package com.dsann.music.ui.onboarding
         drawableRes: Int?,
         imageUrl: String? = null,
         imageScale: Float = 1f,
-        iconTint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+        iconTint: androidx.compose.ui.graphics.Color = DsmusicTheme.colorScheme.onSurface,
         content: @Composable () -> Unit
     ) {
         val configuration = androidx.compose.ui.platform.LocalConfiguration.current
@@ -294,7 +293,7 @@ package com.dsann.music.ui.onboarding
                     )
                 } else {
                     // Fallback / Placeholder surface if drawable is missing
-                    Surface(color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxSize()) {}
+                    Surface(color = DsmusicTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxSize()) {}
                 }
             }
     
@@ -316,16 +315,16 @@ package com.dsann.music.ui.onboarding
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
             drawableRes = R.drawable.ic_applogo,
-            iconTint = MaterialTheme.colorScheme.onSurface
+            iconTint = DsmusicTheme.colorScheme.onSurface
         ) {
             Text(
                 text = "Welcome\nto D.S Music.",
-                style = MaterialTheme.typography.displayMedium,
+                style = DsmusicTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black,
                 fontSize = 42.sp,
                 lineHeight = 48.sp,
                 letterSpacing = (-0.5).sp,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = DsmusicTheme.colorScheme.onBackground,
                 modifier = Modifier.graphicsLayer { 
                     val offset = pageOffsetProvider()
                     translationY = offset * 30f
@@ -335,11 +334,11 @@ package com.dsann.music.ui.onboarding
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "Lets setup the everything for you",
-                style = MaterialTheme.typography.headlineSmall,
+                style = DsmusicTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Normal,
                 fontSize = 18.sp,
                 lineHeight = 28.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.graphicsLayer { 
@@ -357,16 +356,16 @@ package com.dsann.music.ui.onboarding
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
             drawableRes = R.drawable.ic_youtube_music,
-            iconTint = MaterialTheme.colorScheme.onSurface
+            iconTint = DsmusicTheme.colorScheme.onSurface
         ) {
             Text(
                 text = "Your\nComplete\nEcosystem.",
-                style = MaterialTheme.typography.displayMedium,
+                style = DsmusicTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black,
                 fontSize = 42.sp,
                 lineHeight = 48.sp,
                 letterSpacing = (-0.5).sp,
-                color = MaterialTheme.colorScheme.primary,
+                color = DsmusicTheme.colorScheme.primary,
                 modifier = Modifier.graphicsLayer { 
                     val offset = pageOffsetProvider()
                     translationY = offset * -30f
@@ -376,11 +375,11 @@ package com.dsann.music.ui.onboarding
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "Stream millions of tracks or play your local library, perfectly synced.",
-                style = MaterialTheme.typography.headlineSmall,
+                style = DsmusicTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Normal,
                 fontSize = 18.sp,
                 lineHeight = 28.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.graphicsLayer { 
@@ -398,18 +397,18 @@ package com.dsann.music.ui.onboarding
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
             drawableRes = R.drawable.ic_lyrics,
-            iconTint = MaterialTheme.colorScheme.onSurface
+            iconTint = DsmusicTheme.colorScheme.onSurface
         ) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = "Stream",
-                    style = MaterialTheme.typography.displaySmall,
+                    style = DsmusicTheme.typography.displaySmall,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 32.sp,
                     lineHeight = 40.sp,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = DsmusicTheme.colorScheme.secondary,
                     modifier = Modifier.graphicsLayer { 
                         val offset = pageOffsetProvider()
                         translationY = offset * 20f
@@ -418,11 +417,11 @@ package com.dsann.music.ui.onboarding
                 )
                 Text(
                     text = "Discover",
-                    style = MaterialTheme.typography.displaySmall,
+                    style = DsmusicTheme.typography.displaySmall,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 32.sp,
                     lineHeight = 40.sp,
-                    color = MaterialTheme.colorScheme.tertiary,
+                    color = DsmusicTheme.colorScheme.tertiary,
                     modifier = Modifier.graphicsLayer { 
                         val offset = pageOffsetProvider()
                         translationY = offset * 40f
@@ -431,11 +430,11 @@ package com.dsann.music.ui.onboarding
                 )
                 Text(
                     text = "Sing Along.",
-                    style = MaterialTheme.typography.displaySmall,
+                    style = DsmusicTheme.typography.displaySmall,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 32.sp,
                     lineHeight = 40.sp,
-                    color = MaterialTheme.colorScheme.onBackground,
+                    color = DsmusicTheme.colorScheme.onBackground,
                     modifier = Modifier.graphicsLayer { 
                         val offset = pageOffsetProvider()
                         translationY = offset * 60f
@@ -446,10 +445,10 @@ package com.dsann.music.ui.onboarding
             Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = "Karaoke lyrics, powerful search, and offline downloads all in one place.",
-                style = MaterialTheme.typography.bodyLarge,
+                style = DsmusicTheme.typography.bodyLarge,
                 fontSize = 16.sp,
                 lineHeight = 24.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.graphicsLayer { 
                     val offset = pageOffsetProvider()
                     translationY = offset * 80f
@@ -460,7 +459,7 @@ package com.dsann.music.ui.onboarding
         }
     }
     
-    @OptIn(ExperimentalMaterial3Api::class)
+    
     @Composable
     fun ThemeSelectionPage(
         pageOffsetProvider: () -> Float,
@@ -470,16 +469,16 @@ package com.dsann.music.ui.onboarding
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
             drawableRes = R.drawable.ic_appearance,
-            iconTint = MaterialTheme.colorScheme.onSurface
+            iconTint = DsmusicTheme.colorScheme.onSurface
         ) {
             Text(
                 text = "Style it\nyour way.",
-                style = MaterialTheme.typography.displayMedium,
+                style = DsmusicTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black,
                 fontSize = 42.sp,
                 lineHeight = 48.sp,
                 letterSpacing = (-0.5).sp,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = DsmusicTheme.colorScheme.onBackground,
                 modifier = Modifier.graphicsLayer { 
                     val offset = pageOffsetProvider()
                     translationY = offset * -30f
@@ -502,7 +501,7 @@ package com.dsann.music.ui.onboarding
                         onClick = { onThemeChanged(mode) },
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (themeMode == mode) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh
+                            containerColor = if (themeMode == mode) DsmusicTheme.colorScheme.primaryContainer else DsmusicTheme.colorScheme.surfaceContainerHigh
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -521,19 +520,19 @@ package com.dsann.music.ui.onboarding
                                 modifier = Modifier
                                     .size(40.dp)
                                     .clip(CircleShape)
-                                    .background(if (themeMode == mode) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent),
+                                    .background(if (themeMode == mode) DsmusicTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (themeMode == mode) {
-                                    Icon(Icons.Default.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
+                                    Icon(Icons.Default.Check, contentDescription = "Selected", tint = DsmusicTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
                                 }
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             Text(
                                 text = label,
-                                style = MaterialTheme.typography.titleMedium,
+                                style = DsmusicTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = if (themeMode == mode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (themeMode == mode) DsmusicTheme.colorScheme.onPrimaryContainer else DsmusicTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -554,16 +553,16 @@ package com.dsann.music.ui.onboarding
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
             drawableRes = R.drawable.ic_settings,
-            iconTint = MaterialTheme.colorScheme.onSurface
+            iconTint = DsmusicTheme.colorScheme.onSurface
         ) {
             Text(
                 text = "Navigate\nSeamlessly.",
-                style = MaterialTheme.typography.displayMedium,
+                style = DsmusicTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black,
                 fontSize = 42.sp,
                 lineHeight = 48.sp,
                 letterSpacing = (-0.5).sp,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = DsmusicTheme.colorScheme.onBackground,
                 modifier = Modifier.graphicsLayer { 
                     val offset = pageOffsetProvider()
                     translationY = offset * -30f
@@ -583,7 +582,7 @@ package com.dsann.music.ui.onboarding
                         alpha = 1f - kotlin.math.abs(offset * 1.5f)
                     },
                 shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer
+                color = DsmusicTheme.colorScheme.surfaceContainer
             ) {
                 NavigationBar(
                     modifier = Modifier.fillMaxWidth().height(if (dynamicNavStyle) 64.dp else 80.dp),
@@ -616,7 +615,7 @@ package com.dsann.music.ui.onboarding
                         alpha = 1f - kotlin.math.abs(offset * 1.5f)
                     },
                 shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh
+                color = DsmusicTheme.colorScheme.surfaceContainerHigh
             ) {
                 Row(
                     modifier = Modifier
@@ -628,15 +627,15 @@ package com.dsann.music.ui.onboarding
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Hide Nav Labels",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = DsmusicTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Remove text labels from the bottom navigation bar.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                            style = DsmusicTheme.typography.bodyMedium,
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                         )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
@@ -656,7 +655,7 @@ package com.dsann.music.ui.onboarding
                         alpha = 1f - kotlin.math.abs(offset * 1.5f)
                     },
                 shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh
+                color = DsmusicTheme.colorScheme.surfaceContainerHigh
             ) {
                 Row(
                     modifier = Modifier
@@ -668,15 +667,15 @@ package com.dsann.music.ui.onboarding
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Dynamic Navbar",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = DsmusicTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Compact height with bold, elevated icons.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                            style = DsmusicTheme.typography.bodyMedium,
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                         )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
@@ -698,16 +697,16 @@ package com.dsann.music.ui.onboarding
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
             drawableRes = R.drawable.ic_folder_open,
-            iconTint = MaterialTheme.colorScheme.onSurface
+            iconTint = DsmusicTheme.colorScheme.onSurface
         ) {
             Text(
                 text = "Enable\nPermissions.",
-                style = MaterialTheme.typography.displayMedium,
+                style = DsmusicTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black,
                 fontSize = 42.sp,
                 lineHeight = 48.sp,
                 letterSpacing = (-0.5).sp,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = DsmusicTheme.colorScheme.onBackground,
                 modifier = Modifier.graphicsLayer { 
                     val offset = pageOffsetProvider()
                     translationY = offset * -30f
@@ -769,7 +768,7 @@ package com.dsann.music.ui.onboarding
                     alpha = 1f - kotlin.math.abs(offset * 1.5f)
                 },
             shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = DsmusicTheme.colorScheme.surfaceContainerHigh,
             onClick = { if (!isGranted) onRequest() }
         ) {
             Row(
@@ -784,7 +783,7 @@ package com.dsann.music.ui.onboarding
                         .size(44.dp)
                         .clip(CircleShape)
                         .background(
-                            if (isGranted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+                            if (isGranted) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.surface
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -798,22 +797,22 @@ package com.dsann.music.ui.onboarding
                                 scaleY = if (isGranted) 1.1f else 1f
                                 alpha = if (isGranted) 1f else 0.8f
                             },
-                        tint = if (isGranted) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (isGranted) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.titleSmall,
+                        style = DsmusicTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        style = DsmusicTheme.typography.bodySmall,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                         maxLines = 2,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
@@ -824,7 +823,7 @@ package com.dsann.music.ui.onboarding
                         imageVector = Icons.Default.ArrowForward,
                         contentDescription = "Grant $title permission",
                         modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = DsmusicTheme.colorScheme.primary
                     )
                 }
             }
@@ -864,7 +863,7 @@ package com.dsann.music.ui.onboarding
             pageOffsetProvider = pageOffsetProvider,
             drawableRes = if (isLoggedIn && userProfileUrl != null) null else R.drawable.ic_youtube_music,
             imageUrl = if (isLoggedIn) userProfileUrl else null,
-            iconTint = MaterialTheme.colorScheme.onSurface
+            iconTint = DsmusicTheme.colorScheme.onSurface
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -874,12 +873,12 @@ package com.dsann.music.ui.onboarding
                     Spacer(modifier = Modifier.height(20.dp))
                     Text(
                         text = "Welcome,\n$userName",
-                        style = MaterialTheme.typography.displayMedium,
+                        style = DsmusicTheme.typography.displayMedium,
                         fontWeight = FontWeight.Black,
                         fontSize = 42.sp,
                         lineHeight = 48.sp,
                         letterSpacing = (-0.5).sp,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = DsmusicTheme.colorScheme.onBackground,
                         modifier = Modifier.graphicsLayer { 
                             val offset = pageOffsetProvider()
                             translationY = offset * -30f
@@ -888,7 +887,7 @@ package com.dsann.music.ui.onboarding
                     )
                     Spacer(modifier = Modifier.height(20.dp))
                     Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                        color = DsmusicTheme.colorScheme.primaryContainer,
                         shape = RoundedCornerShape(percent = 50),
                         modifier = Modifier.graphicsLayer {
                             val offset = pageOffsetProvider()
@@ -897,21 +896,21 @@ package com.dsann.music.ui.onboarding
                         }
                     ) {
                         Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp), tint = DsmusicTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Login Successful", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                            Text("Login Successful", style = DsmusicTheme.typography.labelMedium, color = DsmusicTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         }
                     }
                     Spacer(modifier = Modifier.height(120.dp))
                 } else {
                     Text(
                         text = "Sign In &\nSync.",
-                        style = MaterialTheme.typography.displayMedium,
+                        style = DsmusicTheme.typography.displayMedium,
                         fontWeight = FontWeight.Black,
                         fontSize = 42.sp,
                         lineHeight = 48.sp,
                         letterSpacing = (-0.5).sp,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = DsmusicTheme.colorScheme.onBackground,
                         modifier = Modifier.graphicsLayer { 
                             val offset = pageOffsetProvider()
                             translationY = offset * -30f
@@ -923,8 +922,8 @@ package com.dsann.music.ui.onboarding
         
                     Text(
                         text = "Connect your account to sync playlists, liked songs, and preferences across all your devices.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = DsmusicTheme.typography.bodyLarge,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 24.sp,
                         modifier = Modifier.graphicsLayer {
                             val offset = pageOffsetProvider()
@@ -935,7 +934,7 @@ package com.dsann.music.ui.onboarding
 
                     Spacer(modifier = Modifier.height(40.dp))
 
-                    androidx.compose.material3.Button(
+                    com.dsann.music.ui.theme.Button(
                         onClick = { showWebView = true },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -955,7 +954,7 @@ package com.dsann.music.ui.onboarding
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = "Continue with YouTube Music",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = DsmusicTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
@@ -964,7 +963,7 @@ package com.dsann.music.ui.onboarding
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    androidx.compose.material3.OutlinedButton(
+                    com.dsann.music.ui.theme.OutlinedButton(
                         onClick = onGuestClick,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -978,9 +977,9 @@ package com.dsann.music.ui.onboarding
                     ) {
                         Text(
                             text = "Continue as Guest",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = DsmusicTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = DsmusicTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
@@ -1013,7 +1012,7 @@ package com.dsann.music.ui.onboarding
             pageOffsetProvider = pageOffsetProvider,
             drawableRes = if (isLoggedIn && userProfileUrl != null) null else R.drawable.ic_applogo,
             imageUrl = if (isLoggedIn) userProfileUrl else null,
-            iconTint = MaterialTheme.colorScheme.onSurface
+            iconTint = DsmusicTheme.colorScheme.onSurface
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -1021,7 +1020,7 @@ package com.dsann.music.ui.onboarding
             ) {
                 Surface(
                     shape = RoundedCornerShape(percent = 50),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                    color = DsmusicTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
                     modifier = Modifier.graphicsLayer {
                         val offset = pageOffsetProvider()
                         translationY = offset * -30f
@@ -1036,13 +1035,13 @@ package com.dsann.music.ui.onboarding
                             modifier = Modifier
                                 .size(8.dp)
                                 .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = pulseAlpha))
+                                .background(DsmusicTheme.colorScheme.primary.copy(alpha = pulseAlpha))
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Setup Complete",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
+                            style = DsmusicTheme.typography.labelMedium,
+                            color = DsmusicTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -1052,12 +1051,12 @@ package com.dsann.music.ui.onboarding
     
                 Text(
                     text = "Ready to\nFlow.",
-                    style = MaterialTheme.typography.displayMedium,
+                    style = DsmusicTheme.typography.displayMedium,
                     fontWeight = FontWeight.Black,
                     fontSize = 42.sp,
                     lineHeight = 48.sp,
                     letterSpacing = (-0.5).sp,
-                    color = MaterialTheme.colorScheme.onBackground,
+                    color = DsmusicTheme.colorScheme.onBackground,
                     modifier = Modifier.graphicsLayer { 
                         val offset = pageOffsetProvider()
                         translationY = offset * -20f
@@ -1069,8 +1068,8 @@ package com.dsann.music.ui.onboarding
     
                 Text(
                     text = "Your library is fully initialized and the engine is primed. It's time to immerse yourself in the ultimate auditory experience.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = DsmusicTheme.typography.bodyLarge,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 24.sp,
                     modifier = Modifier.graphicsLayer {
                         val offset = pageOffsetProvider()
@@ -1123,7 +1122,7 @@ package com.dsann.music.ui.onboarding
     
         Surface(
             modifier = modifier.shadow(elevation = 8.dp, shape = shape, clip = true),
-            color = MaterialTheme.colorScheme.surfaceContainer,
+            color = DsmusicTheme.colorScheme.surfaceContainer,
             shape = shape
         ) {
             Column(
@@ -1137,11 +1136,11 @@ package com.dsann.music.ui.onboarding
                     animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
                     label = "progress"
                 )
-                androidx.compose.material3.LinearProgressIndicator(
+                com.dsann.music.ui.theme.LinearProgressIndicator(
                     progress = { animatedProgress },
                     modifier = Modifier.fillMaxWidth().height(3.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    color = DsmusicTheme.colorScheme.primary,
+                    trackColor = DsmusicTheme.colorScheme.surfaceVariant
                 )
                 Row(
                     modifier = Modifier
@@ -1167,27 +1166,27 @@ package com.dsann.music.ui.onboarding
                         if (targetPage == 0) {
                             Text(
                                 text = "Let's Go!",
-                                style = MaterialTheme.typography.titleLarge,
+                                style = DsmusicTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = DsmusicTheme.colorScheme.primary,
                             )
                         } else {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                androidx.compose.material3.IconButton(
+                                com.dsann.music.ui.theme.IconButton(
                                     onClick = onBackClicked,
                                     modifier = Modifier.size(40.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.ArrowBack,
                                         contentDescription = "Back",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        tint = DsmusicTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = "Step $targetPage of ${pagerState.pageCount - 1}",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = DsmusicTheme.typography.bodyLarge,
+                                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
@@ -1204,12 +1203,12 @@ package com.dsann.music.ui.onboarding
                         }
                     ) { isFinish ->
                         if (isFinish) {
-                            androidx.compose.material3.ExtendedFloatingActionButton(
+                            com.dsann.music.ui.theme.ExtendedFloatingActionButton(
                                 onClick = onFinishClicked,
                                 text = { Text("Start Listening") },
                                 icon = { Icon(Icons.Default.Check, contentDescription = "Finish") },
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                containerColor = DsmusicTheme.colorScheme.primaryContainer,
+                                contentColor = DsmusicTheme.colorScheme.onPrimaryContainer,
                                 elevation = FloatingActionButtonDefaults.elevation(0.dp)
                             )
                         } else {
@@ -1222,8 +1221,8 @@ package com.dsann.music.ui.onboarding
                                     bottomEndPercent = animatedBottomEnd.toInt()
                                 ),
                                 elevation = FloatingActionButtonDefaults.elevation(0.dp),
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                containerColor = DsmusicTheme.colorScheme.primaryContainer,
+                                contentColor = DsmusicTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier
                                     .rotate(animatedRotation)
                                     .graphicsLayer { alpha = fabAlpha }

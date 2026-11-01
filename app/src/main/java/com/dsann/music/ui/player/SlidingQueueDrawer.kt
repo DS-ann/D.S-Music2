@@ -11,7 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import com.dsann.music.ui.theme.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,7 +31,7 @@ import com.dsann.music.ui.rememberDragDropState
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import kotlin.math.abs
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SlidingQueueDrawer(
     isQueueExpanded: Boolean,
@@ -196,7 +196,7 @@ fun SlidingQueueDrawer(
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_keyboard_arrow_down),
                                     contentDescription = "Collapse Queue",
-                                    tint = MaterialTheme.colorScheme.onSurface
+                                    tint = DsmusicTheme.colorScheme.onSurface
                                 )
                             }
                             Spacer(modifier = Modifier.width(4.dp))
@@ -204,15 +204,15 @@ fun SlidingQueueDrawer(
                             Column {
                                 Text(
                                     text = "Playing From",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                                    style = DsmusicTheme.typography.titleMedium,
+                                    color = DsmusicTheme.colorScheme.onSurface.copy(alpha = 0.9f),
                                     letterSpacing = 0.5.sp
                                 )
                                 Text(
                                     text = "QUEUE",
-                                    style = MaterialTheme.typography.titleSmallEmphasized,
+                                    style = DsmusicTheme.typography.titleSmallEmphasized,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                                    color = DsmusicTheme.colorScheme.onSurface.copy(alpha = 0.9f),
                                     letterSpacing = 0.5.sp
                                 )
                             }
@@ -221,14 +221,14 @@ fun SlidingQueueDrawer(
                         // Right Side
                         Text(
                             text = "${songList.size} tracks",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = DsmusicTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                HorizontalDivider(color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
                 // Queue List
                 LazyColumn(
@@ -305,7 +305,7 @@ fun SlidingQueueDrawer(
                         .navigationBarsPadding(),
                     contentAlignment = Alignment.Center
                 ) {
-                    androidx.compose.material3.ButtonGroup(
+                    com.dsann.music.ui.theme.ButtonGroup(
                         modifier = Modifier.fillMaxWidth(),
                         expandedRatio = 0.3f,
                         overflowIndicator = {}
@@ -325,7 +325,7 @@ fun SlidingQueueDrawer(
                                     ),
                                     label = "ShuffleCorner"
                                 )
-                                androidx.compose.material3.Button(
+                                com.dsann.music.ui.theme.Button(
                                     onClick = {
                                         onToggleShuffle()
                                     },
@@ -337,7 +337,7 @@ fun SlidingQueueDrawer(
                                     },
                                     interactionSource = interactionSource,
                                     shape = RoundedCornerShape(cornerRadius),
-                                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                    colors = com.dsann.music.ui.theme.ButtonDefaults.buttonColors(
                                         containerColor = if (isShuffleEnabled) queueTrayActiveButtonColor else queueTrayInactiveButtonColor,
                                         contentColor = if (isShuffleEnabled) queueTrayActiveContentColor else queueTrayInactiveContentColor
                                     ),
@@ -368,7 +368,7 @@ fun SlidingQueueDrawer(
                                 )
                                 val loopIcon = if (repeatMode == PlayerSharedViewModel.REPEAT_ONE) R.drawable.ic_repeat_one else R.drawable.ic_repeat
                                 val loopActive = repeatMode != PlayerSharedViewModel.REPEAT_OFF
-                                androidx.compose.material3.Button(
+                                com.dsann.music.ui.theme.Button(
                                     onClick = {
                                         onToggleLoopMode()
                                     },
@@ -380,7 +380,7 @@ fun SlidingQueueDrawer(
                                     },
                                     interactionSource = interactionSource,
                                     shape = RoundedCornerShape(cornerRadius),
-                                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                    colors = com.dsann.music.ui.theme.ButtonDefaults.buttonColors(
                                         containerColor = if (loopActive) queueTrayActiveButtonColor else queueTrayInactiveButtonColor,
                                         contentColor = if (loopActive) queueTrayActiveContentColor else queueTrayInactiveContentColor
                                     ),
@@ -410,7 +410,7 @@ fun SlidingQueueDrawer(
                                     label = "TimerCorner"
                                 )
                                 val timerActive = sleepTimerMode != PlayerSharedViewModel.SleepTimerMode.OFF
-                                androidx.compose.material3.Button(
+                                com.dsann.music.ui.theme.Button(
                                     onClick = {
                                         onShowSleepTimerDialog()
                                     },
@@ -422,7 +422,7 @@ fun SlidingQueueDrawer(
                                     },
                                     interactionSource = interactionSource,
                                     shape = RoundedCornerShape(cornerRadius),
-                                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                    colors = com.dsann.music.ui.theme.ButtonDefaults.buttonColors(
                                         containerColor = if (timerActive) queueTrayActiveButtonColor else queueTrayInactiveButtonColor,
                                         contentColor = if (timerActive) queueTrayActiveContentColor else queueTrayInactiveContentColor
                                     ),

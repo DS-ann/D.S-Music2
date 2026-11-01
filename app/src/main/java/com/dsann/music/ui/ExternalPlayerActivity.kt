@@ -35,16 +35,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.dsann.music.ui.theme.Button
+import com.dsann.music.ui.theme.ButtonDefaults
+import com.dsann.music.ui.theme.ExtendedFloatingActionButton
+import com.dsann.music.ui.theme.FloatingActionButtonDefaults
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.Surface
+import com.dsann.music.ui.theme.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -152,7 +150,7 @@ class ExternalPlayerActivity : ComponentActivity() {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f)) // Standard M3 Scrim token
+                        .background(DsmusicTheme.colorScheme.scrim.copy(alpha = 0.45f)) // Standard M3 Scrim token
                         .clickable {
                             // Tapping backdrop exits popup (which calls onDestroy automatically)
                             finish()
@@ -360,7 +358,7 @@ fun PopupPlayerContent(
             .padding(16.dp)
             .navigationBarsPadding(),
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        color = DsmusicTheme.colorScheme.surfaceContainerHighest,
         tonalElevation = 8.dp
     ) {
         Column(
@@ -374,7 +372,7 @@ fun PopupPlayerContent(
                 modifier = Modifier
                     .size(width = 36.dp, height = 4.dp)
                     .background(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                         shape = CircleShape
                     )
             )
@@ -390,7 +388,7 @@ fun PopupPlayerContent(
                 Surface(
                     modifier = Modifier.size(88.dp),
                     shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
+                    color = DsmusicTheme.colorScheme.surfaceVariant
                 ) {
                     if (artBitmap != null) {
                         AsyncImage(
@@ -424,25 +422,25 @@ fun PopupPlayerContent(
                 ) {
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        style = DsmusicTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         maxLines = 2, // Spans up to 2 lines for complete visibility
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = DsmusicTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = artist,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = DsmusicTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = album,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = DsmusicTheme.typography.bodySmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 }
             }
@@ -464,9 +462,9 @@ fun PopupPlayerContent(
                     isScrubbing = false
                     player?.seekTo((sliderScrubPos * safeDur).toLong())
                 },
-                activeTrackColor = MaterialTheme.colorScheme.primary,
-                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
-                thumbColor = MaterialTheme.colorScheme.onSurface,
+                activeTrackColor = DsmusicTheme.colorScheme.primary,
+                inactiveTrackColor = DsmusicTheme.colorScheme.surfaceVariant,
+                thumbColor = DsmusicTheme.colorScheme.onSurface,
                 isPlaying = isPlaying,
                 trackHeight = 4.dp,
                 thumbRadius = 6.dp,
@@ -484,13 +482,13 @@ fun PopupPlayerContent(
             ) {
                 Text(
                     text = formatDuration(displayPos),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = DsmusicTheme.typography.labelSmall,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = formatDuration(duration),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = DsmusicTheme.typography.labelSmall,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -535,10 +533,10 @@ fun ExpressivePlayPauseButton(
         modifier = modifier
             .fillMaxWidth() // Upgraded to full width to cleanly align with popup content
             .height(72.dp), // Curated premium height
-        shape = MaterialTheme.shapes.extraLarge, // Official curated Squircle Token
+        shape = DsmusicTheme.shapes.extraLarge, // Official curated Squircle Token
         colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.onSurface,
-            contentColor = MaterialTheme.colorScheme.surface
+            containerColor = DsmusicTheme.colorScheme.onSurface,
+            contentColor = DsmusicTheme.colorScheme.surface
         )
     ) {
         Icon(
@@ -559,14 +557,14 @@ fun ExpressiveActionButton(
     ExtendedFloatingActionButton(
         onClick = onClick,
         modifier = modifier,
-        shape = MaterialTheme.shapes.extraLarge,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        contentColor = MaterialTheme.colorScheme.primary,
+        shape = DsmusicTheme.shapes.extraLarge,
+        containerColor = DsmusicTheme.colorScheme.surfaceContainerHigh,
+        contentColor = DsmusicTheme.colorScheme.primary,
         elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp)
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+            style = DsmusicTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
         )
     }
 }

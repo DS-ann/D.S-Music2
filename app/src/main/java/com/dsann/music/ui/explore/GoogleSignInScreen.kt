@@ -9,7 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
+import com.dsann.music.ui.theme.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,7 +22,7 @@ import com.dsann.music.viewmodel.AccountViewModel
 import kotlinx.coroutines.launch
 
 @SuppressLint("SetJavaScriptEnabled")
-@OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
 fun GoogleSignInScreen(
     accountViewModel: AccountViewModel,
@@ -51,7 +51,7 @@ fun GoogleSignInScreen(
             modifier = modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(MaterialTheme.colorScheme.background)
+                .background(DsmusicTheme.colorScheme.background)
         ) {
             AndroidView(
                 factory = { ctx ->

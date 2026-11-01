@@ -88,32 +88,30 @@ import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.SettingsBackupRestore
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Update
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import com.dsann.music.ui.theme.AlertDialog
+import com.dsann.music.ui.theme.Button
+import com.dsann.music.ui.theme.ButtonDefaults
+import com.dsann.music.ui.theme.Card
+import com.dsann.music.ui.theme.CardDefaults
+import com.dsann.music.ui.theme.CircularProgressIndicator
+import com.dsann.music.ui.theme.DropdownMenu
+import com.dsann.music.ui.theme.DropdownMenuItem
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.IconButton
+import com.dsann.music.ui.theme.LinearProgressIndicator
+import com.dsann.music.ui.theme.ListItem
+import com.dsann.music.ui.theme.ListItemDefaults
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.RadioButton
+import com.dsann.music.ui.theme.Scaffold
+import com.dsann.music.ui.theme.Slider
+import com.dsann.music.ui.theme.Surface
+import com.dsann.music.ui.theme.Switch
+import com.dsann.music.ui.theme.SwitchDefaults
+import com.dsann.music.ui.theme.Text
+import com.dsann.music.ui.theme.TextButton
+import com.dsann.music.ui.theme.TopAppBar
+import com.dsann.music.ui.theme.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -1659,7 +1657,7 @@ private fun SettingsDetailTopBar(title: String, onBack: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
+            .background(DsmusicTheme.colorScheme.background)
             .statusBarsPadding()
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1675,10 +1673,10 @@ private fun SettingsDetailTopBar(title: String, onBack: () -> Unit) {
             modifier = Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(13.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .background(DsmusicTheme.colorScheme.surfaceContainerLow)
                 .border(
                     1.dp,
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+                    DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
                     RoundedCornerShape(13.dp)
                 )
                 .clickable(onClick = onBack),
@@ -1687,7 +1685,7 @@ private fun SettingsDetailTopBar(title: String, onBack: () -> Unit) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
-                tint = MaterialTheme.colorScheme.onSurface,
+                tint = DsmusicTheme.colorScheme.onSurface,
                 modifier = Modifier.size(21.dp)
             )
         }
@@ -1727,8 +1725,8 @@ private fun ControlsAndGesturesScreen(
             SettingsHeader("Player cover")
             Text(
                 "Choose what swipes, a double tap and a long press do on the full player's artwork. Swiping down still collapses the player.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = DsmusicTheme.typography.bodySmall,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             SettingsGroupCard(listOf(
@@ -1782,7 +1780,7 @@ private fun ControlsAndGesturesScreen(
                 SettingsHeader("Double-tap seek")
                 SettingsGroupCard(listOf {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-                        Text("Seconds to seek", style = MaterialTheme.typography.bodyLarge)
+                        Text("Seconds to seek", style = DsmusicTheme.typography.bodyLarge)
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1793,12 +1791,12 @@ private fun ControlsAndGesturesScreen(
                                     modifier = Modifier
                                         .clip(CircleShape)
                                         .clickable { playerViewModel.setDoubleTapSeekSeconds(seconds) },
-                                    color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                                    color = if (selected) DsmusicTheme.colorScheme.primaryContainer else DsmusicTheme.colorScheme.surfaceVariant
                                 ) {
                                     Text(
                                         "$seconds s",
                                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
-                                        color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = if (selected) DsmusicTheme.colorScheme.onPrimaryContainer else DsmusicTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -1809,8 +1807,8 @@ private fun ControlsAndGesturesScreen(
             SettingsHeader("Mini player")
             Text(
                 "These actions apply while the player is collapsed. A tap still opens the full player.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = DsmusicTheme.typography.bodySmall,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             SettingsGroupCard(listOf(
@@ -1867,8 +1865,8 @@ private fun ControlsAndGesturesScreen(
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Restore Prism-style defaults", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
-                    Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Text("Restore Prism-style defaults", modifier = Modifier.weight(1f), color = DsmusicTheme.colorScheme.primary)
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = DsmusicTheme.colorScheme.primary)
                 }
             })
         }
@@ -1891,9 +1889,9 @@ private fun GestureSettingRow(
                 .padding(horizontal = 16.dp, vertical = 13.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Text(selected.label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
-            Icon(Icons.Default.ChevronRight, contentDescription = "Change $title", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 6.dp).size(18.dp))
+            Text(title, modifier = Modifier.weight(1f), style = DsmusicTheme.typography.bodyLarge)
+            Text(selected.label, color = DsmusicTheme.colorScheme.onSurfaceVariant, style = DsmusicTheme.typography.labelLarge)
+            Icon(Icons.Default.ChevronRight, contentDescription = "Change $title", tint = DsmusicTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 6.dp).size(18.dp))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { action ->
@@ -1938,7 +1936,7 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(DsmusicTheme.colorScheme.surface)
             .statusBarsPadding()
             .then(if (isLandscape) Modifier.padding(start = 88.dp) else Modifier)
             .nestedScroll(nestedScrollConnection)
@@ -2035,23 +2033,23 @@ private fun SettingsCategoryItem(
 ) {
     DsmusicListItem(
         headlineContent = {
-            Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(text = title, style = DsmusicTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         },
         supportingContent = {
-            Text(text = subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = subtitle, style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
         },
         leadingContent = {
             Box(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .background(DsmusicTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon, 
                     contentDescription = null, 
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    tint = DsmusicTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -2132,7 +2130,7 @@ private fun MusicManagementScreen(
                 if (hiddenFolders.isEmpty()) {
                     add {
                         DsmusicListItem(
-                            headlineContent = { Text("No folders blacklisted", style = MaterialTheme.typography.bodyLarge) },
+                            headlineContent = { Text("No folders blacklisted", style = DsmusicTheme.typography.bodyLarge) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                         )
                     }
@@ -2158,7 +2156,7 @@ private fun MusicManagementScreen(
                         supportingContent = {
                             Text(if (mediaCacheEnabled) "Cache streamed audio for faster repeat playback."
                                 else "Disabled. New stream data is not retained.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                color = DsmusicTheme.colorScheme.onSurfaceVariant)
                         },
                         trailingContent = { DsmusicSwitch(checked = mediaCacheEnabled, onCheckedChange = onMediaCacheToggle) },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
@@ -2169,15 +2167,15 @@ private fun MusicManagementScreen(
                         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically) {
-                                Text("Stream cache limit", style = MaterialTheme.typography.bodyLarge)
-                                Text(mediaCacheLimitGb.toString() + " GB", style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                Text("Stream cache limit", style = DsmusicTheme.typography.bodyLarge)
+                                Text(mediaCacheLimitGb.toString() + " GB", style = DsmusicTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold, color = DsmusicTheme.colorScheme.primary)
                             }
                             Slider(value = mediaCacheLimitGb.toFloat(),
                                 onValueChange = { onMediaCacheLimitChange(it.toInt().coerceIn(1, 10)) },
                                 valueRange = 1f..10f, steps = 8)
                             Text("Limit is applied immediately. Oldest cached audio is evicted first when exceeded.",
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                style = DsmusicTheme.typography.bodySmall, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -2210,15 +2208,15 @@ private fun BackupRestoreScreen(
                         onClick = onBackupClick,
                         content = {
                             Column {
-                                Text("Export Settings & Library", style = MaterialTheme.typography.bodyLarge)
-                                Text("Export playlists, favorites, and preferences to JSON", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Export Settings & Library", style = DsmusicTheme.typography.bodyLarge)
+                                Text("Export playlists, favorites, and preferences to JSON", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                             }
                         },
                         leadingContent = {
                             Icon(
                                 painter = painterResource(R.drawable.ic_download),
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(24.dp)
                             )
                         },
@@ -2230,15 +2228,15 @@ private fun BackupRestoreScreen(
                         onClick = onRestoreClick,
                         content = {
                             Column {
-                                Text("Import Settings & Library", style = MaterialTheme.typography.bodyLarge)
-                                Text("Restore playlists, favorites, and preferences from JSON", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Import Settings & Library", style = DsmusicTheme.typography.bodyLarge)
+                                Text("Restore playlists, favorites, and preferences from JSON", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                             }
                         },
                         leadingContent = {
                             Icon(
                                 painter = painterResource(R.drawable.ic_download),
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(24.dp).graphicsLayer { rotationZ = 180f }
                             )
                         },
@@ -2258,12 +2256,12 @@ private fun IgnoreShortAudioRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
             Column {
                 Text(
                     text = "Ignore Short Audio (Voice Notes)",
-                    style = MaterialTheme.typography.bodyLarge
+                    style = DsmusicTheme.typography.bodyLarge
                 )
                 Text(
                     text = "Hide voice notes and short recordings from library",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
@@ -2284,12 +2282,12 @@ private fun IgnoreShortAudioDurationRow(
             Column {
                 Text(
                     text = "Minimum Duration Threshold",
-                    style = MaterialTheme.typography.bodyLarge
+                    style = DsmusicTheme.typography.bodyLarge
                 )
                 Text(
                     text = "Ignore tracks under ${value.toInt()} seconds",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
@@ -2313,7 +2311,7 @@ private fun HiddenFolderRow(path: String, onRemove: (String) -> Unit) {
         content = {
             Text(
                 text = path.substringAfterLast("/"),
-                style = MaterialTheme.typography.bodyLarge,
+                style = DsmusicTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -2321,8 +2319,8 @@ private fun HiddenFolderRow(path: String, onRemove: (String) -> Unit) {
         supportingContent = {
             Text(
                 text = path,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = DsmusicTheme.typography.bodyMedium,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -2331,16 +2329,16 @@ private fun HiddenFolderRow(path: String, onRemove: (String) -> Unit) {
             Icon(
                 painter = painterResource(R.drawable.ic_folder_open),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
             )
         },
         trailingContent = {
             Text(
                 text = "Remove",
-                style = MaterialTheme.typography.labelLarge,
+                style = DsmusicTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.error,
+                color = DsmusicTheme.colorScheme.error,
                 modifier = Modifier
                     .clip(CircleShape)
                     .clickable { onRemove(path) }
@@ -2358,15 +2356,15 @@ private fun AddHiddenFolderRow(onClick: () -> Unit) {
         content = {
             Text(
                 text = "Add Hidden Folder",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.primary
+                style = DsmusicTheme.typography.bodyLarge,
+                color = DsmusicTheme.colorScheme.primary
             )
         },
         leadingContent = {
             Icon(
                 imageVector = Icons.Default.Add,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = DsmusicTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)
             )
         },
@@ -2420,21 +2418,21 @@ private fun AccountScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = if (ytCookies != null) "Logged in to YouTube Music" else "Guest Mode (Anonymous)",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
+                                style = DsmusicTheme.typography.titleMedium,
+                                color = DsmusicTheme.colorScheme.onSurface
                             )
                             if (ytCookies != null) {
                                 Text(
                                     text = "Profile: D.S Music User",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    style = DsmusicTheme.typography.bodyMedium,
+                                    color = DsmusicTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                             Text(
                                 text = if (ytCookies != null) "Accessing personalized playlists, library, and recommended interests." else "No account linked. Tap to sign in securely.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = DsmusicTheme.typography.bodySmall,
+                                color = DsmusicTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
@@ -2448,8 +2446,8 @@ private fun AccountScreen(
                             },
                             shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (ytCookies != null) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = if (ytCookies != null) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                                containerColor = if (ytCookies != null) DsmusicTheme.colorScheme.errorContainer else DsmusicTheme.colorScheme.primaryContainer,
+                                contentColor = if (ytCookies != null) DsmusicTheme.colorScheme.onErrorContainer else DsmusicTheme.colorScheme.onPrimaryContainer
                             )
                         ) {
                             Text(if (ytCookies != null) "Log Out" else "Log In")
@@ -2480,12 +2478,12 @@ private fun DataSaverRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
             Column {
                 Text(
                     text = "Data Saver (Wi-Fi Only)",
-                    style = MaterialTheme.typography.bodyLarge
+                    style = DsmusicTheme.typography.bodyLarge
                 )
                 Text(
                     text = "Restrict streaming and high-res cover art downloads to Wi-Fi only",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
@@ -2507,12 +2505,12 @@ private fun PauseHistoryRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
             Column {
                 Text(
                     text = "Pause Listening History",
-                    style = MaterialTheme.typography.bodyLarge
+                    style = DsmusicTheme.typography.bodyLarge
                 )
                 Text(
                     text = "Stop tracking played songs for recommendations",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
@@ -2543,8 +2541,8 @@ private fun ManualSyncRow() {
         },
         content = {
             Column {
-                Text(text = "Manual Sync", style = MaterialTheme.typography.bodyLarge)
-                Text(text = "Sync playlists and favorites with server", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(text = "Manual Sync", style = DsmusicTheme.typography.bodyLarge)
+                Text(text = "Sync playlists and favorites with server", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
             }
         },
         trailingContent = {
@@ -2552,13 +2550,13 @@ private fun ManualSyncRow() {
                 CircularProgressIndicator(
                     modifier = Modifier.size(24.dp),
                     strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.primary
+                    color = DsmusicTheme.colorScheme.primary
                 )
             } else {
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = "Sync Now",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -2666,8 +2664,8 @@ private fun AppearanceScreen(
         ) {
             Text(
                 "Make the player and interface your own: choose a layout, arrange its buttons, tune typography and progress, and set its background.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = DsmusicTheme.typography.bodyMedium,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
             )
 
@@ -2732,7 +2730,7 @@ private fun AppearanceScreen(
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Text(
                         "Artwork size · ${(playerArtworkScale * 100).toInt()}%",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = DsmusicTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium
                     )
                     Slider(
@@ -2742,8 +2740,8 @@ private fun AppearanceScreen(
                     )
                     Text(
                         "Adjust the full-player cover independently of its layout preset.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = DsmusicTheme.typography.bodySmall,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
                     )
                 }
             })
@@ -3046,36 +3044,36 @@ private fun CustomAccentEditor(value: String, onApply: (String) -> Unit) {
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text("Custom accent", style = MaterialTheme.typography.bodyLarge)
+        Text("Custom accent", style = DsmusicTheme.typography.bodyLarge)
         Text(
             "Enter a six-digit HEX color to use your own app accent.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = DsmusicTheme.typography.bodySmall,
+            color = DsmusicTheme.colorScheme.onSurfaceVariant
         )
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             val parsed = if (valid) runCatching {
                 Color(android.graphics.Color.parseColor(if (draft.startsWith("#")) draft else "#$draft"))
-            }.getOrDefault(MaterialTheme.colorScheme.primary) else MaterialTheme.colorScheme.surfaceVariant
+            }.getOrDefault(DsmusicTheme.colorScheme.primary) else DsmusicTheme.colorScheme.surfaceVariant
             Box(
                 Modifier.size(34.dp).clip(CircleShape).background(parsed)
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                    .border(1.dp, DsmusicTheme.colorScheme.outlineVariant, CircleShape)
             )
             BasicTextField(
                 value = draft,
                 onValueChange = { draft = it.take(7).uppercase() },
                 singleLine = true,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                textStyle = DsmusicTheme.typography.bodyLarge.copy(color = DsmusicTheme.colorScheme.onSurface),
                 modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .background(DsmusicTheme.colorScheme.surfaceContainerHigh)
                     .padding(horizontal = 12.dp, vertical = 11.dp)
             )
             Box(
                 Modifier.clip(RoundedCornerShape(50))
-                    .background(if (valid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                    .background(if (valid) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.surfaceVariant)
                     .clickable(enabled = valid) { onApply(if (draft.startsWith("#")) draft else "#$draft") }
                     .padding(horizontal = 15.dp, vertical = 10.dp)
             ) {
-                Text("Apply", style = MaterialTheme.typography.labelLarge, color = if (valid) Color(0xFF0B1220) else MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Apply", style = DsmusicTheme.typography.labelLarge, color = if (valid) Color(0xFF0B1220) else DsmusicTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -3101,11 +3099,11 @@ private fun ColorPaletteSelector(selected: String, onSelected: (String) -> Unit)
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("Accent palette", style = MaterialTheme.typography.bodyLarge)
+        Text("Accent palette", style = DsmusicTheme.typography.bodyLarge)
         Text(
             "Choose the app-wide accent. Dynamic colors can still tint the interface from the current artwork.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = DsmusicTheme.typography.bodySmall,
+            color = DsmusicTheme.colorScheme.onSurfaceVariant
         )
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -3123,14 +3121,14 @@ private fun ColorPaletteSelector(selected: String, onSelected: (String) -> Unit)
                         Modifier.size(34.dp).clip(CircleShape)
                             .background(color)
                             .then(
-                                if (active) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                else Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                                if (active) Modifier.border(3.dp, DsmusicTheme.colorScheme.onSurface, CircleShape)
+                                else Modifier.border(1.dp, DsmusicTheme.colorScheme.outlineVariant, CircleShape)
                             )
                     )
                     Text(
                         name,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = DsmusicTheme.typography.labelSmall,
+                        color = if (active) DsmusicTheme.colorScheme.onSurface else DsmusicTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1
                     )
                 }
@@ -3150,7 +3148,7 @@ private fun PlayerCustomizationPreview(
     artworkScale: Float,
     buttonsPill: Boolean
 ) {
-    val accent = MaterialTheme.colorScheme.primary
+    val accent = DsmusicTheme.colorScheme.primary
     val previewBackground = Color(0xFF111923)
     val artworkCorner = when (artworkShape) {
         "Square" -> RoundedCornerShape(3.dp)
@@ -3187,8 +3185,8 @@ private fun PlayerCustomizationPreview(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("PLAYER PREVIEW", style = MaterialTheme.typography.labelLarge, color = accent, fontWeight = FontWeight.SemiBold)
-            Text(layout, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("PLAYER PREVIEW", style = DsmusicTheme.typography.labelLarge, color = accent, fontWeight = FontWeight.SemiBold)
+            Text(layout, style = DsmusicTheme.typography.labelSmall, color = DsmusicTheme.colorScheme.onSurfaceVariant)
         }
         Row(
             modifier = Modifier.fillMaxWidth()
@@ -3202,14 +3200,14 @@ private fun PlayerCustomizationPreview(
                     .background(accent.copy(alpha = 0.22f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text("DS", color = accent, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("DS", color = accent, style = DsmusicTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
             Column(
                 modifier = Modifier.weight(1f).padding(start = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text("Now playing", color = Color.White, style = MaterialTheme.typography.titleSmall, maxLines = 1)
-                Text("Artist · Album", color = Color.White.copy(alpha = 0.62f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                Text("Now playing", color = Color.White, style = DsmusicTheme.typography.titleSmall, maxLines = 1)
+                Text("Artist · Album", color = Color.White.copy(alpha = 0.62f), style = DsmusicTheme.typography.bodySmall, maxLines = 1)
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
@@ -3245,7 +3243,7 @@ private fun PlayerCustomizationPreview(
                                 .background(if (buttonStyle == "Minimal") Color.Transparent else accent.copy(alpha = 0.17f))
                                 .padding(horizontal = 5.dp, vertical = 4.dp),
                             color = if (buttonStyle == "Minimal") Color.White.copy(alpha = 0.76f) else accent,
-                            style = MaterialTheme.typography.labelSmall,
+                            style = DsmusicTheme.typography.labelSmall,
                             maxLines = 1
                         )
                     }
@@ -3254,8 +3252,8 @@ private fun PlayerCustomizationPreview(
         }
         Text(
             "$layout layout · $artworkShape artwork · $miniPlayerStyle mini player · $buttonStyle actions",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = DsmusicTheme.typography.bodySmall,
+            color = DsmusicTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -3269,19 +3267,19 @@ private fun SavedLooksEditor(
 ) {
     var showSaveDialog by remember { mutableStateOf(false) }
     var lookName by remember { mutableStateOf("") }
-    val accent = MaterialTheme.colorScheme.primary
-    val surface = MaterialTheme.colorScheme.surfaceContainerLow
-    val textColor = MaterialTheme.colorScheme.onSurface
-    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+    val accent = DsmusicTheme.colorScheme.primary
+    val surface = DsmusicTheme.colorScheme.surfaceContainerLow
+    val textColor = DsmusicTheme.colorScheme.onSurface
+    val secondary = DsmusicTheme.colorScheme.onSurfaceVariant
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("Your Looks", style = MaterialTheme.typography.titleLarge, color = textColor)
+        Text("Your Looks", style = DsmusicTheme.typography.titleLarge, color = textColor)
         Text(
             "Save the complete visual setup — colors, player, lyrics, typography and navigation — then switch between looks in one tap.",
-            style = MaterialTheme.typography.bodySmall,
+            style = DsmusicTheme.typography.bodySmall,
             color = secondary
         )
         Row(
@@ -3292,13 +3290,13 @@ private fun SavedLooksEditor(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Save current look", style = MaterialTheme.typography.titleSmall, color = textColor)
-                Text("Create a reusable appearance preset", style = MaterialTheme.typography.bodySmall, color = secondary)
+                Text("Save current look", style = DsmusicTheme.typography.titleSmall, color = textColor)
+                Text("Create a reusable appearance preset", style = DsmusicTheme.typography.bodySmall, color = secondary)
             }
-            Text("+", style = MaterialTheme.typography.headlineSmall, color = accent)
+            Text("+", style = DsmusicTheme.typography.headlineSmall, color = accent)
         }
         if (looks.isEmpty()) {
-            Text("No saved looks yet. Save your current setup to create your first one.", style = MaterialTheme.typography.bodySmall, color = secondary)
+            Text("No saved looks yet. Save your current setup to create your first one.", style = DsmusicTheme.typography.bodySmall, color = secondary)
         } else {
             looks.forEach { name ->
                 Row(
@@ -3307,20 +3305,20 @@ private fun SavedLooksEditor(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(name, style = MaterialTheme.typography.titleSmall, color = textColor, maxLines = 1)
-                        Text("Saved appearance", style = MaterialTheme.typography.bodySmall, color = secondary)
+                        Text(name, style = DsmusicTheme.typography.titleSmall, color = textColor, maxLines = 1)
+                        Text("Saved appearance", style = DsmusicTheme.typography.bodySmall, color = secondary)
                     }
                     Box(
                         Modifier.clip(RoundedCornerShape(50)).background(accent.copy(alpha = 0.16f))
                             .clickable { onApply(name) }.padding(horizontal = 13.dp, vertical = 8.dp)
                     ) {
-                        Text("Apply", style = MaterialTheme.typography.labelMedium, color = accent)
+                        Text("Apply", style = DsmusicTheme.typography.labelMedium, color = accent)
                     }
                     Box(
                         Modifier.padding(start = 6.dp).clip(RoundedCornerShape(50))
                             .clickable { onDelete(name) }.padding(horizontal = 10.dp, vertical = 8.dp)
                     ) {
-                        Text("Delete", style = MaterialTheme.typography.labelMedium, color = secondary)
+                        Text("Delete", style = DsmusicTheme.typography.labelMedium, color = secondary)
                     }
                 }
             }
@@ -3331,27 +3329,27 @@ private fun SavedLooksEditor(
         Dialog(onDismissRequest = { showSaveDialog = false }) {
             Column(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(DsmusicTheme.colorScheme.surface)
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text("Save this Look", style = MaterialTheme.typography.titleLarge, color = textColor)
+                Text("Save this Look", style = DsmusicTheme.typography.titleLarge, color = textColor)
                 Text(
                     "Your current colors, player layout, controls, lyrics and navigation will be saved together.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = DsmusicTheme.typography.bodySmall,
                     color = secondary
                 )
                 BasicTextField(
                     value = lookName,
                     onValueChange = { lookName = it.take(32) },
                     singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = textColor),
+                    textStyle = DsmusicTheme.typography.bodyLarge.copy(color = textColor),
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
                         .background(surface).padding(horizontal = 14.dp, vertical = 13.dp),
                     decorationBox = { inner ->
                         Box {
                             if (lookName.isEmpty()) {
-                                Text("Look name", color = secondary, style = MaterialTheme.typography.bodyLarge)
+                                Text("Look name", color = secondary, style = DsmusicTheme.typography.bodyLarge)
                             }
                             inner()
                         }
@@ -3361,7 +3359,7 @@ private fun SavedLooksEditor(
                     Box(
                         Modifier.clip(RoundedCornerShape(50)).clickable { showSaveDialog = false }
                             .padding(horizontal = 14.dp, vertical = 10.dp)
-                    ) { Text("Cancel", color = secondary, style = MaterialTheme.typography.labelLarge) }
+                    ) { Text("Cancel", color = secondary, style = DsmusicTheme.typography.labelLarge) }
                     Box(
                         Modifier.clip(RoundedCornerShape(50))
                             .background(if (lookName.isBlank()) accent.copy(alpha = 0.28f) else accent)
@@ -3370,7 +3368,7 @@ private fun SavedLooksEditor(
                                 showSaveDialog = false
                             }
                             .padding(horizontal = 16.dp, vertical = 10.dp)
-                    ) { Text("Save", color = Color(0xFF0B1220), style = MaterialTheme.typography.labelLarge) }
+                    ) { Text("Save", color = Color(0xFF0B1220), style = DsmusicTheme.typography.labelLarge) }
                 }
             }
         }
@@ -3399,34 +3397,34 @@ private fun SessionButtonsSettings(
         ) {
             Text(
                 "Choose and arrange media-session actions. The first two appear beside playback controls in the notification; compatible controllers can use the full selected set.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = DsmusicTheme.typography.bodySmall,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant
             )
             val ordered = selected.filter { it in sessionButtonNames.keys }
             ordered.forEachIndexed { index, key ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.Checkbox(
+                    com.dsann.music.ui.theme.Checkbox(
                         checked = true,
                         onCheckedChange = { enabled ->
                             if (!enabled && ordered.size > 2) onSelectionChanged(ordered - key)
                         }
                     )
-                    Text(sessionButtonNames[key] ?: key, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Text(sessionButtonNames[key] ?: key, Modifier.weight(1f), style = DsmusicTheme.typography.bodyMedium)
                     DsmusicTextButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) { Text("↑") }
                     DsmusicTextButton(onClick = { onMove(index, index + 1) }, enabled = index < ordered.lastIndex) { Text("↓") }
                 }
             }
             sessionButtonNames.filterKeys { it !in ordered }.forEach { (key, label) ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.Checkbox(
+                    com.dsann.music.ui.theme.Checkbox(
                         checked = false,
                         enabled = ordered.size < 6,
                         onCheckedChange = { enabled ->
                             if (enabled && ordered.size < 6) onSelectionChanged(ordered + key)
                         }
                     )
-                    Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(label, Modifier.weight(1f), style = DsmusicTheme.typography.bodyMedium,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if (ordered != listOf("like", "shuffle", "repeat", "back10", "ahead30")) {
@@ -3464,14 +3462,14 @@ private fun PlayerButtonsSettings(
         ) {
             Text(
                 "Choose 3 to 6 actions and arrange their order in the player.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = DsmusicTheme.typography.bodySmall,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant
             )
             val orderedSelected = selected.filter { it in playerButtonNames.keys }
             Text(
                 "Shown in player · in this order",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
+                style = DsmusicTheme.typography.labelMedium,
+                color = DsmusicTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
             )
             // Render the selected actions from the saved list, not the master lookup map.
@@ -3480,7 +3478,7 @@ private fun PlayerButtonsSettings(
             orderedSelected.forEachIndexed { index, key ->
                 val label = playerButtonNames[key] ?: key
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.Checkbox(
+                    com.dsann.music.ui.theme.Checkbox(
                         checked = true,
                         onCheckedChange = { enabled ->
                             if (!enabled && orderedSelected.size > 3) {
@@ -3488,7 +3486,7 @@ private fun PlayerButtonsSettings(
                             }
                         }
                     )
-                    Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Text(label, Modifier.weight(1f), style = DsmusicTheme.typography.bodyMedium)
                     DsmusicTextButton(
                         onClick = { onMove(index, index - 1) },
                         enabled = index > 0
@@ -3504,13 +3502,13 @@ private fun PlayerButtonsSettings(
             if (availableActions.isNotEmpty()) {
                 Text(
                     "Available actions",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = DsmusicTheme.typography.labelMedium,
+                    color = DsmusicTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
                 )
                 availableActions.forEach { (key, label) ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        androidx.compose.material3.Checkbox(
+                        com.dsann.music.ui.theme.Checkbox(
                             checked = false,
                             enabled = orderedSelected.size < 6,
                             onCheckedChange = { enabled ->
@@ -3522,16 +3520,16 @@ private fun PlayerButtonsSettings(
                         Text(
                             label,
                             Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = DsmusicTheme.typography.bodyMedium,
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
             Text(
                 "${selected.size}/6 selected",
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.labelSmall
+                color = DsmusicTheme.colorScheme.primary,
+                style = DsmusicTheme.typography.labelSmall
             )
             DsmusicTextButton(onClick = {
                 onSelectionChanged(listOf("lyrics", "video", "queue", "share", "download"))
@@ -3552,8 +3550,8 @@ private fun ToggleSettingRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(title, style = DsmusicTheme.typography.bodyLarge)
+            Text(description, style = DsmusicTheme.typography.bodySmall, color = DsmusicTheme.colorScheme.onSurfaceVariant)
         }
         DsmusicSwitch(checked = checked, onCheckedChange = onCheckedChange)
     }
@@ -3575,15 +3573,15 @@ private fun SettingsChoiceRow(
     ) {
         BasicText(
             title,
-            style = MaterialTheme.typography.bodyLarge.copy(
-                color = MaterialTheme.colorScheme.onSurface,
+            style = DsmusicTheme.typography.bodyLarge.copy(
+                color = DsmusicTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium
             )
         )
         BasicText(
             description,
-            style = MaterialTheme.typography.bodySmall.copy(
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = DsmusicTheme.typography.bodySmall.copy(
+                color = DsmusicTheme.colorScheme.onSurfaceVariant
             )
         )
         Row(
@@ -3600,13 +3598,13 @@ private fun SettingsChoiceRow(
                     modifier = Modifier
                         .clip(pillShape)
                         .background(
-                            if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.17f)
-                            else MaterialTheme.colorScheme.surfaceContainerHigh
+                            if (active) DsmusicTheme.colorScheme.primary.copy(alpha = 0.17f)
+                            else DsmusicTheme.colorScheme.surfaceContainerHigh
                         )
                         .then(
                             if (active) Modifier.border(
                                 1.dp,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.65f),
+                                DsmusicTheme.colorScheme.primary.copy(alpha = 0.65f),
                                 pillShape
                             ) else Modifier
                         )
@@ -3615,9 +3613,9 @@ private fun SettingsChoiceRow(
                 ) {
                     BasicText(
                         text = option,
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            color = if (active) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = DsmusicTheme.typography.labelMedium.copy(
+                            color = if (active) DsmusicTheme.colorScheme.primary
+                                else DsmusicTheme.colorScheme.onSurfaceVariant,
                             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium
                         ),
                         maxLines = 1
@@ -3634,10 +3632,10 @@ private fun DsmusicSwitch(
     onCheckedChange: ((Boolean) -> Unit)?,
     modifier: Modifier = Modifier
 ) {
-    val trackColor = if (checked) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.surfaceVariant
-    val thumbColor = if (checked) MaterialTheme.colorScheme.onPrimary
-        else MaterialTheme.colorScheme.onSurfaceVariant
+    val trackColor = if (checked) DsmusicTheme.colorScheme.primary
+        else DsmusicTheme.colorScheme.surfaceVariant
+    val thumbColor = if (checked) DsmusicTheme.colorScheme.onPrimary
+        else DsmusicTheme.colorScheme.onSurfaceVariant
 
     Box(
         modifier = modifier
@@ -3667,12 +3665,12 @@ private fun DynamicNavStyleRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
             Column {
                 Text(
                     text = "Dynamic Navbar Style",
-                    style = MaterialTheme.typography.bodyLarge
+                    style = DsmusicTheme.typography.bodyLarge
                 )
                 Text(
                     text = "Compact height with bold, elevated icons",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
@@ -3694,12 +3692,12 @@ private fun HideNavLabelsRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
             Column {
                 Text(
                     text = "Hide Navigation Labels",
-                    style = MaterialTheme.typography.bodyLarge
+                    style = DsmusicTheme.typography.bodyLarge
                 )
                 Text(
                     text = "Remove text labels from the bottom navigation bar",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
@@ -3721,12 +3719,12 @@ private fun DynamicAlbumThemeRow(checked: Boolean, onToggle: (Boolean) -> Unit) 
             Column {
                 Text(
                     text = "Dynamic colors",
-                    style = MaterialTheme.typography.bodyLarge
+                    style = DsmusicTheme.typography.bodyLarge
                 )
                 Text(
                     text = "Extract theme colors from the currently playing album art",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
@@ -3734,7 +3732,7 @@ private fun DynamicAlbumThemeRow(checked: Boolean, onToggle: (Boolean) -> Unit) 
             Icon(
                 imageVector = Icons.Rounded.Palette,
                 contentDescription = null,
-                tint = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (checked) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
             )
         },
@@ -3756,12 +3754,12 @@ private fun AmoledBlackRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
             Column {
                 Text(
                     text = "Pure AMOLED Black",
-                    style = MaterialTheme.typography.bodyLarge
+                    style = DsmusicTheme.typography.bodyLarge
                 )
                 Text(
                     text = "Pitch black background in dark mode to save battery",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
@@ -3860,11 +3858,11 @@ private fun AutoplayRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
         onClick = { onToggle(!checked) },
         content = {
             Column {
-                Text("Autoplay", style = MaterialTheme.typography.bodyLarge)
+                Text("Autoplay", style = DsmusicTheme.typography.bodyLarge)
                 Text(
                     "Continue with similar YouTube Music tracks when the current queue ends.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
@@ -3875,7 +3873,7 @@ private fun AutoplayRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
     )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 private fun AudioQualityRow(
     title: String,
@@ -3887,11 +3885,11 @@ private fun AudioQualityRow(
     DsmusicListItem(
         headlineContent = {
             Column {
-                Text(text = title, style = MaterialTheme.typography.bodyLarge)
+                Text(text = title, style = DsmusicTheme.typography.bodyLarge)
                 Text(
                     text = "Target bitrate; the closest matching source stream is selected. The source may not offer the exact rate.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
@@ -3904,14 +3902,14 @@ private fun AudioQualityRow(
                         val isSelected = option == currentQuality
                         DsmusicSurface(
                             shape = RoundedCornerShape(50),
-                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (isSelected) DsmusicTheme.colorScheme.primaryContainer else DsmusicTheme.colorScheme.surfaceVariant,
+                            contentColor = if (isSelected) DsmusicTheme.colorScheme.onPrimaryContainer else DsmusicTheme.colorScheme.onSurfaceVariant,
                             onClick = { onQualityChange(option) }
                         ) {
                             Text(
                                 text = option,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                style = MaterialTheme.typography.labelLarge
+                                style = DsmusicTheme.typography.labelLarge
                             )
                         }
                     }
@@ -3922,7 +3920,7 @@ private fun AudioQualityRow(
     )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 private fun AudioFormatRow(
     title: String,
@@ -3943,11 +3941,11 @@ private fun AudioFormatRow(
     DsmusicListItem(
         headlineContent = {
             Column {
-                Text(text = title, style = MaterialTheme.typography.bodyLarge)
+                Text(text = title, style = DsmusicTheme.typography.bodyLarge)
                 Text(
                     text = "Requests this source format without transcoding. If a track has no matching stream, D.S Music asks you to choose from formats that track actually offers.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
@@ -3960,14 +3958,14 @@ private fun AudioFormatRow(
                         val isSelected = value == selectedFormat
                         DsmusicSurface(
                             shape = RoundedCornerShape(50),
-                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (isSelected) DsmusicTheme.colorScheme.primaryContainer else DsmusicTheme.colorScheme.surfaceVariant,
+                            contentColor = if (isSelected) DsmusicTheme.colorScheme.onPrimaryContainer else DsmusicTheme.colorScheme.onSurfaceVariant,
                             onClick = { onFormatChange(value) }
                         ) {
                             Text(
                                 text = label,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                style = MaterialTheme.typography.labelLarge
+                                style = DsmusicTheme.typography.labelLarge
                             )
                         }
                     }
@@ -3978,7 +3976,7 @@ private fun AudioFormatRow(
     )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 // ── Whats New ───────────────────────────────────────────────────────────────
 
 @Composable
@@ -3999,7 +3997,7 @@ private fun WhatsNewScreen(navController: androidx.navigation.NavController) {
             }
         } else if (releases!!.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                Text("No releases found.", style = MaterialTheme.typography.bodyLarge)
+                Text("No releases found.", style = DsmusicTheme.typography.bodyLarge)
             }
         } else {
             androidx.compose.foundation.lazy.LazyColumn(
@@ -4018,8 +4016,8 @@ private fun WhatsNewScreen(navController: androidx.navigation.NavController) {
                     item(key = "header_$majorVersion") {
                         Text(
                             text = "Version $majorVersion Series",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary,
+                            style = DsmusicTheme.typography.titleMedium,
+                            color = DsmusicTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
                         )
@@ -4033,14 +4031,14 @@ private fun WhatsNewScreen(navController: androidx.navigation.NavController) {
                             DsmusicSurface(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = getSettingsSegmentedShape(index = 0, count = 2),
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh
+                                color = DsmusicTheme.colorScheme.surfaceContainerHigh
                             ) {
                                 DsmusicListItem(
                                     headlineContent = {
                                         Text(
                                             text = release.tagName,
-                                            style = MaterialTheme.typography.titleLarge,
-                                            color = MaterialTheme.colorScheme.primary,
+                                            style = DsmusicTheme.typography.titleLarge,
+                                            color = DsmusicTheme.colorScheme.primary,
                                             fontWeight = FontWeight.Bold
                                         )
                                     },
@@ -4051,7 +4049,7 @@ private fun WhatsNewScreen(navController: androidx.navigation.NavController) {
                             DsmusicSurface(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = getSettingsSegmentedShape(index = 1, count = 2),
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh
+                                color = DsmusicTheme.colorScheme.surfaceContainerHigh
                             ) {
                                 val cleanedBody = release.changelog
                                     .replace(Regex("\\*\\*(.*?)\\*\\*"), "$1") // bold
@@ -4065,8 +4063,8 @@ private fun WhatsNewScreen(navController: androidx.navigation.NavController) {
                                     headlineContent = {
                                         Text(
                                             text = cleanedBody,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            style = DsmusicTheme.typography.bodyMedium,
+                                            color = DsmusicTheme.colorScheme.onSurfaceVariant
                                         )
                                     },
                                     colors = ListItemDefaults.colors(containerColor = Color.Transparent)
@@ -4105,13 +4103,13 @@ private fun AboutScreen(
             Box(
                 modifier = Modifier
                     .size(120.dp)
-                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                    .background(DsmusicTheme.colorScheme.primaryContainer, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_applogo),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    tint = DsmusicTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(72.dp)
                 )
             }
@@ -4120,8 +4118,8 @@ private fun AboutScreen(
             
             Text(
                 text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                style = DsmusicTheme.typography.displaySmall,
+                color = DsmusicTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = (-0.5).sp
             )
@@ -4133,20 +4131,20 @@ private fun AboutScreen(
             ) {
                 DsmusicSurface(
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh
+                    color = DsmusicTheme.colorScheme.surfaceContainerHigh
                 ) {
                     Text(
                         text = BuildConfig.VERSION_NAME,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = DsmusicTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = DsmusicTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                     )
                 }
             }
             
             // Action Buttons
-            androidx.compose.material3.ButtonGroup(
+            com.dsann.music.ui.theme.ButtonGroup(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 32.dp)
@@ -4157,7 +4155,7 @@ private fun AboutScreen(
                 ) {
                     Icon(Icons.Rounded.Update, null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Updates", style = MaterialTheme.typography.labelLarge)
+                    Text("Updates", style = DsmusicTheme.typography.labelLarge)
                 }
                 DsmusicButton(
                     onClick = onWhatsNew,
@@ -4165,7 +4163,7 @@ private fun AboutScreen(
                 ) {
                     Icon(Icons.Rounded.Info, null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("What's New", style = MaterialTheme.typography.labelLarge)
+                    Text("What's New", style = DsmusicTheme.typography.labelLarge)
                 }
             }
             
@@ -4191,12 +4189,12 @@ private fun SettingsHeader(text: String) {
             Modifier
                 .size(width = 4.dp, height = 18.dp)
                 .clip(RoundedCornerShape(3.dp))
-                .background(MaterialTheme.colorScheme.primary)
+                .background(DsmusicTheme.colorScheme.primary)
         )
         BasicText(
             text = text.uppercase(),
-            style = MaterialTheme.typography.titleMedium.copy(
-                color = MaterialTheme.colorScheme.primary,
+            style = DsmusicTheme.typography.titleMedium.copy(
+                color = DsmusicTheme.colorScheme.primary,
                 fontSize = 15.sp,
                 lineHeight = 20.sp,
                 letterSpacing = 1.15.sp,
@@ -4210,16 +4208,16 @@ private fun SettingsHeader(text: String) {
 
 @Composable
 private fun SettingsGroupCard(items: List<@Composable () -> Unit>) {
-    val shape = MaterialTheme.shapes.medium
+    val shape = DsmusicTheme.shapes.medium
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 7.dp)
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(DsmusicTheme.colorScheme.surfaceContainerLow)
             .border(
                 1.dp,
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f),
+                DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.52f),
                 shape
             ),
         verticalArrangement = Arrangement.spacedBy(0.dp)
@@ -4229,7 +4227,7 @@ private fun SettingsGroupCard(items: List<@Composable () -> Unit>) {
             if (index < items.lastIndex) {
                 Box(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(1.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
+                        .background(DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
                 )
             }
         }
@@ -4249,7 +4247,7 @@ private fun getSettingsSegmentedShape(index: Int, count: Int): androidx.compose.
 
 // ── Theme ────────────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 private fun ThemeRow(isDark: Boolean, onToggle: (Boolean) -> Unit) {
     DsmusicListItem(
@@ -4257,7 +4255,7 @@ private fun ThemeRow(isDark: Boolean, onToggle: (Boolean) -> Unit) {
         content = {
             Text(
                 text = stringResource(R.string.setting_dark_mode),
-                style = MaterialTheme.typography.bodyLarge
+                style = DsmusicTheme.typography.bodyLarge
             )
         },
         trailingContent = { ThemeDsmusicSwitch(isDark, onToggle) },
@@ -4276,7 +4274,7 @@ private fun ThemeDsmusicSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> 
 
 // ── Crossfade ───────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 private fun CrossfadeRow(
     enabled: Boolean,
@@ -4290,7 +4288,7 @@ private fun CrossfadeRow(
         content = {
             Text(
                 text = stringResource(R.string.setting_crossfade),
-                style = MaterialTheme.typography.bodyLarge
+                style = DsmusicTheme.typography.bodyLarge
             )
         },
         supportingContent = {
@@ -4305,8 +4303,8 @@ private fun CrossfadeRow(
                 ) { label ->
                     Text(
                         text = label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = DsmusicTheme.typography.bodyMedium,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
@@ -4329,7 +4327,7 @@ private fun CrossfadeRow(
 
 // ── Audio Focus ─────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 private fun AudioFocusRow(enabled: Boolean, onToggle: (Boolean) -> Unit) {
     DsmusicListItem(
@@ -4337,14 +4335,14 @@ private fun AudioFocusRow(enabled: Boolean, onToggle: (Boolean) -> Unit) {
         content = {
             Text(
                 text = stringResource(R.string.setting_audio_focus),
-                style = MaterialTheme.typography.bodyLarge
+                style = DsmusicTheme.typography.bodyLarge
             )
         },
         leadingContent = {
             Icon(
                 painter = painterResource(R.drawable.ic_audio_focus),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
             )
         },
@@ -4355,7 +4353,7 @@ private fun AudioFocusRow(enabled: Boolean, onToggle: (Boolean) -> Unit) {
 
 // ── Sleep Timer ─────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 private fun SleepTimerSection(
     endTime: Long, 
@@ -4376,7 +4374,7 @@ private fun SleepTimerSection(
             content = {
                 Text(
                     text = stringResource(R.string.setting_sleep_timer),
-                    style = MaterialTheme.typography.bodyLarge
+                    style = DsmusicTheme.typography.bodyLarge
                 )
             },
             supportingContent = {
@@ -4391,15 +4389,15 @@ private fun SleepTimerSection(
                 }
                 Text(
                     text = supportingText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             },
             leadingContent = {
                 Icon(
                     painter = painterResource(R.drawable.ic_timer),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(24.dp)
                 )
             },
@@ -4407,7 +4405,7 @@ private fun SleepTimerSection(
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
@@ -4440,14 +4438,14 @@ private fun LibrarySourceHeader() {
         headlineContent = {
             Text(
                 text = stringResource(R.string.setting_music_source),
-                style = MaterialTheme.typography.bodyLarge
+                style = DsmusicTheme.typography.bodyLarge
             )
         },
         leadingContent = {
             Icon(
                 painter = painterResource(R.drawable.ic_folder_open),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
             )
         },
@@ -4455,7 +4453,7 @@ private fun LibrarySourceHeader() {
     )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 private fun LibraryPathRow(path: String, onRemove: ((String) -> Unit)?) {
     DsmusicListItem(
@@ -4463,7 +4461,7 @@ private fun LibraryPathRow(path: String, onRemove: ((String) -> Unit)?) {
         content = {
             Text(
                 text = path.substringAfterLast(":"),
-                style = MaterialTheme.typography.bodyLarge,
+                style = DsmusicTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -4474,7 +4472,7 @@ private fun LibraryPathRow(path: String, onRemove: ((String) -> Unit)?) {
                     if (onRemove != null) R.drawable.ic_folder_music else R.drawable.ic_folder_open
                 ),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
             )
         },
@@ -4482,9 +4480,9 @@ private fun LibraryPathRow(path: String, onRemove: ((String) -> Unit)?) {
             {
                 Text(
                     text = "Remove",
-                    style = MaterialTheme.typography.labelLarge,
+                    style = DsmusicTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.error,
+                    color = DsmusicTheme.colorScheme.error,
                     modifier = Modifier
                         .clip(CircleShape)
                         .clickable { onRemove(path) }
@@ -4496,7 +4494,7 @@ private fun LibraryPathRow(path: String, onRemove: ((String) -> Unit)?) {
     )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 private fun AddMorePathRow(onClick: () -> Unit) {
     DsmusicListItem(
@@ -4504,15 +4502,15 @@ private fun AddMorePathRow(onClick: () -> Unit) {
         content = {
             Text(
                 text = stringResource(R.string.setting_add_more_path),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.primary
+                style = DsmusicTheme.typography.bodyLarge,
+                color = DsmusicTheme.colorScheme.primary
             )
         },
         leadingContent = {
             Icon(
                 imageVector = Icons.Default.Add,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = DsmusicTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)
             )
         },
@@ -4530,12 +4528,12 @@ private fun DownloadFolderRow(path: String?, onClick: () -> Unit) {
             Column {
                 Text(
                     text = "Download Location",
-                    style = MaterialTheme.typography.bodyLarge
+                    style = DsmusicTheme.typography.bodyLarge
                 )
                 Text(
                     text = path ?: "Not Set",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -4545,7 +4543,7 @@ private fun DownloadFolderRow(path: String?, onClick: () -> Unit) {
             Icon(
                 painter = painterResource(R.drawable.ic_folder_open),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
             )
         },
@@ -4589,7 +4587,7 @@ private fun CacheSizeRow(
                                 }
                             )
                             Spacer(modifier = Modifier.width(16.dp))
-                            Text(text = text, style = MaterialTheme.typography.bodyLarge)
+                            Text(text = text, style = DsmusicTheme.typography.bodyLarge)
                         }
                     }
                 }
@@ -4611,7 +4609,7 @@ private fun CacheSizeRow(
             Column {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.bodyLarge
+                    style = DsmusicTheme.typography.bodyLarge
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Row(
@@ -4629,16 +4627,16 @@ private fun CacheSizeRow(
                     ) { size ->
                         Text(
                             text = size,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = DsmusicTheme.typography.bodyMedium,
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     
                     val maxText = if (maxSize == 0) "Unlimited" else if (maxSize >= 1024) "${maxSize / 1024} GB" else "$maxSize MB"
                     Text(
                         text = "Max: $maxText",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = DsmusicTheme.typography.bodyMedium,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 if (maxBytes > 0) {
@@ -4649,8 +4647,8 @@ private fun CacheSizeRow(
                             .fillMaxWidth()
                             .height(4.dp)
                             .clip(RoundedCornerShape(50)),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        color = DsmusicTheme.colorScheme.primary,
+                        trackColor = DsmusicTheme.colorScheme.surfaceVariant
                     )
                 }
             }
@@ -4660,7 +4658,7 @@ private fun CacheSizeRow(
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Clear Cache",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
@@ -4721,7 +4719,7 @@ private fun ImageCacheSizeRow(
 
 // ── Credits ─────────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 private fun CreditsCard(onOpenUrl: (String) -> Unit) {
     Column {
@@ -4729,7 +4727,7 @@ private fun CreditsCard(onOpenUrl: (String) -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                containerColor = DsmusicTheme.colorScheme.surfaceContainerLow
             )
         ) {
             Column(
@@ -4749,15 +4747,15 @@ private fun CreditsCard(onOpenUrl: (String) -> Unit) {
                 
                 Text(
                     text = "Shubham Karande",
-                    style = MaterialTheme.typography.titleLarge,
+                    style = DsmusicTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = DsmusicTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(top = 16.dp)
                 )
                 Text(
                     text = "Android Developer",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp)
                 )
                 
@@ -4780,13 +4778,13 @@ private fun SocialIconButton(icon: Int, onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier
             .size(48.dp)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), CircleShape)
+            .border(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), CircleShape)
     ) {
         Icon(
             painter = painterResource(id = icon),
             contentDescription = null,
             modifier = Modifier.size(24.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = DsmusicTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -4820,20 +4818,20 @@ private fun AppLogoSection(isLandscape: Boolean) {
         Icon(
             painter = painterResource(R.drawable.ic_applogo),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = DsmusicTheme.colorScheme.primary,
             modifier = Modifier.size(iconSize)
         )
         Text(
             text = stringResource(R.string.app_name),
-            style = MaterialTheme.typography.displayLarge,
-            color = MaterialTheme.colorScheme.primary,
+            style = DsmusicTheme.typography.displayLarge,
+            color = DsmusicTheme.colorScheme.primary,
             fontSize = fontSize.sp,
             letterSpacing = 0.sp
         )
         Text(
             text = "© 2025 Shubham Karande",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = DsmusicTheme.typography.bodySmall,
+            color = DsmusicTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp)
         )
     }
@@ -4850,23 +4848,23 @@ fun YouTubeMusicLoginDialog(
         confirmButton = {},
         dismissButton = {
             DsmusicTextButton(onClick = onDismissRequest) {
-                Text("Cancel", color = MaterialTheme.colorScheme.primary)
+                Text("Cancel", color = DsmusicTheme.colorScheme.primary)
             }
         },
         title = {
             Text(
                 text = "Log In to YouTube Music",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
+                style = DsmusicTheme.typography.titleLarge,
+                color = DsmusicTheme.colorScheme.onSurface
             )
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth().height(420.dp)) {
                 Text(
                     text = "Sign in to access your real playlists, library, and personalized interests.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = DsmusicTheme.typography.bodyMedium,
                     modifier = Modifier.padding(bottom = 8.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
                 
                 Box(
@@ -4939,9 +4937,9 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
                 items = listOf(
                     {
                         DsmusicListItem(
-                            headlineContent = { Text("Report a Bug", style = MaterialTheme.typography.bodyLarge) },
-                            supportingContent = { Text("Open GitHub with pre-filled device information", style = MaterialTheme.typography.bodyMedium) },
-                            leadingContent = { Icon(Icons.Rounded.BugReport, null, tint = MaterialTheme.colorScheme.error) },
+                            headlineContent = { Text("Report a Bug", style = DsmusicTheme.typography.bodyLarge) },
+                            supportingContent = { Text("Open GitHub with pre-filled device information", style = DsmusicTheme.typography.bodyMedium) },
+                            leadingContent = { Icon(Icons.Rounded.BugReport, null, tint = DsmusicTheme.colorScheme.error) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             modifier = Modifier.clickable {
                                 val title = URLEncoder.encode("[Bug] ", "UTF-8")
@@ -4953,9 +4951,9 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
                     },
                     {
                         DsmusicListItem(
-                            headlineContent = { Text("Request Feature", style = MaterialTheme.typography.bodyLarge) },
-                            supportingContent = { Text("Suggest a new feature for D.S Music", style = MaterialTheme.typography.bodyMedium) },
-                            leadingContent = { Icon(Icons.Rounded.OpenInNew, null, tint = MaterialTheme.colorScheme.primary) },
+                            headlineContent = { Text("Request Feature", style = DsmusicTheme.typography.bodyLarge) },
+                            supportingContent = { Text("Suggest a new feature for D.S Music", style = DsmusicTheme.typography.bodyMedium) },
+                            leadingContent = { Icon(Icons.Rounded.OpenInNew, null, tint = DsmusicTheme.colorScheme.primary) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             modifier = Modifier.clickable {
                                 val title = URLEncoder.encode("[Feature] ", "UTF-8")
@@ -4973,9 +4971,9 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
                 items = listOf(
                     {
                         DsmusicListItem(
-                            headlineContent = { Text("Copy Debug Information", style = MaterialTheme.typography.bodyLarge) },
-                            supportingContent = { Text("Copy device & app version to clipboard", style = MaterialTheme.typography.bodyMedium) },
-                            leadingContent = { Icon(Icons.Rounded.ContentCopy, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                            headlineContent = { Text("Copy Debug Information", style = DsmusicTheme.typography.bodyLarge) },
+                            supportingContent = { Text("Copy device & app version to clipboard", style = DsmusicTheme.typography.bodyMedium) },
+                            leadingContent = { Icon(Icons.Rounded.ContentCopy, null, tint = DsmusicTheme.colorScheme.onSurfaceVariant) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             modifier = Modifier.clickable {
                                 val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -4986,9 +4984,9 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
                     },
                     {
                         DsmusicListItem(
-                            headlineContent = { Text("Export Logs", style = MaterialTheme.typography.bodyLarge) },
-                            supportingContent = { Text("Share raw debug logs to attach to an issue", style = MaterialTheme.typography.bodyMedium) },
-                            leadingContent = { Icon(Icons.Rounded.Description, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                            headlineContent = { Text("Export Logs", style = DsmusicTheme.typography.bodyLarge) },
+                            supportingContent = { Text("Share raw debug logs to attach to an issue", style = DsmusicTheme.typography.bodyMedium) },
+                            leadingContent = { Icon(Icons.Rounded.Description, null, tint = DsmusicTheme.colorScheme.onSurfaceVariant) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             modifier = Modifier.clickable {
                                 val sendIntent: Intent = Intent().apply {

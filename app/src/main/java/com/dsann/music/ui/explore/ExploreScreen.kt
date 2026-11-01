@@ -67,26 +67,24 @@ import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.material3.TextFieldDefaults
+import com.dsann.music.ui.theme.LoadingIndicator
+import com.dsann.music.ui.theme.FilterChip
+import com.dsann.music.ui.theme.FilterChipDefaults
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.IconButton
+import com.dsann.music.ui.theme.ListItem
+import com.dsann.music.ui.theme.ListItemDefaults
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.OutlinedButton
+import com.dsann.music.ui.theme.Snackbar
+import com.dsann.music.ui.theme.Surface
+import com.dsann.music.ui.theme.Text
+import com.dsann.music.ui.theme.TextField
+import com.dsann.music.ui.theme.TextButton
+import com.dsann.music.ui.theme.PullToRefreshBox
+import com.dsann.music.ui.theme.PullToRefreshDefaults
+import com.dsann.music.ui.theme.rememberPullToRefreshState
+import com.dsann.music.ui.theme.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -166,8 +164,7 @@ fun Modifier.sharedElementIfAvailable(key: String): Modifier {
 
 // ===== Explore Screen =====
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class,
-    ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun ExploreScreen(
     viewModel: ExploreViewModel,
@@ -486,7 +483,7 @@ fun ExploreScreen(
     }
 
     // Solid D.S Launcher surface: no animated mesh, blur, or parallax layer behind long lists.
-    val backgroundColor = MaterialTheme.colorScheme.background
+    val backgroundColor = DsmusicTheme.colorScheme.background
 
     Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
         Column(
@@ -786,7 +783,7 @@ fun ExploreScreen(
                                                                         Text(
                                                                             section.filter.label,
                                                                             modifier = Modifier.weight(1f),
-                                                                            style = MaterialTheme.typography.titleMedium,
+                                                                            style = DsmusicTheme.typography.titleMedium,
                                                                             fontWeight = FontWeight.SemiBold
                                                                         )
                                                                         DsmusicTextButton(onClick = { viewModel.setSearchFilter(section.filter) }) {
@@ -861,7 +858,7 @@ fun ExploreScreen(
                                                                     Text(
                                                                         "More results",
                                                                         modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 6.dp),
-                                                                        style = MaterialTheme.typography.titleMedium,
+                                                                        style = DsmusicTheme.typography.titleMedium,
                                                                         fontWeight = FontWeight.SemiBold
                                                                     )
                                                                 }
@@ -950,12 +947,12 @@ fun ExploreScreen(
                                                                 imageVector = Icons.Default.Search,
                                                                 contentDescription = null,
                                                                 modifier = Modifier.size(48.dp),
-                                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                tint = DsmusicTheme.colorScheme.onSurfaceVariant
                                                             )
                                                             Text(
                                                                 text = "No results found for \"$searchQuery\"",
-                                                                style = MaterialTheme.typography.bodyLarge,
-                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                style = DsmusicTheme.typography.bodyLarge,
+                                                                color = DsmusicTheme.colorScheme.onSurfaceVariant
                                                             )
                                                         }
                                                     }
@@ -1109,7 +1106,7 @@ fun ExploreScreen(
                                                                             modifier = Modifier.size(
                                                                                 64.dp
                                                                             ),
-                                                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                                            tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(
                                                                                 alpha = 0.5f
                                                                             )
                                                                         )
@@ -1120,8 +1117,8 @@ fun ExploreScreen(
                                                                         )
                                                                         Text(
                                                                             "Search for music",
-                                                                            style = MaterialTheme.typography.titleMedium,
-                                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                            style = DsmusicTheme.typography.titleMedium,
+                                                                            color = DsmusicTheme.colorScheme.onSurfaceVariant
                                                                         )
                                                                         Spacer(
                                                                             modifier = Modifier.height(
@@ -1223,7 +1220,7 @@ fun ExploreScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding(),
-            color = MaterialTheme.colorScheme.background
+            color = DsmusicTheme.colorScheme.background
         ) {
             Column(
                 modifier = Modifier.fillMaxSize()
@@ -1239,7 +1236,7 @@ fun ExploreScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onBackground
+                            tint = DsmusicTheme.colorScheme.onBackground
                         )
                     }
 
@@ -1266,17 +1263,17 @@ fun ExploreScreen(
                             )
                             Text(
                                 text = song.artist,
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = DsmusicTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground
+                                color = DsmusicTheme.colorScheme.onBackground
                             )
                         }
                         Text(
                             text = "Song • ${
                                 java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
                             }",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = DsmusicTheme.typography.bodySmall,
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -1326,11 +1323,11 @@ fun ExploreScreen(
                         ) {
                             Text(
                                 text = song.title,
-                                style = MaterialTheme.typography.headlineMedium.copy(
+                                style = DsmusicTheme.typography.headlineMedium.copy(
                                     fontWeight = FontWeight.ExtraBold,
                                     letterSpacing = (-0.5).sp
                                 ),
-                                color = MaterialTheme.colorScheme.onBackground
+                                color = DsmusicTheme.colorScheme.onBackground
                             )
 
                             CreditsTextSection(title = "Performed by", content = contributors)
@@ -1385,13 +1382,13 @@ fun ExploreScreen(
                         // Large Bold Title
                         Text(
                             text = song.title,
-                            style = MaterialTheme.typography.headlineLarge.copy(
+                            style = DsmusicTheme.typography.headlineLarge.copy(
                                 fontWeight = FontWeight.ExtraBold,
                                 fontSize = 34.sp,
                                 letterSpacing = (-0.5).sp
                             ),
                             textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onBackground
+                            color = DsmusicTheme.colorScheme.onBackground
                         )
 
                         Spacer(modifier = Modifier.height(40.dp))
@@ -1437,21 +1434,21 @@ fun ExploreScreen(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = DsmusicTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
+                color = DsmusicTheme.colorScheme.onBackground
             )
             content.forEach { item ->
                 Text(
                     text = item,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = DsmusicTheme.typography.bodyLarge,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
     }
 
-    @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
+    
     @Composable
     fun SearchHeader(
         searchQuery: String,
@@ -1503,7 +1500,7 @@ fun ExploreScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(DsmusicTheme.colorScheme.surface)
                     .statusBarsPadding()
                     .imePadding()
             ) {
@@ -1523,10 +1520,10 @@ fun ExploreScreen(
                     modifier = Modifier
                         .size(42.dp)
                         .clip(RoundedCornerShape(13.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .background(DsmusicTheme.colorScheme.surfaceContainerLow)
                         .border(
                             1.dp,
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+                            DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
                             RoundedCornerShape(13.dp)
                         )
                         .clickable {
@@ -1543,7 +1540,7 @@ fun ExploreScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface
+                        tint = DsmusicTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -1562,16 +1559,16 @@ fun ExploreScreen(
                         .weight(1f)
                         .focusRequester(searchFocusRequester)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .background(DsmusicTheme.colorScheme.surfaceContainerLow)
                         .border(
                             1.dp,
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+                            DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
                             RoundedCornerShape(14.dp)
                         )
                         .padding(horizontal = 14.dp, vertical = 14.dp),
                     singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(
-                        color = MaterialTheme.colorScheme.onSurface
+                    textStyle = DsmusicTheme.typography.bodyLarge.copy(
+                        color = DsmusicTheme.colorScheme.onSurface
                     ),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { submitSearch() }),
@@ -1580,8 +1577,8 @@ fun ExploreScreen(
                             if (searchQuery.isBlank()) {
                                 BasicText(
                                     text = "Search music, artists, albums...",
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    style = DsmusicTheme.typography.bodyLarge.copy(
+                                        color = DsmusicTheme.colorScheme.onSurfaceVariant
                                     ),
                                     maxLines = 1
                                 )
@@ -1596,14 +1593,14 @@ fun ExploreScreen(
                         Modifier
                             .size(40.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .background(DsmusicTheme.colorScheme.surfaceContainerLow)
                             .clickable { onQueryChange("") },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Clear query",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -1614,13 +1611,13 @@ fun ExploreScreen(
                         .size(44.dp)
                         .clip(RoundedCornerShape(13.dp))
                         .background(
-                            if (searchQuery.isNotBlank()) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceContainerLow
+                            if (searchQuery.isNotBlank()) DsmusicTheme.colorScheme.primary
+                            else DsmusicTheme.colorScheme.surfaceContainerLow
                         )
                         .border(
                             1.dp,
-                            if (searchQuery.isNotBlank()) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+                            if (searchQuery.isNotBlank()) DsmusicTheme.colorScheme.primary
+                            else DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
                             RoundedCornerShape(13.dp)
                         )
                         .clickable(enabled = searchQuery.isNotBlank()) { submitSearch() },
@@ -1629,8 +1626,8 @@ fun ExploreScreen(
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "Search",
-                        tint = if (searchQuery.isNotBlank()) MaterialTheme.colorScheme.onPrimary
-                        else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (searchQuery.isNotBlank()) DsmusicTheme.colorScheme.onPrimary
+                        else DsmusicTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -1639,7 +1636,7 @@ fun ExploreScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(1.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+                        .background(DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
                 )
 
                 LazyColumn(
@@ -1660,9 +1657,9 @@ fun ExploreScreen(
                                 ) {
                                     Text(
                                         text = "Recent Searches",
-                                        style = MaterialTheme.typography.titleSmall,
+                                        style = DsmusicTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = DsmusicTheme.colorScheme.onSurfaceVariant
                                     )
                                     DsmusicTextButton(onClick = onClearSearchHistory) {
                                         Text("Clear all")
@@ -1699,9 +1696,9 @@ fun ExploreScreen(
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
                                     text = "Recently Played (YouTube Music)",
-                                    style = MaterialTheme.typography.titleSmall,
+                                    style = DsmusicTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                 )
                             }
@@ -1750,8 +1747,8 @@ fun ExploreScreen(
                             item {
                                 Text(
                                     text = "Search for a song, artist, album, or playlist.",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = DsmusicTheme.typography.bodyLarge,
+                                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(24.dp)
                                 )
                             }
@@ -1803,17 +1800,17 @@ fun ExploreScreen(
                                     imageVector = Icons.Default.Search,
                                     contentDescription = null,
                                     modifier = Modifier.size(32.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = DsmusicTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
                                     text = "No suggestions yet",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    style = DsmusicTheme.typography.titleMedium,
+                                    color = DsmusicTheme.colorScheme.onSurface
                                 )
                                 Text(
                                     text = "Press Search to find results for \"$searchQuery\".",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    style = DsmusicTheme.typography.bodyMedium,
+                                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -1842,15 +1839,15 @@ fun ExploreScreen(
                 ) {
                     BasicText(
                         text = if (isSearchDestination) "SEARCH" else "DISCOVER",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = DsmusicTheme.typography.labelSmall.copy(
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant,
                             letterSpacing = 1.2.sp
                         )
                     )
                     if (!showSearchEntry) {
                         Box(
                             Modifier.size(40.dp).clip(RoundedCornerShape(13.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                .background(DsmusicTheme.colorScheme.surfaceContainerLow)
                                 .clickable { onAccountVisibleChange(true) },
                             contentAlignment = Alignment.Center
                         ) {
@@ -1871,7 +1868,7 @@ fun ExploreScreen(
                                     imageVector = Icons.Default.AccountCircle,
                                     contentDescription = "Account",
                                     modifier = Modifier.size(26.dp),
-                                    tint = MaterialTheme.colorScheme.primary
+                                    tint = DsmusicTheme.colorScheme.primary
                                 )
                             }
                         }
@@ -1891,7 +1888,7 @@ fun ExploreScreen(
                         .weight(1f)
                         .height(54.dp)
                         .clip(RoundedCornerShape(17.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .background(DsmusicTheme.colorScheme.surfaceContainerLow)
                         .clickable { onSearchActiveChange(true) }
                         .padding(horizontal = 15.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1900,14 +1897,14 @@ fun ExploreScreen(
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = DsmusicTheme.colorScheme.primary
                     )
                     BasicText(
                         text = searchQuery.ifBlank { "Search music, artists, albums..." },
                         modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            color = if (searchQuery.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
-                                else MaterialTheme.colorScheme.onSurface
+                        style = DsmusicTheme.typography.bodyLarge.copy(
+                            color = if (searchQuery.isBlank()) DsmusicTheme.colorScheme.onSurfaceVariant
+                                else DsmusicTheme.colorScheme.onSurface
                         ),
                         maxLines = 1
                     )
@@ -1916,20 +1913,20 @@ fun ExploreScreen(
                 if (searchQuery.isNotBlank()) {
                     Box(
                         Modifier.size(40.dp).clip(RoundedCornerShape(13.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .background(DsmusicTheme.colorScheme.surfaceContainerLow)
                             .clickable { onClearSearch() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Clear search",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 } else {
                     Box(
                         Modifier.size(40.dp).clip(RoundedCornerShape(13.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .background(DsmusicTheme.colorScheme.surfaceContainerLow)
                             .clickable { onAccountVisibleChange(true) },
                         contentAlignment = Alignment.Center
                     ) {
@@ -1950,7 +1947,7 @@ fun ExploreScreen(
                                 imageVector = Icons.Default.AccountCircle,
                                 contentDescription = "Account",
                                 modifier = Modifier.size(26.dp),
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = DsmusicTheme.colorScheme.primary
                             )
                         }
                     }
@@ -1974,7 +1971,7 @@ fun ExploreScreen(
                             label = {
                                 Text(
                                     label,
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = DsmusicTheme.typography.labelMedium,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
                                 )
                             }
@@ -2000,7 +1997,7 @@ fun ExploreScreen(
                             label = {
                                 Text(
                                     label,
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = DsmusicTheme.typography.labelMedium,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
                                 )
                             }

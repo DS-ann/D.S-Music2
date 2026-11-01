@@ -41,14 +41,13 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
+import com.dsann.music.ui.theme.Card
+import com.dsann.music.ui.theme.CardDefaults
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.Text
+import com.dsann.music.ui.theme.TextField
+import com.dsann.music.ui.theme.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -336,7 +335,7 @@ private fun ExpressiveButton(
         label = "button_scale"
     )
 
-    androidx.compose.material3.Button(
+    com.dsann.music.ui.theme.Button(
         onClick = onClick,
         enabled = enabled,
         interactionSource = interactionSource,
@@ -346,8 +345,8 @@ private fun ExpressiveButton(
                 scaleX = scale
                 scaleY = scale
             },
-        shape = androidx.compose.material3.ButtonDefaults.shape,
-        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+        shape = com.dsann.music.ui.theme.ButtonDefaults.shape,
+        colors = com.dsann.music.ui.theme.ButtonDefaults.buttonColors(
             containerColor = containerColor,
             contentColor = contentColor,
             disabledContainerColor = disabledContainerColor
@@ -573,7 +572,7 @@ private fun TagEditorScreen(
                 ) {
                     Text(
                         text = "Edit Details",
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = DsmusicTheme.typography.headlineSmall,
                         color = Color.White,
                         fontWeight = FontWeight.Bold
                     )
@@ -614,7 +613,7 @@ private fun TagEditorScreen(
                 ) {
                     Text(
                         text = "Edit Song",
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = DsmusicTheme.typography.headlineMedium,
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 34.sp
@@ -654,7 +653,7 @@ private fun TagEditorScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
 private fun CustomInputField(
     label: String,

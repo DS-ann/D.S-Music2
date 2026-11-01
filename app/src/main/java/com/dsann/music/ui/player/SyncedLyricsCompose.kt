@@ -38,12 +38,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearWavyProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.WavyProgressIndicatorDefaults
+import com.dsann.music.ui.theme.Button
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.LinearWavyProgressIndicator
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.Text
+import com.dsann.music.ui.theme.WavyProgressIndicatorDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -467,7 +467,7 @@ private fun LyricLineItem(
         "Center" -> TextAlign.Center
         else -> if (line.isRightAligned) TextAlign.End else TextAlign.Start
     }
-    val mainTextStyle = MaterialTheme.typography.headlineMedium.copy(
+    val mainTextStyle = DsmusicTheme.typography.headlineMedium.copy(
         fontFamily = lyricFontFamily,
         fontSize = 38.sp * textScale,
         fontWeight = FontWeight.Bold,
@@ -476,7 +476,7 @@ private fun LyricLineItem(
         platformStyle = PlatformTextStyle(includeFontPadding = true)
     )
 
-    val bracketTextStyle = MaterialTheme.typography.bodyLarge.copy(
+    val bracketTextStyle = DsmusicTheme.typography.bodyLarge.copy(
         fontFamily = GoogleSansFlexNonRounded,
         fontSize = 20.sp * textScale,
         fontWeight = FontWeight.Medium,
@@ -859,7 +859,7 @@ internal fun LyricsErrorState(
     ) {
         Text(
             text = message,
-            style = MaterialTheme.typography.titleMedium,
+            style = DsmusicTheme.typography.titleMedium,
             color = textColor,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )

@@ -50,8 +50,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -560,7 +560,7 @@ class MainActivity : AppCompatActivity() {
                                     .padding(start = railStartPadding)
                                     .width(76.dp)
                                     .clip(RoundedCornerShape(22.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                                    .background(DsmusicTheme.colorScheme.surfaceContainer)
                                     .padding(vertical = 8.dp, horizontal = 6.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -574,14 +574,14 @@ class MainActivity : AppCompatActivity() {
                                     )
                                     items.forEach { (route, label, iconResId) ->
                                         val selected = currentDestination?.route == route
-                                        val tint = if (selected) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                        val tint = if (selected) DsmusicTheme.colorScheme.primary
+                                            else DsmusicTheme.colorScheme.onSurfaceVariant
                                         Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .clip(RoundedCornerShape(22.dp))
                                                 .background(
-                                                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                    if (selected) DsmusicTheme.colorScheme.primary.copy(alpha = 0.15f)
                                                     else androidx.compose.ui.graphics.Color.Transparent
                                                 )
                                                 .clickable {
@@ -607,7 +607,7 @@ class MainActivity : AppCompatActivity() {
                                             if (navLabelsMode == "Always" || (navLabelsMode == "Selected" && selected)) {
                                                 BasicText(
                                                     text = label,
-                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                    style = DsmusicTheme.typography.labelSmall.copy(
                                                         color = tint,
                                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
                                                     ),

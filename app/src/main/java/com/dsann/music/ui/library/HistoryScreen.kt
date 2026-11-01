@@ -15,17 +15,16 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.IconButton
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.Scaffold
+import com.dsann.music.ui.theme.Text
+import com.dsann.music.ui.theme.TopAppBar
+import com.dsann.music.ui.theme.TopAppBarDefaults
+import com.dsann.music.ui.theme.PullToRefreshBox
+import com.dsann.music.ui.theme.PullToRefreshDefaults
+import com.dsann.music.ui.theme.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,7 +39,7 @@ import com.dsann.music.ui.explore.SearchResultItem
  * A beautiful dedicated page showing Listening History as a list of songs,
  * strictly focused on the song playback rather than account settings.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
 fun HistoryScreen(
     history: List<OnlineSong>,
@@ -67,7 +66,7 @@ fun HistoryScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background
+                        containerColor = DsmusicTheme.colorScheme.background
                     ),
                     windowInsets = WindowInsets(0, 0, 0, 0)
                 )
@@ -83,7 +82,7 @@ fun HistoryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background),
+                .background(DsmusicTheme.colorScheme.background),
             indicator = {
                 PullToRefreshDefaults.Indicator(
                     state = pullToRefreshState,
@@ -105,19 +104,19 @@ fun HistoryScreen(
                             imageVector = Icons.Default.History,
                             contentDescription = null,
                             modifier = Modifier.size(56.dp),
-                            tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            tint = DsmusicTheme.colorScheme.outline.copy(alpha = 0.5f)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = "No listening history yet",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = DsmusicTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Songs you listen to from your account will appear here.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = DsmusicTheme.typography.bodyMedium,
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
                     }

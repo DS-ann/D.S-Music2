@@ -37,25 +37,23 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberTimePickerState
+import com.dsann.music.ui.theme.AlertDialog
+import com.dsann.music.ui.theme.BottomSheetDefaults
+import com.dsann.music.ui.theme.Button
+import com.dsann.music.ui.theme.ButtonDefaults
+import com.dsann.music.ui.theme.Card
+import com.dsann.music.ui.theme.CardDefaults
+import com.dsann.music.ui.theme.ListItem
+import com.dsann.music.ui.theme.ListItemDefaults
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.ModalBottomSheet
+import com.dsann.music.ui.theme.HorizontalDivider
+import com.dsann.music.ui.theme.Slider
+import com.dsann.music.ui.theme.Text
+import com.dsann.music.ui.theme.TextButton
+import com.dsann.music.ui.theme.TimePicker
+import com.dsann.music.ui.theme.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -75,7 +73,7 @@ import com.dsann.music.viewmodel.PlayerSharedViewModel
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 fun SleepTimerBottomSheet(
     onDismissRequest: () -> Unit,
@@ -128,7 +126,7 @@ fun SleepTimerBottomSheet(
         ) {
             Text(
                 text = "Sleep Timer",
-                style = MaterialTheme.typography.headlineSmall,
+                style = DsmusicTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -140,7 +138,7 @@ fun SleepTimerBottomSheet(
             ) {
                 DsmusicCard(
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        containerColor = DsmusicTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                     ),
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
@@ -154,7 +152,7 @@ fun SleepTimerBottomSheet(
                         Icon(
                             imageVector = Icons.Default.Notifications,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = DsmusicTheme.colorScheme.primary,
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
@@ -170,9 +168,9 @@ fun SleepTimerBottomSheet(
                             }
                             Text(
                                 text = activeText,
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = DsmusicTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                color = DsmusicTheme.colorScheme.onPrimaryContainer
                             )
                         }
                     }
@@ -183,7 +181,7 @@ fun SleepTimerBottomSheet(
             DsmusicCard(
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    containerColor = DsmusicTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -202,16 +200,16 @@ fun SleepTimerBottomSheet(
                                     Box(
                                         modifier = Modifier
                                             .size(40.dp)
-                                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                                            .background(DsmusicTheme.colorScheme.primaryContainer, CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(Icons.Default.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                        Icon(Icons.Default.Timer, contentDescription = null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
                                     }
                                 },
                                 headlineContent = {
                                     Text(
                                         text = "Set Hours (${sliderValue.roundToInt()}h)",
-                                        style = MaterialTheme.typography.titleMedium,
+                                        style = DsmusicTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold
                                     )
                                 },
@@ -239,9 +237,9 @@ fun SleepTimerBottomSheet(
                                             listOf(1, 2, 3, 4, 5).forEach { hour ->
                                                 Text(
                                                     text = "${hour}h",
-                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    style = DsmusicTheme.typography.bodyMedium,
                                                     fontWeight = if (sliderValue.roundToInt() == hour) FontWeight.Bold else FontWeight.Normal,
-                                                    color = if (sliderValue.roundToInt() == hour) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                                    color = if (sliderValue.roundToInt() == hour) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                                     textAlign = TextAlign.Center,
                                                     modifier = Modifier.width(28.dp)
                                                 )
@@ -251,12 +249,12 @@ fun SleepTimerBottomSheet(
                                 },
                                 colors = ListItemDefaults.colors(
                                     containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                                    headlineColor = MaterialTheme.colorScheme.onSurface
+                                    headlineColor = DsmusicTheme.colorScheme.onSurface
                                 )
                             )
 
                             HorizontalDivider(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
+                                color = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
                                 thickness = 1.dp,
                                 modifier = Modifier.padding(start = 72.dp, end = 16.dp)
                             )
@@ -273,16 +271,16 @@ fun SleepTimerBottomSheet(
                             Box(
                                 modifier = Modifier
                                     .size(40.dp)
-                                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                                    .background(DsmusicTheme.colorScheme.primaryContainer, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Stop, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                Icon(Icons.Default.Stop, contentDescription = null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
                             }
                         },
                         content = {
                             Text(
                                 text = "Stop at end of track",
-                                style = MaterialTheme.typography.titleMedium,
+                                style = DsmusicTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                         },
@@ -294,7 +292,7 @@ fun SleepTimerBottomSheet(
                         },
                         colors = ListItemDefaults.colors(
                             containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                            headlineColor = MaterialTheme.colorScheme.onSurface
+                            headlineColor = DsmusicTheme.colorScheme.onSurface
                         )
                     )
                 }
@@ -321,7 +319,7 @@ fun SleepTimerBottomSheet(
                         topEnd = 4.dp,
                         bottomEnd = 4.dp
                     ),
-                    colors = ButtonDefaults.filledTonalButtonColors(),
+                    colors = ButtonDefaults.filledTonalDsmusicButtonColors(),
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp)
@@ -343,8 +341,8 @@ fun SleepTimerBottomSheet(
                         bottomEnd = 24.dp
                     ),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        containerColor = DsmusicTheme.colorScheme.primary,
+                        contentColor = DsmusicTheme.colorScheme.onPrimary
                     ),
                     modifier = Modifier
                         .weight(1f)
@@ -383,7 +381,7 @@ fun SleepTimerBottomSheet(
                 }
             },
             title = {
-                Text("Select Duration", style = MaterialTheme.typography.titleMedium)
+                Text("Select Duration", style = DsmusicTheme.typography.titleMedium)
             },
             text = {
                 Box(

@@ -63,21 +63,19 @@ import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.ThumbUpOffAlt
-import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.ListItemShapes
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
+import com.dsann.music.ui.theme.BottomSheetDefaults
+import com.dsann.music.ui.theme.ButtonDefaults
+import com.dsann.music.ui.theme.HorizontalDivider
+import com.dsann.music.ui.theme.Icon
+import com.dsann.music.ui.theme.IconButton
+import com.dsann.music.ui.theme.LoadingIndicator
+import com.dsann.music.ui.theme.ListItemDefaults
+import com.dsann.music.ui.theme.ListItemShapes
+import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.ModalBottomSheet
+import com.dsann.music.ui.theme.rememberModalBottomSheetState
+import com.dsann.music.ui.theme.OutlinedButton
+import com.dsann.music.ui.theme.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -145,7 +143,7 @@ fun Modifier.shimmerEffect(): Modifier = composed {
     // A static placeholder on low-memory devices avoids an infinite animation and
     // per-frame position/draw invalidations while the feed is loading.
     if (SpatialFlowApplication.isLowRamDevice || !LocalRootTabActive.current) {
-        this.background(MaterialTheme.colorScheme.surfaceContainerHigh)
+        this.background(DsmusicTheme.colorScheme.surfaceContainerHigh)
     } else {
         var positionInRoot by remember { mutableStateOf(Offset.Zero) }
         val transition = rememberInfiniteTransition(label = "shimmer")
@@ -159,9 +157,9 @@ fun Modifier.shimmerEffect(): Modifier = composed {
             label = "shimmer_anim"
         )
         val shimmerColors = listOf(
-            MaterialTheme.colorScheme.surfaceContainerLow,
-            MaterialTheme.colorScheme.surfaceContainerHigh,
-            MaterialTheme.colorScheme.surfaceContainerLow
+            DsmusicTheme.colorScheme.surfaceContainerLow,
+            DsmusicTheme.colorScheme.surfaceContainerHigh,
+            DsmusicTheme.colorScheme.surfaceContainerLow
         )
 
         this
@@ -182,7 +180,7 @@ fun Modifier.shimmerEffect(): Modifier = composed {
 @Composable
 fun AnimatedEqualizerBars(
     modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.primary
+    color: Color = DsmusicTheme.colorScheme.primary
 ) {
     if (!LocalRootTabActive.current || SpatialFlowApplication.isLowRamDevice) {
         Row(
@@ -226,7 +224,7 @@ fun AnimatedEqualizerBars(
 @Composable
 fun HomeFeedSkeleton() {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+        modifier = Modifier.fillMaxSize().background(DsmusicTheme.colorScheme.background),
         contentPadding = PaddingValues(bottom = 120.dp)
     ) {
         item {
@@ -291,22 +289,22 @@ fun WelcomeGreetingBanner(userName: String?) {
             Icon(
                 painter = painterResource(id = iconResId),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = DsmusicTheme.colorScheme.primary,
                 modifier = Modifier.size(22.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = greeting,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = DsmusicTheme.typography.titleMedium,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = name,
-            style = MaterialTheme.typography.headlineLarge.copy(letterSpacing = (-1).sp),
+            style = DsmusicTheme.typography.headlineLarge.copy(letterSpacing = (-1).sp),
             fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = DsmusicTheme.colorScheme.onSurface
         )
     }
 }
@@ -322,7 +320,7 @@ fun SearchResultItem(
     onClick: () -> Unit
 ) {
     val backgroundColor = if (isCurrentlyPlaying)
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+        DsmusicTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
     else Color.Transparent
 
     val containerShape = RoundedCornerShape(8.dp)
@@ -391,7 +389,7 @@ fun SearchResultItem(
                 } else 0.45f
                 Box(
                     modifier = Modifier.fillMaxSize().clip(imageShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = shimmerAlpha)),
+                        .background(DsmusicTheme.colorScheme.surfaceContainerHigh.copy(alpha = shimmerAlpha)),
                     contentAlignment = Alignment.Center
                 ) {
                     LoadingIndicator(modifier = Modifier.size(20.dp))
@@ -412,10 +410,10 @@ fun SearchResultItem(
                 },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyMedium.copy(
+                style = DsmusicTheme.typography.bodyMedium.copy(
                     fontWeight = if (isCurrentlyPlaying) FontWeight.SemiBold else FontWeight.Medium
                 ),
-                color = if (isCurrentlyPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                color = if (isCurrentlyPlaying) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(1.dp))
             Text(
@@ -434,8 +432,8 @@ fun SearchResultItem(
                 },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = DsmusicTheme.typography.bodySmall,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant
             )
         }
 
@@ -449,7 +447,7 @@ fun SearchResultItem(
             if (item is SearchItem.Song && isCurrentlyPlaying && !isLoading) {
                 AnimatedEqualizerBars(
                     modifier = Modifier.size(20.dp).height(12.dp),
-                    color = MaterialTheme.colorScheme.primary
+                    color = DsmusicTheme.colorScheme.primary
                 )
             }
             
@@ -463,7 +461,7 @@ fun SearchResultItem(
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
                                 contentDescription = "More Options",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -480,7 +478,7 @@ fun SearchResultItem(
                             imageVector = Icons.Default.ChevronRight,
                             contentDescription = null,
                             modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -536,7 +534,7 @@ fun SearchTopResultCard(
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(DsmusicTheme.colorScheme.surfaceContainerLow)
             .pointerInput(item) {
                 awaitPointerEventScope {
                     while (true) {
@@ -564,22 +562,22 @@ fun SearchTopResultCard(
         Column(Modifier.weight(1f)) {
             Text(
                 "TOP RESULT",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
+                style = DsmusicTheme.typography.labelSmall,
+                color = DsmusicTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
                 title,
-                style = MaterialTheme.typography.titleMedium,
+                style = DsmusicTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                color = if (isCurrentlyPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                color = if (isCurrentlyPlaying) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurface
             )
             Text(
                 detail,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = DsmusicTheme.typography.bodySmall,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -593,7 +591,7 @@ fun SearchTopResultCard(
                 Icon(Icons.Default.MoreVert, "More options")
             }
         } else {
-            Icon(Icons.Default.PlayArrow, "Open result", tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Default.PlayArrow, "Open result", tint = DsmusicTheme.colorScheme.primary)
         }
     }
 }
@@ -635,9 +633,9 @@ fun SearchBrowseCard(item: SearchItem, onClick: () -> Unit) {
             contentScale = ContentScale.Crop
         )
         Spacer(Modifier.height(7.dp))
-        Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
+        Text(title, style = DsmusicTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Text(subtitle, style = DsmusicTheme.typography.bodySmall, color = DsmusicTheme.colorScheme.onSurfaceVariant,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -703,20 +701,20 @@ fun BentoCell(
                     Box(
                         modifier = Modifier.padding(bottom = 8.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f))
+                            .background(DsmusicTheme.colorScheme.primaryContainer.copy(alpha = 0.92f))
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
                             text = "Feature",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = DsmusicTheme.typography.labelSmall,
                             fontWeight = FontWeight.Black,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = DsmusicTheme.colorScheme.onPrimaryContainer
                         )
                     }
                 }
                 Text(
                     text = title,
-                    style = if (isFeature) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleSmall,
+                    style = if (isFeature) DsmusicTheme.typography.titleLarge else DsmusicTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     maxLines = if (isFeature) 2 else 1,
@@ -724,7 +722,7 @@ fun BentoCell(
                 )
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = DsmusicTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.8f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -759,9 +757,9 @@ fun HomeSectionRow(
         ) {
             Text(
                 text = section.title,
-                style = MaterialTheme.typography.headlineSmall,
+                style = DsmusicTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
+                color = DsmusicTheme.colorScheme.onBackground
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (hasSongsOnly || section.title.contains("daily discover", ignoreCase = true)) {
@@ -773,11 +771,11 @@ fun HomeSectionRow(
                         modifier = Modifier.height(32.dp),
                         shape = CircleShape,
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onBackground
+                        colors = ButtonDefaults.outlinedDsmusicButtonColors(
+                            contentColor = DsmusicTheme.colorScheme.onBackground
                         )
                     ) {
-                        Text("Play all", style = MaterialTheme.typography.labelSmall)
+                        Text("Play all", style = DsmusicTheme.typography.labelSmall)
                     }
                 }
                 
@@ -790,7 +788,7 @@ fun HomeSectionRow(
                         Icon(
                             imageVector = Icons.Default.ChevronRight,
                             contentDescription = "See All",
-                            tint = MaterialTheme.colorScheme.onBackground,
+                            tint = DsmusicTheme.colorScheme.onBackground,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -909,7 +907,7 @@ fun HomeSectionRow(
                                             Brush.verticalGradient(
                                                 colors = listOf(
                                                     Color.Transparent,
-                                                    MaterialTheme.colorScheme.scrim.copy(alpha = 0.72f)
+                                                    DsmusicTheme.colorScheme.scrim.copy(alpha = 0.72f)
                                                 ),
                                                 startY = 80f
                                             )
@@ -917,8 +915,8 @@ fun HomeSectionRow(
                                     )
                                     Text(
                                         text = title,
-                                        color = MaterialTheme.colorScheme.inverseOnSurface,
-                                        style = MaterialTheme.typography.labelMedium,
+                                        color = DsmusicTheme.colorScheme.inverseOnSurface,
+                                        style = DsmusicTheme.typography.labelMedium,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
@@ -994,9 +992,9 @@ fun HomeSectionRow(
                             Box(
                                 modifier = Modifier.fillMaxSize().background(
                                     Brush.verticalGradient(
-                                        0f to MaterialTheme.colorScheme.scrim.copy(alpha = 0.5f),
+                                        0f to DsmusicTheme.colorScheme.scrim.copy(alpha = 0.5f),
                                         0.35f to Color.Transparent,
-                                        1f to MaterialTheme.colorScheme.scrim.copy(alpha = 0.88f)
+                                        1f to DsmusicTheme.colorScheme.scrim.copy(alpha = 0.88f)
                                     )
                                 )
                             )
@@ -1008,7 +1006,7 @@ fun HomeSectionRow(
                                     Text(
                                         text = title,
                                         color = Color.White,
-                                        style = MaterialTheme.typography.titleMedium,
+                                        style = DsmusicTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis
@@ -1017,7 +1015,7 @@ fun HomeSectionRow(
                                     Text(
                                         text = subtitle,
                                         color = Color.White.copy(alpha = 0.8f),
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = DsmusicTheme.typography.bodySmall,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -1025,7 +1023,7 @@ fun HomeSectionRow(
                                 Text(
                                     text = promptText,
                                     color = Color.White.copy(alpha = 0.65f),
-                                    style = MaterialTheme.typography.labelSmall.copy(fontStyle = FontStyle.Italic),
+                                    style = DsmusicTheme.typography.labelSmall.copy(fontStyle = FontStyle.Italic),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -1080,7 +1078,7 @@ fun HomeSectionRow(
                         Box(
                             modifier = Modifier.width(320.dp).padding(vertical = 4.dp)
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                .background(DsmusicTheme.colorScheme.surfaceContainerLow)
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1092,20 +1090,20 @@ fun HomeSectionRow(
                                     )
                                     Spacer(modifier = Modifier.width(14.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(title, style = MaterialTheme.typography.titleMedium,
+                                        Text(title, style = DsmusicTheme.typography.titleMedium,
                                             fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                            color = MaterialTheme.colorScheme.onSurface)
-                                        Text(author, style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            color = DsmusicTheme.colorScheme.onSurface)
+                                        Text(author, style = DsmusicTheme.typography.bodySmall,
+                                            color = DsmusicTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         if (songCount.isNotBlank()) {
-                                            Text(songCount, style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(songCount, style = DsmusicTheme.typography.labelSmall,
+                                                color = DsmusicTheme.colorScheme.onSurfaceVariant)
                                         }
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(12.dp))
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                                HorizontalDivider(color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -1115,7 +1113,7 @@ fun HomeSectionRow(
                                     Box(
                                         modifier = Modifier.size(54.dp)
                                             .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.primaryContainer)
+                                            .background(DsmusicTheme.colorScheme.primaryContainer)
                                             .clickable {
                                                 when (item) {
                                                     is SearchItem.Song -> onSongClick(item.song)
@@ -1128,7 +1126,7 @@ fun HomeSectionRow(
                                         Icon(
                                             Icons.Default.PlayArrow,
                                             contentDescription = "Play",
-                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            tint = DsmusicTheme.colorScheme.onPrimaryContainer,
                                             modifier = Modifier.size(32.dp)
                                         )
                                     }
@@ -1265,7 +1263,7 @@ fun HomeCarouselItem(
                 modifier = Modifier.fillMaxSize()
                     .sharedElementIfAvailable("image-$itemId")
                     .clip(imageShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .background(DsmusicTheme.colorScheme.surfaceContainerLow)
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     AsyncImage(
@@ -1277,12 +1275,12 @@ fun HomeCarouselItem(
                     if (isPlaying) {
                         Box(
                             modifier = Modifier.fillMaxSize()
-                                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f)),
+                                .background(DsmusicTheme.colorScheme.scrim.copy(alpha = 0.45f)),
                             contentAlignment = Alignment.Center
                         ) {
                             AnimatedEqualizerBars(
                                 modifier = Modifier.size(32.dp).height(24.dp),
-                                color = MaterialTheme.colorScheme.inverseOnSurface
+                                color = DsmusicTheme.colorScheme.inverseOnSurface
                             )
                         }
                     }
@@ -1292,9 +1290,9 @@ fun HomeCarouselItem(
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.bodyMedium,
+            style = DsmusicTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = DsmusicTheme.colorScheme.onBackground,
             minLines = 2,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -1302,8 +1300,8 @@ fun HomeCarouselItem(
         )
         Text(
             text = subtitle.ifBlank { " " },
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = DsmusicTheme.typography.labelSmall,
+            color = DsmusicTheme.colorScheme.onSurfaceVariant,
             minLines = 1,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1324,7 +1322,7 @@ fun HomeSongListItem(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
+            .background(DsmusicTheme.colorScheme.background)
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
@@ -1352,12 +1350,12 @@ fun HomeSongListItem(
             if (isPlaying) {
                 Box(
                     modifier = Modifier.fillMaxSize()
-                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f)),
+                        .background(DsmusicTheme.colorScheme.scrim.copy(alpha = 0.45f)),
                     contentAlignment = Alignment.Center
                 ) {
                     AnimatedEqualizerBars(
                         modifier = Modifier.size(24.dp).height(16.dp),
-                        color = MaterialTheme.colorScheme.inverseOnSurface
+                        color = DsmusicTheme.colorScheme.inverseOnSurface
                     )
                 }
             }
@@ -1366,23 +1364,23 @@ fun HomeSongListItem(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = song.title,
-                style = MaterialTheme.typography.bodyMedium,
+                style = DsmusicTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                color = if (isPlaying) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = song.artist,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = DsmusicTheme.typography.bodySmall,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
         DsmusicIconButton(onClick = onMenuClick) {
-            Icon(Icons.Default.MoreVert, "More", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Default.MoreVert, "More", tint = DsmusicTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -1405,26 +1403,26 @@ fun CompactMenuItem(
         Box(
             modifier = Modifier.size(36.dp)
                 .clip(RoundedCornerShape(11.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)),
+                .background(DsmusicTheme.colorScheme.primary.copy(alpha = 0.13f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = DsmusicTheme.colorScheme.primary,
                 modifier = Modifier.size(21.dp)
             )
         }
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyLarge,
+            style = DsmusicTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface
+            color = DsmusicTheme.colorScheme.onSurface
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+
 @Composable
 fun OnlineSongBottomSheet(
     song: OnlineSong,
@@ -1473,7 +1471,7 @@ fun OnlineSongBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        containerColor = DsmusicTheme.colorScheme.surfaceContainerHigh,
         dragHandle = { BottomSheetDefaults.DragHandle() },
         modifier = modifier
     ) {
@@ -1492,15 +1490,15 @@ fun OnlineSongBottomSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = song.title,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = DsmusicTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = song.artist,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = DsmusicTheme.typography.bodySmall,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1519,7 +1517,7 @@ fun OnlineSongBottomSheet(
                     Icon(
                         imageVector = if (isFavorite) Icons.Filled.ThumbUp else Icons.Filled.ThumbUpOffAlt,
                         contentDescription = "Like",
-                        tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        tint = if (isFavorite) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurface,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -1533,7 +1531,7 @@ fun OnlineSongBottomSheet(
                 }
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            HorizontalDivider(color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
             // Big Square Button Grid: Play next, Share
             Row(
@@ -1560,7 +1558,7 @@ fun OnlineSongBottomSheet(
                             .aspectRatio(1.5f)
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            .background(DsmusicTheme.colorScheme.surfaceContainerHighest),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -1569,7 +1567,7 @@ fun OnlineSongBottomSheet(
                             modifier = Modifier.size(24.dp)
                         )
                     }
-                    Text("Play next", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                    Text("Play next", style = DsmusicTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                 }
 
                 // Card 2: Share
@@ -1595,7 +1593,7 @@ fun OnlineSongBottomSheet(
                             .aspectRatio(1.5f)
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            .background(DsmusicTheme.colorScheme.surfaceContainerHighest),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -1604,7 +1602,7 @@ fun OnlineSongBottomSheet(
                             modifier = Modifier.size(24.dp)
                         )
                     }
-                    Text("Share", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                    Text("Share", style = DsmusicTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                 }
             }
 
