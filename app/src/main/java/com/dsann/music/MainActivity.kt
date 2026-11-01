@@ -54,7 +54,6 @@ import com.dsann.music.ui.theme.DsmusicTheme
 import com.dsann.music.ui.theme.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -115,6 +114,7 @@ import com.dsann.music.viewmodel.ExploreViewModel
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
@@ -371,12 +371,17 @@ class MainActivity : AppCompatActivity() {
                     // composition. This keeps each animation frame from recomposing the entire
                     // root navigation tree and all retained tab hosts.
                     // Only the navigation rail needs the per-frame expansion value.
-                    // Collecting it on phones invalidates the retained root tabs at 60 fps
-                    // during every player-sheet animation, with no layout benefit.
-                    val playerExpansionFractionState = if (useNavigationRail) {
-                        playerViewModel.playerExpansionFraction.collectAsState()
-                    } else {
-                        remember { mutableStateOf(0f) }
+                    // Subscribe while the rail is present; phone tabs must not recompose
+                    // for every player-sheet animation frame.
+                    val playerExpansionFractionState = remember { mutableStateOf(0f) }
+                    LaunchedEffect(useNavigationRail) {
+                        if (useNavigationRail) {
+                            playerViewModel.playerExpansionFraction.collect { fraction ->
+                                playerExpansionFractionState.value = fraction
+                            }
+                        } else {
+                            playerExpansionFractionState.value = 0f
+                        }
                     }
 
                     // Base padding target not considering expansion
