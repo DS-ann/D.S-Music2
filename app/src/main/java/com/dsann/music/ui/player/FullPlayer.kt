@@ -416,6 +416,7 @@ private fun LandscapePlayerDetailsPane(
     accentColor: Color,
     selectedProvider: String?,
     providerResults: Map<String, LyricsResult>,
+    onProviderSelected: (String) -> Unit,
     onSeekTo: (Int) -> Unit,
     onFetchLyrics: () -> Unit,
     onPlayQueueItem: (Int) -> Unit
