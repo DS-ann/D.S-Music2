@@ -1579,7 +1579,7 @@ fun PlayerBottomSheetCompose(
 
                                 val normalX = androidx.compose.ui.util.lerp(xStartPx, xEndPx, artTransitionProgress)
                                 val normalY = androidx.compose.ui.util.lerp(yStartPx, yEndPx, artTransitionProgress)
-                                val normalShadow = androidx.compose.ui.util.lerp(0f, 16.dp.toPx(), t)
+                                val normalShadow = androidx.compose.ui.util.lerp(0f, 16.dp.toPx(), artTransitionProgress)
 
                                 val appBarThumbSizePx = 44.dp.toPx()
                                 val appBarScale = appBarThumbSizePx / fullSizePx
