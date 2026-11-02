@@ -124,7 +124,7 @@ import com.dsann.music.service.CurrentAudioFormatDetails
 import com.dsann.music.ui.player.OnlineStreamMetadata
 import com.dsann.music.ui.player.OnlineStreamMetadataReader
 import com.dsann.music.ui.theme.GoogleSansFlex
-import com.dsann.music.ui.theme.SpatialFlowTheme
+import com.dsann.music.ui.theme.DsmusicAppTheme
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import kotlinx.coroutines.Dispatchers
@@ -177,7 +177,7 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
         return ComposeView(requireContext()).apply {
             setViewCompositionStrategy(androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
-                SpatialFlowTheme {
+                DsmusicAppTheme {
                     BottomSheetScaffoldContent(
                         song = song,
                         actionListener = actionListener,
