@@ -44,30 +44,38 @@ import com.dsann.music.model.SongItem
 @OptIn(ExperimentalFoundationApi::class)
 fun Modifier.basicMarqueeWithFadedEdges(
     edgeWidth: Dp = 12.dp
-): Modifier = this
-    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-    .drawWithCache {
-        val edgeWidthPx = edgeWidth.toPx()
-        // Cache the brushes so they aren't recreated every frame
-        val leftBrush = Brush.horizontalGradient(
-            colors = listOf(Color.Transparent, Color.Black),
-            startX = 0f,
-            endX = edgeWidthPx
-        )
-        val rightBrush = Brush.horizontalGradient(
-            colors = listOf(Color.Black, Color.Transparent),
-            startX = size.width - edgeWidthPx,
-            endX = size.width
-        )
-        
-        onDrawWithContent {
-            drawContent()
-            drawRect(brush = leftBrush, blendMode = BlendMode.DstIn)
-            drawRect(brush = rightBrush, blendMode = BlendMode.DstIn)
-        }
+): Modifier {
+    // Keep the marquee interaction and scrolling, but skip the offscreen alpha-mask
+    // compositing pass on API 23. The edge fade is purely decorative.
+    if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) {
+        return this.basicMarquee().padding(horizontal = edgeWidth)
     }
-    .basicMarquee()
-    .padding(horizontal = edgeWidth)
+
+    return this
+        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithCache {
+            val edgeWidthPx = edgeWidth.toPx()
+            // Cache the brushes so they aren't recreated every frame
+            val leftBrush = Brush.horizontalGradient(
+                colors = listOf(Color.Transparent, Color.Black),
+                startX = 0f,
+                endX = edgeWidthPx
+            )
+            val rightBrush = Brush.horizontalGradient(
+                colors = listOf(Color.Black, Color.Transparent),
+                startX = size.width - edgeWidthPx,
+                endX = size.width
+            )
+
+            onDrawWithContent {
+                drawContent()
+                drawRect(brush = leftBrush, blendMode = BlendMode.DstIn)
+                drawRect(brush = rightBrush, blendMode = BlendMode.DstIn)
+            }
+        }
+        .basicMarquee()
+        .padding(horizontal = edgeWidth)
+}
 
 internal fun formatDuration(ms: Long): String {
     val totalSeconds = ms / 1000
