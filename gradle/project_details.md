@@ -5397,7 +5397,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "D.S-Music"
+rootProject.name = "D.S Music"
 include ':app'
 ``
 
