@@ -9,6 +9,7 @@ import com.dsann.music.ui.theme.DsmusicButton
 import com.dsann.music.ui.theme.DsmusicOutlinedButton
 import com.dsann.music.ui.theme.DsmusicTextButton
 import com.dsann.music.ui.theme.DsmusicIconButton
+import com.dsann.music.ui.player.PlayerFrameRateController
 import com.dsann.music.ui.theme.DsmusicFilterChip
 import com.dsann.music.ui.theme.DsmusicSwitchControl
 import android.annotation.SuppressLint
@@ -896,6 +897,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     )
     val downloadBitrate: StateFlow<String> = _downloadBitrate.asStateFlow()
 
+    // A value of 0 follows the device's actual display refresh cadence.
+    private val _playerFrameRate = MutableStateFlow(PlayerFrameRateController.load(context))
+    val playerFrameRate: StateFlow<Int> = _playerFrameRate.asStateFlow()
+
     fun setAudioQuality(quality: String) {
         val normalized = com.dsann.music.data.innertube.NewPipeStreamExtractor
             .normalizeAudioQuality(quality)
@@ -923,6 +928,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         _downloadBitrate.value = normalized
         prefs.edit { putString(KEY_DOWNLOAD_BITRATE, normalized) }
         com.dsann.music.data.innertube.NewPipeStreamExtractor.clearCache()
+    }
+
+    fun setPlayerFrameRate(frameRate: Int) {
+        _playerFrameRate.value = PlayerFrameRateController.set(context, frameRate)
     }
 
     // ── Pause Listening History ────────────────────────────────────────────────
@@ -1375,6 +1384,7 @@ fun SettingsScreenContent(
     val playbackAudioFormat by viewModel.playbackAudioFormat.collectAsStateWithLifecycle()
     val downloadAudioFormat by viewModel.downloadAudioFormat.collectAsStateWithLifecycle()
     val downloadBitrate by viewModel.downloadBitrate.collectAsStateWithLifecycle()
+    val playerFrameRate by viewModel.playerFrameRate.collectAsStateWithLifecycle()
     val pauseHistory by viewModel.pauseHistory.collectAsStateWithLifecycle()
     val downloadFolder by viewModel.downloadFolder.collectAsStateWithLifecycle()
     val songCacheMaxSize by viewModel.songCacheMaxSize.collectAsStateWithLifecycle()
@@ -1660,6 +1670,8 @@ fun SettingsScreenContent(
                 onDownloadAudioFormatChange = { viewModel.setDownloadAudioFormat(it) },
                 downloadBitrate = downloadBitrate,
                 onDownloadBitrateChange = { viewModel.setDownloadBitrate(it) },
+                playerFrameRate = playerFrameRate,
+                onPlayerFrameRateChange = { viewModel.setPlayerFrameRate(it) },
             )
         }
         composable(SettingsRoute.About.route) {
@@ -3897,6 +3909,8 @@ private fun PlaybackScreen(
     onDownloadAudioFormatChange: (String) -> Unit,
     downloadBitrate: String,
     onDownloadBitrateChange: (String) -> Unit,
+    playerFrameRate: Int,
+    onPlayerFrameRateChange: (Int) -> Unit,
 ) {
     Scaffold(
         topBar = { SettingsDetailTopBar("Playback") { navController.popBackStack() } }
@@ -3918,6 +3932,27 @@ private fun PlaybackScreen(
             SettingsGroupCard(listOf(
                 { CrossfadeRow(crossfadeEnabled, onCrossfadeToggle, crossfadeDuration, onCrossfadeDurationChange) }
             ))
+
+            SettingsHeader("Animation frame rate")
+            SettingsGroupCard(listOf {
+                SettingsChoiceRow(
+                    title = "Global animation frame rate",
+                    description = "Device follows the display's refresh rate. Fixed values cap continuous player animations; audio playback is unchanged.",
+                    selected = if (playerFrameRate == 0) "Device" else "$playerFrameRate FPS",
+                    options = listOf("Device", "20 FPS", "30 FPS", "40 FPS", "60 FPS"),
+                    onSelected = { selected ->
+                        onPlayerFrameRateChange(
+                            when (selected) {
+                                "20 FPS" -> 20
+                                "30 FPS" -> 30
+                                "40 FPS" -> 40
+                                "60 FPS" -> 60
+                                else -> 0
+                            }
+                        )
+                    }
+                )
+            })
 
             SettingsHeader("Playback Format")
             SettingsGroupCard(listOf(
