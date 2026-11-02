@@ -18,6 +18,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -86,6 +87,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -123,6 +126,7 @@ import com.dsann.music.util.SongDownloader
 import com.dsann.music.viewmodel.ExploreViewModel
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import com.dsann.music.ui.LocalRootTabActive
+import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
 
 /**
  * Standard UI Shimmer Modifier to render placeholder skeleton states efficiently.
@@ -142,36 +146,43 @@ fun ShimmerModifier(
 }
 
 fun Modifier.shimmerEffect(): Modifier = composed {
-    // Hidden cached tabs keep placeholders static; visible tabs animate normally.
+    // Cached/inactive tabs stay static. Visible shimmer samples the shared app frame clock.
     if (!LocalRootTabActive.current || Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
         this.background(DsmusicTheme.colorScheme.surfaceContainerHigh)
     } else {
         var positionInRoot by remember { mutableStateOf(Offset.Zero) }
-        val transition = rememberInfiniteTransition(label = "shimmer")
-        val translateAnim by transition.animateFloat(
-            initialValue = -1000f,
-            targetValue = 3000f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 2000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "shimmer_anim"
-        )
-        val shimmerColors = listOf(
+        val frameTimeNanos = rememberAppAnimationFrameTimeNanos(active = true)
+        val shimmerColors = remember(
             DsmusicTheme.colorScheme.surfaceContainerLow,
-            DsmusicTheme.colorScheme.surfaceContainerHigh,
-            DsmusicTheme.colorScheme.surfaceContainerLow
-        )
+            DsmusicTheme.colorScheme.surfaceContainerHigh
+        ) {
+            listOf(
+                DsmusicTheme.colorScheme.surfaceContainerLow,
+                DsmusicTheme.colorScheme.surfaceContainerHigh,
+                DsmusicTheme.colorScheme.surfaceContainerLow
+            )
+        }
 
         this
             .onGloballyPositioned { positionInRoot = it.positionInRoot() }
-            .background(
-                brush = Brush.linearGradient(
-                    colors = shimmerColors,
-                    start = Offset(translateAnim - positionInRoot.x, translateAnim - positionInRoot.y),
-                    end = Offset(translateAnim - positionInRoot.x + 600f, translateAnim - positionInRoot.y + 600f)
-                )
-            )
+            .drawWithCache {
+                val origin = positionInRoot
+                onDrawBehind {
+                    val frameNanos = frameTimeNanos.value
+                    val phase = if (frameNanos > 0L) {
+                        (frameNanos % 2_000_000_000L).toFloat() / 2_000_000_000f
+                    } else 0f
+                    val translate = -1000f + 4000f * phase
+                    val start = Offset(translate - origin.x, translate - origin.y)
+                    drawRect(
+                        brush = Brush.linearGradient(
+                            colors = shimmerColors,
+                            start = start,
+                            end = Offset(start.x + 600f, start.y + 600f)
+                        )
+                    )
+                }
+            }
     }
 }
 
@@ -195,27 +206,29 @@ fun AnimatedEqualizerBars(
         }
         return
     }
-    val infiniteTransition = rememberInfiniteTransition(label = "equalizer")
-    val height1 by infiniteTransition.animateFloat(
-        initialValue = 0.2f, targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(animation = tween(450, easing = LinearEasing), repeatMode = RepeatMode.Reverse),
-        label = "bar1"
-    )
-    val height2 by infiniteTransition.animateFloat(
-        initialValue = 0.3f, targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(animation = tween(350, easing = LinearEasing), repeatMode = RepeatMode.Reverse),
-        label = "bar2"
-    )
-    val height3 by infiniteTransition.animateFloat(
-        initialValue = 0.1f, targetValue = 0.7f,
-        animationSpec = infiniteRepeatable(animation = tween(550, easing = LinearEasing), repeatMode = RepeatMode.Reverse),
-        label = "bar3"
-    )
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.Bottom) {
-        val barWidth = 3.dp
-        Box(modifier = Modifier.width(barWidth).fillMaxHeight(height1).background(color, RoundedCornerShape(1.dp)))
-        Box(modifier = Modifier.width(barWidth).fillMaxHeight(height2).background(color, RoundedCornerShape(1.dp)))
-        Box(modifier = Modifier.width(barWidth).fillMaxHeight(height3).background(color, RoundedCornerShape(1.dp)))
+    val frameTimeNanos = rememberAppAnimationFrameTimeNanos(active = true)
+    Canvas(modifier = modifier) {
+        val seconds = frameTimeNanos.value.coerceAtLeast(0L) / 1_000_000_000.0
+        val barWidth = 3.dp.toPx()
+        val gap = 2.dp.toPx()
+        val corner = androidx.compose.ui.geometry.CornerRadius(1.dp.toPx())
+        val periods = doubleArrayOf(0.90, 0.70, 1.10)
+        val base = floatArrayOf(0.50f, 0.65f, 0.40f)
+        val amplitude = floatArrayOf(0.30f, 0.35f, 0.30f)
+        repeat(3) { index ->
+            val phase = (seconds % periods[index]) / periods[index] * (2.0 * Math.PI)
+            val wave = ((1.0 - kotlin.math.cos(phase)) * 0.5).toFloat()
+            val fraction = (base[index] - amplitude[index] + 2f * amplitude[index] * wave)
+                .coerceIn(0.12f, 1f)
+            val height = size.height * fraction
+            val x = index * (barWidth + gap)
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(x, size.height - height),
+                size = androidx.compose.ui.geometry.Size(barWidth, height),
+                cornerRadius = corner
+            )
+        }
     }
 }
 
@@ -384,20 +397,22 @@ fun SearchResultItem(
                 contentScale = ContentScale.Crop
             )
             if (isLoading) {
-                val shimmerAlpha = if (LocalRootTabActive.current && Build.VERSION.SDK_INT > Build.VERSION_CODES.M) {
-                    val loadingTransition = rememberInfiniteTransition(label = "loading_shimmer")
-                    val animatedAlpha by loadingTransition.animateFloat(
-                        initialValue = 0.3f, targetValue = 0.7f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(800, easing = LinearEasing),
-                            repeatMode = RepeatMode.Reverse
-                        ), label = "shimmer_alpha"
-                    )
-                    animatedAlpha
-                } else 0.45f
+                val loadingFrameTimeNanos = rememberAppAnimationFrameTimeNanos(
+                    active = LocalRootTabActive.current && Build.VERSION.SDK_INT > Build.VERSION_CODES.M
+                )
                 Box(
-                    modifier = Modifier.fillMaxSize().clip(imageShape)
-                        .background(DsmusicTheme.colorScheme.surfaceContainerHigh.copy(alpha = shimmerAlpha)),
+                    modifier = Modifier.fillMaxSize().clip(imageShape).drawBehind {
+                        val frameNanos = loadingFrameTimeNanos.value
+                        val phase = if (frameNanos > 0L) {
+                            (frameNanos % 800_000_000L).toFloat() / 800_000_000f
+                        } else 0.5f
+                        val pulse = (1f - kotlin.math.cos(phase * (2f * Math.PI.toFloat()))) * 0.5f
+                        drawRect(
+                            DsmusicTheme.colorScheme.surfaceContainerHigh.copy(
+                                alpha = 0.3f + pulse * 0.4f
+                            )
+                        )
+                    },
                     contentAlignment = Alignment.Center
                 ) {
                     LoadingIndicator(modifier = Modifier.size(20.dp))
