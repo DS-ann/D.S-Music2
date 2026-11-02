@@ -317,7 +317,7 @@ fun SearchResultItem(
     isCurrentlyPlaying: Boolean,
     isLoading: Boolean,
     onSongMenuClick: ((OnlineSong) -> Unit)? = null,
-    onTouchDown: () -> Unit = {},
+    onTouchDown: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
     val backgroundColor = if (isCurrentlyPlaying)
@@ -340,6 +340,22 @@ fun SearchResultItem(
         is SearchItem.Playlist -> item.playlist.playlistId
     }
     val imageShape = if (isCircle) CircleShape else RoundedCornerShape(4.dp) // Match YT Music sharp rounded corner
+    // Most Explore/history/detail rows do not need press-time prefetch. Avoid installing
+    // an always-listening pointer coroutine for those rows, especially on API 23.
+    val touchDownModifier = if (onTouchDown != null) {
+        Modifier.pointerInput(itemId) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    if (event.type == androidx.compose.ui.input.pointer.PointerEventType.Press) {
+                        onTouchDown()
+                    }
+                }
+            }
+        }
+    } else {
+        Modifier
+    }
 
     Row(
         modifier = Modifier
@@ -347,16 +363,7 @@ fun SearchResultItem(
             .padding(horizontal = 8.dp, vertical = 2.dp) // Perfect gap between items
             .clip(containerShape)
             .background(backgroundColor)
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        if (event.type == androidx.compose.ui.input.pointer.PointerEventType.Press) {
-                            onTouchDown()
-                        }
-                    }
-                }
-            }
+            .then(touchDownModifier)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
