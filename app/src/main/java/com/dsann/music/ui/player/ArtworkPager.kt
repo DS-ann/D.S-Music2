@@ -74,7 +74,10 @@ fun ArtworkPager(
     ) {
         (minOf(configuration.screenWidthDp, configuration.screenHeightDp) * density.density)
             .roundToInt()
-            .coerceIn(256, 768)
+            .coerceIn(
+                256,
+                if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 384 else 768
+            )
     }
 
     // Keep the previous and next covers warm in Coil's existing memory/disk caches.
