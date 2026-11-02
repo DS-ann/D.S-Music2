@@ -2090,10 +2090,17 @@ class AudioPlaybackService : MediaSessionService() {
                         lastPositionPersistedAtMs = nowMs
                     }
 
-                    if (player.isPlaying && nowMs - lastWidgetProgressUpdateAtMs >= 1_000L) {
+                    val lyricsModeActive = viewModel?.isLyricsModeEnabled?.value == true
+                    val widgetProgressIntervalMs = if (
+                        Build.VERSION.SDK_INT <= Build.VERSION_CODES.M && !lyricsModeActive
+                    ) 5_000L else 1_000L
+                    if (player.isPlaying &&
+                        nowMs - lastWidgetProgressUpdateAtMs >= widgetProgressIntervalMs
+                    ) {
                         lastWidgetProgressUpdateAtMs = nowMs
-                        // Lyrics lookup and RemoteViews preparation are not playback-clock work.
-                        // Keep both away from the main-looper progress callback.
+                        // Widget progress is intentionally less frequent on API 23. RemoteViews
+                        // Binder traffic is expensive on older devices and widgets do not need
+                        // a one-second clock; lyrics mode keeps its normal update cadence.
                         serviceScope.launch(Dispatchers.Default) {
                             updateWidgetProgress(pos, dur)
                         }
@@ -2122,8 +2129,11 @@ class AudioPlaybackService : MediaSessionService() {
                 // position every 400ms invalidates the always-mounted player overlay even when
                 // the user is browsing another tab. Keep legacy UI state updates to 1Hz.
                 // Lyrics retain a faster clock because line synchronization is user-visible.
+                val lyricsModeActive = viewModel?.isLyricsModeEnabled?.value == true
+                val playerExpanded = viewModel?.isPlayerExpanded?.value == true
                 val intervalMs = when {
-                    viewModel?.isLyricsModeEnabled?.value == true && player.isPlaying -> 180L
+                    lyricsModeActive && player.isPlaying -> 180L
+                    Build.VERSION.SDK_INT <= Build.VERSION_CODES.M && !playerExpanded -> 2_000L
                     Build.VERSION.SDK_INT <= Build.VERSION_CODES.M -> 1_000L
                     else -> 400L
                 }
