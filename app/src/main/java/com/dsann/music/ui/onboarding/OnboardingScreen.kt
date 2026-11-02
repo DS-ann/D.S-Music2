@@ -62,6 +62,7 @@ package com.dsann.music.ui.onboarding
     import com.dsann.music.ui.theme.FloatingActionButtonDefaults
     import com.dsann.music.ui.theme.Icon
     import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
     import com.dsann.music.ui.theme.NavigationBar
     import com.dsann.music.ui.theme.NavigationBarItem
     import com.dsann.music.ui.theme.Scaffold
@@ -997,16 +998,7 @@ package com.dsann.music.ui.onboarding
         isLoggedIn: Boolean,
         userProfileUrl: String?
     ) {
-        val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "pulse")
-        val pulseAlpha by infiniteTransition.animateFloat(
-            initialValue = 0.4f,
-            targetValue = 1f,
-            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                animation = tween(1000, easing = FastOutSlowInEasing),
-                repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-            ),
-            label = "pulse_alpha"
-        )
+        val pulseFrameTimeNanos = rememberAppAnimationFrameTimeNanos(active = true)
     
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
@@ -1035,7 +1027,15 @@ package com.dsann.music.ui.onboarding
                             modifier = Modifier
                                 .size(8.dp)
                                 .clip(CircleShape)
-                                .background(DsmusicTheme.colorScheme.primary.copy(alpha = pulseAlpha))
+                                .graphicsLayer {
+                                    val frameNanos = pulseFrameTimeNanos.value
+                                    val phase = if (frameNanos > 0L) {
+                                        (frameNanos % 1_000_000_000L).toDouble() / 1_000_000_000.0
+                                    } else 0.0
+                                    val pulse = (1.0 - kotlin.math.cos(phase * 2.0 * Math.PI)) * 0.5
+                                    alpha = 0.4f + 0.6f * pulse.toFloat()
+                                }
+                                .background(DsmusicTheme.colorScheme.primary)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
