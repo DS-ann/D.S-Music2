@@ -64,7 +64,7 @@ import coil.request.ImageRequest
 import com.dsann.music.MainActivity
 import com.dsann.music.service.AudioPlaybackService
 import com.dsann.music.ui.player.WavyMusicSlider
-import com.dsann.music.ui.player.rememberPlayerFrameTimeNanos
+import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
 import com.dsann.music.ui.theme.DsmusicAppTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
@@ -316,7 +316,7 @@ fun PopupPlayerContent(
     var duration by remember { mutableLongStateOf(0L) }
     var isScrubbing by remember { mutableStateOf(false) }
     var sliderScrubPos by remember { mutableFloatStateOf(0f) }
-    val frameTimeNanos = rememberPlayerFrameTimeNanos(
+    val frameTimeNanos = rememberAppAnimationFrameTimeNanos(
         active = player != null && isPlaying && !isScrubbing
     )
     val frameNanos by frameTimeNanos
