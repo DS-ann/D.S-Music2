@@ -21,6 +21,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -408,6 +409,7 @@ private fun LandscapePlayerDetailsPane(
     songList: List<SongItem>,
     currentSongIndex: Int,
     currentPositionProvider: () -> Int,
+    playbackSpeedProvider: () -> Float,
     isPlaying: Boolean,
     contentColor: Color,
     secondaryColor: Color,
@@ -419,6 +421,7 @@ private fun LandscapePlayerDetailsPane(
     onPlayQueueItem: (Int) -> Unit
 ) {
     var showQueue by remember { mutableStateOf(false) }
+    var showProviderPicker by remember { mutableStateOf(false) }
     var lastAutoRequestedLyricsSongId by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(showQueue, currentSong?.id) {
         val songId = currentSong?.id ?: return@LaunchedEffect
@@ -459,6 +462,11 @@ private fun LandscapePlayerDetailsPane(
                 )
             }
             Spacer(Modifier.weight(1f))
+            if (!showQueue) {
+                DsmusicIconButton(onClick = { showProviderPicker = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Choose lyrics source")
+                }
+            }
             Text(
                 text = if (showQueue) songList.size.toString() + " tracks" else currentSong?.artist.orEmpty(),
                 color = secondaryColor,
@@ -475,6 +483,7 @@ private fun LandscapePlayerDetailsPane(
                     onSeekTo = onSeekTo,
                     lyrics = syncedLyrics,
                     currentPositionProvider = currentPositionProvider,
+                    playbackSpeedProvider = playbackSpeedProvider,
                     isPlaying = isPlaying,
                     contentColor = contentColor,
                     dynamicAccentColor = accentColor,
@@ -591,6 +600,21 @@ private fun LandscapePlayerDetailsPane(
             }
         }
     }
+
+    if (showProviderPicker) {
+        LyricsProviderPickerSheet(
+            providerResults = providerResults,
+            selectedProvider = selectedProvider,
+            onProviderSelected = onProviderSelected,
+            onRefindClick = onFetchLyrics,
+            accentColor = accentColor,
+            contentColor = contentColor,
+            backgroundBrush = Brush.verticalGradient(
+                listOf(contentColor.copy(alpha = 0.13f), contentColor.copy(alpha = 0.035f))
+            ),
+            onDismissRequest = { showProviderPicker = false }
+        )
+    }
 }
 
 /**
@@ -618,10 +642,14 @@ fun FullPlayerScreen(
     val lyricsError by viewModel.lyricsError.collectAsStateWithLifecycle()
     val providerResults by viewModel.providerResults.collectAsStateWithLifecycle()
     val selectedProvider by viewModel.selectedProvider.collectAsStateWithLifecycle()
-    // Do not collect playback position at the player root. This screen remains composed
-    // while collapsed; a root subscription used to recompose the entire hidden player every tick.
-    val currentPositionProvider: () -> Int = remember(viewModel) {
-        { viewModel.currentPosition.value }
+    // Read the service's live ExoPlayer clock for lyrics only. The general-purpose
+    // currentPosition StateFlow remains throttled on older devices to protect UI performance.
+    val lyricsAudioService by viewModel.audioServiceState.collectAsStateWithLifecycle()
+    val currentPositionProvider: () -> Int = remember(viewModel, lyricsAudioService) {
+        { lyricsAudioService?.getCurrentPositionForLyrics() ?: viewModel.currentPosition.value }
+    }
+    val playbackSpeedProvider: () -> Float = remember(lyricsAudioService) {
+        { lyricsAudioService?.getPlaybackSpeedForLyrics() ?: 1f }
     }
     val customizeViewModel: SettingsViewModel =
         androidx.lifecycle.viewmodel.compose.viewModel(viewModelStoreOwner = activity)
@@ -682,6 +710,7 @@ fun FullPlayerScreen(
         visualizerColor = visualizerColor,
         onProviderSelected = { viewModel.selectLyricsProvider(it) },
         currentPositionProvider = currentPositionProvider,
+        playbackSpeedProvider = playbackSpeedProvider,
         currentPositionFlow = viewModel.currentPosition,
         isPlayerVisible = isPlayerVisible,
         onCollapse = onCollapse,
@@ -739,6 +768,7 @@ fun FullPlayer(
     isLyricsLoading: Boolean,
     lyricsError: Throwable?,
     currentPositionProvider: () -> Int,
+    playbackSpeedProvider: () -> Float,
     currentPositionFlow: StateFlow<Int>,
     isPlayerVisible: Boolean,
     onCollapse: () -> Unit,
@@ -1432,12 +1462,14 @@ fun FullPlayer(
                         songList = songList,
                         currentSongIndex = currentSongIndex,
                         currentPositionProvider = currentPositionProvider,
+                        playbackSpeedProvider = playbackSpeedProvider,
                         isPlaying = uiState.isPlaying,
                         contentColor = contentColor,
                         secondaryColor = contentSecondary,
                         accentColor = dynamicAccentColor,
                         selectedProvider = selectedProvider,
                         providerResults = providerResults,
+                        onProviderSelected = onProviderSelected,
                         onSeekTo = onSeekTo,
                         onFetchLyrics = onFetchLyrics,
                         onPlayQueueItem = { index -> viewModel.playSongAtIndex(index) }
@@ -1466,6 +1498,7 @@ fun FullPlayer(
                 isPlaying = uiState.isPlaying,
                 lyricsError = lyricsError,
                 currentPositionProvider = currentPositionProvider,
+                playbackSpeedProvider = playbackSpeedProvider,
                 contentReady = lyricsContentReady,
                 backgroundBrush = lyricsBackgroundBrush,
                 revealProgressProvider = { lyricsRevealProgress },
