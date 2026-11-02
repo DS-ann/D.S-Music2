@@ -1131,6 +1131,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     _downloadBitrate.value =
                         com.dsann.music.data.innertube.NewPipeStreamExtractor
                             .normalizeAudioQuality(prefs.getString(KEY_DOWNLOAD_BITRATE, "256 kbps"))
+                    _playerFrameRate.value = PlayerFrameRateController.load(context)
                     _pauseHistory.value = prefs.getBoolean("pause_history", false)
                     _downloadFolder.value = prefs.getString("download_folder", null)
                     _songCacheMaxSize.value = prefs.getInt("song_cache_max_size", 1024)
@@ -3938,8 +3939,8 @@ private fun PlaybackScreen(
                 SettingsChoiceRow(
                     title = "Global animation frame rate",
                     description = "Device follows the display's refresh rate. Fixed values cap continuous player animations; audio playback is unchanged.",
-                    selected = if (playerFrameRate == 0) "Device" else "$playerFrameRate FPS",
-                    options = listOf("Device", "20 FPS", "30 FPS", "40 FPS", "60 FPS"),
+                    selected = if (playerFrameRate == 0) "Device (Default)" else "$playerFrameRate FPS",
+                    options = listOf("Device (Default)", "20 FPS", "30 FPS", "40 FPS", "60 FPS"),
                     onSelected = { selected ->
                         onPlayerFrameRateChange(
                             when (selected) {
