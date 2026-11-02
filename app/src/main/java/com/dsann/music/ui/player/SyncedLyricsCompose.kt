@@ -169,6 +169,9 @@ internal fun SyncedLyricsCompose(
     val isKaraokeMode = remember(lyrics) {
         lyrics.any { !it.isInterlude && it.isWordByWord && it.words.isNotEmpty() }
     }
+    val karaokeFrameTimeNanos = rememberPlayerFrameTimeNanos(
+        active = isPlaying && isKaraokeMode
+    )
 
     // ── Filter out interludes when in karaoke mode ──
     val displayItems = remember(lyrics, isKaraokeMode) {
@@ -207,7 +210,13 @@ internal fun SyncedLyricsCompose(
                 lastFrameNanos = -1L
                 if (lyricClock.intValue != actualMs) lyricClock.intValue = actualMs
             } else {
-                withFrameNanos { frameNanos ->
+                withFrameNanos {
+                    // Use the shared player frame timestamp rather than an independent
+                    // display callback, so karaoke, progress and visualizer obey one rate.
+                    val frameNanos = karaokeFrameTimeNanos.value
+                    if (frameNanos <= 0L || frameNanos == lastFrameNanos) {
+                        return@withFrameNanos
+                    }
                     val actualMs = currentPositionProvider().coerceAtLeast(0).toDouble()
                     if (lastFrameNanos < 0L || frameNanos <= lastFrameNanos) {
                         shownMs = actualMs
