@@ -2208,8 +2208,9 @@ class AudioPlaybackService : MediaSessionService() {
                 val playerExpanded = viewModel?.isPlayerExpanded?.value == true
                 val intervalMs = when {
                     lyricsModeActive && player.isPlaying -> 180L
-                    Build.VERSION.SDK_INT <= Build.VERSION_CODES.M && !playerExpanded -> 2_000L
-                    Build.VERSION.SDK_INT <= Build.VERSION_CODES.M -> 1_000L
+                    // Audio stays on Media3's precise playback clock. API 23 only samples
+                    // UI/cache/crossfade housekeeping every 2s outside the lyrics view.
+                    Build.VERSION.SDK_INT <= Build.VERSION_CODES.M -> 2_000L
                     else -> 400L
                 }
                 handler.postDelayed(this, intervalMs)
