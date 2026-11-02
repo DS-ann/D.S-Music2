@@ -85,6 +85,10 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.size.Precision
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -336,6 +340,14 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
         }
     }
 
+    val showLegacyCompactArtwork by remember(playerContentExpansionFraction, isLyricsModeEnabled) {
+        derivedStateOf {
+            android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M &&
+                playerContentExpansionFraction.value < 0.5f &&
+                !isLyricsModeEnabled
+        }
+    }
+
     val miniPlayerZIndex by remember {
         derivedStateOf { if (playerContentExpansionFraction.value < 0.5f) 1f else 0f }
     }
@@ -361,6 +373,8 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
             currentSong = currentSong,
             isPlaying = isPlaying,
             accentColor = baseAccentColor,
+            showLegacyCompactArtwork = showLegacyCompactArtwork,
+            expansionFraction = playerContentExpansionFraction,
             onClick = {
                 // A tap on the mini player always opens the normal full player.
                 // Lyrics and Queue are explicit modes, never inherited from the last session.
@@ -1155,6 +1169,13 @@ fun PlayerBottomSheetCompose(
         var isDragging by remember { mutableStateOf(false) }
 
         val showPlayerContentArea = currentSong != null
+        val isLegacyCompactArtwork by remember(playerContentExpansionFraction, isLyricsModeEnabled) {
+            derivedStateOf {
+                android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M &&
+                    playerContentExpansionFraction.value < 0.5f &&
+                    !isLyricsModeEnabled
+            }
+        }
 
         LaunchedEffect(currentSheetContentState) {
             viewModel.setPlayerExpanded(currentSheetContentState == PlayerSheetState.EXPANDED)
@@ -1503,6 +1524,7 @@ fun PlayerBottomSheetCompose(
                     ) * playerArtworkScale.coerceIn(0.65f, 1f)
                     val statusBarTopPx = WindowInsets.statusBars.getTop(density).toFloat()
 
+                    if (!isLegacyCompactArtwork) {
                     Box(
                         modifier = Modifier
                             .size(albumArtSizeDp)
@@ -1512,7 +1534,12 @@ fun PlayerBottomSheetCompose(
 
                                 val miniSizePx = 48.dp.toPx()
                                 val fullSizePx = albumArtSizeDp.toPx()
-                                val normalScale = androidx.compose.ui.util.lerp(miniSizePx / fullSizePx, 1f, t)
+                                val artTransitionProgress = if (
+                                    android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M
+                                ) ((t - 0.5f) * 2f).coerceIn(0f, 1f) else t
+                                val normalScale = androidx.compose.ui.util.lerp(
+                                    miniSizePx / fullSizePx, 1f, artTransitionProgress
+                                )
 
                                 // Account for the horizontal padding applied in the parent layout block
                                 val startPaddingPx = sheetVisualState.currentHorizontalPaddingStartPxProvider()
@@ -1550,8 +1577,8 @@ fun PlayerBottomSheetCompose(
                                 }
                                 val yEndPx = with(density) { topOffsetDp.toPx() }
 
-                                val normalX = androidx.compose.ui.util.lerp(xStartPx, xEndPx, t)
-                                val normalY = androidx.compose.ui.util.lerp(yStartPx, yEndPx, t)
+                                val normalX = androidx.compose.ui.util.lerp(xStartPx, xEndPx, artTransitionProgress)
+                                val normalY = androidx.compose.ui.util.lerp(yStartPx, yEndPx, artTransitionProgress)
                                 val normalShadow = androidx.compose.ui.util.lerp(0f, 16.dp.toPx(), t)
 
                                 val appBarThumbSizePx = 44.dp.toPx()
@@ -1821,6 +1848,7 @@ fun PlayerBottomSheetCompose(
                             )
                         }
                     }
+                    }
                 }
             }
         }
@@ -1933,6 +1961,8 @@ private fun MiniPlayerContentInternal(
     currentSong: SongItem,
     isPlaying: Boolean,
     accentColor: Color,
+    showLegacyCompactArtwork: Boolean,
+    expansionFraction: Animatable<Float, AnimationVector1D>,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1944,6 +1974,31 @@ private fun MiniPlayerContentInternal(
     }
     val controlShapeName by miniPlayerPreferences.observeKey("mini_player_control_shape", "Circle")
     val controlIconSet by miniPlayerPreferences.observeKey("mini_player_control_icons", "Classic")
+    val artworkShapeName by miniPlayerPreferences.observeKey("player_artwork_shape", "Rounded")
+    val artworkLayout by miniPlayerPreferences.observeKey("player_layout", "Standard")
+    val miniArtworkShape = remember(artworkShapeName, artworkLayout) {
+        DsmCoverShapes.forPlayerLayout(artworkLayout, artworkShapeName)
+    }
+    val miniArtworkModel = remember(
+        currentSong.id, currentSong.thumbnailUrl, currentSong.videoId,
+        currentSong.albumId, currentSong.path
+    ) {
+        currentSong.thumbnailUrl?.takeIf { it.isNotBlank() }
+            ?.let { SongItem.enhanceThumbnailUrl(it) }
+            ?: currentSong.videoId?.takeIf { it.isNotBlank() }
+                ?.let { "https://img.youtube.com/vi/$it/hqdefault.jpg" }
+            ?: currentSong.getAlbumArtUri()?.toString()
+    }
+    val miniArtworkRequest = remember(context, miniArtworkModel) {
+        miniArtworkModel?.let { model ->
+            ImageRequest.Builder(context)
+                .data(model)
+                .size(96, 96)
+                .precision(Precision.INEXACT)
+                .crossfade(false)
+                .build()
+        }
+    }
     val controlShape: Shape = when (controlShapeName) {
         "Rounded" -> RoundedCornerShape(14.dp)
         "Pill" -> RoundedCornerShape(percent = 50)
@@ -1985,9 +2040,42 @@ private fun MiniPlayerContentInternal(
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Reserves the same 60dp artwork slot used by the shared transformed cover.
-        // Progress is painted above that cover so both always share coordinates and clipping.
-        Box(modifier = Modifier.size(artworkSize))
+        // Keep the Android 6 mini cover at its actual display size. The full-size
+        // artwork pager is mounted only once the player is meaningfully expanded.
+        Box(
+            modifier = Modifier.size(artworkSize),
+            contentAlignment = Alignment.Center
+        ) {
+            if (showLegacyCompactArtwork) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(miniArtworkShape)
+                        .background(DsmusicTheme.colorScheme.surfaceVariant)
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_music_note),
+                        contentDescription = null,
+                        tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                        modifier = Modifier.align(Alignment.Center).size(26.dp)
+                    )
+                    miniArtworkRequest?.let { request ->
+                        AsyncImage(
+                            model = request,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(miniArtworkShape)
+                        )
+                    }
+                }
+                MiniPlayerArtworkProgressOverlay(
+                    viewModel = viewModel,
+                    accentColor = accentColor,
+                    expansionFraction = expansionFraction,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.width(if (compactLandscape) 12.dp else 20.dp))
 
