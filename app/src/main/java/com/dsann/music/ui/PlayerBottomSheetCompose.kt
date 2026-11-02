@@ -2121,7 +2121,12 @@ private fun MiniPlayerArtworkProgressOverlay(
     }
     val progressState = animateFloatAsState(
         targetValue = targetProgress,
-        animationSpec = tween(durationMillis = 350, easing = LinearEasing),
+        // API 23 receives progress less frequently; an extra 350 ms animation only
+        // adds draw work between updates without improving seek accuracy.
+        animationSpec = if (
+            android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M
+        ) androidx.compose.animation.core.snap()
+        else tween(durationMillis = 350, easing = LinearEasing),
         label = "MiniArtworkProgress"
     )
     androidx.compose.foundation.Canvas(
