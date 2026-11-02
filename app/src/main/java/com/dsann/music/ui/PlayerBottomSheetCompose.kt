@@ -2206,22 +2206,11 @@ private fun MiniPlayerArtworkProgressOverlay(
     val frameTimeNanos = rememberPlayerFrameTimeNanos(
         active = isMiniLayerVisible && isPlaying
     )
-    val frameNanos by frameTimeNanos
     val observedPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
     val duration by viewModel.duration.collectAsStateWithLifecycle()
 
-    // While visible, sample Media3 on the display's own frame clock. The ViewModel
-    // position is only a paused/background fallback, never the running progress clock.
-    val currentPosition = if (isPlaying && frameNanos > 0L) {
-        audioService?.getCurrentPositionForLyrics() ?: observedPosition
-    } else {
-        observedPosition
-    }
-    val progress = if (duration > 0) {
-        (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
+    // The frame timestamp is read inside Canvas so only the artwork-progress drawing
+    // invalidates at display refresh, not the entire mini-player composition.
     androidx.compose.foundation.Canvas(
         modifier = modifier.graphicsLayer {
             alpha = (1f - expansionFraction.value * 2f).coerceIn(0f, 1f)
@@ -2229,7 +2218,19 @@ private fun MiniPlayerArtworkProgressOverlay(
     ) {
         val side = size.minDimension
         if (side <= 0f) return@Canvas
-        // Progress is read from Media3 once per display frame; no timer or tween is layered on top.
+        val frameNanos = frameTimeNanos.value
+        // Sample Media3 directly on each delivered display frame. The ViewModel value is
+        // used only when paused or when the playback service is not yet connected.
+        val currentPosition = if (isPlaying && frameNanos > 0L) {
+            audioService?.getCurrentPositionForLyrics() ?: observedPosition
+        } else {
+            observedPosition
+        }
+        val progress = if (duration > 0) {
+            (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
 
         when (style) {
             "Ring" -> {
