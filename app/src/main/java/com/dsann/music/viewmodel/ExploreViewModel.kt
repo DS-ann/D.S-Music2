@@ -1207,28 +1207,46 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun prefetchThumbnails(items: List<SearchItem>) {
-        val urls = items.mapNotNull { item ->
-            when (item) {
-                is SearchItem.Song -> item.song.thumbnailUrl
-                is SearchItem.Album -> item.album.thumbnailUrl
-                is SearchItem.Artist -> item.artist.thumbnailUrl
-                is SearchItem.Playlist -> item.playlist.thumbnailUrl
+        // Prefetch only a small leading window on older devices. Rows load their own
+        // artwork when they become visible, so warming an entire detail page is wasteful.
+        val maxPrefetchCount = if (
+            android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M
+        ) 4 else 12
+        val urls = items.asSequence()
+            .take(maxPrefetchCount)
+            .mapNotNull { item ->
+                when (item) {
+                    is SearchItem.Song -> item.song.thumbnailUrl
+                    is SearchItem.Album -> item.album.thumbnailUrl
+                    is SearchItem.Artist -> item.artist.thumbnailUrl
+                    is SearchItem.Playlist -> item.playlist.thumbnailUrl
+                }
             }
-        }
+            .toList()
         prefetchUrls(urls)
     }
 
     private fun prefetchUrls(urls: List<String?>) {
+        val maxPrefetchCount = if (
+            android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M
+        ) 4 else 12
+        val selectedUrls = urls.asSequence()
+            .filterNotNull()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .take(maxPrefetchCount)
+            .toList()
+        if (selectedUrls.isEmpty()) return
+
         val applicationContext = getApplication<Application>()
         viewModelScope.launch {
             val loader = applicationContext.imageLoader
-            urls.forEach { url ->
-                if (!url.isNullOrBlank()) {
-                    val req = ImageRequest.Builder(applicationContext)
-                        .data(url)
-                        .build()
-                    loader.enqueue(req)
-                }
+            selectedUrls.forEach { url ->
+                val req = ImageRequest.Builder(applicationContext)
+                    .data(url)
+                    .build()
+                loader.enqueue(req)
             }
         }
     }
