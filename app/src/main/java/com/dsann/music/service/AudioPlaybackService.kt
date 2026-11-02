@@ -2205,7 +2205,6 @@ class AudioPlaybackService : MediaSessionService() {
                 // is throttled to 0.5 Hz outside lyrics mode; this handler still checks internal
                 // playback transitions at its normal cadence. Lyrics keep the faster clock.
                 val lyricsModeActive = viewModel?.isLyricsModeEnabled?.value == true
-                val playerExpanded = viewModel?.isPlayerExpanded?.value == true
                 val intervalMs = when {
                     lyricsModeActive && player.isPlaying -> 180L
                     // Audio stays on Media3's precise playback clock. API 23 only samples
