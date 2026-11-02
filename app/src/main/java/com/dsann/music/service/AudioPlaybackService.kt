@@ -1865,12 +1865,77 @@ class AudioPlaybackService : MediaSessionService() {
             requestGeneration != artworkRequestGeneration
         ) return
 
-        currentSongName = songName?.takeIf { it.isNotBlank() } ?: activeSong.title
-        currentAlbumArt = albumArt?.let {
-            val size = min(it.width, it.height)
-            Bitmap.createBitmap(it, (it.width - size) / 2, (it.height - size) / 2, size, size)
-                .scale(512, 512, true)
+        val resolvedSongName = songName?.takeIf { it.isNotBlank() } ?: activeSong.title
+        if (albumArt == null) {
+            applySongMetadata(
+                resolvedSongName,
+                null,
+                null,
+                expectedSongId,
+                requestGeneration,
+                persistArtwork
+            )
+            return
         }
+
+        // Bitmap crop/scale and PNG encoding used to run on the main thread every time
+        // artwork arrived. On API 23 that can stall all pages during local track changes.
+        // Keep player/session mutations on Main, but do all pixel work on a worker thread.
+        serviceScope.launch(Dispatchers.Default) {
+            val processedArtwork = try {
+                val size = min(albumArt.width, albumArt.height)
+                Bitmap.createBitmap(
+                    albumArt,
+                    (albumArt.width - size) / 2,
+                    (albumArt.height - size) / 2,
+                    size,
+                    size
+                ).scale(512, 512, true)
+            } catch (error: Exception) {
+                Log.w(TAG, "Unable to prepare artwork for $expectedSongId", error)
+                null
+            }
+            val encodedArtwork = processedArtwork?.let { bitmap ->
+                try {
+                    java.io.ByteArrayOutputStream().use { stream ->
+                        if (bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)) {
+                            stream.toByteArray()
+                        } else null
+                    }
+                } catch (error: Exception) {
+                    Log.w(TAG, "Unable to encode artwork for $expectedSongId", error)
+                    null
+                }
+            }
+            withContext(Dispatchers.Main) {
+                applySongMetadata(
+                    resolvedSongName,
+                    processedArtwork,
+                    encodedArtwork,
+                    expectedSongId,
+                    requestGeneration,
+                    persistArtwork
+                )
+            }
+        }
+    }
+
+    private fun applySongMetadata(
+        songName: String,
+        albumArt: Bitmap?,
+        encodedArtwork: ByteArray?,
+        expectedSongId: String,
+        requestGeneration: Long,
+        persistArtwork: Boolean
+    ) {
+        val activeSong = viewModel?.currentSong?.value
+        if (expectedSongId.isBlank() ||
+            activeSong?.id?.toString() != expectedSongId ||
+            requestGeneration != artworkRequestGeneration
+        ) return
+
+        currentSongName = songName
+        currentAlbumArt = albumArt
         currentAlbumArtSongId = expectedSongId.takeIf { currentAlbumArt != null }
         if (persistArtwork) persistCurrentSongArtwork(currentAlbumArt, expectedSongId)
 
@@ -1882,11 +1947,9 @@ class AudioPlaybackService : MediaSessionService() {
             activeSong.thumbnailUrl?.takeIf { it.isNotBlank() }?.let {
                 metadataBuilder.setArtworkUri(it.toUri())
             }
-            currentAlbumArt?.let {
-                val stream = java.io.ByteArrayOutputStream()
-                it.compress(Bitmap.CompressFormat.PNG, 100, stream)
+            if (encodedArtwork != null) {
                 metadataBuilder.setArtworkData(
-                    stream.toByteArray(),
+                    encodedArtwork,
                     androidx.media3.common.MediaMetadata.PICTURE_TYPE_FRONT_COVER
                 )
             }
