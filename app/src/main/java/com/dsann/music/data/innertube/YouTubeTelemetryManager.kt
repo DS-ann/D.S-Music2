@@ -74,6 +74,10 @@ class YouTubeTelemetryManager(
     }
     
     fun updateProgress(positionMs: Long, durationMs: Long = 0) {
+        // Local/offline songs have no YouTube telemetry session. Skip all heartbeat,
+        // logging, and URL work instead of waking this path on every service progress tick.
+        if (currentVideoId == null) return
+
         if (kotlin.math.abs(positionMs - currentPositionMs) > 2000L) {
             val prevPos = lastReportedTimeMs / 1000
             val preSeekPos = currentPositionMs / 1000
