@@ -3133,6 +3133,23 @@ class AudioPlaybackService : MediaSessionService() {
         return player.currentPosition.coerceAtLeast(0L)
     }
 
+    /**
+     * Direct application-thread playback clock for frame-paced lyric rendering.
+     * The public UI StateFlow is intentionally throttled on older devices; karaoke
+     * must not use that coarse UI snapshot as its audio clock.
+     */
+    fun getCurrentPositionForLyrics(): Int? {
+        if (!isPlayerInitialized || player.currentMediaItem == null ||
+            player.playbackState == Player.STATE_IDLE
+        ) return null
+        return player.currentPosition.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+    }
+
+    fun getPlaybackSpeedForLyrics(): Float {
+        if (!isPlayerInitialized) return 1f
+        return player.playbackParameters.speed.takeIf { it.isFinite() && it > 0f } ?: 1f
+    }
+
     fun getPlayerInstance(): ExoPlayer = player
 
     inner class LocalBinder : Binder() {
