@@ -9,7 +9,7 @@ import com.dsann.music.ui.theme.DsmusicButton
 import com.dsann.music.ui.theme.DsmusicOutlinedButton
 import com.dsann.music.ui.theme.DsmusicTextButton
 import com.dsann.music.ui.theme.DsmusicIconButton
-import com.dsann.music.ui.player.PlayerFrameRateController
+import com.dsann.music.ui.player.AppAnimationFrameRateController
 import com.dsann.music.ui.theme.DsmusicFilterChip
 import com.dsann.music.ui.theme.DsmusicSwitchControl
 import android.annotation.SuppressLint
@@ -898,7 +898,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val downloadBitrate: StateFlow<String> = _downloadBitrate.asStateFlow()
 
     // A value of 0 follows the device's actual display refresh cadence.
-    private val _playerFrameRate = MutableStateFlow(PlayerFrameRateController.load(context))
+    private val _playerFrameRate = MutableStateFlow(AppAnimationFrameRateController.load(context))
     val playerFrameRate: StateFlow<Int> = _playerFrameRate.asStateFlow()
 
     fun setAudioQuality(quality: String) {
@@ -931,7 +931,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun setPlayerFrameRate(frameRate: Int) {
-        _playerFrameRate.value = PlayerFrameRateController.set(context, frameRate)
+        _playerFrameRate.value = AppAnimationFrameRateController.set(context, frameRate)
     }
 
     // ── Pause Listening History ────────────────────────────────────────────────
@@ -1131,7 +1131,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     _downloadBitrate.value =
                         com.dsann.music.data.innertube.NewPipeStreamExtractor
                             .normalizeAudioQuality(prefs.getString(KEY_DOWNLOAD_BITRATE, "256 kbps"))
-                    _playerFrameRate.value = PlayerFrameRateController.load(context)
+                    _playerFrameRate.value = AppAnimationFrameRateController.load(context)
                     _pauseHistory.value = prefs.getBoolean("pause_history", false)
                     _downloadFolder.value = prefs.getString("download_folder", null)
                     _songCacheMaxSize.value = prefs.getInt("song_cache_max_size", 1024)
@@ -3938,7 +3938,7 @@ private fun PlaybackScreen(
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
                     title = "Global animation frame rate",
-                    description = "Device follows the display's refresh rate. Fixed values cap continuous player animations; audio playback is unchanged.",
+                    description = "Device follows display refresh. Fixed values cap continuous visual effects across playback, lyrics and loading indicators. Short touch/layout transitions stay on display vsync for responsiveness; audio playback is unchanged.",
                     selected = if (playerFrameRate == 0) "Device (Default)" else "$playerFrameRate FPS",
                     options = listOf("Device (Default)", "20 FPS", "30 FPS", "40 FPS", "60 FPS"),
                     onSelected = { selected ->
