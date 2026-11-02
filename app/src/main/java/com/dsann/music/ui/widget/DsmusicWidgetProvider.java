@@ -658,7 +658,15 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
     private static PendingIntent getServicePendingIntent(Context context, String action, int requestCode) {
         Intent intent = new Intent(context, com.dsann.music.service.AudioPlaybackService.class);
         intent.setAction(action);
-        return PendingIntent.getService(context, requestCode, intent, 
-                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        int flags = PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT;
+
+        // Widget taps are explicit user actions and can arrive while the app is backgrounded
+        // (especially from the lock screen). On Android 8+, start the MediaSessionService via
+        // a foreground-service PendingIntent so background-service launch limits cannot leave
+        // the widget command undelivered. Older Android versions keep the compatible service PI.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            return PendingIntent.getForegroundService(context, requestCode, intent, flags);
+        }
+        return PendingIntent.getService(context, requestCode, intent, flags);
     }
 }
