@@ -640,7 +640,7 @@ fun LibraryScreen(
                                     activeTab
                                 ) {
                                     value = withContext(Dispatchers.Default) {
-                                        localSongs.filter(::isSpatialFlowDownloadedSong)
+                                        localSongs.filter(::isDsmusicDownloadedSong)
                                     }
                                 }
 
@@ -3263,10 +3263,10 @@ private fun accountViewModelRefreshReplay(context: Context) {
 }
 
 
-private fun isSpatialFlowDownloadedSong(song: SongItem): Boolean =
-    isSpatialFlowDownloadedLocation(song.mediaStoreRelativePath, song.path ?: song.data)
+private fun isDsmusicDownloadedSong(song: SongItem): Boolean =
+    isDsmusicDownloadedLocation(song.mediaStoreRelativePath, song.path ?: song.data)
 
-private fun isSpatialFlowDownloadedLocation(relativePathValue: String?, rawPath: String?): Boolean {
+private fun isDsmusicDownloadedLocation(relativePathValue: String?, rawPath: String?): Boolean {
     val relativePath = relativePathValue.orEmpty().trim('/').lowercase(java.util.Locale.ROOT)
     val appFolders = listOf(
         "music/d.s music", "download/d.s music", "downloads/d.s music",
@@ -3331,7 +3331,7 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
                 while (c.moveToNext()) {
                     val path = c.getString(dataCol)
                     val relativePath = if (relativePathCol >= 0) c.getString(relativePathCol) else null
-                    val isDownloadedFile = isSpatialFlowDownloadedLocation(relativePath, path)
+                    val isDownloadedFile = isDsmusicDownloadedLocation(relativePath, path)
                     if (!isDownloadedFile && c.getInt(isMusicCol) == 0) continue
                     if (!isDownloadedFile && path != null && hiddenFolders.any { path.startsWith(it) }) continue
 
