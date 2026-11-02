@@ -176,7 +176,7 @@ private fun PlayerVisualizer(
         when (style) {
             // Keep the compact bar style as-is; it is already the strongest visual.
             "Bars" -> {
-                val count = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 16 else 32
+                val count = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 8 else 32
                 val gap = 3.dp.toPx()
                 val barWidth = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
                 repeat(count) { index ->
