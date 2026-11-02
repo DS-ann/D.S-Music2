@@ -4838,7 +4838,7 @@ private fun CreditsCard(onOpenUrl: (String) -> Unit) {
             ) {
                 coil.compose.AsyncImage(
                     model = "https://github.com/DS-ann.png",
-                    contentDescription = "Shubham Karande",
+                    contentDescription = "Debarghya Sannigrahi",
                     modifier = Modifier
                         .size(80.dp)
                         .clip(CircleShape),
@@ -4846,14 +4846,14 @@ private fun CreditsCard(onOpenUrl: (String) -> Unit) {
                 )
                 
                 Text(
-                    text = "Shubham Karande",
+                    text = "Debarghya Sannigrahi",
                     style = DsmusicTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = DsmusicTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(top = 16.dp)
                 )
                 Text(
-                    text = "Android Developer",
+                    text = "D.S Music Developer",
                     style = DsmusicTheme.typography.bodyMedium,
                     color = DsmusicTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp)
@@ -4863,9 +4863,7 @@ private fun CreditsCard(onOpenUrl: (String) -> Unit) {
                     modifier = Modifier.padding(top = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    SocialIconButton(icon = R.drawable.ic_github, onClick = { onOpenUrl("https://github.com/DS-ann") })
-                    SocialIconButton(icon = R.drawable.ic_instagram, onClick = { onOpenUrl("https://instagram.com/mythicalshub") })
-                    SocialIconButton(icon = R.drawable.ic_youtube, onClick = { onOpenUrl("https://youtube.com/@8dmusic_s") })
+                    SocialIconButton(icon = R.drawable.ic_github, onClick = { onOpenUrl("https://github.com/DS-ann/D.S-Music2") })
                 }
             }
         }
@@ -4929,7 +4927,7 @@ private fun AppLogoSection(isLandscape: Boolean) {
             letterSpacing = 0.sp
         )
         Text(
-            text = "© 2025 Shubham Karande",
+            text = "© 2026 Debarghya Sannigrahi",
             style = DsmusicTheme.typography.bodySmall,
             color = DsmusicTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp)
@@ -5058,7 +5056,7 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
                             modifier = Modifier.clickable {
                                 val title = URLEncoder.encode("[Feature] ", "UTF-8")
                                 val body = URLEncoder.encode("## Feature Description\n\n\n## Why is this needed?\n\n", "UTF-8")
-                                val url = "https://github.com/MythicalSHUB/SpatialFlow/issues/new?title=$title&body=$body"
+                                val url = "https://github.com/DS-ann/D.S-Music2/issues/new?title=$title&body=$body"
                                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                             }
                         )
