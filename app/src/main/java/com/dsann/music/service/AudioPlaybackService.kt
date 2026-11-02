@@ -47,7 +47,7 @@ import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
 import com.dsann.music.R
 import com.dsann.music.data.innertube.YouTubeMusic
-import com.dsann.music.ui.widget.SpatialFlowWidgetProvider
+import com.dsann.music.ui.widget.DsmusicWidgetProvider
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -1015,7 +1015,7 @@ class AudioPlaybackService : MediaSessionService() {
                 val duration = player.duration.coerceAtLeast(0L)
                 val currentText = currentWidgetLyricText(position)
                 if (currentText != "...") {
-                    SpatialFlowWidgetProvider.updateAllWidgetsPartial(
+                    DsmusicWidgetProvider.updateAllWidgetsPartial(
                         this@AudioPlaybackService,
                         position.toInt(),
                         duration.toInt(),
@@ -1029,7 +1029,7 @@ class AudioPlaybackService : MediaSessionService() {
                 if (vm.syncedLyrics.value.isNullOrEmpty() && !plain.isNullOrBlank()) {
                     val position = player.currentPosition.coerceAtLeast(0L)
                     val duration = player.duration.coerceAtLeast(0L)
-                    SpatialFlowWidgetProvider.updateAllWidgetsPartial(
+                    DsmusicWidgetProvider.updateAllWidgetsPartial(
                         this@AudioPlaybackService,
                         position.toInt(),
                         duration.toInt(),
@@ -2313,7 +2313,7 @@ class AudioPlaybackService : MediaSessionService() {
             val duration = player.duration.coerceAtLeast(0L)
             val synced = result?.syncedLyrics
             val timedLine = if (!synced.isNullOrBlank()) {
-                SpatialFlowWidgetProvider.findCurrentLyricLine(
+                DsmusicWidgetProvider.findCurrentLyricLine(
                     com.dsann.music.data.lyrics.LrcParser.parse(synced),
                     position.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
                 )
@@ -2327,7 +2327,7 @@ class AudioPlaybackService : MediaSessionService() {
             val text = timedLine?.takeIf { it.isNotBlank() }
                 ?: plain.ifBlank { fallbackText.orEmpty() }
             if (text.isNotBlank()) {
-                SpatialFlowWidgetProvider.updateAllWidgetsPartial(
+                DsmusicWidgetProvider.updateAllWidgetsPartial(
                     this@AudioPlaybackService,
                     position.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
                     duration.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
@@ -2345,7 +2345,7 @@ class AudioPlaybackService : MediaSessionService() {
         val vm = viewModel ?: return "..."
         val synced = vm.syncedLyrics.value
         if (!synced.isNullOrEmpty()) {
-            return SpatialFlowWidgetProvider.findCurrentLyricLine(synced, positionMs.toInt())
+            return DsmusicWidgetProvider.findCurrentLyricLine(synced, positionMs.toInt())
                 ?.takeIf { it.isNotBlank() } ?: "..."
         }
         val plain = vm.plainLyrics.value.orEmpty()
@@ -2358,7 +2358,7 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     private fun updateWidgetProgress(pos: Long, dur: Long) {
-        SpatialFlowWidgetProvider.updateAllWidgetsPartial(
+        DsmusicWidgetProvider.updateAllWidgetsPartial(
             this,
             pos.toInt(),
             dur.toInt(),
@@ -2389,7 +2389,7 @@ class AudioPlaybackService : MediaSessionService() {
                 thumbnailUrl = mediaItem.mediaMetadata.artworkUri?.toString()
             }
         }
-        SpatialFlowWidgetProvider.updateAllWidgets(
+        DsmusicWidgetProvider.updateAllWidgets(
             this,
             song,
             isPlaying,
