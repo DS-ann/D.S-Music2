@@ -132,6 +132,7 @@ internal fun SyncedLyricsCompose(
     onSeekTo: (Int) -> Unit,
     lyrics: List<LyricLine>,
     currentPositionProvider: () -> Int,
+    playbackSpeedProvider: () -> Float = { 1f },
     isPlaying: Boolean,
     contentColor: Color,
     dynamicAccentColor: Color,
@@ -180,34 +181,42 @@ internal fun SyncedLyricsCompose(
         }
     }
 
-    // Run a frame-paced lyric clock only while this lyrics page is composed.
-    // Playback-state callbacks arrive in uneven batches; interpolating between them keeps
-    // karaoke timing smooth without forcing the whole lyrics list to recompose each frame.
+    // Frame-paced karaoke clock. The player position is an uneven audio callback snapshot;
+    // advancing by frame time keeps the sweep smooth, while gentle correction prevents drift.
     val lyricClock = remember { mutableIntStateOf(currentPositionProvider().coerceAtLeast(0)) }
-    LaunchedEffect(isPlaying, currentSong?.id, lyrics, currentPositionProvider) {
+    LaunchedEffect(isPlaying, currentSong?.id, lyrics, currentPositionProvider, playbackSpeedProvider) {
         var shownMs = currentPositionProvider().coerceAtLeast(0).toDouble()
+        var lastFrameNanos = -1L
         lyricClock.intValue = shownMs.roundToInt()
-        if (!isPlaying) {
-            // Paused seeks still update promptly, but an idle lyrics screen does not run at display rate.
-            while (true) {
-                val actual = currentPositionProvider().coerceAtLeast(0)
-                shownMs = actual.toDouble()
-                if (lyricClock.intValue != actual) lyricClock.intValue = actual
-                // While paused only seeks can change the clock; 5 Hz is responsive without idle frame-rate polling.
-                delay(200L)
-            }
-        }
-
-        // Keep karaoke timing responsive while limiting API 23 list/draw invalidations.
-        // Android 6 uses about 12 Hz; newer devices retain the 25 Hz lyric clock.
-        val refreshIntervalMs = if (
-            android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M
-        ) 84L else 40L
         while (true) {
-            delay(refreshIntervalMs)
-            val actualMs = currentPositionProvider().coerceAtLeast(0)
-            shownMs = actualMs.toDouble()
-            if (lyricClock.intValue != actualMs) lyricClock.intValue = actualMs
+            if (!isPlaying) {
+                // A paused playhead must stay still; this also reflects paused seeks promptly.
+                val actualMs = currentPositionProvider().coerceAtLeast(0)
+                shownMs = actualMs.toDouble()
+                lastFrameNanos = -1L
+                if (lyricClock.intValue != actualMs) lyricClock.intValue = actualMs
+                delay(40L)
+            } else {
+                withFrameNanos { frameNanos ->
+                    val actualMs = currentPositionProvider().coerceAtLeast(0).toDouble()
+                    if (lastFrameNanos < 0L || frameNanos <= lastFrameNanos) {
+                        shownMs = actualMs
+                    } else {
+                        val elapsedMs = (frameNanos - lastFrameNanos) / 1_000_000.0
+                        val speed = playbackSpeedProvider().takeIf { it.isFinite() && it > 0f } ?: 1f
+                        shownMs += elapsedMs * speed
+                        val errorMs = actualMs - shownMs
+                        shownMs = if (abs(errorMs) > 250.0) {
+                            actualMs
+                        } else {
+                            shownMs + errorMs * 0.06
+                        }
+                    }
+                    lastFrameNanos = frameNanos
+                    val framePosition = shownMs.roundToInt().coerceAtLeast(0)
+                    if (lyricClock.intValue != framePosition) lyricClock.intValue = framePosition
+                }
+            }
         }
     }
     val lyricPositionProvider = remember(lyricClock) { { lyricClock.intValue } }
@@ -708,7 +717,7 @@ private fun eraseFutureText(
 
 private fun calculateWordProgress(word: LyricWord, pos: Long): Float {
     val wordStartMs = word.absoluteStartTimeMs
-    val wordEndMs = wordStartMs + word.durationMs.coerceAtLeast(120L)
+    val wordEndMs = wordStartMs + word.durationMs.coerceAtLeast(1L)
     return when {
         pos < wordStartMs -> 0f
         pos >= wordEndMs -> 1f
