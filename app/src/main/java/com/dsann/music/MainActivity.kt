@@ -300,6 +300,15 @@ class MainActivity : AppCompatActivity() {
                             bottomInset = bottomPadding,
                             barStyle = navBarStyle,
                             modifier = Modifier
+                                // Overlay the dock instead of letting Scaffold reserve its height.
+                                // This keeps the expanded player truly edge-to-edge while the dock
+                                // remains visible over the collapsed mini-player.
+                                .layout { measurable, constraints ->
+                                    val placeable = measurable.measure(constraints)
+                                    layout(placeable.width, 0) {
+                                        placeable.placeRelative(0, -placeable.height)
+                                    }
+                                }
                                 .graphicsLayer {
                                     val translationY = animatedBaseTranslationState.value
                                         .coerceIn(0f, totalSlideDistPx)
