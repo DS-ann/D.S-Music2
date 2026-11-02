@@ -93,25 +93,30 @@ public class SpatialFlowWidgetProvider extends AppWidgetProvider {
     public static void updateAllWidgetsPartial(Context context, int position, int duration, String currentLyric) {
         final Context appContext = context.getApplicationContext();
         final AppWidgetManager manager = AppWidgetManager.getInstance(appContext);
-        new Handler(Looper.getMainLooper()).post(() -> {
-            try {
-                int[] mediumIds = manager.getAppWidgetIds(
-                        new ComponentName(appContext, WidgetMediumProvider.class));
-                for (int id : mediumIds) {
-                    updateWidgetProgress(
-                            appContext, manager, id, position, duration, currentLyric, R.layout.widget_medium);
-                }
-
-                int[] largeIds = manager.getAppWidgetIds(
-                        new ComponentName(appContext, WidgetLargeProvider.class));
-                for (int id : largeIds) {
-                    updateWidgetProgress(
-                            appContext, manager, id, position, duration, null, R.layout.widget_large);
-                }
-            } catch (Exception error) {
-                Log.w(TAG, "Widget progress update failed", error);
+        // AudioPlaybackService invokes this from a background dispatcher. AppWidgetManager
+        // uses Binder and does not need the activity's main looper; keeping this work here
+        // prevents the one-second playback ticker from stalling every screen in the app.
+        try {
+            int[] mediumIds = manager.getAppWidgetIds(
+                    new ComponentName(appContext, WidgetMediumProvider.class));
+            int[] largeIds = manager.getAppWidgetIds(
+                    new ComponentName(appContext, WidgetLargeProvider.class));
+            if (mediumIds.length == 0 && largeIds.length == 0) {
+                return;
             }
-        });
+
+            for (int id : mediumIds) {
+                updateWidgetProgress(
+                        appContext, manager, id, position, duration, currentLyric, R.layout.widget_medium);
+            }
+
+            for (int id : largeIds) {
+                updateWidgetProgress(
+                        appContext, manager, id, position, duration, null, R.layout.widget_large);
+            }
+        } catch (Exception error) {
+            Log.w(TAG, "Widget progress update failed", error);
+        }
     }
 
     private static void updateWidgetProgress(Context context, AppWidgetManager manager, int id, int position, int duration, String currentLyric, int layoutId) {
