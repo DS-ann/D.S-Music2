@@ -104,7 +104,7 @@ import com.dsann.music.ui.library.LibraryScreen
 import com.dsann.music.ui.library.LocalMusicScreen
 import com.dsann.music.ui.theme.DsmusicNavigationBar
 import com.dsann.music.ui.theme.DsmusicNavigationDestination
-import com.dsann.music.ui.theme.SpatialFlowTheme
+import com.dsann.music.ui.theme.DsmusicAppTheme
 import com.dsann.music.ui.theme.observeKey
 import com.dsann.music.ui.onboarding.OnboardingScreen
 import android.content.Context
@@ -204,7 +204,7 @@ class MainActivity : AppCompatActivity() {
             val playerBackgroundColor by playerViewModel.playerBackgroundColor.collectAsStateWithLifecycle()
             val dynamicAlbumColor = if (currentSong != null) playerBackgroundColor else null
 
-            SpatialFlowTheme(darkTheme = isDarkTheme, dynamicAlbumColor = dynamicAlbumColor) {
+            DsmusicAppTheme(darkTheme = isDarkTheme, dynamicAlbumColor = dynamicAlbumColor) {
                 // The settings screen and the navigation chrome share the Activity-scoped
                 // SettingsViewModel. Using the same StateFlows makes dock changes immediate
                 // and prevents the dock from becoming stale while its root tab is cached.
