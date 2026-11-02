@@ -88,10 +88,11 @@ fun WavyMusicSlider(
 
     LaunchedEffect(shouldShowWave, waveAnimationDuration) {
         if (shouldShowWave && waveAnimationDuration > 0) {
-            // Draw-only wave motion at a fixed 24 fps. This avoids a 60 fps Compose
-            // animation workload while keeping the wave active on every Android version.
+            // API 23 devices have less CPU headroom. Keep the wave effect, but
+            // reduce its draw invalidations to about 12 fps; newer devices retain 24 fps.
             val fullRotation = (2 * PI).toFloat()
-            val frameDelayMs = 42L
+            val isLegacyDevice = android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M
+            val frameDelayMs = if (isLegacyDevice) 84L else 42L
             val phaseStep = fullRotation * frameDelayMs / waveAnimationDuration.toFloat()
             var phase = phaseShiftAnim.value
             while (true) {
