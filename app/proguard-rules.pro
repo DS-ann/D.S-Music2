@@ -1,6 +1,6 @@
 # Keep the manifest Application class and its Hilt-injected startup entry point stable on older ART runtimes.
--keep class com.dsann.music.SpatialFlowApplication { *; }
--keep class com.dsann.music.Hilt_SpatialFlowApplication { *; }
+-keep class com.dsann.music.DsmusicApplication { *; }
+-keep class com.dsann.music.Hilt_DsmusicApplication { *; }
 
 # Add project specific ProGuard rules here.
 # You can control the set of applied configuration files using the
