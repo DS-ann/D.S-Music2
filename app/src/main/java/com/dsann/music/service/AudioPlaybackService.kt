@@ -1998,6 +1998,37 @@ class AudioPlaybackService : MediaSessionService() {
         }
     }
 
+    /**
+     * API 23 has no ContentResolver.loadThumbnail(). Decode a sampled bitmap instead
+     * of MediaStore.getBitmap(), which allocates the full-resolution cover only to
+     * immediately scale it down for MediaSession/notification artwork.
+     * Caller runs this on Dispatchers.IO.
+     */
+    private fun decodeAlbumArtThumbnail(uri: Uri, targetSizePx: Int): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        contentResolver.openInputStream(uri)?.use { input ->
+            BitmapFactory.decodeStream(input, null, bounds)
+        } ?: return null
+
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        var sampleSize = 1
+        while (
+            bounds.outWidth / (sampleSize * 2) >= targetSizePx &&
+            bounds.outHeight / (sampleSize * 2) >= targetSizePx
+        ) {
+            sampleSize *= 2
+        }
+
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        return contentResolver.openInputStream(uri)?.use { input ->
+            BitmapFactory.decodeStream(input, null, options)
+        }
+    }
+
     fun setSongMetadataById(songName: String?, albumId: Long) {
         val expectedSongId = viewModel?.currentSong?.value?.id?.toString() ?: return
         val requestGeneration = ++artworkRequestGeneration
@@ -2010,7 +2041,7 @@ class AudioPlaybackService : MediaSessionService() {
                     albumArt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         contentResolver.loadThumbnail(artUri, Size(512, 512), null)
                     } else {
-                        @Suppress("DEPRECATION") MediaStore.Images.Media.getBitmap(contentResolver, artUri)
+                        decodeAlbumArtThumbnail(artUri, 512)
                     }
                 } catch (_: Exception) {}
             }
