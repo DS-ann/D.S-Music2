@@ -502,6 +502,7 @@ class AudioPlaybackService : MediaSessionService() {
     private var lastWidgetProgressUpdateAtMs: Long = 0L
     private var lastPositionPersistedAtMs: Long = 0L
     private var lastTelemetryUpdateAtMs: Long = 0L
+    private var lastUiPositionUpdateAtMs: Long = 0L
     private var shouldAutoPlay = false
     private var pendingSeekPos: Long = -1
     
@@ -2071,10 +2072,22 @@ class AudioPlaybackService : MediaSessionService() {
                 if (player.playbackState != Player.STATE_IDLE && player.playbackState != Player.STATE_ENDED) {
                     val pos = player.currentPosition
                     val dur = player.duration
-                    viewModel?.setCurrentPosition(pos.toInt())
+                    val nowMs = System.currentTimeMillis()
+                    val lyricsModeActive = viewModel?.isLyricsModeEnabled?.value == true
+                    // API 23 updates the visible progress UI at 0.5 Hz outside lyrics mode.
+                    // Media3 keeps its precise playback clock; only Compose's display state is
+                    // throttled, so audio, seeking, and crossfade timing are not delayed.
+                    val uiPositionIntervalMs = if (
+                        Build.VERSION.SDK_INT <= Build.VERSION_CODES.M && !lyricsModeActive
+                    ) 2_000L else 0L
+                    if (uiPositionIntervalMs == 0L ||
+                        nowMs - lastUiPositionUpdateAtMs >= uiPositionIntervalMs
+                    ) {
+                        viewModel?.setCurrentPosition(pos.toInt())
+                        lastUiPositionUpdateAtMs = nowMs
+                    }
                     if (dur > 0) viewModel?.setDuration(dur.toInt())
 
-                    val nowMs = System.currentTimeMillis()
                     // Telemetry has second-level heartbeat semantics; update it once per second.
                     if (nowMs - lastTelemetryUpdateAtMs >= 1_000L) {
                         telemetryManager.updateProgress(pos, dur)
@@ -2090,7 +2103,6 @@ class AudioPlaybackService : MediaSessionService() {
                         lastPositionPersistedAtMs = nowMs
                     }
 
-                    val lyricsModeActive = viewModel?.isLyricsModeEnabled?.value == true
                     val widgetProgressIntervalMs = if (
                         Build.VERSION.SDK_INT <= Build.VERSION_CODES.M && !lyricsModeActive
                     ) 5_000L else 1_000L
