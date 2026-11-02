@@ -96,6 +96,7 @@ import com.dsann.music.ui.CachedRootTabLifecycle
 import com.dsann.music.ui.AudioFormatChoiceDialogHost
 import com.dsann.music.ui.PlayerBottomSheetCompose
 import com.dsann.music.ui.SettingsScreenContent
+import com.dsann.music.ui.SettingsViewModel
 import com.dsann.music.ui.TagEditorScreenEntryPoint
 import com.dsann.music.ui.explore.ExploreScreen
 import com.dsann.music.ui.explore.GoogleSignInScreen
@@ -204,13 +205,15 @@ class MainActivity : AppCompatActivity() {
             val dynamicAlbumColor = if (currentSong != null) playerBackgroundColor else null
 
             SpatialFlowTheme(darkTheme = isDarkTheme, dynamicAlbumColor = dynamicAlbumColor) {
-                val navLabelsMode by prefs.observeKey(
-                    "nav_label_mode",
-                    if (prefs.getBoolean("hide_nav_labels", false)) "Never" else "Always"
-                )
-                val dynamicNavStyle by prefs.observeKey("dynamic_nav_style", false)
-                val navBarStyle by prefs.observeKey("nav_bar_style", "Floating")
-                val navBarSize by prefs.observeKey("nav_bar_size", "Standard")
+                // The settings screen and the navigation chrome share the Activity-scoped
+                // SettingsViewModel. Using the same StateFlows makes dock changes immediate
+                // and prevents the dock from becoming stale while its root tab is cached.
+                val navigationSettings: SettingsViewModel =
+                    androidx.lifecycle.viewmodel.compose.viewModel(viewModelStoreOwner = this@MainActivity)
+                val navLabelsMode by navigationSettings.navLabelsMode.collectAsStateWithLifecycle()
+                val dynamicNavStyle by navigationSettings.dynamicNavStyle.collectAsStateWithLifecycle()
+                val navBarStyle by navigationSettings.navBarStyle.collectAsStateWithLifecycle()
+                val navBarSize by navigationSettings.navBarSize.collectAsStateWithLifecycle()
                 val hasSeenOnboarding by prefs.observeKey("has_seen_onboarding_1_8", false)
 
                 val currentNavController = rememberNavController()
@@ -359,9 +362,18 @@ class MainActivity : AppCompatActivity() {
                     val railSystemInset = WindowInsets.navigationBars
                         .asPaddingValues()
                         .calculateStartPadding(layoutDirection)
-                    val railStartPadding = railSystemInset + 12.dp
+                    // Reuse dock size/style customisation for the side rail. A Docked rail
+                    // attaches to the screen edge; Floating keeps a margin and rounded shell;
+                    // Minimal removes the shell surface.
+                    val railWidth = when (navBarSize) {
+                        "Compact" -> 68.dp
+                        "Tall" -> 84.dp
+                        else -> 76.dp
+                    }
+                    val railOuterGap = if (navBarStyle == "Docked") 0.dp else 12.dp
+                    val railStartPadding = railSystemInset + railOuterGap
                     val railInsetState = animateDpAsState(
-                        targetValue = if (showNavigationRail) railSystemInset + 88.dp else 0.dp,
+                        targetValue = if (showNavigationRail) railSystemInset + railWidth + railOuterGap else 0.dp,
                         animationSpec = if (isLegacyAndroid6) snap() else spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
                         label = "NavigationRailInset"
                     )
@@ -563,19 +575,35 @@ class MainActivity : AppCompatActivity() {
                         }
 
                         if (showNavigationRail) {
+                            val configuredRailIconSize = when (navBarSize) {
+                                "Compact" -> 22.dp
+                                "Tall" -> 30.dp
+                                else -> 26.dp
+                            }
                             val railIconSize by animateDpAsState(
-                                if (dynamicNavStyle) 34.dp else 26.dp,
+                                if (dynamicNavStyle) 32.dp else configuredRailIconSize,
                                 animationSpec = if (isLegacyAndroid6) snap() else spring(stiffness = Spring.StiffnessMediumLow),
                                 label = "RailIconSize"
                             )
+                            val railShape = when (navBarStyle) {
+                                "Docked" -> RoundedCornerShape(topEnd = 18.dp, bottomEnd = 18.dp)
+                                "Minimal" -> RoundedCornerShape(0.dp)
+                                else -> RoundedCornerShape(22.dp)
+                            }
                             Column(
                                 modifier = Modifier
                                     .align(Alignment.CenterStart)
                                     .padding(start = railStartPadding)
-                                    .width(76.dp)
-                                    .clip(RoundedCornerShape(22.dp))
-                                    .background(DsmusicTheme.colorScheme.surfaceContainer)
-                                    .padding(vertical = 8.dp, horizontal = 6.dp),
+                                    .width(railWidth)
+                                    .clip(railShape)
+                                    .background(
+                                        if (navBarStyle == "Minimal") androidx.compose.ui.graphics.Color.Transparent
+                                        else DsmusicTheme.colorScheme.surfaceContainer
+                                    )
+                                    .padding(
+                                        vertical = if (navBarSize == "Compact") 6.dp else 8.dp,
+                                        horizontal = 6.dp
+                                    ),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
@@ -609,7 +637,15 @@ class MainActivity : AppCompatActivity() {
                                                         }
                                                     }
                                                 }
-                                                .padding(vertical = if (navLabelsMode == "Never") 12.dp else 8.dp),
+                                                .padding(
+                                                    vertical = when {
+                                                        navLabelsMode == "Never" && navBarSize == "Compact" -> 8.dp
+                                                        navLabelsMode == "Never" -> 12.dp
+                                                        navBarSize == "Compact" -> 5.dp
+                                                        navBarSize == "Tall" -> 10.dp
+                                                        else -> 8.dp
+                                                    }
+                                                ),
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
                                             Image(
