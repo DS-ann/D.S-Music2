@@ -16,6 +16,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.view.Choreographer
 import android.provider.MediaStore
 import android.util.Log
 import android.util.Size
@@ -48,6 +49,7 @@ import androidx.media3.session.SessionResult
 import com.dsann.music.R
 import com.dsann.music.data.innertube.YouTubeMusic
 import com.dsann.music.ui.widget.DsmusicWidgetProvider
+import com.dsann.music.ui.player.AppAnimationFrameRateController
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -482,7 +484,44 @@ class AudioPlaybackService : MediaSessionService() {
     private var viewModel: PlayerSharedViewModel? = null
     private var widgetLyricsObserverJob: Job? = null
     private lateinit var handler: Handler
+    // The Handler below does slower playback housekeeping; position snapshots use vsync.
     private lateinit var progressUpdateRunnable: Runnable
+    private var progressFrameUpdatesRunning = false
+    private var lastUiFrameBucket = Long.MIN_VALUE
+    private val progressFrameCallback = object : Choreographer.FrameCallback {
+        override fun doFrame(frameTimeNanos: Long) {
+            if (!progressFrameUpdatesRunning || !isPlayerInitialized || !player.isPlaying) {
+                progressFrameUpdatesRunning = false
+                lastUiFrameBucket = Long.MIN_VALUE
+                return
+            }
+
+            // Match Compose's absolute-vsync bucket calculation and AppSettings preference.
+            // Device (0) emits every display frame; fixed modes cap snapshots to that rate.
+            val selectedFrameRate = AppAnimationFrameRateController.frameRate.value
+            val intervalNanos = if (selectedFrameRate > 0) {
+                1_000_000_000L / selectedFrameRate
+            } else {
+                0L
+            }
+            val frameBucket = if (intervalNanos > 0L) frameTimeNanos / intervalNanos else frameTimeNanos
+            if (intervalNanos == 0L || frameBucket != lastUiFrameBucket) {
+                val positionMs = player.currentPosition
+                    .coerceAtLeast(0L)
+                    .coerceAtMost(Int.MAX_VALUE.toLong())
+                    .toInt()
+                viewModel?.setCurrentPosition(positionMs)
+                lastUiFrameBucket = frameBucket
+            }
+
+            if (progressFrameUpdatesRunning && player.isPlaying) {
+                Choreographer.getInstance().postFrameCallback(this)
+            } else {
+                progressFrameUpdatesRunning = false
+                lastUiFrameBucket = Long.MIN_VALUE
+            }
+        }
+    }
 
     private var currentSourceUri: Uri? = null
     private var originalSourceUri: Uri? = null
@@ -558,8 +597,10 @@ class AudioPlaybackService : MediaSessionService() {
             if (isPlaying) {
                 handler.removeCallbacks(progressUpdateRunnable)
                 handler.post(progressUpdateRunnable)
+                startProgressFrameUpdates()
             } else {
                 handler.removeCallbacks(progressUpdateRunnable)
+                stopProgressFrameUpdates()
             }
             updateWidgetState(isPlaying)
             if (isPlaying) {
@@ -816,6 +857,7 @@ class AudioPlaybackService : MediaSessionService() {
                 setupMediaSession()
                 loadAudioPreferences()
                 setupPreferenceListener()
+                AppAnimationFrameRateController.load(applicationContext)
                 setupProgressTracking()
                 isPlayerInitialized = true
 
@@ -934,6 +976,7 @@ class AudioPlaybackService : MediaSessionService() {
         if (::progressUpdateRunnable.isInitialized) {
             handler.removeCallbacks(progressUpdateRunnable)
         }
+        stopProgressFrameUpdates()
         abandonAudioFocus()
         cancelCurrentTrackCache()
 
@@ -1011,6 +1054,7 @@ class AudioPlaybackService : MediaSessionService() {
             oldVm.cleanupBgScope()
         }
         this.viewModel = vm
+        if (player.isPlaying) startProgressFrameUpdates()
 
         // Keep widget lyrics live after the activity has closed. Tapping the widget's
         // lyrics page starts the normal provider pipeline, and each result updates RemoteViews.
@@ -2167,6 +2211,24 @@ class AudioPlaybackService : MediaSessionService() {
         }
     }
 
+    private fun startProgressFrameUpdates() {
+        if (progressFrameUpdatesRunning || viewModel == null || !isPlayerInitialized || !player.isPlaying) {
+            return
+        }
+        // Service may start before the user has opened Playback settings.
+        AppAnimationFrameRateController.load(applicationContext)
+        progressFrameUpdatesRunning = true
+        lastUiFrameBucket = Long.MIN_VALUE
+        Choreographer.getInstance().postFrameCallback(progressFrameCallback)
+    }
+
+    private fun stopProgressFrameUpdates() {
+        if (!progressFrameUpdatesRunning) return
+        progressFrameUpdatesRunning = false
+        lastUiFrameBucket = Long.MIN_VALUE
+        Choreographer.getInstance().removeFrameCallback(progressFrameCallback)
+    }
+
     private fun setupProgressTracking() {
         progressUpdateRunnable = object : Runnable {
             override fun run() {
@@ -2175,18 +2237,8 @@ class AudioPlaybackService : MediaSessionService() {
                     val dur = player.duration
                     val nowMs = System.currentTimeMillis()
                     val lyricsModeActive = viewModel?.isLyricsModeEnabled?.value == true
-                    // API 23 updates the visible progress UI at 0.5 Hz outside lyrics mode.
-                    // Media3 keeps its precise playback clock; only Compose's display state is
-                    // throttled, so audio, seeking, and crossfade timing are not delayed.
-                    val uiPositionIntervalMs = if (
-                        Build.VERSION.SDK_INT <= Build.VERSION_CODES.M && !lyricsModeActive
-                    ) 2_000L else 0L
-                    if (uiPositionIntervalMs == 0L ||
-                        nowMs - lastUiPositionUpdateAtMs >= uiPositionIntervalMs
-                    ) {
-                        viewModel?.setCurrentPosition(pos.toInt())
-                        lastUiPositionUpdateAtMs = nowMs
-                    }
+                    // Current position is published by Choreographer at the selected global
+                    // frame rate. Duration stays in this slower path because it rarely changes.
                     if (dur > 0) viewModel?.setDuration(dur.toInt())
 
                     // Telemetry has second-level heartbeat semantics; update it once per second.
