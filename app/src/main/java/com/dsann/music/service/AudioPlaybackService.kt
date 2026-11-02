@@ -1899,7 +1899,7 @@ class AudioPlaybackService : MediaSessionService() {
             val encodedArtwork = processedArtwork?.let { bitmap ->
                 try {
                     java.io.ByteArrayOutputStream().use { stream ->
-                        if (bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)) {
+                        if (bitmap.compress(Bitmap.CompressFormat.JPEG, 88, stream)) {
                             stream.toByteArray()
                         } else null
                     }
