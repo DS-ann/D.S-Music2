@@ -80,12 +80,17 @@ fun ArtworkPager(
             )
     }
 
-    // Keep the previous and next covers warm in Coil's existing memory/disk caches.
+    // Keep adjacent covers warm on modern devices. On API 23, speculative decoding
+    // competes with local audio-file reads; the selected page still loads its own cover.
     val neighborArtworkUrls = remember(songList, currentSongIndex) {
-        listOf(currentSongIndex - 1, currentSongIndex + 1)
-            .mapNotNull { songList.getOrNull(it) }
-            .distinctBy { it.id }
-            .mapNotNull(::resolveArtworkUrl)
+        if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) {
+            emptyList()
+        } else {
+            listOf(currentSongIndex - 1, currentSongIndex + 1)
+                .mapNotNull { songList.getOrNull(it) }
+                .distinctBy { it.id }
+                .mapNotNull(::resolveArtworkUrl)
+        }
     }
     LaunchedEffect(neighborArtworkUrls, artworkTargetSizePx) {
         val loader = context.imageLoader
