@@ -23,6 +23,8 @@ import com.dsann.music.model.SongItem;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Base Widget Provider for D.S Music.
@@ -49,6 +51,25 @@ public class SpatialFlowWidgetProvider extends AppWidgetProvider {
                 worker.setPriority(Thread.MIN_PRIORITY);
                 return worker;
             });
+    // Progress ticks arrive once per second. Keep only the newest pending snapshot so a
+    // slow AppWidgetManager/Binder call cannot build an unbounded queue of stale positions.
+    private static final AtomicReference<WidgetProgressUpdate> PENDING_PARTIAL_WIDGET_UPDATE =
+            new AtomicReference<>();
+    private static final AtomicBoolean PARTIAL_WIDGET_UPDATE_SCHEDULED = new AtomicBoolean(false);
+
+    private static final class WidgetProgressUpdate {
+        final Context context;
+        final int position;
+        final int duration;
+        final String currentLyric;
+
+        WidgetProgressUpdate(Context context, int position, int duration, String currentLyric) {
+            this.context = context;
+            this.position = position;
+            this.duration = duration;
+            this.currentLyric = currentLyric;
+        }
+    }
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
@@ -103,30 +124,65 @@ public class SpatialFlowWidgetProvider extends AppWidgetProvider {
 
     public static void updateAllWidgetsPartial(Context context, int position, int duration, String currentLyric) {
         final Context appContext = context.getApplicationContext();
-        PARTIAL_WIDGET_UPDATE_EXECUTOR.execute(() -> {
-            final AppWidgetManager manager = AppWidgetManager.getInstance(appContext);
-            try {
-                int[] mediumIds = manager.getAppWidgetIds(
-                        new ComponentName(appContext, WidgetMediumProvider.class));
-                int[] largeIds = manager.getAppWidgetIds(
-                        new ComponentName(appContext, WidgetLargeProvider.class));
-                if (mediumIds.length == 0 && largeIds.length == 0) {
-                    return;
-                }
+        PENDING_PARTIAL_WIDGET_UPDATE.set(
+                new WidgetProgressUpdate(appContext, position, duration, currentLyric));
+        schedulePartialWidgetUpdateDrain();
+    }
 
-                for (int id : mediumIds) {
-                    updateWidgetProgress(
-                            appContext, manager, id, position, duration, currentLyric, R.layout.widget_medium);
-                }
+    private static void schedulePartialWidgetUpdateDrain() {
+        if (!PARTIAL_WIDGET_UPDATE_SCHEDULED.compareAndSet(false, true)) {
+            return;
+        }
 
-                for (int id : largeIds) {
-                    updateWidgetProgress(
-                            appContext, manager, id, position, duration, null, R.layout.widget_large);
+        try {
+            PARTIAL_WIDGET_UPDATE_EXECUTOR.execute(() -> {
+                while (true) {
+                    WidgetProgressUpdate update = PENDING_PARTIAL_WIDGET_UPDATE.getAndSet(null);
+                    if (update != null) {
+                        applyPartialWidgetProgress(update);
+                    }
+
+                    PARTIAL_WIDGET_UPDATE_SCHEDULED.set(false);
+                    // If another tick arrived during the Binder update, process only its newest
+                    // snapshot. If a producer already scheduled a worker, let that worker run.
+                    if (PENDING_PARTIAL_WIDGET_UPDATE.get() == null ||
+                            !PARTIAL_WIDGET_UPDATE_SCHEDULED.compareAndSet(false, true)) {
+                        return;
+                    }
                 }
-            } catch (Exception error) {
-                Log.w(TAG, "Widget progress update failed", error);
+            });
+        } catch (RuntimeException error) {
+            PARTIAL_WIDGET_UPDATE_SCHEDULED.set(false);
+            Log.w(TAG, "Could not schedule widget progress update", error);
+        }
+    }
+
+    private static void applyPartialWidgetProgress(WidgetProgressUpdate update) {
+        Context appContext = update.context;
+        AppWidgetManager manager = AppWidgetManager.getInstance(appContext);
+        try {
+            int[] mediumIds = manager.getAppWidgetIds(
+                    new ComponentName(appContext, WidgetMediumProvider.class));
+            int[] largeIds = manager.getAppWidgetIds(
+                    new ComponentName(appContext, WidgetLargeProvider.class));
+            if (mediumIds.length == 0 && largeIds.length == 0) {
+                return;
             }
-        });
+
+            for (int id : mediumIds) {
+                updateWidgetProgress(
+                        appContext, manager, id, update.position, update.duration,
+                        update.currentLyric, R.layout.widget_medium);
+            }
+
+            for (int id : largeIds) {
+                updateWidgetProgress(
+                        appContext, manager, id, update.position, update.duration,
+                        null, R.layout.widget_large);
+            }
+        } catch (Exception error) {
+            Log.w(TAG, "Widget progress update failed", error);
+        }
     }
 
     private static void updateWidgetProgress(Context context, AppWidgetManager manager, int id, int position, int duration, String currentLyric, int layoutId) {
