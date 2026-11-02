@@ -1,5 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <style name="Theme.SpatialFlow" parent="Base.Theme.SpatialFlow" tools:targetApi="28">
+    <style name="Theme.Dsmusic" parent="Base.Theme.Dsmusic" tools:targetApi="28">
         <item name="colorSurfaceContainer">@color/md_theme_dark_surfaceContainer</item>
         <item name="colorSurfaceContainerHigh">@color/md_theme_dark_surfaceContainerHigh</item>
         <item name="colorSurfaceContainerHighest">@color/md_theme_dark_surfaceContainerHighest</item>
@@ -43,24 +43,24 @@
         <item name="materialButtonStyle">@style/Widget.Material3.Button</item>
 
         <!-- Custom MaterialSwitch style with checked icon -->
-        <item name="materialSwitchStyle">@style/Widget.SpatialFlow.Switch</item>
+        <item name="materialSwitchStyle">@style/Widget.Dsmusic.Switch</item>
 
         <!-- Typography -->
 
     </style>
 
     <!-- Custom MaterialSwitch with checked icon and dynamic colors -->
-    <style name="Widget.SpatialFlow.Switch" parent="Widget.Material3.CompoundButton.MaterialSwitch">
+    <style name="Widget.Dsmusic.Switch" parent="Widget.Material3.CompoundButton.MaterialSwitch">
         <item name="thumbIcon">@drawable/switch_thumb_icon_selector</item>
         <item name="thumbIconTint">@color/switch_thumb_icon_color</item>
         <item name="useMaterialThemeColors">true</item>
     </style>
 
     <!-- Splash Screen Theme (Dark) -->
-    <style name="Theme.SpatialFlow.Splash" parent="Theme.SplashScreen">
+    <style name="Theme.Dsmusic.Splash" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/md_theme_dark_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo_static_dark</item>
         <item name="windowSplashScreenAnimationDuration">800</item>
-        <item name="postSplashScreenTheme">@style/Theme.SpatialFlow</item>
+        <item name="postSplashScreenTheme">@style/Theme.Dsmusic</item>
     </style>
 </resources>
