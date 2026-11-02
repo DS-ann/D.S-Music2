@@ -183,7 +183,7 @@ fun customizedTypography(
             fontSize = style.fontSize * scale,
             lineHeight = style.lineHeight * scale,
             fontWeight = weight,
-            letterSpacing = baseSpacing + spacingAdjustment
+            letterSpacing = baseSpacing.merge(spacingAdjustment)
         )
     }
 
