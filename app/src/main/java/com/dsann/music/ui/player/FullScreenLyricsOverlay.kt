@@ -129,6 +129,58 @@ private fun Modifier.circularRevealFrom(
 
 
 @Composable
+internal fun LyricsProviderPickerSheet(
+    providerResults: Map<String, LyricsResult>,
+    selectedProvider: String?,
+    onProviderSelected: (String) -> Unit,
+    onRefindClick: () -> Unit,
+    accentColor: Color,
+    contentColor: Color,
+    backgroundBrush: Brush,
+    onDismissRequest: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        sheetState = sheetState,
+        containerColor = Color.Transparent,
+        dragHandle = null
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                .background(backgroundBrush)
+                .navigationBarsPadding()
+                .padding(top = 16.dp)
+        ) {
+            Column {
+                Box(
+                    modifier = Modifier
+                        .width(32.dp)
+                        .height(4.dp)
+                        .clip(CircleShape)
+                        .background(contentColor.copy(alpha = 0.4f))
+                        .align(Alignment.CenterHorizontally)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                ProvidersSelector(
+                    providerResults = providerResults,
+                    selectedProvider = selectedProvider,
+                    onProviderSelected = onProviderSelected,
+                    onRefindClick = onRefindClick,
+                    accentColor = accentColor,
+                    contentColor = contentColor,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
 internal fun FullScreenLyricsOverlay(
     currentSong: SongItem?,
     syncedLyrics: List<LyricLine>?,
@@ -137,6 +189,7 @@ internal fun FullScreenLyricsOverlay(
     isPlaying: Boolean,
     lyricsError: Throwable?,
     currentPositionProvider: () -> Int,
+    playbackSpeedProvider: () -> Float = { 1f },
     contentReady: Boolean,
     backgroundBrush: Brush,
     revealProgressProvider: () -> Float,
@@ -335,6 +388,7 @@ internal fun FullScreenLyricsOverlay(
                             onSeekTo = onSeekTo,
                             lyrics = syncedLyrics,
                             currentPositionProvider = effectivePositionProvider,
+                            playbackSpeedProvider = playbackSpeedProvider,
                             isPlaying = isPlaying,
                             contentColor = contentColor,
                             dynamicAccentColor = dynamicAccentColor,
@@ -390,46 +444,16 @@ internal fun FullScreenLyricsOverlay(
             // Do not tie the source selector to contentReady: provider switching temporarily
             // clears the visible lyrics while a new source is loading.
             if (showProvidersSheet) {
-                val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-                ModalBottomSheet(
-                    onDismissRequest = { showProvidersSheet = false },
-                    sheetState = sheetState,
-                    containerColor = Color.Transparent,
-                    dragHandle = null
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                            .background(backgroundBrush)
-                            .navigationBarsPadding()
-                            .padding(top = 16.dp)
-                    ) {
-                        Column {
-                            Box(
-                                modifier = Modifier
-                                    .width(32.dp)
-                                    .height(4.dp)
-                                    .clip(CircleShape)
-                                    .background(contentColor.copy(alpha = 0.4f))
-                                    .align(Alignment.CenterHorizontally)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            ProvidersSelector(
-                                providerResults = providerResults,
-                                selectedProvider = selectedProvider,
-                                onProviderSelected = onProviderSelected,
-                                onRefindClick = onRetryLyrics,
-                                accentColor = dynamicAccentColor,
-                                contentColor = contentColor,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                            )
-                        }
-                    }
-                }
+                LyricsProviderPickerSheet(
+                    providerResults = providerResults,
+                    selectedProvider = selectedProvider,
+                    onProviderSelected = onProviderSelected,
+                    onRefindClick = onRetryLyrics,
+                    accentColor = dynamicAccentColor,
+                    contentColor = contentColor,
+                    backgroundBrush = backgroundBrush,
+                    onDismissRequest = { showProvidersSheet = false }
+                )
             }
         }
 
