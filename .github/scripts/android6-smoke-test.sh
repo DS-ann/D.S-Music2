@@ -16,7 +16,7 @@ if printf '%s' "$RUNTIME_LOG" | grep -q 'FATAL EXCEPTION'; then
   echo "D.S Music crashed during startup on Android 6 (API 23)." >&2
   exit 1
 fi
-if ! adb shell ps | grep -q 'com.codetrio.spatialflow'; then
+if ! adb shell ps | grep -q 'com.dsann.music'; then
   echo "D.S Music process was not alive after startup on Android 6." >&2
   exit 1
 fi
