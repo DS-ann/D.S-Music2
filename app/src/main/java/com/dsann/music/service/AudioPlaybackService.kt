@@ -2201,10 +2201,9 @@ class AudioPlaybackService : MediaSessionService() {
                         }
                     }
                 }
-                // API 23 devices have substantially less CPU headroom. Publishing playback
-                // position every 400ms invalidates the always-mounted player overlay even when
-                // the user is browsing another tab. Keep legacy UI state updates to 1Hz.
-                // Lyrics retain a faster clock because line synchronization is user-visible.
+                // API 23 devices have substantially less CPU headroom. The display position
+                // is throttled to 0.5 Hz outside lyrics mode; this handler still checks internal
+                // playback transitions at its normal cadence. Lyrics keep the faster clock.
                 val lyricsModeActive = viewModel?.isLyricsModeEnabled?.value == true
                 val playerExpanded = viewModel?.isPlayerExpanded?.value == true
                 val intervalMs = when {
