@@ -6,6 +6,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import com.dsann.music.R
 
@@ -146,3 +147,62 @@ val Typography = DsmusicTypography(
         letterSpacing = 0.5.sp
     )
 )
+
+/**
+ * Applies app-wide type settings while retaining each text role's base size and hierarchy.
+ */
+fun customizedTypography(
+    familyChoice: String,
+    scaleChoice: Float,
+    weightChoice: String,
+    spacingChoice: String
+): DsmusicTypography {
+    val family = when (familyChoice) {
+        "Google Sans Flex" -> GoogleSansFlex
+        "Serif" -> FontFamily.Serif
+        "Monospace" -> FontFamily.Monospace
+        else -> FontFamily.SansSerif
+    }
+    val scale = scaleChoice.takeIf { it.isFinite() }?.coerceIn(0.85f, 1.30f) ?: 1f
+    val spacingAdjustment = when (spacingChoice) {
+        "Tight" -> (-0.15).sp
+        "Wide" -> 0.2.sp
+        else -> 0.sp
+    }
+
+    fun tune(style: TextStyle): TextStyle {
+        val baseWeight = style.fontWeight ?: FontWeight.Normal
+        val weight = when (weightChoice) {
+            "Lighter" -> FontWeight((baseWeight.weight - 100).coerceAtLeast(100))
+            "Bolder" -> FontWeight((baseWeight.weight + 100).coerceAtMost(900))
+            else -> baseWeight
+        }
+        val baseSpacing = style.letterSpacing.takeUnless { it == TextUnit.Unspecified } ?: 0.sp
+        return style.copy(
+            fontFamily = family,
+            fontSize = style.fontSize * scale,
+            lineHeight = style.lineHeight * scale,
+            fontWeight = weight,
+            letterSpacing = baseSpacing + spacingAdjustment
+        )
+    }
+
+    return Typography.copy(
+        displayLarge = tune(Typography.displayLarge),
+        displayMedium = tune(Typography.displayMedium),
+        displaySmall = tune(Typography.displaySmall),
+        headlineLarge = tune(Typography.headlineLarge),
+        headlineMedium = tune(Typography.headlineMedium),
+        headlineSmall = tune(Typography.headlineSmall),
+        titleLarge = tune(Typography.titleLarge),
+        titleMedium = tune(Typography.titleMedium),
+        titleSmall = tune(Typography.titleSmall),
+        titleSmallEmphasized = tune(Typography.titleSmallEmphasized),
+        bodyLarge = tune(Typography.bodyLarge),
+        bodyMedium = tune(Typography.bodyMedium),
+        bodySmall = tune(Typography.bodySmall),
+        labelLarge = tune(Typography.labelLarge),
+        labelMedium = tune(Typography.labelMedium),
+        labelSmall = tune(Typography.labelSmall)
+    )
+}
