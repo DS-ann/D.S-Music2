@@ -88,7 +88,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.dsann.music.R
 import com.dsann.music.model.SongItem
-import com.dsann.music.ui.theme.SpatialFlowTheme
+import com.dsann.music.ui.theme.DsmusicAppTheme
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import kotlinx.coroutines.CoroutineScope
@@ -115,7 +115,7 @@ class QueueBottomSheet : BottomSheetDialogFragment() {
     ): View {
         return ComposeView(requireContext()).apply {
             setContent {
-                SpatialFlowTheme(darkTheme = isSystemInDarkTheme()) {
+                DsmusicAppTheme(darkTheme = isSystemInDarkTheme()) {
                     QueueBottomSheetContent(
                         viewModel = viewModel
                     )
