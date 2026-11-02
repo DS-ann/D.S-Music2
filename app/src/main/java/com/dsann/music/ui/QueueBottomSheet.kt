@@ -738,8 +738,8 @@ class DragDropState(
 @Composable
 fun rememberDragDropState(
     lazyListState: LazyListState,
-    onMove: (Int, Int) -> Unit,
-    frameClockActive: Boolean = true
+    frameClockActive: Boolean = true,
+    onMove: (Int, Int) -> Unit
 ): DragDropState {
     val scope = rememberCoroutineScope()
     val frameTimeNanos = rememberAppAnimationFrameTimeNanos(active = frameClockActive)
