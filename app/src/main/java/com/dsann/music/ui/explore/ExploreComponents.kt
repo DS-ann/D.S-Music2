@@ -94,7 +94,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.composed
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -145,45 +144,47 @@ fun ShimmerModifier(
     )
 }
 
-fun Modifier.shimmerEffect(): Modifier = composed {
+@Composable
+fun Modifier.shimmerEffect(): Modifier {
     // Cached/inactive tabs stay static. Visible shimmer samples the shared app frame clock.
+    val staticShimmerColor = DsmusicTheme.colorScheme.surfaceContainerHigh
     if (!LocalRootTabActive.current || Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
-        this.background(DsmusicTheme.colorScheme.surfaceContainerHigh)
-    } else {
-        var positionInRoot by remember { mutableStateOf(Offset.Zero) }
-        val frameTimeNanos = rememberAppAnimationFrameTimeNanos(active = true)
-        val shimmerColors = remember(
-            DsmusicTheme.colorScheme.surfaceContainerLow,
-            DsmusicTheme.colorScheme.surfaceContainerHigh
-        ) {
-            listOf(
-                DsmusicTheme.colorScheme.surfaceContainerLow,
-                DsmusicTheme.colorScheme.surfaceContainerHigh,
-                DsmusicTheme.colorScheme.surfaceContainerLow
-            )
-        }
-
-        this
-            .onGloballyPositioned { positionInRoot = it.positionInRoot() }
-            .drawWithCache {
-                val origin = positionInRoot
-                onDrawBehind {
-                    val frameNanos = frameTimeNanos.value
-                    val phase = if (frameNanos > 0L) {
-                        (frameNanos % 2_000_000_000L).toFloat() / 2_000_000_000f
-                    } else 0f
-                    val translate = -1000f + 4000f * phase
-                    val start = Offset(translate - origin.x, translate - origin.y)
-                    drawRect(
-                        brush = Brush.linearGradient(
-                            colors = shimmerColors,
-                            start = start,
-                            end = Offset(start.x + 600f, start.y + 600f)
-                        )
-                    )
-                }
-            }
+        return this.background(staticShimmerColor)
     }
+
+    var positionInRoot by remember { mutableStateOf(Offset.Zero) }
+    val frameTimeNanos = rememberAppAnimationFrameTimeNanos(active = true)
+    val shimmerColors = remember(
+        DsmusicTheme.colorScheme.surfaceContainerLow,
+        staticShimmerColor
+    ) {
+        listOf(
+            DsmusicTheme.colorScheme.surfaceContainerLow,
+            staticShimmerColor,
+            DsmusicTheme.colorScheme.surfaceContainerLow
+        )
+    }
+
+    return this
+        .onGloballyPositioned { positionInRoot = it.positionInRoot() }
+        .drawWithCache {
+            val origin = positionInRoot
+            onDrawBehind {
+                val frameNanos = frameTimeNanos.value
+                val phase = if (frameNanos > 0L) {
+                    (frameNanos % 2_000_000_000L).toFloat() / 2_000_000_000f
+                } else 0f
+                val translate = -1000f + 4000f * phase
+                val start = Offset(translate - origin.x, translate - origin.y)
+                drawRect(
+                    brush = Brush.linearGradient(
+                        colors = shimmerColors,
+                        start = start,
+                        end = Offset(start.x + 600f, start.y + 600f)
+                    )
+                )
+            }
+        }
 }
 
 /**
@@ -400,6 +401,7 @@ fun SearchResultItem(
                 val loadingFrameTimeNanos = rememberAppAnimationFrameTimeNanos(
                     active = LocalRootTabActive.current && Build.VERSION.SDK_INT > Build.VERSION_CODES.M
                 )
+                val loadingShimmerColor = DsmusicTheme.colorScheme.surfaceContainerHigh
                 Box(
                     modifier = Modifier.fillMaxSize().clip(imageShape).drawBehind {
                         val frameNanos = loadingFrameTimeNanos.value
@@ -408,9 +410,7 @@ fun SearchResultItem(
                         } else 0.5f
                         val pulse = (1f - kotlin.math.cos(phase * (2f * Math.PI.toFloat()))) * 0.5f
                         drawRect(
-                            DsmusicTheme.colorScheme.surfaceContainerHigh.copy(
-                                alpha = 0.3f + pulse * 0.4f
-                            )
+                            loadingShimmerColor.copy(alpha = 0.3f + pulse * 0.4f)
                         )
                     },
                     contentAlignment = Alignment.Center
