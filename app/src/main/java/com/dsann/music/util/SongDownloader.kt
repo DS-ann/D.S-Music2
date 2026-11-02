@@ -122,7 +122,7 @@ object SongDownloader {
 
     /**
      * Resolve an app-downloaded audio file before trying Media3's online stream resolver.
-     * Video-ID mappings are preferred; title/artist filenames and the SpatialFlow folder
+     * Video-ID mappings are preferred; title/artist filenames and the legacy D.S Music folder
      * provide a migration path for downloads created before mappings were recorded.
      */
     fun findDownloadedUri(
@@ -145,7 +145,7 @@ object SongDownloader {
         val extensions = listOf("m4a", "mp3", "webm", "opus", "ogg", "flac", "aac", "wav")
         for (extension in extensions) {
             val filename = "$baseName.$extension"
-            val found = findSpatialFlowMediaStoreUri(context, filename)
+            val found = findDsmusicMediaStoreUri(context, filename)
                 ?: findLegacyDownloadedFile(filename)
             if (found != null && isUriReadable(context, found)) {
                 prefs.edit().putString(mappingKey, found.toString()).apply()
@@ -158,7 +158,7 @@ object SongDownloader {
     /** Record the permanent MediaStore URI immediately after the file is published. */
     private fun rememberDownloadedSong(context: Context, videoId: String, outputFile: File) {
         if (videoId.isBlank()) return
-        val uri = findSpatialFlowMediaStoreUri(context, outputFile.name)
+        val uri = findDsmusicMediaStoreUri(context, outputFile.name)
             ?: if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && outputFile.isFile) {
                 Uri.fromFile(outputFile)
             } else null
@@ -173,7 +173,7 @@ object SongDownloader {
         }
     }
 
-    private fun findSpatialFlowMediaStoreUri(context: Context, filename: String): Uri? {
+    private fun findDsmusicMediaStoreUri(context: Context, filename: String): Uri? {
         val projection = mutableListOf(MediaStore.Audio.Media._ID).apply {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
                 add(MediaStore.Audio.Media.DATA)
@@ -784,7 +784,7 @@ object SongDownloader {
             }
             outputFile.copyTo(stagedFile, overwrite = true)
             val sourceComment = if (fromCache) {
-                "Exported from SpatialFlow cached audio (video ID: $videoId)"
+                "Exported from D.S Music cached audio (video ID: $videoId)"
             } else {
                 "Downloaded from YouTube Music (video ID: $videoId)"
             }
