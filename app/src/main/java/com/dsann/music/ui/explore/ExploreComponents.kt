@@ -154,15 +154,9 @@ fun Modifier.shimmerEffect(): Modifier {
 
     var positionInRoot by remember { mutableStateOf(Offset.Zero) }
     val frameTimeNanos = rememberAppAnimationFrameTimeNanos(active = true)
-    val shimmerColors = remember(
-        DsmusicTheme.colorScheme.surfaceContainerLow,
-        staticShimmerColor
-    ) {
-        listOf(
-            DsmusicTheme.colorScheme.surfaceContainerLow,
-            staticShimmerColor,
-            DsmusicTheme.colorScheme.surfaceContainerLow
-        )
+    val shimmerLowColor = DsmusicTheme.colorScheme.surfaceContainerLow
+    val shimmerColors = remember(shimmerLowColor, staticShimmerColor) {
+        listOf(shimmerLowColor, staticShimmerColor, shimmerLowColor)
     }
 
     return this
