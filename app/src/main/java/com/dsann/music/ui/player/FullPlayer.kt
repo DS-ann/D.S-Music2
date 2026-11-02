@@ -205,7 +205,7 @@ private fun PlayerVisualizer(
                     strokeWidth = 1.dp.toPx()
                 )
 
-                val points = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 24 else 48
+                val points = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 12 else 48
                 repeat(2) { layer ->
                     val path = wavePaths[layer]
                     path.reset()
