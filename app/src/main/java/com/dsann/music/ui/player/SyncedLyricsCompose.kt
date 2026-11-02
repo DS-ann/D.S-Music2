@@ -169,7 +169,7 @@ internal fun SyncedLyricsCompose(
     val isKaraokeMode = remember(lyrics) {
         lyrics.any { !it.isInterlude && it.isWordByWord && it.words.isNotEmpty() }
     }
-    val karaokeFrameTimeNanos = rememberPlayerFrameTimeNanos(
+    val karaokeFrameTimeNanos = rememberAppAnimationFrameTimeNanos(
         active = isPlaying && isKaraokeMode
     )
 
