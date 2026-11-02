@@ -44,6 +44,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -51,6 +52,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -226,7 +228,7 @@ class PlayerSharedViewModel @Inject constructor(
             var accumulatedMs = 0L
             var lastPersistedMs = 0L
             var insertedId: Long? = null
-            var wasPlaying = false
+            var activeSegmentStartMs: Long? = null
 
             suspend fun persistHistoryProgress() {
                 val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
@@ -250,32 +252,57 @@ class PlayerSharedViewModel @Inject constructor(
 
             try {
                 while (kotlinx.coroutines.currentCoroutineContext().isActive) {
-                    delay(1000.milliseconds)
-                    val playing = _isPlaying.value
-                    if (playing) accumulatedMs += 1000L
+                    // StateFlow suspends while paused instead of waking an IO worker every
+                    // second just to discover that playback has not resumed.
+                    if (!_isPlaying.value) {
+                        _isPlaying.first { it }
+                    }
 
-                    // Do not replace the same Room row every second. A 15-second checkpoint
-                    // keeps crash recovery useful while avoiding continuous DB invalidations
-                    // and history-flow recomputation during playback.
-                    val firstCheckpoint = insertedId == null && accumulatedMs >= 2000L
+                    val segmentStartMs = android.os.SystemClock.elapsedRealtime()
+                    activeSegmentStartMs = segmentStartMs
+                    // Create the first history row after 2s; update it only every 15s after
+                    // that. A pause interrupts this wait immediately so short sessions flush.
+                    val checkpointDelayMs = if (insertedId == null) {
+                        2_000L
+                    } else {
+                        HISTORY_PROGRESS_PERSIST_INTERVAL_MS
+                    }
+                    val pausedBeforeCheckpoint = withTimeoutOrNull(checkpointDelayMs) {
+                        _isPlaying.first { !it }
+                        true
+                    } == true
+
+                    val segmentDurationMs = (
+                        android.os.SystemClock.elapsedRealtime() - segmentStartMs
+                    ).coerceAtLeast(0L)
+                    activeSegmentStartMs = null
+                    accumulatedMs += segmentDurationMs
+
+                    val firstCheckpoint = insertedId == null && accumulatedMs >= 2_000L
                     val periodicCheckpoint = insertedId != null &&
                         accumulatedMs - lastPersistedMs >= HISTORY_PROGRESS_PERSIST_INTERVAL_MS
-                    // Flush promptly on pause so short listening sessions are not left stale.
-                    val pauseCheckpoint = wasPlaying && !playing &&
-                        accumulatedMs >= 2000L && accumulatedMs > lastPersistedMs
+                    // Preserve the old immediate-pause checkpoint behavior without polling.
+                    val pauseCheckpoint = (pausedBeforeCheckpoint || !_isPlaying.value) &&
+                        accumulatedMs >= 2_000L && accumulatedMs > lastPersistedMs
 
                     if (firstCheckpoint || periodicCheckpoint || pauseCheckpoint) {
                         persistHistoryProgress()
                     }
-                    wasPlaying = playing
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 Log.e("PlayerSharedViewModel", "Error logging history: ${error.message}", error)
             } finally {
-                // Preserve the final few seconds when the song changes or the ViewModel is cleared.
-                if (accumulatedMs >= 2000L && accumulatedMs > lastPersistedMs) {
+                // Include the in-flight playback segment if a song change cancels the job
+                // before its next checkpoint, then flush the final listening duration.
+                activeSegmentStartMs?.let { startedAt ->
+                    accumulatedMs += (
+                        android.os.SystemClock.elapsedRealtime() - startedAt
+                    ).coerceAtLeast(0L)
+                    activeSegmentStartMs = null
+                }
+                if (accumulatedMs >= 2_000L && accumulatedMs > lastPersistedMs) {
                     withContext(NonCancellable) {
                         runCatching { persistHistoryProgress() }
                             .onFailure { error ->
