@@ -148,7 +148,7 @@ fun ShimmerModifier(
 fun Modifier.shimmerEffect(): Modifier {
     // Cached/inactive tabs stay static. Visible shimmer samples the shared app frame clock.
     val staticShimmerColor = DsmusicTheme.colorScheme.surfaceContainerHigh
-    if (!LocalRootTabActive.current || Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
+    if (!LocalRootTabActive.current) {
         return this.background(staticShimmerColor)
     }
 
@@ -189,7 +189,7 @@ fun AnimatedEqualizerBars(
     modifier: Modifier = Modifier,
     color: Color = DsmusicTheme.colorScheme.primary
 ) {
-    if (!LocalRootTabActive.current || Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
+    if (!LocalRootTabActive.current) {
         Row(
             modifier = modifier,
             horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -393,7 +393,7 @@ fun SearchResultItem(
             )
             if (isLoading) {
                 val loadingFrameTimeNanos = rememberAppAnimationFrameTimeNanos(
-                    active = LocalRootTabActive.current && Build.VERSION.SDK_INT > Build.VERSION_CODES.M
+                    active = LocalRootTabActive.current
                 )
                 val loadingShimmerColor = DsmusicTheme.colorScheme.surfaceContainerHigh
                 Box(
