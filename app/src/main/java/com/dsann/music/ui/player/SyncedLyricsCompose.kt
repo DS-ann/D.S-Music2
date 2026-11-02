@@ -184,7 +184,9 @@ internal fun SyncedLyricsCompose(
     // Frame-paced karaoke clock. The player position is an uneven audio callback snapshot;
     // advancing by frame time keeps the sweep smooth, while gentle correction prevents drift.
     val lyricClock = remember { mutableIntStateOf(currentPositionProvider().coerceAtLeast(0)) }
-    LaunchedEffect(isPlaying, currentSong?.id, lyrics, currentPositionProvider, playbackSpeedProvider) {
+    LaunchedEffect(
+        isPlaying, currentSong?.id, lyrics, currentPositionProvider, playbackSpeedProvider, isKaraokeMode
+    ) {
         var shownMs = currentPositionProvider().coerceAtLeast(0).toDouble()
         var lastFrameNanos = -1L
         lyricClock.intValue = shownMs.roundToInt()
@@ -196,6 +198,14 @@ internal fun SyncedLyricsCompose(
                 lastFrameNanos = -1L
                 if (lyricClock.intValue != actualMs) lyricClock.intValue = actualMs
                 delay(40L)
+            } else if (!isKaraokeMode) {
+                // Ordinary synced lyrics need line changes, not a per-frame word sweep.
+                val interval = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 84L else 40L
+                delay(interval)
+                val actualMs = currentPositionProvider().coerceAtLeast(0)
+                shownMs = actualMs.toDouble()
+                lastFrameNanos = -1L
+                if (lyricClock.intValue != actualMs) lyricClock.intValue = actualMs
             } else {
                 withFrameNanos { frameNanos ->
                     val actualMs = currentPositionProvider().coerceAtLeast(0).toDouble()
