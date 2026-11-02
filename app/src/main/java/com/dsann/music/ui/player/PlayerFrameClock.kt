@@ -8,10 +8,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 
 /**
- * Publishes the timestamp of each frame Compose can actually render.
+ * Publishes the platform-vsync frame timestamp supplied by Compose.
  *
- * Consumers share this state so the scrubber, waveform and visualizer use the
- * same display cadence instead of independent delay-based timers.
+ * withFrameNanos follows the display's actual refresh cadence; this deliberately
+ * has no fixed 30/60 FPS timer or app-side cap. 60 Hz, 90 Hz, 120 Hz and older
+ * 60 Hz Android 6 displays all use the frames the device can really present.
+ *
+ * Share one returned State with related drawing components so the scrubber,
+ * waveform and visualizer stay phase-aligned instead of running timer loops.
  */
 @Composable
 internal fun rememberPlayerFrameTimeNanos(active: Boolean): State<Long> {
