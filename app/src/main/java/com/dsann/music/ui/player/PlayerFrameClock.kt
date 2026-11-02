@@ -67,11 +67,11 @@ internal object AppAnimationFrameRateController {
 @Composable
 internal fun rememberAppAnimationFrameTimeNanos(active: Boolean): State<Long> {
     val context = LocalContext.current.applicationContext
-    val frameRate by PlayerFrameRateController.frameRate.collectAsState()
+    val frameRate by AppAnimationFrameRateController.frameRate.collectAsState()
     val frameTimeNanos = remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(context) {
-        PlayerFrameRateController.load(context)
+        AppAnimationFrameRateController.load(context)
     }
 
     LaunchedEffect(active, frameRate) {
