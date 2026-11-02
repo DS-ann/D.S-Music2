@@ -2,7 +2,6 @@ package com.dsann.music.ui.theme
 
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.merge
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
@@ -184,7 +183,7 @@ fun customizedTypography(
             fontSize = style.fontSize * scale,
             lineHeight = style.lineHeight * scale,
             fontWeight = weight,
-            letterSpacing = baseSpacing.merge(spacingAdjustment)
+            letterSpacing = (baseSpacing.value + spacingAdjustment.value).sp
         )
     }
 

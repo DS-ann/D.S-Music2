@@ -30,7 +30,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.setProgress
 import kotlin.math.roundToInt
-import kotlinx.coroutines.delay
 
 /**
  * A highly optimized, custom Bezier curve wavy slider.
@@ -61,7 +60,8 @@ fun WavyMusicSlider(
     thumbStyle: String = "Auto",
     isWaveEligible: Boolean = true,
     semanticsLabel: String? = null,
-    semanticsProgressStep: Float = 0.01f
+    semanticsProgressStep: Float = 0.01f,
+    frameTimeNanos: State<Long>? = null
 ) {
     val isDragged by interactionSource.collectIsDraggedAsState()
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -74,36 +74,16 @@ fun WavyMusicSlider(
     )
 
     val shouldShowWave = isWaveEligible && isPlaying && !isInteracting
+    val localFrameTimeNanos = rememberPlayerFrameTimeNanos(
+        active = frameTimeNanos == null && shouldShowWave
+    )
+    val activeFrameTimeNanos = frameTimeNanos ?: localFrameTimeNanos
 
     val animatedWaveAmplitude by animateDpAsState(
         targetValue = if (shouldShowWave) waveAmplitudeWhenPlaying else 0.dp,
         animationSpec = tween(300, easing = FastOutSlowInEasing),
         label = "WaveAmplitudeAnim"
     )
-
-    // Infinitely shifting phase when active
-    val phaseShiftAnim = remember { Animatable(0f) }
-
-
-
-    LaunchedEffect(shouldShowWave, waveAnimationDuration) {
-        if (shouldShowWave && waveAnimationDuration > 0) {
-            // API 23 devices have less CPU headroom. Keep the wave effect, but
-            // reduce its draw invalidations to about 12 fps; newer devices retain 24 fps.
-            val fullRotation = (2 * PI).toFloat()
-            val isLegacyDevice = android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M
-            val frameDelayMs = if (isLegacyDevice) 84L else 42L
-            val phaseStep = fullRotation * frameDelayMs / waveAnimationDuration.toFloat()
-            var phase = phaseShiftAnim.value
-            while (true) {
-                phase = (phase + phaseStep) % fullRotation
-                phaseShiftAnim.snapTo(phase)
-                delay(frameDelayMs)
-            }
-        } else {
-            phaseShiftAnim.snapTo(0f)
-        }
-    }
 
     val trackHeightPx = with(LocalDensity.current) { trackHeight.toPx() }
     val thumbRadiusPx = with(LocalDensity.current) { thumbRadius.toPx() }
@@ -123,17 +103,6 @@ fun WavyMusicSlider(
     val clampedValue = value.coerceIn(valueRange.start, valueRange.endInclusive)
     val normalizedValue = if (valueRange.endInclusive == valueRange.start) 0f
         else ((clampedValue - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
-
-    // Interpolate the service's periodic progress updates without a spring restart on every tick.
-    val animatedNormalizedValueState = animateFloatAsState(
-        targetValue = normalizedValue,
-        animationSpec = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) {
-            snap()
-        } else {
-            tween(durationMillis = 320, easing = LinearEasing)
-        },
-        label = "ProgressValueAnim"
-    )
 
     val safeSemanticsStep = semanticsProgressStep.coerceIn(0.005f, 0.25f)
     val semanticNormalizedValue = remember(normalizedValue, safeSemanticsStep) {
@@ -208,15 +177,18 @@ fun WavyMusicSlider(
                     )
 
                     onDrawWithContent {
-                        // Read animated state while drawing, not during composition. Animation
-                        // frames now invalidate only this canvas instead of rebuilding the slider UI.
-                        val renderNormalizedValue = if (isInteracting) {
-                            normalizedValue
-                        } else {
-                            animatedNormalizedValueState.value
-                        }
+                        // The caller supplies per-frame progress. Read the shared frame clock
+                        // in draw so the wave phase invalidates at the same cadence as the player.
+                        val renderNormalizedValue = normalizedValue
                         val thumbInteractionFraction = thumbInteractionFractionState.value
-                        val phaseShift = phaseShiftAnim.value
+                        val frameNanos = activeFrameTimeNanos.value
+                        val phasePeriodNanos = waveAnimationDuration.coerceAtLeast(1).toLong() * 1_000_000L
+                        val phaseShift = if (shouldShowWave && frameNanos > 0L && waveAnimationDuration > 0) {
+                            ((frameNanos % phasePeriodNanos).toDouble() /
+                                phasePeriodNanos.toDouble() * (2.0 * PI)).toFloat()
+                        } else {
+                            0f
+                        }
                         val currentProgressPxEndVisual = localTrackStart + localTrackWidth * renderNormalizedValue
                         
                         // 1. Draw Inactive Track

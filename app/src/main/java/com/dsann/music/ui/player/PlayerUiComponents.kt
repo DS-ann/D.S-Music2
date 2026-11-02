@@ -298,6 +298,7 @@ internal fun PillChip(
 internal fun WavySliderWithLabels(
     currentPositionProvider: () -> Int,
     currentPositionFlow: StateFlow<Int>,
+    frameTimeNanos: State<Long>,
     isPlayerVisible: Boolean,
     duration: Int,
     isPlaying: Boolean,
@@ -317,10 +318,12 @@ internal fun WavySliderWithLabels(
     var isScrubbing by remember { mutableStateOf(false) }
     var sliderScrubPos by remember { mutableFloatStateOf(0f) }
 
-    val currentPosition = if (isPlayerVisible) {
-        currentPositionFlow.collectAsStateWithLifecycle().value
-    } else {
-        currentPositionProvider()
+    val frameNanos by frameTimeNanos
+    val observedPosition by currentPositionFlow.collectAsStateWithLifecycle()
+    val currentPosition = when {
+        isPlayerVisible && isPlaying && frameNanos > 0L -> currentPositionProvider()
+        isPlayerVisible -> observedPosition
+        else -> currentPositionProvider()
     }.coerceAtLeast(0)
     // A missing duration is not a one-millisecond track. Treat progress as unknown/zero
     // until Media3 publishes a valid duration, otherwise any restored position renders full.
@@ -376,6 +379,7 @@ internal fun WavySliderWithLabels(
             waveAmplitudeWhenPlaying = if (waveEnabled) 6.dp else 0.dp,
             waveLength = 48.dp,
             isWaveEligible = waveEnabled && isPlayerVisible,
+            frameTimeNanos = frameTimeNanos,
         )
 
         if (playerTimes != "None") {

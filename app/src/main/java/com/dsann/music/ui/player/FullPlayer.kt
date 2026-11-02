@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
@@ -68,6 +67,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -107,9 +107,9 @@ private fun PlayerVisualizer(
     isPlaying: Boolean,
     color: Color,
     colorMode: String = "Accent",
-    isVisible: Boolean
+    isVisible: Boolean,
+    frameTimeNanos: State<Long>
 ) {
-    val phase = remember { Animatable(0f) }
     val wavePaths = remember { arrayOf(
         androidx.compose.ui.graphics.Path(),
         androidx.compose.ui.graphics.Path()
@@ -134,26 +134,6 @@ private fun PlayerVisualizer(
         }
         Brush.horizontalGradient(colors)
     }
-    // The visualizer is a draw-only animation. A consistent 24 fps cadence avoids
-    // 60 fps Compose invalidations while keeping it animated on Android 6 as well.
-    LaunchedEffect(style, isPlaying, isVisible) {
-        if (!isVisible || !isPlaying || style == "Off") {
-            phase.snapTo(0f)
-        } else {
-            // Keep every visualizer style available on API 23, but lower its visual
-            // refresh rate to about 6 fps and simplify its geometry on the older GPU.
-            val legacyDevice = android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M
-            val frameDelayMs = if (legacyDevice) 167L else 42L
-            val frameCount = if (legacyDevice) 12 else 24
-            var frame = 0
-            while (true) {
-                phase.snapTo((frame % frameCount) / frameCount.toFloat())
-                frame++
-                delay(frameDelayMs)
-            }
-        }
-    }
-
     androidx.compose.foundation.Canvas(
         modifier = Modifier.fillMaxWidth().height(
             when (style) {
@@ -163,7 +143,12 @@ private fun PlayerVisualizer(
             }
         )
     ) {
-        val phaseValue = phase.value
+        val frameNanos = frameTimeNanos.value
+        val phaseValue = if (isVisible && isPlaying && frameNanos > 0L) {
+            (frameNanos % 1_200_000_000L).toFloat() / 1_200_000_000f
+        } else {
+            0f
+        }
         val phaseAngle = phaseValue * 6.2831855f
         val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
         val centerY = center.y
@@ -809,6 +794,9 @@ fun FullPlayer(
     val isDark = isSystemInDarkTheme()
     val contentColor = if (isDark) Color.White else Color(0xFF1C1B1F)
     val contentSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1C1B1F).copy(alpha = 0.6f)
+    val playerFrameTimeNanos = rememberPlayerFrameTimeNanos(
+        active = isPlayerVisible && uiState.isPlaying
+    )
 
     val dynamicAccentColor = remember(accentColor, isDark) {
         val hsl = FloatArray(3)
@@ -1099,7 +1087,8 @@ fun FullPlayer(
                         else -> dynamicAccentColor
                     },
                     colorMode = visualizerColor,
-                    isVisible = isPlayerVisible
+                    isVisible = isPlayerVisible,
+                    frameTimeNanos = playerFrameTimeNanos
                 )
                 Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 10.dp))
             }
@@ -1300,6 +1289,7 @@ fun FullPlayer(
             WavySliderWithLabels(
                 currentPositionProvider = currentPositionProvider,
                 currentPositionFlow = currentPositionFlow,
+                frameTimeNanos = playerFrameTimeNanos,
                 isPlayerVisible = isPlayerVisible,
                 duration = uiState.duration,
                 isPlaying = uiState.isPlaying,
