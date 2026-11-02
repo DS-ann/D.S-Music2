@@ -12,8 +12,10 @@ import com.google.gson.JsonParser
  * marker so they survive the existing LyricsResult and cache flow.
  */
 object AdvancedLyricsParser {
-    const val WORD_PREFIX = "SPATIALFLOW-WORDS:"
-    const val LYRICS_PLUS_PREFIX = "SPATIALFLOW-LYRICSPLUS\n"
+    const val WORD_PREFIX = "DSMUSIC-WORDS:"
+    const val LYRICS_PLUS_PREFIX = "DSMUSIC-LYRICSPLUS\n"
+    private const val LEGACY_WORD_PREFIX = "SPATIALFLOW-WORDS:"
+    private const val LEGACY_LYRICS_PLUS_PREFIX = "SPATIALFLOW-LYRICSPLUS\n"
 
     enum class WordKind { QRC, YRC, KRC }
 
@@ -29,20 +31,29 @@ object AdvancedLyricsParser {
     fun wrapLyricsPlus(json: String): String = LYRICS_PLUS_PREFIX + json
 
     fun recognizes(content: String): Boolean =
-        content.startsWith(WORD_PREFIX) || content.startsWith(LYRICS_PLUS_PREFIX)
+        content.startsWith(WORD_PREFIX) ||
+            content.startsWith(LYRICS_PLUS_PREFIX) ||
+            content.startsWith(LEGACY_WORD_PREFIX) ||
+            content.startsWith(LEGACY_LYRICS_PLUS_PREFIX)
 
     /** Returns null only when this is a format we do not own; a malformed wrapped payload returns an empty list. */
     fun parse(content: String): List<LyricLine>? {
         return when {
-            content.startsWith(WORD_PREFIX) -> {
-                val kind = runCatching {
-                    WordKind.valueOf(content.substringAfter(WORD_PREFIX).substringBefore('\n').trim())
-                }.getOrNull() ?: return emptyList()
-                parseWordLines(kind, content.substringAfter('\n', ""))
-            }
-            content.startsWith(LYRICS_PLUS_PREFIX) -> parseLyricsPlus(content.removePrefix(LYRICS_PLUS_PREFIX))
+            content.startsWith(WORD_PREFIX) -> parseWrappedWords(content, WORD_PREFIX)
+            content.startsWith(LEGACY_WORD_PREFIX) -> parseWrappedWords(content, LEGACY_WORD_PREFIX)
+            content.startsWith(LYRICS_PLUS_PREFIX) ->
+                parseLyricsPlus(content.removePrefix(LYRICS_PLUS_PREFIX))
+            content.startsWith(LEGACY_LYRICS_PLUS_PREFIX) ->
+                parseLyricsPlus(content.removePrefix(LEGACY_LYRICS_PLUS_PREFIX))
             else -> null
         }
+    }
+
+    private fun parseWrappedWords(content: String, prefix: String): List<LyricLine> {
+        val kind = runCatching {
+            WordKind.valueOf(content.substringAfter(prefix).substringBefore('\n').trim())
+        }.getOrNull() ?: return emptyList()
+        return parseWordLines(kind, content.substringAfter('\n', ""))
     }
 
     private fun parseWordLines(kind: WordKind, content: String): List<LyricLine> {
