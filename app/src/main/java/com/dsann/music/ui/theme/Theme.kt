@@ -109,7 +109,7 @@ private fun readableOnColor(background: Color): Color {
  * appearance presets, album-art accent, AMOLED black and density preferences.
  */
 @Composable
-fun SpatialFlowTheme(
+fun DsmusicAppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicAlbumColor: Int? = null,
     content: @Composable () -> Unit
@@ -124,6 +124,10 @@ fun SpatialFlowTheme(
     val customAccentHex by prefs.observeKey("custom_accent_color", "#7C9CFF")
     val uiDensity by prefs.observeKey("ui_density", "Comfortable")
     val uiCornerStyle by prefs.observeKey("ui_corner_style", "Soft")
+    val uiFontFamily by prefs.observeKey("ui_font_family", "System")
+    val uiFontScale by prefs.observeKey("ui_font_scale", 1f)
+    val uiFontWeight by prefs.observeKey("ui_font_weight", "Default")
+    val uiLetterSpacing by prefs.observeKey("ui_letter_spacing", "Normal")
 
     val accent = remember(appearancePreset, albumArtThemeEnabled, dynamicAlbumColor, customAccentHex) {
         if (albumArtThemeEnabled && dynamicAlbumColor != null) {
@@ -258,7 +262,7 @@ fun SpatialFlowTheme(
     CompositionLocalProvider(LocalDensity provides adjustedDensity) {
         DsmusicThemeProvider(
             colorScheme = colorScheme,
-            typography = Typography,
+            typography = customizedTypography(uiFontFamily, uiFontScale, uiFontWeight, uiLetterSpacing),
             shapes = remember(uiCornerStyle) {
                 val (xs, sm, md, lg, xl) = when (uiCornerStyle) {
                     "Tight" -> listOf(3.dp, 5.dp, 8.dp, 11.dp, 15.dp)
