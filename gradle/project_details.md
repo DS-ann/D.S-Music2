@@ -1,4 +1,4 @@
-# SpatialFlow Project Details
+# D.S Music Project Details
 
 This file contains the content of all significant source code and configuration files in the project.
 
@@ -27,17 +27,17 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      # Use your real SpatialFlow.jks from secrets
+      # Use your real dsmusic.jks from secrets
       - name: Decode and write release keystore
         run: |
           mkdir -p $HOME/keystores
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > $HOME/keystores/spatialflow.jks
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > $HOME/keystores/dsmusic.jks
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
 
       - name: Set keystore env vars
         run: |
-          echo "ANDROID_KEYSTORE_PATH=$HOME/keystores/spatialflow.jks" >> $GITHUB_ENV
+          echo "ANDROID_KEYSTORE_PATH=$HOME/keystores/dsmusic.jks" >> $GITHUB_ENV
           echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
           echo "ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> $GITHUB_ENV
           echo "ANDROID_KEY_ALIAS_PASSWORD=${{ secrets.ANDROID_KEY_ALIAS_PASSWORD }}" >> $GITHUB_ENV
@@ -60,7 +60,7 @@ jobs:
             app/build/outputs/apk/release/app-release.apk
             app/build/outputs/apk/release/checksum.txt
           body: |
-            ## SpatialFlow ${{ github.ref_name }}
+            ## D.S Music ${{ github.ref_name }}
             
             ### What's New
             - Updated app logo
@@ -1104,7 +1104,7 @@ jobs:
     app:cardCornerRadius="32dp"
     app:cardElevation="0dp"
     app:strokeWidth="0dp"
-    app:shapeAppearanceOverlay="@style/ShapeAppearance.SpatialFlow.BottomSheet"
+    app:shapeAppearanceOverlay="@style/ShapeAppearance.D.S Music.BottomSheet"
     android:backgroundTint="?attr/colorSurfaceContainerLow"
     app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
 
@@ -2458,7 +2458,7 @@ jobs:
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?attr/colorSurface"
-    tools:context="com.codetrio.spatialflow.ui.SettingsFragment">
+    tools:context="com.dsann.music.ui.SettingsFragment">
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/settingsScroll"
@@ -2642,7 +2642,7 @@ jobs:
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="Shubham Karande"
+                        android:text="Debarghya Sannigrahi"
                         android:textAppearance="?attr/textAppearanceTitleLarge"
                         android:textColor="?attr/colorOnSurface"
                         android:gravity="center"
@@ -2672,7 +2672,7 @@ jobs:
                             app:iconGravity="textStart"
                             app:iconPadding="0dp"
                             app:iconTint="?attr/colorOnPrimary"
-                            app:shapeAppearanceOverlay="@style/ShapeAppearance.SpatialFlow.CircleButton"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.D.S Music.CircleButton"
                             app:layout_constraintTop_toBottomOf="@id/tvDeveloperName"
                             app:layout_constraintHorizontal_chainStyle="packed"
                             app:layout_constraintStart_toStartOf="parent"
@@ -2689,7 +2689,7 @@ jobs:
                             app:iconGravity="textStart"
                             app:iconPadding="0dp"
                             app:iconTint="?attr/colorOnPrimary"
-                            app:shapeAppearanceOverlay="@style/ShapeAppearance.SpatialFlow.CircleButton"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.D.S Music.CircleButton"
                             app:layout_constraintTop_toTopOf="@id/btnGitHub"
                             app:layout_constraintStart_toEndOf="@id/btnGitHub"
                             app:layout_constraintEnd_toStartOf="@+id/btnYoutube" />
@@ -2704,7 +2704,7 @@ jobs:
                             app:iconGravity="textStart"
                             app:iconPadding="0dp"
                             app:iconTint="?attr/colorOnPrimary"
-                            app:shapeAppearanceOverlay="@style/ShapeAppearance.SpatialFlow.CircleButton"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.D.S Music.CircleButton"
                             app:layout_constraintTop_toTopOf="@id/btnGitHub"
                             app:layout_constraintStart_toEndOf="@id/btnInstagram"
                             app:layout_constraintEnd_toEndOf="parent" />
@@ -2749,7 +2749,7 @@ jobs:
                     android:id="@+id/tvCopyright"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="© 2025 Shubham Karande"
+                    android:text="© 2025 Debarghya Sannigrahi"
                     android:textSize="13sp"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:layout_marginTop="4dp"
@@ -3956,7 +3956,7 @@ jobs:
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?attr/colorSurface"
-    tools:context="com.codetrio.spatialflow.ui.SettingsFragment">
+    tools:context="com.dsann.music.ui.SettingsFragment">
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/settingsScroll"
@@ -4147,7 +4147,7 @@ jobs:
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="6dp"
-                            android:text="Shubham Karande"
+                            android:text="Debarghya Sannigrahi"
                             android:textAppearance="?attr/textAppearanceTitleMedium"
                             android:textColor="?attr/colorOnSurface"
                             android:gravity="center"
@@ -4175,7 +4175,7 @@ jobs:
                                 app:icon="@drawable/ic_github"
                                 app:iconSize="20dp"
                                 app:iconTint="?attr/colorOnPrimary"
-                                app:shapeAppearanceOverlay="@style/ShapeAppearance.SpatialFlow.CircleButton"/>
+                                app:shapeAppearanceOverlay="@style/ShapeAppearance.D.S Music.CircleButton"/>
 
                             <com.google.android.material.button.MaterialButton
                                 android:id="@+id/btnInstagram"
@@ -4186,7 +4186,7 @@ jobs:
                                 app:icon="@drawable/ic_instagram"
                                 app:iconSize="20dp"
                                 app:iconTint="?attr/colorOnPrimary"
-                                app:shapeAppearanceOverlay="@style/ShapeAppearance.SpatialFlow.CircleButton"/>
+                                app:shapeAppearanceOverlay="@style/ShapeAppearance.D.S Music.CircleButton"/>
 
                             <com.google.android.material.button.MaterialButton
                                 android:id="@+id/btnYoutube"
@@ -4196,7 +4196,7 @@ jobs:
                                 app:icon="@drawable/ic_youtube"
                                 app:iconSize="20dp"
                                 app:iconTint="?attr/colorOnPrimary"
-                                app:shapeAppearanceOverlay="@style/ShapeAppearance.SpatialFlow.CircleButton"/>
+                                app:shapeAppearanceOverlay="@style/ShapeAppearance.D.S Music.CircleButton"/>
 
                         </LinearLayout>
 
@@ -4246,7 +4246,7 @@ jobs:
                     android:id="@+id/tvCopyright"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="© 2025 Shubham Karande"
+                    android:text="© 2025 Debarghya Sannigrahi"
                     android:textSize="12sp"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:layout_marginTop="4dp"
@@ -4316,17 +4316,17 @@ jobs:
 
     <fragment
         android:id="@+id/navigation_player"
-        android:name="com.codetrio.spatialflow.ui.PlayerFragment"
+        android:name="com.dsann.music.ui.PlayerFragment"
         android:label="Player" />
 
     <fragment
         android:id="@+id/navigation_effects"
-        android:name="com.codetrio.spatialflow.ui.EffectsFragment"
+        android:name="com.dsann.music.ui.EffectsFragment"
         android:label="Effects" />
 
     <fragment
         android:id="@+id/navigation_settings"
-        android:name="com.codetrio.spatialflow.ui.SettingsFragment"
+        android:name="com.dsann.music.ui.SettingsFragment"
         android:label="Settings" />
 
 </navigation>
@@ -4495,7 +4495,7 @@ jobs:
 <resources>
 
     <!-- App name -->
-    <string name="app_name">SpatialFlow</string>
+    <string name="app_name">D.S Music</string>
 
     <!-- Bottom tabs -->
     <string name="tab_player">Player</string>
@@ -4578,7 +4578,7 @@ jobs:
         <item name="fontFamily">sans-serif-medium</item>
 
     </style>
-    <style name="Base.Theme.SpatialFlow" parent="Theme.Material3.DayNight">
+    <style name="Base.Theme.D.S Music" parent="Theme.Material3.DayNight">
         <item name="colorPrimary">@color/md_theme_primary</item>
 
         <!-- System bars styling -->
@@ -4596,7 +4596,7 @@ jobs:
         <item name="android:textStyle">normal</item>
         <item name="fontFamily">sans-serif-medium</item>
     </style>
-    <style name="ShapeAppearance.SpatialFlow.CircleButton" parent="">
+    <style name="ShapeAppearance.D.S Music.CircleButton" parent="">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">50%</item>
     </style>
@@ -4613,7 +4613,7 @@ jobs:
         <item name="backgroundTint">?attr/colorSurfaceContainerLow</item>
     </style>
 
-    <style name="ShapeAppearance.SpatialFlow.BottomSheet" parent="ShapeAppearance.Material3.MediumComponent">
+    <style name="ShapeAppearance.D.S Music.BottomSheet" parent="ShapeAppearance.Material3.MediumComponent">
         <item name="cornerSizeTopLeft">32dp</item>
         <item name="cornerSizeTopRight">32dp</item>
         <item name="cornerSizeBottomLeft">0dp</item>
@@ -4629,7 +4629,7 @@ jobs:
 <resources>
 
     <!-- Light app theme -->
-    <style name="Theme.SpatialFlow" parent="Theme.Material3.DynamicColors.Light.NoActionBar">
+    <style name="Theme.D.S Music" parent="Theme.Material3.DynamicColors.Light.NoActionBar">
         <!-- Status Bar -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
@@ -4739,7 +4739,7 @@ jobs:
 
 ``xml
 <resources>
-    <style name="Theme.SpatialFlow" parent="Theme.Material3.DynamicColors.Dark.NoActionBar">
+    <style name="Theme.D.S Music" parent="Theme.Material3.DynamicColors.Dark.NoActionBar">
         <!-- Status Bar -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
@@ -4918,12 +4918,12 @@ jobs:
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
 
     <application
-        android:name=".SpatialFlowApplication"
+        android:name=".D.S MusicApplication"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.SpatialFlow"
+        android:theme="@style/Theme.D.S Music"
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="31">
         <activity
@@ -4933,7 +4933,7 @@ jobs:
             android:resizeableActivity="true"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
             android:label="@string/app_name"
-            android:theme="@style/Theme.SpatialFlow">
+            android:theme="@style/Theme.D.S Music">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -4991,11 +4991,11 @@ def ciKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
 def ciKeyPassword = System.getenv("ANDROID_KEY_ALIAS_PASSWORD")
 
 android {
-    namespace 'com.codetrio.spatialflow'
+    namespace 'com.dsann.music'
     compileSdk 36
 
     defaultConfig {
-        applicationId "com.codetrio.spatialflow"
+        applicationId "com.dsann.music"
         minSdk 24
         targetSdk 35
         versionCode 6
@@ -5006,16 +5006,16 @@ android {
         release {
             if (ciStoreFile != null) {
                 // CI (GitHub Actions)
-                storeFile file(ciStoreFile)
-                storePassword ciStorePassword
-                keyAlias ciKeyAlias
-                keyPassword ciKeyPassword
+                storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_ALIAS_PASSWORD")
             } else {
                 // Local build on your PC
-                storeFile file("C:/Users/shubh/Documents/SpatialFlow.jks")
-                storePassword "Shubham@k124"
-                keyAlias "ShubhamKarande"
-                keyPassword "Shubham@k124"
+                storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_ALIAS_PASSWORD")
             }
         }
     }
@@ -5167,7 +5167,7 @@ android.nonTransitiveRClass=true
   <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp" width="120"/>
 </p>
 
-<h1 align="center">SpatialFlow</h1>
+<h1 align="center">D.S Music</h1>
 
 <p align="center">
   A modern, lightweight Android music player built with Material Design 3, smooth animations, and a clean immersive UI.
@@ -5179,13 +5179,13 @@ android.nonTransitiveRClass=true
 
 <p align="center">
   <!-- Downloads & Release -->
-  <img src="https://img.shields.io/github/downloads/MythicalSHUB/SpatialFlow/total?color=5C7AEA&style=for-the-badge" />
-  <img src="https://img.shields.io/github/v/release/MythicalSHUB/SpatialFlow?color=4ADE80&style=for-the-badge" />
-  <img src="https://img.shields.io/github/actions/workflow/status/MythicalSHUB/SpatialFlow/release.yml?style=for-the-badge&label=BUILD" />
+  <img src="https://img.shields.io/github/downloads/DS-ann/D.S Music/total?color=5C7AEA&style=for-the-badge" />
+  <img src="https://img.shields.io/github/v/release/DS-ann/D.S Music?color=4ADE80&style=for-the-badge" />
+  <img src="https://img.shields.io/github/actions/workflow/status/DS-ann/D.S Music/release.yml?style=for-the-badge&label=BUILD" />
 
   <!-- Repo Health -->
 
-  <img src="https://img.shields.io/github/issues/MythicalSHUB/SpatialFlow?color=EF4444&style=for-the-badge" />
+  <img src="https://img.shields.io/github/issues/DS-ann/D.S Music?color=EF4444&style=for-the-badge" />
 
   <!-- Tech Stack -->
 
@@ -5195,14 +5195,14 @@ android.nonTransitiveRClass=true
 
   <!-- License -->
 
-  <img src="https://img.shields.io/github/license/MythicalSHUB/SpatialFlow?color=10B981&style=for-the-badge" />
+  <img src="https://img.shields.io/github/license/DS-ann/D.S Music?color=10B981&style=for-the-badge" />
 </p>
 
 ---
 
-## About SpatialFlow
+## About D.S Music
 
-**SpatialFlow** is a modern Android music player designed for a clean, distraction-free listening experience.
+**D.S Music** is a modern Android music player designed for a clean, distraction-free listening experience.
 Built with Material Design 3 (Material You), it delivers smooth animations, dynamic colors, and high-performance local audio playback.
 
 Perfect for users who want:
@@ -5254,7 +5254,7 @@ Perfect for users who want:
 ### Download APK (Recommended)
 
 Latest Release:
-https://github.com/MythicalSHUB/SpatialFlow/releases
+https://github.com/DS-ann/D.S-Music2/releases
 
 > If upgrading from v1.0.0, uninstall once due to signing key change.
 
@@ -5263,8 +5263,8 @@ https://github.com/MythicalSHUB/SpatialFlow/releases
 ### Build from Source
 
 ```bash
-git clone https://github.com/MythicalSHUB/SpatialFlow.git
-cd SpatialFlow
+git clone https://github.com/DS-ann/D.S-Music2.git
+cd D.S Music
 ```
 
 1. Open in Android Studio (JDK 17)
@@ -5275,7 +5275,7 @@ cd SpatialFlow
 
 ## In-App Updater
 
-SpatialFlow includes a built-in updater that:
+D.S Music includes a built-in updater that:
 
 * Fetches the latest release from GitHub
 * Downloads the APK securely
@@ -5328,27 +5328,15 @@ Contributions are welcome.
 
 ## Developer
 
-Shubham Karande
+Debarghya Sannigrahi
 
 Focused on clean UI, smooth UX, and modern Android development.
 
 ---
 
-## License (MIT)
+## License
 
-```
-MIT License
-
-Copyright (c) 2026 Shubham Karande
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software...
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
-```
+See the repository root `LICENSE` and `NOTICE` for the applicable licence and required upstream attribution.
 
 ---
 
@@ -5364,9 +5352,9 @@ If you like this project:
 
 ## Keywords
 
-SpatialFlow, SpatialFlow Android App, SpatialFlow Music Player, SpatialFlow Audio Player, SpatialFlow Offline Music Player,
+D.S Music, D.S Music Android App, D.S Music Music Player, D.S Music Audio Player, D.S Music Offline Music Player,
 
-Shubham Karande, Shubham Karande Developer, Apps by Shubham Karande, Shubham Android Developer,
+Debarghya Sannigrahi, Debarghya Sannigrahi Developer, Apps by Debarghya Sannigrahi, Shubham Android Developer,
 
 Android Music Player, Offline Music Player Android, Android Audio Player App, Local Music Player Android, MP3 Player Android App,
 
@@ -5409,7 +5397,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "SpatialFlow"
+rootProject.name = "D.S-Music"
 include ':app'
 ``
 
