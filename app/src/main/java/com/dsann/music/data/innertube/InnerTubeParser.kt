@@ -1348,7 +1348,7 @@ object InnerTubeParser {
         }
 
         val prefs = try {
-            com.dsann.music.SpatialFlowApplication.instance.getSharedPreferences("AppSettings", android.content.Context.MODE_PRIVATE)
+            com.dsann.music.DsmusicApplication.instance.getSharedPreferences("AppSettings", android.content.Context.MODE_PRIVATE)
         } catch (e: Exception) { null }
         val dataSaver = prefs?.getBoolean("data_saver", false) ?: false
 
