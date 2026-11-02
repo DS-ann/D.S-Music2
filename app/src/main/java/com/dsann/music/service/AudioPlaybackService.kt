@@ -548,6 +548,12 @@ class AudioPlaybackService : MediaSessionService() {
     private val mainPlayerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             viewModel?.postIsPlaying(isPlaying)
+            // Publish the exact pause/resume anchor immediately. Active player UIs read
+            // Media3 per display frame; this snapshot keeps paused/background UI accurate.
+            viewModel?.setCurrentPosition(
+                player.currentPosition.coerceAtLeast(0L)
+                    .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            )
             telemetryManager.onPlaybackStateChanged(isPlaying)
             if (isPlaying) {
                 handler.removeCallbacks(progressUpdateRunnable)
