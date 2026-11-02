@@ -2,6 +2,7 @@
 
 package com.dsann.music.service
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -22,6 +23,7 @@ import android.util.Log
 import android.util.Size
 import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.scale
 import androidx.core.net.toUri
 import androidx.media3.common.AudioAttributes
@@ -488,6 +490,25 @@ class AudioPlaybackService : MediaSessionService() {
     private lateinit var progressUpdateRunnable: Runnable
     private var progressFrameUpdatesRunning = false
     private var lastUiFrameBucket = Long.MIN_VALUE
+    private var screenWakeReceiverRegistered = false
+    private var pendingWidgetRefreshAfterScreenWake = false
+    private val widgetRefreshAfterWakeRunnable = Runnable {
+        if (isPlayerInitialized) {
+            // Re-send the full RemoteViews state after keyguard/screen wake. This repairs
+            // stale widget buttons, text, artwork references and progress on launchers that
+            // defer or drop RemoteViews updates while the display is asleep.
+            updateWidgetState(player.isPlaying)
+            lastWidgetProgressUpdateAtMs = 0L
+        }
+    }
+    private val screenWakeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_ON,
+                Intent.ACTION_USER_PRESENT -> scheduleWidgetRefreshAfterScreenWake()
+            }
+        }
+    }
     private val progressFrameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
             if (!progressFrameUpdatesRunning || !isPlayerInitialized || !player.isPlaying) {
@@ -838,6 +859,7 @@ class AudioPlaybackService : MediaSessionService() {
         // No-op for behavior in older Media3 or if unresolved
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         handler = Handler(Looper.getMainLooper())
+        registerScreenWakeReceiver()
 
         telemetryManager = com.dsann.music.data.innertube.YouTubeTelemetryManager(
             httpClient = com.dsann.music.data.innertube.InnerTubeClient.httpClient,
@@ -859,6 +881,10 @@ class AudioPlaybackService : MediaSessionService() {
                 AppAnimationFrameRateController.load(applicationContext)
                 setupProgressTracking()
                 isPlayerInitialized = true
+                if (pendingWidgetRefreshAfterScreenWake) {
+                    pendingWidgetRefreshAfterScreenWake = false
+                    scheduleWidgetRefreshAfterScreenWake()
+                }
 
                 pendingViewModel?.let { vm ->
                     pendingViewModel = null
@@ -976,6 +1002,11 @@ class AudioPlaybackService : MediaSessionService() {
             handler.removeCallbacks(progressUpdateRunnable)
         }
         stopProgressFrameUpdates()
+        handler.removeCallbacks(widgetRefreshAfterWakeRunnable)
+        if (screenWakeReceiverRegistered) {
+            runCatching { unregisterReceiver(screenWakeReceiver) }
+            screenWakeReceiverRegistered = false
+        }
         abandonAudioFocus()
         cancelCurrentTrackCache()
 
@@ -2208,6 +2239,32 @@ class AudioPlaybackService : MediaSessionService() {
             viewModel?.setLoading(false)
             Log.e(TAG, "Failed to load audio: ${e.message}")
         }
+    }
+
+    private fun registerScreenWakeReceiver() {
+        if (screenWakeReceiverRegistered) return
+        val filter = android.content.IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_USER_PRESENT)
+        }
+        ContextCompat.registerReceiver(
+            this,
+            screenWakeReceiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        screenWakeReceiverRegistered = true
+    }
+
+    private fun scheduleWidgetRefreshAfterScreenWake() {
+        if (!isPlayerInitialized) {
+            pendingWidgetRefreshAfterScreenWake = true
+            return
+        }
+        handler.removeCallbacks(widgetRefreshAfterWakeRunnable)
+        // SCREEN_ON and USER_PRESENT can both fire for one unlock. Debounce them to one
+        // complete widget refresh after the launcher/keyguard has resumed.
+        handler.postDelayed(widgetRefreshAfterWakeRunnable, 500L)
     }
 
     private fun startProgressFrameUpdates() {
