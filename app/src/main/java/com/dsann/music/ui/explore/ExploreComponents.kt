@@ -754,7 +754,9 @@ fun HomeSectionRow(
     onSongTouchDown: (OnlineSong) -> Unit = {},
     onSectionClick: (browseId: String, params: String?, title: String) -> Unit = { _, _, _ -> }
 ) {
-    val hasSongsOnly = section.items.isNotEmpty() && section.items.all { it is SearchItem.Song }
+    val hasSongsOnly = remember(section.items) {
+        section.items.isNotEmpty() && section.items.all { it is SearchItem.Song }
+    }
 
     // Android 6 struggles with animating the measured height of nested lazy rows.
     // Keep the layout stable there; newer versions retain the section resize animation.
@@ -1154,8 +1156,12 @@ fun HomeSectionRow(
             // 4. GENERAL FALLBACK â€” Song List or Carousel
             else -> {
                 if (hasSongsOnly) {
-                    val songItems = section.items.filterIsInstance<SearchItem.Song>()
-                    val chunkedSongs = songItems.chunked(4)
+                    // Playback-state changes should not re-filter and re-chunk an unchanged
+                    // home section; API 23 list recompositions must stay allocation-light.
+                    val songItems = remember(section.items) {
+                        section.items.filterIsInstance<SearchItem.Song>()
+                    }
+                    val chunkedSongs = remember(songItems) { songItems.chunked(4) }
                     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                         // Two four-song columns should fit inside the current viewport.
                         // A fixed 320dp width pushed the second column beyond phone screens.
@@ -1205,9 +1211,9 @@ fun HomeSectionRow(
                                     is SearchItem.Song -> item.song.videoId == currentOnlineSong?.videoId
                                     else -> false
                                 },
-                                onTouchDown = {
-                                    if (item is SearchItem.Song) onSongTouchDown(item.song)
-                                },
+                                onTouchDown = if (item is SearchItem.Song) {
+                                    { onSongTouchDown(item.song) }
+                                } else null,
                                 onClick = {
                                     when (item) {
                                         is SearchItem.Song -> onSongClick(item.song)
@@ -1231,7 +1237,7 @@ fun HomeSectionRow(
 fun HomeCarouselItem(
     item: SearchItem,
     isPlaying: Boolean,
-    onTouchDown: () -> Unit = {},
+    onTouchDown: (() -> Unit)? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier.width(160.dp)
 ) {
@@ -1262,18 +1268,24 @@ fun HomeCarouselItem(
         is SearchItem.Playlist -> item.playlist.author?.name ?: ""
     }
 
-    Column(
-        modifier = modifier
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        if (event.type == androidx.compose.ui.input.pointer.PointerEventType.Press) {
-                            onTouchDown()
-                        }
+    val touchDownModifier = if (onTouchDown != null) {
+        Modifier.pointerInput(itemId) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    if (event.type == androidx.compose.ui.input.pointer.PointerEventType.Press) {
+                        onTouchDown?.invoke()
                     }
                 }
             }
+        }
+    } else {
+        Modifier
+    }
+
+    Column(
+        modifier = modifier
+            .then(touchDownModifier)
             .clickable(onClick = onClick),
         horizontalAlignment = Alignment.Start
     ) {
