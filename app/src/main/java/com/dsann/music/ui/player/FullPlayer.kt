@@ -794,7 +794,7 @@ fun FullPlayer(
     val isDark = isSystemInDarkTheme()
     val contentColor = if (isDark) Color.White else Color(0xFF1C1B1F)
     val contentSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1C1B1F).copy(alpha = 0.6f)
-    val playerFrameTimeNanos = rememberPlayerFrameTimeNanos(
+    val playerFrameTimeNanos = rememberAppAnimationFrameTimeNanos(
         active = isPlayerVisible && uiState.isPlaying
     )
 
