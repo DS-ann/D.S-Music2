@@ -21,6 +21,8 @@ import com.dsann.music.R;
 import com.dsann.music.model.SongItem;
 
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Base Widget Provider for D.S Music.
@@ -38,6 +40,15 @@ public class SpatialFlowWidgetProvider extends AppWidgetProvider {
     
     private static final String PREFS_NAME = "spatialflow_widget_prefs";
     private static final String PREF_LYRICS_MODE = "lyrics_mode_";
+
+    // Keep RemoteViews/AppWidgetManager Binder work away from the activity's main looper.
+    // A single worker also preserves update order across rapid playback/lyrics callbacks.
+    private static final ExecutorService PARTIAL_WIDGET_UPDATE_EXECUTOR =
+            Executors.newSingleThreadExecutor(runnable -> {
+                Thread worker = new Thread(runnable, "DsmusicWidgetUpdates");
+                worker.setPriority(Thread.MIN_PRIORITY);
+                return worker;
+            });
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
@@ -92,31 +103,30 @@ public class SpatialFlowWidgetProvider extends AppWidgetProvider {
 
     public static void updateAllWidgetsPartial(Context context, int position, int duration, String currentLyric) {
         final Context appContext = context.getApplicationContext();
-        final AppWidgetManager manager = AppWidgetManager.getInstance(appContext);
-        // AudioPlaybackService invokes this from a background dispatcher. AppWidgetManager
-        // uses Binder and does not need the activity's main looper; keeping this work here
-        // prevents the one-second playback ticker from stalling every screen in the app.
-        try {
-            int[] mediumIds = manager.getAppWidgetIds(
-                    new ComponentName(appContext, WidgetMediumProvider.class));
-            int[] largeIds = manager.getAppWidgetIds(
-                    new ComponentName(appContext, WidgetLargeProvider.class));
-            if (mediumIds.length == 0 && largeIds.length == 0) {
-                return;
-            }
+        PARTIAL_WIDGET_UPDATE_EXECUTOR.execute(() -> {
+            final AppWidgetManager manager = AppWidgetManager.getInstance(appContext);
+            try {
+                int[] mediumIds = manager.getAppWidgetIds(
+                        new ComponentName(appContext, WidgetMediumProvider.class));
+                int[] largeIds = manager.getAppWidgetIds(
+                        new ComponentName(appContext, WidgetLargeProvider.class));
+                if (mediumIds.length == 0 && largeIds.length == 0) {
+                    return;
+                }
 
-            for (int id : mediumIds) {
-                updateWidgetProgress(
-                        appContext, manager, id, position, duration, currentLyric, R.layout.widget_medium);
-            }
+                for (int id : mediumIds) {
+                    updateWidgetProgress(
+                            appContext, manager, id, position, duration, currentLyric, R.layout.widget_medium);
+                }
 
-            for (int id : largeIds) {
-                updateWidgetProgress(
-                        appContext, manager, id, position, duration, null, R.layout.widget_large);
+                for (int id : largeIds) {
+                    updateWidgetProgress(
+                            appContext, manager, id, position, duration, null, R.layout.widget_large);
+                }
+            } catch (Exception error) {
+                Log.w(TAG, "Widget progress update failed", error);
             }
-        } catch (Exception error) {
-            Log.w(TAG, "Widget progress update failed", error);
-        }
+        });
     }
 
     private static void updateWidgetProgress(Context context, AppWidgetManager manager, int id, int position, int duration, String currentLyric, int layoutId) {
