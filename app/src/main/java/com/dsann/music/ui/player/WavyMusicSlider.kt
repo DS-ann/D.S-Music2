@@ -74,7 +74,7 @@ fun WavyMusicSlider(
     )
 
     val shouldShowWave = isWaveEligible && isPlaying && !isInteracting
-    val localFrameTimeNanos = rememberPlayerFrameTimeNanos(
+    val localFrameTimeNanos = rememberAppAnimationFrameTimeNanos(
         active = frameTimeNanos == null && shouldShowWave
     )
     val activeFrameTimeNanos = frameTimeNanos ?: localFrameTimeNanos
