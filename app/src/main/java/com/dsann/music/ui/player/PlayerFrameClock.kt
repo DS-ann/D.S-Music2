@@ -15,11 +15,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * One persisted frame-rate preference for all continuous player frame animations.
+ * One persisted frame-rate preference for all continuous app animation loops.
  * 0 means follow the display's real vsync cadence; other values cap updates while
  * still sampling only on display frames. Audio playback timing is never modified.
  */
-internal object PlayerFrameRateController {
+internal object AppAnimationFrameRateController {
     private const val PREFS_NAME = "AppSettings"
     private const val PREFERENCE_KEY = "player_animation_frame_rate"
 
@@ -60,11 +60,12 @@ internal object PlayerFrameRateController {
  * that drifts away from the display. If a target cannot be represented exactly by
  * the physical refresh cadence, frames are distributed across adjacent vsyncs.
  *
- * Every player component uses the same persisted rate and the same absolute time
- * buckets, so progress, waveform, visualizer and karaoke updates remain phase-aligned.
+ * All continuous visual components use the same persisted rate and absolute time
+ * buckets, so player progress, waveform, visualizer, karaoke and other visual loops
+ * remain aligned to the device's presented frames.
  */
 @Composable
-internal fun rememberPlayerFrameTimeNanos(active: Boolean): State<Long> {
+internal fun rememberAppAnimationFrameTimeNanos(active: Boolean): State<Long> {
     val context = LocalContext.current.applicationContext
     val frameRate by PlayerFrameRateController.frameRate.collectAsState()
     val frameTimeNanos = remember { mutableLongStateOf(0L) }
