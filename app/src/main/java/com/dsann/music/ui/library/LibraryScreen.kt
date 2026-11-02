@@ -735,28 +735,33 @@ fun LibraryScreen(
                                 // Precompute each song's position within its heading group once.
                                 // Calculating this by scanning the list inside every LazyColumn row
                                 // made large date/artist groups increasingly expensive to scroll.
-                                val groupedSongPositions = remember(sortedAndGrouped) {
-                                    buildMap<Long, Pair<Int, Int>> {
-                                        var cursor = 0
-                                        while (cursor < sortedAndGrouped.size) {
-                                            if (sortedAndGrouped[cursor] !is String) {
-                                                cursor++
-                                                continue
+                                val groupedSongPositions by produceState(
+                                    initialValue = emptyMap<Long, Pair<Int, Int>>(),
+                                    sortedAndGrouped
+                                ) {
+                                    value = withContext(Dispatchers.Default) {
+                                        buildMap<Long, Pair<Int, Int>> {
+                                            var cursor = 0
+                                            while (cursor < sortedAndGrouped.size) {
+                                                if (sortedAndGrouped[cursor] !is String) {
+                                                    cursor++
+                                                    continue
+                                                }
+                                                val sectionStart = cursor + 1
+                                                var sectionEnd = sectionStart
+                                                while (
+                                                    sectionEnd < sortedAndGrouped.size &&
+                                                    sortedAndGrouped[sectionEnd] is SongItem
+                                                ) {
+                                                    sectionEnd++
+                                                }
+                                                val sectionCount = sectionEnd - sectionStart
+                                                for (songIndex in sectionStart until sectionEnd) {
+                                                    val song = sortedAndGrouped[songIndex] as SongItem
+                                                    put(song.id, (songIndex - sectionStart) to sectionCount)
+                                                }
+                                                cursor = sectionEnd
                                             }
-                                            val sectionStart = cursor + 1
-                                            var sectionEnd = sectionStart
-                                            while (
-                                                sectionEnd < sortedAndGrouped.size &&
-                                                sortedAndGrouped[sectionEnd] is SongItem
-                                            ) {
-                                                sectionEnd++
-                                            }
-                                            val sectionCount = sectionEnd - sectionStart
-                                            for (songIndex in sectionStart until sectionEnd) {
-                                                val song = sortedAndGrouped[songIndex] as SongItem
-                                                put(song.id, (songIndex - sectionStart) to sectionCount)
-                                            }
-                                            cursor = sectionEnd
                                         }
                                     }
                                 }
