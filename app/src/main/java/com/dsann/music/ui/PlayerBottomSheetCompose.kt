@@ -989,17 +989,33 @@ fun PlayerBottomSheetCompose(
         // the mini player; the fallback mirrors the same nav-size settings before first measure.
         val bottomNavVisible = bottomNavigationVisible
         val dynamicBottomNavHeightState = viewModel.bottomNavHeight.collectAsStateWithLifecycle()
-        // This composable is measured inside the Scaffold content area. On phones,
-        // Scaffold has already removed the bottom navigation bar from that area, so
-        // subtracting its measured height here a second time lifts the mini-player.
-        // Only wide layouts without a bottom bar need the system bottom inset reserved.
-        val miniPlayerBottomInsetPx = if (useNavigationRail) systemNavigationBottomPx else 0f
+        val navBarSize by playerPreferences.observeKey("nav_bar_size", "Standard")
+        val dynamicNavStyle by playerPreferences.observeKey("dynamic_nav_style", false)
+        val configuredBottomNavHeight = when (navBarSize) {
+            "Compact" -> 56.dp
+            "Tall" -> 76.dp
+            else -> 68.dp
+        }
+        val fallbackBottomNavHeightPx = with(density) {
+            (if (dynamicNavStyle) 64.dp else configuredBottomNavHeight).toPx() +
+                systemNavigationBottomPx
+        }
+        // The dock is now an overlay and no longer reduces Scaffold's content height.
+        // Keep a collapsed mini-player immediately above it; when the dock is hidden,
+        // use the full window height instead.
+        val measuredBottomNavHeightPx = dynamicBottomNavHeightState.value
+            .takeIf { it > 0f } ?: fallbackBottomNavHeightPx
+        val miniPlayerBottomInsetPx = when {
+            useNavigationRail -> systemNavigationBottomPx
+            bottomNavVisible -> measuredBottomNavHeightPx
+            else -> 0f
+        }
         val miniPlayerBottomGapPx = with(density) {
             if (useNavigationRail) 8.dp.toPx() else 4.dp.toPx()
         }
         val sheetCollapsedTargetYState = remember(
             screenHeightPx, density, useNavigationRail, miniPlayerHeight,
-            systemNavigationBottomPx
+            miniPlayerBottomInsetPx, miniPlayerBottomGapPx
         ) {
             derivedStateOf {
                 val miniPlayerHeightPx = with(density) { miniPlayerHeight.toPx() }
@@ -1116,7 +1132,7 @@ fun PlayerBottomSheetCompose(
 
         // A rotation changes the sheet's coordinate space. Recalculate its Y position using
         // the new height while retaining the previously saved expansion fraction.
-        LaunchedEffect(screenHeightPx, containerWidthDp, useNavigationRail) {
+        LaunchedEffect(screenHeightPx, containerWidthDp, useNavigationRail, miniPlayerBottomInsetPx) {
             // Local sheet state is authoritative. The ViewModel expanded flag is updated
             // asynchronously and can still be true when the close animation begins.
             if (pendingSheetAnimation != null ||
@@ -1147,7 +1163,7 @@ fun PlayerBottomSheetCompose(
         // Synchronize dock changes both during and after a player transition.
         // If the dock moves while the sheet is animating, apply the latest target
         // when the animation owner finishes instead of silently discarding the update.
-        LaunchedEffect(screenHeightPx) {
+        LaunchedEffect(screenHeightPx, miniPlayerBottomInsetPx) {
             snapshotFlow {
                 Triple(
                     sheetCollapsedTargetYState.value,
