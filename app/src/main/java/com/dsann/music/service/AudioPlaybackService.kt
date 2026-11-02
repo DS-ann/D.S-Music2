@@ -3309,7 +3309,7 @@ private class AdjustableCacheEvictor(initialEnabled: Boolean, initialMaxBytes: L
             if (!removeOne) return
             val oldest = synchronized(lock) { if (spans.isEmpty()) null else spans.pollFirst() } ?: return
             try { cache.removeSpan(oldest) }
-            catch (error: Exception) { android.util.Log.w("SpatialFlowCache", "Unable to evict cached audio", error) }
+            catch (error: Exception) { android.util.Log.w("DsmusicCache", "Unable to evict cached audio", error) }
         }
     }
 }
