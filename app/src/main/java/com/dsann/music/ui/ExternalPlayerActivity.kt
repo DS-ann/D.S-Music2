@@ -64,14 +64,13 @@ import coil.request.ImageRequest
 import com.dsann.music.MainActivity
 import com.dsann.music.service.AudioPlaybackService
 import com.dsann.music.ui.player.WavyMusicSlider
+import com.dsann.music.ui.player.rememberPlayerFrameTimeNanos
 import com.dsann.music.ui.theme.DsmusicAppTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
-import kotlin.time.Duration.Companion.milliseconds
 
 @AndroidEntryPoint
 class ExternalPlayerActivity : ComponentActivity() {
@@ -317,6 +316,13 @@ fun PopupPlayerContent(
     var duration by remember { mutableLongStateOf(0L) }
     var isScrubbing by remember { mutableStateOf(false) }
     var sliderScrubPos by remember { mutableFloatStateOf(0f) }
+    val frameTimeNanos = rememberPlayerFrameTimeNanos(
+        active = player != null && isPlaying && !isScrubbing
+    )
+    val frameNanos by frameTimeNanos
+    val liveCurrentPosition = if (
+        player != null && isPlaying && !isScrubbing && frameNanos > 0L
+    ) player.currentPosition else currentPos
 
     // Attach core listeners to ExoPlayer to sync UI triggers
     DisposableEffect(player) {
@@ -328,26 +334,27 @@ fun PopupPlayerContent(
 
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
+                currentPos = player.currentPosition
                 isPlaying = playing
             }
             override fun onPlaybackStateChanged(state: Int) {
+                currentPos = player.currentPosition
                 duration = if (player.duration > 0) player.duration else 0L
+            }
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
+                currentPos = newPosition.positionMs.coerceAtLeast(0L)
             }
         }
         player.addListener(listener)
         onDispose { player.removeListener(listener) }
     }
 
-    // Background tracking loop for live timeline scrubbing updates
-    LaunchedEffect(player, isPlaying, isScrubbing) {
-        if (player != null && isPlaying && !isScrubbing) {
-            while (true) {
-                currentPos = player.currentPosition
-                duration = if (player.duration > 0) player.duration else 0L
-                delay(250.milliseconds)
-            }
-        }
-    }
+    // The visible timeline is sampled on Compose's display frame clock below.
+    // Avoid a competing 250 ms polling timer that causes uneven progress steps.
 
     // Raised Material Container matching visual specs
     Surface(
@@ -447,8 +454,8 @@ fun PopupPlayerContent(
 
             // Scrub timeline: Layered animated WavyProgress overlay with an invisible tactile Slider
             val safeDur = if (duration > 0) duration else 1L
-            val displayPos = if (isScrubbing) (sliderScrubPos * safeDur).toLong() else currentPos
-            val progressRatio = (currentPos.toFloat() / safeDur.toFloat()).coerceIn(0f, 1f)
+            val displayPos = if (isScrubbing) (sliderScrubPos * safeDur).toLong() else liveCurrentPosition
+            val progressRatio = (liveCurrentPosition.toFloat() / safeDur.toFloat()).coerceIn(0f, 1f)
 
             WavyMusicSlider(
                 value = if (isScrubbing) sliderScrubPos else progressRatio,
@@ -468,6 +475,7 @@ fun PopupPlayerContent(
                 thumbRadius = 6.dp,
                 waveAmplitudeWhenPlaying = 6.dp,
                 waveLength = 48.dp,
+                frameTimeNanos = frameTimeNanos,
                 modifier = Modifier.fillMaxWidth()
             )
 
