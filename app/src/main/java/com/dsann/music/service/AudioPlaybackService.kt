@@ -541,7 +541,6 @@ class AudioPlaybackService : MediaSessionService() {
     private var lastWidgetProgressUpdateAtMs: Long = 0L
     private var lastPositionPersistedAtMs: Long = 0L
     private var lastTelemetryUpdateAtMs: Long = 0L
-    private var lastUiPositionUpdateAtMs: Long = 0L
     private var shouldAutoPlay = false
     private var pendingSeekPos: Long = -1
     
@@ -587,8 +586,8 @@ class AudioPlaybackService : MediaSessionService() {
     private val mainPlayerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             viewModel?.postIsPlaying(isPlaying)
-            // Publish the exact pause/resume anchor immediately. Active player UIs read
-            // Media3 per display frame; this snapshot keeps paused/background UI accurate.
+            // Publish the pause/resume anchor immediately. While playing, the service then
+            // publishes position snapshots using the same selected frame rate as Compose.
             viewModel?.setCurrentPosition(
                 player.currentPosition.coerceAtLeast(0L)
                     .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
@@ -2290,14 +2289,13 @@ class AudioPlaybackService : MediaSessionService() {
                         }
                     }
                 }
-                // API 23 devices have substantially less CPU headroom. The display position
-                // is throttled to 0.5 Hz outside lyrics mode; this handler still checks internal
-                // playback transitions at its normal cadence. Lyrics keep the faster clock.
+                // Keep housekeeping deliberately low-frequency on API 23. The selected-rate
+                // UI position callback runs independently on display vsync on every Android version.
                 val lyricsModeActive = viewModel?.isLyricsModeEnabled?.value == true
                 val intervalMs = when {
                     lyricsModeActive && player.isPlaying -> 180L
-                    // Audio stays on Media3's precise playback clock. API 23 only samples
-                    // UI/cache/crossfade housekeeping every 2s outside the lyrics view.
+                    // Audio stays on Media3's precise playback clock. API 23 runs background
+                    // housekeeping every 2s outside lyrics mode; the UI snapshot is vsync-driven.
                     Build.VERSION.SDK_INT <= Build.VERSION_CODES.M -> 2_000L
                     else -> 400L
                 }
