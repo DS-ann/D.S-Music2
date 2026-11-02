@@ -348,7 +348,7 @@ fun SearchResultItem(
                 while (true) {
                     val event = awaitPointerEvent()
                     if (event.type == androidx.compose.ui.input.pointer.PointerEventType.Press) {
-                        onTouchDown()
+                        onTouchDown?.invoke()
                     }
                 }
             }
