@@ -4,13 +4,8 @@ package com.dsann.music.ui.player
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -773,19 +768,7 @@ private fun InterludeItem(
         label = "InterludeProgress"
     )
 
-    val infiniteTransition = rememberInfiniteTransition(label = "InterludeBreathing")
-    val breatheScale by infiniteTransition.animateFloat(
-        initialValue = 0.82f,
-        targetValue = 1.18f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = 1400,
-                easing = FastOutSlowInEasing
-            ),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "BreathScale"
-    )
+    val breathingFrameTimeNanos = rememberAppAnimationFrameTimeNanos(active = isActive)
 
     val iconAlpha by animateFloatAsState(
         targetValue = if (isActive) 0.85f else 0.25f,
@@ -816,8 +799,17 @@ private fun InterludeItem(
             modifier = Modifier
                 .size(26.dp)
                 .graphicsLayer {
-                    scaleX = if (isActive) breatheScale else 1f
-                    scaleY = if (isActive) breatheScale else 1f
+                    val frameNanos = breathingFrameTimeNanos.value
+                    val phase = if (isActive && frameNanos > 0L) {
+                        (frameNanos % 1_400_000_000L).toDouble() / 1_400_000_000.0
+                    } else 0.25
+                    val breatheScale = if (isActive) {
+                        1f + 0.18f * kotlin.math.sin(
+                            phase * 2.0 * Math.PI - Math.PI / 2.0
+                        ).toFloat()
+                    } else 1f
+                    scaleX = breatheScale
+                    scaleY = breatheScale
                 }
         )
 
