@@ -3,13 +3,13 @@ package com.dsann.music.ui
 import com.dsann.music.ui.theme.DsmusicIconButton
 import com.dsann.music.ui.theme.DsmusicSurface
 import com.dsann.music.ui.theme.DsmusicTextButton
+import com.dsann.music.ui.player.rememberPlayerFrameTimeNanos
 import android.annotation.SuppressLint
 import android.content.Context
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -2201,23 +2201,27 @@ private fun MiniPlayerArtworkProgressOverlay(
     val style by preferences.observeKey("mini_player_progress", "Ring")
     if (style == "None") return
 
-    val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
+    val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
+    val audioService by viewModel.audioServiceState.collectAsStateWithLifecycle()
+    val frameTimeNanos = rememberPlayerFrameTimeNanos(
+        active = isMiniLayerVisible && isPlaying
+    )
+    val frameNanos by frameTimeNanos
+    val observedPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
     val duration by viewModel.duration.collectAsStateWithLifecycle()
-    val targetProgress = if (duration > 0) {
+
+    // While visible, sample Media3 on the display's own frame clock. The ViewModel
+    // position is only a paused/background fallback, never the running progress clock.
+    val currentPosition = if (isPlaying && frameNanos > 0L) {
+        audioService?.getCurrentPositionForLyrics() ?: observedPosition
+    } else {
+        observedPosition
+    }
+    val progress = if (duration > 0) {
         (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
     } else {
         0f
     }
-    val progressState = animateFloatAsState(
-        targetValue = targetProgress,
-        // API 23 receives progress less frequently; an extra 350 ms animation only
-        // adds draw work between updates without improving seek accuracy.
-        animationSpec = if (
-            android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M
-        ) androidx.compose.animation.core.snap()
-        else tween(durationMillis = 350, easing = LinearEasing),
-        label = "MiniArtworkProgress"
-    )
     androidx.compose.foundation.Canvas(
         modifier = modifier.graphicsLayer {
             alpha = (1f - expansionFraction.value * 2f).coerceIn(0f, 1f)
@@ -2225,8 +2229,7 @@ private fun MiniPlayerArtworkProgressOverlay(
     ) {
         val side = size.minDimension
         if (side <= 0f) return@Canvas
-        // Animate the canvas without recomposing the always-visible mini-player layer.
-        val progress = progressState.value
+        // Progress is read from Media3 once per display frame; no timer or tween is layered on top.
 
         when (style) {
             "Ring" -> {
