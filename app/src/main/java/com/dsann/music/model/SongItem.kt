@@ -66,8 +66,17 @@ data class SongItem(
         if (albumId > 0) {
             return "content://media/external/audio/albumart/$albumId".toUri()
         }
-        if (path != null && File(path).exists()) {
-            return Uri.fromFile(File(path))
+        // Do not call File.exists() here: this method is used while composing
+        // visible song rows and artwork pages. A synchronous storage stat for every
+        // row stalls scrolling on slower Android 6 devices. Coil handles missing files.
+        val localPath = path?.takeIf {
+            it.isNotBlank() &&
+                !it.startsWith("http://", ignoreCase = true) &&
+                !it.startsWith("https://", ignoreCase = true) &&
+                !it.contains("://")
+        }
+        if (localPath != null) {
+            return Uri.fromFile(File(localPath))
         }
         return contentUri
     }
