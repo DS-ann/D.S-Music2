@@ -710,12 +710,12 @@ fun Scaffold(
     modifier: Modifier = Modifier,
     topBar: @Composable () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
-    bottomBarOverlay: Boolean = false,
     snackbarHost: @Composable () -> Unit = {},
     floatingActionButton: @Composable BoxScope.() -> Unit = {},
     containerColor: Color = DsmusicTheme.colorScheme.background,
     contentColor: Color = DsmusicTheme.colorScheme.onBackground,
     contentWindowInsets: WindowInsets = WindowInsets(0, 0, 0, 0),
+    bottomBarOverlay: Boolean = false,
     content: @Composable (PaddingValues) -> Unit
 ) {
     Box(modifier.fillMaxSize().background(containerColor)) {
