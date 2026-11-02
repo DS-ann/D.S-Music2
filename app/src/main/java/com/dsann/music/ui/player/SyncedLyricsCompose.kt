@@ -198,10 +198,13 @@ internal fun SyncedLyricsCompose(
             }
         }
 
-        // A fixed 25 Hz clock keeps karaoke highlighting responsive without making
-        // every display frame trigger a lyrics-list state update on slower phones.
+        // Keep karaoke timing responsive while limiting API 23 list/draw invalidations.
+        // Android 6 uses about 12 Hz; newer devices retain the 25 Hz lyric clock.
+        val refreshIntervalMs = if (
+            android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M
+        ) 84L else 40L
         while (true) {
-            delay(40L)
+            delay(refreshIntervalMs)
             val actualMs = currentPositionProvider().coerceAtLeast(0)
             shownMs = actualMs.toDouble()
             if (lyricClock.intValue != actualMs) lyricClock.intValue = actualMs
