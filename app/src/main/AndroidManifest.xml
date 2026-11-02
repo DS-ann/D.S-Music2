@@ -34,7 +34,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.SpatialFlow"
+        android:theme="@style/Theme.Dsmusic"
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="31">
         <activity
@@ -43,7 +43,7 @@
             android:resizeableActivity="true"
             android:launchMode="singleTask"
             android:label="@string/app_name"
-            android:theme="@style/Theme.SpatialFlow.Splash">
+            android:theme="@style/Theme.Dsmusic.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -57,7 +57,7 @@
             android:excludeFromRecents="true"
             android:resizeableActivity="false"
             android:screenOrientation="portrait"
-            android:theme="@style/Theme.SpatialFlow.Translucent">
+            android:theme="@style/Theme.Dsmusic.Translucent">
             
             <!-- Support for opening external audio files (Open With dialog) -->
             <intent-filter>
