@@ -234,46 +234,44 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
             .statusBarsPadding()
             .padding(horizontal = 16.dp)
     ) {
-        // Keep one lazy scroll owner for the complete screen. The heading, search and
-        // filters scroll with the songs instead of occupying a permanently fixed block.
+        // Keep the Local Music title and scan action pinned while the content below scrolls.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 18.dp, bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            DsmusicPageHeading(
+                title = "Local Music",
+                subtitle = "${localSongs.size} songs on this device",
+                modifier = Modifier.weight(1f)
+            )
+            DsmusicIconButton(
+                enabled = !isScanning,
+                onClick = {
+                    scope.launch {
+                        isScanning = true
+                        try {
+                            scanLocalFiles(context, viewModel)
+                        } finally {
+                            isScanning = false
+                        }
+                    }
+                }
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = "Rescan local music")
+            }
+        }
+
+        // Search, filters, folders and songs share one scrollable area below the fixed heading.
         val listState = rememberLazyListState()
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(bottom = 160.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            item(key = "local_music_header", contentType = "header") {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 18.dp, bottom = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    DsmusicPageHeading(
-                        title = "Local Music",
-                        subtitle = "${localSongs.size} songs on this device",
-                        modifier = Modifier.weight(1f)
-                    )
-                    DsmusicIconButton(
-                        enabled = !isScanning,
-                        onClick = {
-                            scope.launch {
-                                isScanning = true
-                                try {
-                                    scanLocalFiles(context, viewModel)
-                                } finally {
-                                    isScanning = false
-                                }
-                            }
-                        }
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Rescan local music")
-                    }
-                }
-            }
-
             item(key = "local_music_search", contentType = "search") {
                 OutlinedTextField(
                     value = searchQuery,
