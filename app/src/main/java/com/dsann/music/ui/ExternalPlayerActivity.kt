@@ -64,7 +64,7 @@ import coil.request.ImageRequest
 import com.dsann.music.MainActivity
 import com.dsann.music.service.AudioPlaybackService
 import com.dsann.music.ui.player.WavyMusicSlider
-import com.dsann.music.ui.theme.SpatialFlowTheme
+import com.dsann.music.ui.theme.DsmusicAppTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -144,7 +144,7 @@ class ExternalPlayerActivity : ComponentActivity() {
         }
 
         setContent {
-            SpatialFlowTheme(darkTheme = true) { // Sleek immersive popup palette
+            DsmusicAppTheme(darkTheme = true) { // Sleek immersive popup palette
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
