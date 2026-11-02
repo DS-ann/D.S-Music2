@@ -1866,6 +1866,7 @@ class AudioPlaybackService : MediaSessionService() {
         ) return
 
         val resolvedSongName = songName?.takeIf { it.isNotBlank() } ?: activeSong.title
+        currentSongName = resolvedSongName
         if (albumArt == null) {
             applySongMetadata(
                 resolvedSongName,
