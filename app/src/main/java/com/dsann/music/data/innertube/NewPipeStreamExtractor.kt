@@ -234,7 +234,7 @@ object NewPipeStreamExtractor {
         if (!isInitialized) {
             withContext(Dispatchers.IO) {
                 if (!isInitialized) {
-                    val context = appContext ?: com.dsann.music.SpatialFlowApplication.instance.applicationContext
+                    val context = appContext ?: com.dsann.music.DsmusicApplication.instance.applicationContext
                     init(context)
                 }
             }
