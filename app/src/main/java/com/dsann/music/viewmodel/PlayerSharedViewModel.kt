@@ -701,9 +701,9 @@ class PlayerSharedViewModel @Inject constructor(
         _sleepTimerEndTime.value = endTime
 
         sleepTimerJob = bgScope.launch(Dispatchers.Main) {
-            while (System.currentTimeMillis() < endTime) {
-                delay(1000.milliseconds)
-            }
+            // One deadline timer is sufficient; waking the Main dispatcher every second
+            // does not update any UI state and can compete with frame work on API 23.
+            delay((endTime - System.currentTimeMillis()).coerceAtLeast(0L))
             if (_sleepTimerMode.value == SleepTimerMode.CUSTOM) {
                 pauseAudio()
                 setSleepTimerMode(SleepTimerMode.OFF)
