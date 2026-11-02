@@ -3,7 +3,7 @@ package com.dsann.music.ui
 import com.dsann.music.ui.theme.DsmusicIconButton
 import com.dsann.music.ui.theme.DsmusicSurface
 import com.dsann.music.ui.theme.DsmusicTextButton
-import com.dsann.music.ui.player.rememberPlayerFrameTimeNanos
+import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
 import android.annotation.SuppressLint
 import android.content.Context
 import androidx.compose.animation.core.Animatable
@@ -2203,7 +2203,7 @@ private fun MiniPlayerArtworkProgressOverlay(
 
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val audioService by viewModel.audioServiceState.collectAsStateWithLifecycle()
-    val frameTimeNanos = rememberPlayerFrameTimeNanos(
+    val frameTimeNanos = rememberAppAnimationFrameTimeNanos(
         active = isMiniLayerVisible && isPlaying
     )
     val observedPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
