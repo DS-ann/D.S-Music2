@@ -694,6 +694,38 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putString("ui_density", safe) }
     }
 
+    private val _uiFontFamily = MutableStateFlow(prefs.getString("ui_font_family", "System") ?: "System")
+    val uiFontFamily: StateFlow<String> = _uiFontFamily.asStateFlow()
+    fun setUiFontFamily(value: String) {
+        val safe = value.takeIf { it in listOf("System", "Google Sans Flex", "Serif", "Monospace") } ?: "System"
+        _uiFontFamily.value = safe
+        prefs.edit { putString("ui_font_family", safe) }
+    }
+
+    private val _uiFontScale = MutableStateFlow(prefs.getFloat("ui_font_scale", 1f).coerceIn(0.85f, 1.30f))
+    val uiFontScale: StateFlow<Float> = _uiFontScale.asStateFlow()
+    fun setUiFontScale(value: Float) {
+        val safe = value.takeIf { it.isFinite() }?.coerceIn(0.85f, 1.30f) ?: 1f
+        _uiFontScale.value = safe
+        prefs.edit { putFloat("ui_font_scale", safe) }
+    }
+
+    private val _uiFontWeight = MutableStateFlow(prefs.getString("ui_font_weight", "Default") ?: "Default")
+    val uiFontWeight: StateFlow<String> = _uiFontWeight.asStateFlow()
+    fun setUiFontWeight(value: String) {
+        val safe = value.takeIf { it in listOf("Default", "Lighter", "Bolder") } ?: "Default"
+        _uiFontWeight.value = safe
+        prefs.edit { putString("ui_font_weight", safe) }
+    }
+
+    private val _uiLetterSpacing = MutableStateFlow(prefs.getString("ui_letter_spacing", "Normal") ?: "Normal")
+    val uiLetterSpacing: StateFlow<String> = _uiLetterSpacing.asStateFlow()
+    fun setUiLetterSpacing(value: String) {
+        val safe = value.takeIf { it in listOf("Tight", "Normal", "Wide") } ?: "Normal"
+        _uiLetterSpacing.value = safe
+        prefs.edit { putString("ui_letter_spacing", safe) }
+    }
+
     // ── Saved appearance Looks ──────────────────────────────────────────────
     // A Look stores only presentation preferences. Playback, downloads, cache,
     // account and library settings are deliberately excluded.
@@ -705,7 +737,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         "player_title_weight", "player_title_scroll", "player_times", "scrubber_style",
         "scrubber_color", "player_visualizer", "player_button_style", "scrubber_thickness",
         "scrubber_thumb_style", "visualizer_color", "lyrics_text_size", "lyrics_alignment",
-        "lyrics_font_family", "ui_density", "nav_label_mode", "hide_nav_labels",
+        "lyrics_font_family", "ui_density", "ui_font_family", "ui_font_scale",
+        "ui_font_weight", "ui_letter_spacing", "nav_label_mode", "hide_nav_labels",
         "dynamic_nav_style", "nav_bar_style", "nav_bar_size"
     )
 
@@ -788,6 +821,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         setLyricsAlignment(look.optString("lyrics_alignment", _lyricsAlignment.value))
         setLyricsFontFamily(look.optString("lyrics_font_family", _lyricsFontFamily.value))
         setUiDensity(look.optString("ui_density", _uiDensity.value))
+        setUiFontFamily(look.optString("ui_font_family", _uiFontFamily.value))
+        setUiFontScale(look.optDouble("ui_font_scale", _uiFontScale.value.toDouble()).toFloat())
+        setUiFontWeight(look.optString("ui_font_weight", _uiFontWeight.value))
+        setUiLetterSpacing(look.optString("ui_letter_spacing", _uiLetterSpacing.value))
         setNavLabelsMode(look.optString("nav_label_mode", _navLabelsMode.value))
         setDynamicNavStyle(look.optBoolean("dynamic_nav_style", _dynamicNavStyle.value))
         setNavBarStyle(look.optString("nav_bar_style", _navBarStyle.value))
@@ -1311,6 +1348,10 @@ fun SettingsScreenContent(
     val lyricsAlignment by viewModel.lyricsAlignment.collectAsStateWithLifecycle()
     val lyricsFontFamily by viewModel.lyricsFontFamily.collectAsStateWithLifecycle()
     val uiDensity by viewModel.uiDensity.collectAsStateWithLifecycle()
+    val uiFontFamily by viewModel.uiFontFamily.collectAsStateWithLifecycle()
+    val uiFontScale by viewModel.uiFontScale.collectAsStateWithLifecycle()
+    val uiFontWeight by viewModel.uiFontWeight.collectAsStateWithLifecycle()
+    val uiLetterSpacing by viewModel.uiLetterSpacing.collectAsStateWithLifecycle()
     val autoplayEnabled by viewModel.autoplayEnabled.collectAsStateWithLifecycle()
     val navLabelsMode by viewModel.navLabelsMode.collectAsStateWithLifecycle()
     val dynamicNavStyle by viewModel.dynamicNavStyle.collectAsStateWithLifecycle()
@@ -1527,6 +1568,14 @@ fun SettingsScreenContent(
                 onLyricsFontFamilyChange = { viewModel.setLyricsFontFamily(it) },
                 uiDensity = uiDensity,
                 onUiDensityChange = { viewModel.setUiDensity(it) },
+                uiFontFamily = uiFontFamily,
+                onUiFontFamilyChange = { viewModel.setUiFontFamily(it) },
+                uiFontScale = uiFontScale,
+                onUiFontScaleChange = { viewModel.setUiFontScale(it) },
+                uiFontWeight = uiFontWeight,
+                onUiFontWeightChange = { viewModel.setUiFontWeight(it) },
+                uiLetterSpacing = uiLetterSpacing,
+                onUiLetterSpacingChange = { viewModel.setUiLetterSpacing(it) },
                 navLabelsMode = navLabelsMode,
                 onNavLabelsModeChange = { viewModel.setNavLabelsMode(it) },
                 dynamicNavStyle = dynamicNavStyle,
@@ -2605,6 +2654,14 @@ private fun AppearanceScreen(
     onLyricsFontFamilyChange: (String) -> Unit,
     uiDensity: String,
     onUiDensityChange: (String) -> Unit,
+    uiFontFamily: String,
+    onUiFontFamilyChange: (String) -> Unit,
+    uiFontScale: Float,
+    onUiFontScaleChange: (Float) -> Unit,
+    uiFontWeight: String,
+    onUiFontWeightChange: (String) -> Unit,
+    uiLetterSpacing: String,
+    onUiLetterSpacingChange: (String) -> Unit,
     navLabelsMode: String,
     onNavLabelsModeChange: (String) -> Unit,
     dynamicNavStyle: Boolean,
@@ -2974,6 +3031,54 @@ private fun AppearanceScreen(
             ))
 
             SettingsHeader("Typography & Layout")
+            SettingsGroupCard(listOf(
+                {
+                    SettingsChoiceRow(
+                        title = "Interface font",
+                        description = "Choose the typeface used across headings, labels, buttons, lists and settings.",
+                        selected = uiFontFamily,
+                        options = listOf("System", "Google Sans Flex", "Serif", "Monospace"),
+                        onSelected = onUiFontFamilyChange
+                    )
+                },
+                {
+                    SettingsChoiceRow(
+                        title = "Font weight",
+                        description = "Adjust the weight of every interface text style while preserving its hierarchy.",
+                        selected = uiFontWeight,
+                        options = listOf("Default", "Lighter", "Bolder"),
+                        onSelected = onUiFontWeightChange
+                    )
+                },
+                {
+                    SettingsChoiceRow(
+                        title = "Letter spacing",
+                        description = "Tighten or widen letter spacing across the interface.",
+                        selected = uiLetterSpacing,
+                        options = listOf("Tight", "Normal", "Wide"),
+                        onSelected = onUiLetterSpacingChange
+                    )
+                }
+            ))
+            SettingsGroupCard(listOf {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Text(
+                        "Global font size · " + (uiFontScale * 100f).toInt() + "%",
+                        style = DsmusicTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Slider(
+                        value = uiFontScale,
+                        onValueChange = onUiFontScaleChange,
+                        valueRange = 0.85f..1.30f
+                    )
+                    Text(
+                        "Live preview · AaBb 123",
+                        style = DsmusicTheme.typography.titleMedium,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            })
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
                     title = "Interface corners",
@@ -2986,7 +3091,7 @@ private fun AppearanceScreen(
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
                     title = "Interface density",
-                    description = "Compact fits more content. Large increases the app's text scale and touch-target spacing.",
+                    description = "Compact fits more content. Large increases touch-target and layout spacing.",
                     selected = uiDensity,
                     options = listOf("Compact", "Comfortable", "Large"),
                     onSelected = onUiDensityChange
