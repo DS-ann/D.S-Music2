@@ -630,7 +630,7 @@ fun LibraryScreen(
 
                                 Spacer(modifier = Modifier.height(6.dp))
 
-                                // Keep this folder scoped to files saved by SpatialFlow's downloader.
+                                // Keep this folder scoped to files saved by D.S Music's downloader.
                                 // Build the download list away from the UI thread. Large libraries
                                 // used to filter, sort and group synchronously during composition,
                                 // which stalled both first display and every search/sort change.
@@ -3270,7 +3270,7 @@ private fun isSpatialFlowDownloadedLocation(relativePathValue: String?, rawPath:
     val relativePath = relativePathValue.orEmpty().trim('/').lowercase(java.util.Locale.ROOT)
     val appFolders = listOf(
         "music/d.s music", "download/d.s music", "downloads/d.s music",
-        // Keep recognising files downloaded by earlier SpatialFlow builds.
+        // Keep recognising files downloaded by earlier D.S Music builds.
         "music/spatialflow", "download/spatialflow", "downloads/spatialflow"
     )
     if (appFolders.any { relativePath == it || relativePath.startsWith("$it/") }) return true
