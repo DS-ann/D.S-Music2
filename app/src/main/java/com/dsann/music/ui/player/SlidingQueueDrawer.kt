@@ -159,10 +159,7 @@ fun SlidingQueueDrawer(
             val boxScope = this
             val lazyListState = rememberLazyListState()
             
-            val dragDropState = rememberDragDropState(
-                lazyListState = lazyListState,
-                frameClockActive = isQueueExpanded
-            ) { from, to ->
+            val dragDropState = rememberDragDropState(lazyListState = lazyListState) { from, to ->
                 onReorderQueue(from, to)
             }
 
