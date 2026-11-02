@@ -1779,11 +1779,16 @@ fun OnlineSongBottomSheet(
 @Composable
 private fun rememberExploreImageRequest(data: Any?, targetSizePx: Int): ImageRequest? {
     val context = LocalContext.current
-    return remember(context, data, targetSizePx) {
+    // Older devices pay a high cost for large software bitmaps. All Explore cards remain
+    // fully functional, but API 23 uses a smaller decode target than their layout bounds.
+    val effectiveTargetSizePx = if (
+        Build.VERSION.SDK_INT <= Build.VERSION_CODES.M
+    ) targetSizePx.coerceAtMost(256) else targetSizePx
+    return remember(context, data, effectiveTargetSizePx) {
         data?.let {
             ImageRequest.Builder(context)
                 .data(it)
-                .size(targetSizePx, targetSizePx)
+                .size(effectiveTargetSizePx, effectiveTargetSizePx)
                 .precision(Precision.INEXACT)
                 .crossfade(false)
                 .build()
