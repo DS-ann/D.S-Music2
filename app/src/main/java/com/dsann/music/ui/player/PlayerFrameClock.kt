@@ -1,34 +1,98 @@
 package com.dsann.music.ui.player
 
+import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Publishes the platform-vsync frame timestamp supplied by Compose.
+ * One persisted frame-rate preference for all continuous player frame animations.
+ * 0 means follow the display's real vsync cadence; other values cap updates while
+ * still sampling only on display frames. Audio playback timing is never modified.
+ */
+internal object PlayerFrameRateController {
+    private const val PREFS_NAME = "AppSettings"
+    private const val PREFERENCE_KEY = "player_animation_frame_rate"
+
+    private val mutableFrameRate = MutableStateFlow(0)
+    val frameRate: StateFlow<Int> = mutableFrameRate.asStateFlow()
+
+    fun normalize(value: Int): Int =
+        value.takeIf { it == 0 || it == 20 || it == 30 || it == 40 || it == 60 } ?: 0
+
+    fun load(context: Context): Int {
+        val safe = normalize(
+            context.applicationContext
+                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getInt(PREFERENCE_KEY, 0)
+        )
+        mutableFrameRate.value = safe
+        return safe
+    }
+
+    fun set(context: Context, value: Int): Int {
+        val safe = normalize(value)
+        context.applicationContext
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(PREFERENCE_KEY, safe)
+            .apply()
+        mutableFrameRate.value = safe
+        return safe
+    }
+}
+
+/**
+ * Publishes a display-vsync timestamp, optionally capped to a selected frame rate.
  *
- * withFrameNanos follows the display's actual refresh cadence; this deliberately
- * has no fixed 30/60 FPS timer or app-side cap. 60 Hz, 90 Hz, 120 Hz and older
- * 60 Hz Android 6 displays all use the frames the device can really present.
+ * Device mode (the default) publishes every frame delivered by Compose. Fixed modes
+ * publish on the first display frame that crosses each target-time interval. This
+ * preserves vsync alignment on 60/90/120 Hz displays instead of introducing a timer
+ * that drifts away from the display. If a target cannot be represented exactly by
+ * the physical refresh cadence, frames are distributed across adjacent vsyncs.
  *
- * Share one returned State with related drawing components so the scrubber,
- * waveform and visualizer stay phase-aligned instead of running timer loops.
+ * Every player component uses the same persisted rate and the same absolute time
+ * buckets, so progress, waveform, visualizer and karaoke updates remain phase-aligned.
  */
 @Composable
 internal fun rememberPlayerFrameTimeNanos(active: Boolean): State<Long> {
+    val context = LocalContext.current.applicationContext
+    val frameRate by PlayerFrameRateController.frameRate.collectAsState()
     val frameTimeNanos = remember { mutableLongStateOf(0L) }
 
-    LaunchedEffect(active) {
+    LaunchedEffect(context) {
+        PlayerFrameRateController.load(context)
+    }
+
+    LaunchedEffect(active, frameRate) {
         if (!active) {
             frameTimeNanos.longValue = 0L
             return@LaunchedEffect
         }
 
+        val intervalNanos = if (frameRate > 0) 1_000_000_000L / frameRate else 0L
+        var lastBucket = Long.MIN_VALUE
+
         while (true) {
-            withFrameNanos { frameTimeNanos.longValue = it }
+            withFrameNanos { displayFrameNanos ->
+                if (intervalNanos == 0L) {
+                    frameTimeNanos.longValue = displayFrameNanos
+                } else {
+                    val bucket = displayFrameNanos / intervalNanos
+                    if (bucket != lastBucket) {
+                        lastBucket = bucket
+                        frameTimeNanos.longValue = displayFrameNanos
+                    }
+                }
+            }
         }
     }
 
