@@ -616,6 +616,7 @@ class DragDropState(
     val lazyListState: LazyListState,
     private val scope: CoroutineScope,
     private val frameTimeNanos: State<Long>,
+    private val onFrameLoopActiveChanged: (Boolean) -> Unit,
     private val onMove: (Int, Int) -> Unit
 ) {
     var draggedDistance by mutableFloatStateOf(0f)
@@ -706,6 +707,7 @@ class DragDropState(
             return
         }
         autoScrollDeltaPx = scrollDeltaPx
+        onFrameLoopActiveChanged(true)
         if (autoScrollJob?.isActive == true) return
 
         autoScrollJob = scope.launch {
@@ -732,22 +734,28 @@ class DragDropState(
         autoScrollDeltaPx = 0f
         autoScrollJob?.cancel()
         autoScrollJob = null
+        onFrameLoopActiveChanged(false)
     }
 }
 
 @Composable
 fun rememberDragDropState(
     lazyListState: LazyListState,
-    frameClockActive: Boolean = true,
     onMove: (Int, Int) -> Unit
 ): DragDropState {
     val scope = rememberCoroutineScope()
-    val frameTimeNanos = rememberAppAnimationFrameTimeNanos(active = frameClockActive)
+    val frameClockActive = remember(lazyListState) { mutableStateOf(false) }
+    val frameTimeNanos = rememberAppAnimationFrameTimeNanos(active = frameClockActive.value)
     // Keep the active move callback fresh while preserving drag state across recompositions.
     // Capturing onMove inside remember(lazyListState) can retain an obsolete callback.
     val currentOnMove = rememberUpdatedState(onMove)
     return remember(lazyListState, frameTimeNanos) {
-        DragDropState(lazyListState, scope, frameTimeNanos) { from, to ->
+        DragDropState(
+            lazyListState,
+            scope,
+            frameTimeNanos,
+            { active -> frameClockActive.value = active }
+        ) { from, to ->
             currentOnMove.value(from, to)
         }
     }
