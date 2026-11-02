@@ -1818,6 +1818,8 @@ class PlayerSharedViewModel @Inject constructor(
 
 
     override fun onCleared() {
+        // Stop history tracking and stateIn collectors owned by this ViewModel.
+        cleanupBgScope()
         super.onCleared()
         audioService = null
         _audioServiceState.value = null
