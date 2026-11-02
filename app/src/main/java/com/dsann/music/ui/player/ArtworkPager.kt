@@ -29,7 +29,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
-import java.io.File
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.size.Precision
@@ -282,7 +281,10 @@ private fun resolveArtworkUrl(song: SongItem): String? {
         thumbnail != null -> SongItem.enhanceThumbnailUrl(thumbnail)
         !videoId.isNullOrBlank() -> "https://img.youtube.com/vi/$videoId/hqdefault.jpg"
         song.albumId > 0L -> song.getAlbumArtUri()?.toString()
-        !song.path.isNullOrBlank() && File(song.path!!).isFile -> song.getAlbumArtUri()?.toString()
+        !song.path.isNullOrBlank() &&
+            !song.path!!.startsWith("http://", ignoreCase = true) &&
+            !song.path!!.startsWith("https://", ignoreCase = true) &&
+            !song.path!!.contains("://") -> song.getAlbumArtUri()?.toString()
         else -> null
     }
 }
