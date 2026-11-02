@@ -47,6 +47,22 @@ class AdvancedLyricsParserTest {
     }
 
     @Test
+    fun legacySpatialFlowKaraokeCacheMarkersRemainReadable() {
+        val legacyWordPayload =
+            "SPATIALFLOW-WORDS:QRC\n[1000,2000]Hello (1000,300)world (1300,400)"
+        assertTrue(AdvancedLyricsParser.recognizes(legacyWordPayload))
+        val legacyLine = AdvancedLyricsParser.parse(legacyWordPayload)!!.single()
+        assertEquals("Hello world", legacyLine.content)
+        assertEquals(1000L, legacyLine.words.first().absoluteStartTimeMs)
+
+        val legacyLyricsPlus =
+            "SPATIALFLOW-LYRICSPLUS\n" +
+                """{"type":"Word","lyrics":[{"time":"1000","duration":"800","text":"Hi","syllabus":[{"time":"1000","duration":"800","text":"Hi"}]}]}"""
+        assertTrue(AdvancedLyricsParser.recognizes(legacyLyricsPlus))
+        assertEquals("Hi", AdvancedLyricsParser.parse(legacyLyricsPlus)!!.single().content)
+    }
+
+    @Test
     fun wholeSecondAndSingleDecimalLrcAreSynced() {
         assertTrue(LyricsResult.looksSynchronized("[01:23]line"))
         assertTrue(LyricsResult.looksSynchronized("[01:23.4]line"))
