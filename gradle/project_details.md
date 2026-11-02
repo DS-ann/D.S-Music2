@@ -1104,7 +1104,7 @@ jobs:
     app:cardCornerRadius="32dp"
     app:cardElevation="0dp"
     app:strokeWidth="0dp"
-    app:shapeAppearanceOverlay="@style/ShapeAppearance.D.S Music.BottomSheet"
+    app:shapeAppearanceOverlay="@style/ShapeAppearance.Dsmusic.BottomSheet"
     android:backgroundTint="?attr/colorSurfaceContainerLow"
     app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
 
@@ -2672,7 +2672,7 @@ jobs:
                             app:iconGravity="textStart"
                             app:iconPadding="0dp"
                             app:iconTint="?attr/colorOnPrimary"
-                            app:shapeAppearanceOverlay="@style/ShapeAppearance.D.S Music.CircleButton"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Dsmusic.CircleButton"
                             app:layout_constraintTop_toBottomOf="@id/tvDeveloperName"
                             app:layout_constraintHorizontal_chainStyle="packed"
                             app:layout_constraintStart_toStartOf="parent"
@@ -2689,7 +2689,7 @@ jobs:
                             app:iconGravity="textStart"
                             app:iconPadding="0dp"
                             app:iconTint="?attr/colorOnPrimary"
-                            app:shapeAppearanceOverlay="@style/ShapeAppearance.D.S Music.CircleButton"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Dsmusic.CircleButton"
                             app:layout_constraintTop_toTopOf="@id/btnGitHub"
                             app:layout_constraintStart_toEndOf="@id/btnGitHub"
                             app:layout_constraintEnd_toStartOf="@+id/btnYoutube" />
@@ -2704,7 +2704,7 @@ jobs:
                             app:iconGravity="textStart"
                             app:iconPadding="0dp"
                             app:iconTint="?attr/colorOnPrimary"
-                            app:shapeAppearanceOverlay="@style/ShapeAppearance.D.S Music.CircleButton"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Dsmusic.CircleButton"
                             app:layout_constraintTop_toTopOf="@id/btnGitHub"
                             app:layout_constraintStart_toEndOf="@id/btnInstagram"
                             app:layout_constraintEnd_toEndOf="parent" />
@@ -2749,7 +2749,7 @@ jobs:
                     android:id="@+id/tvCopyright"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="© 2025 Debarghya Sannigrahi"
+                    android:text="© 2026 Debarghya Sannigrahi"
                     android:textSize="13sp"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:layout_marginTop="4dp"
@@ -4175,7 +4175,7 @@ jobs:
                                 app:icon="@drawable/ic_github"
                                 app:iconSize="20dp"
                                 app:iconTint="?attr/colorOnPrimary"
-                                app:shapeAppearanceOverlay="@style/ShapeAppearance.D.S Music.CircleButton"/>
+                                app:shapeAppearanceOverlay="@style/ShapeAppearance.Dsmusic.CircleButton"/>
 
                             <com.google.android.material.button.MaterialButton
                                 android:id="@+id/btnInstagram"
@@ -4186,7 +4186,7 @@ jobs:
                                 app:icon="@drawable/ic_instagram"
                                 app:iconSize="20dp"
                                 app:iconTint="?attr/colorOnPrimary"
-                                app:shapeAppearanceOverlay="@style/ShapeAppearance.D.S Music.CircleButton"/>
+                                app:shapeAppearanceOverlay="@style/ShapeAppearance.Dsmusic.CircleButton"/>
 
                             <com.google.android.material.button.MaterialButton
                                 android:id="@+id/btnYoutube"
@@ -4196,7 +4196,7 @@ jobs:
                                 app:icon="@drawable/ic_youtube"
                                 app:iconSize="20dp"
                                 app:iconTint="?attr/colorOnPrimary"
-                                app:shapeAppearanceOverlay="@style/ShapeAppearance.D.S Music.CircleButton"/>
+                                app:shapeAppearanceOverlay="@style/ShapeAppearance.Dsmusic.CircleButton"/>
 
                         </LinearLayout>
 
@@ -4246,7 +4246,7 @@ jobs:
                     android:id="@+id/tvCopyright"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="© 2025 Debarghya Sannigrahi"
+                    android:text="© 2026 Debarghya Sannigrahi"
                     android:textSize="12sp"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:layout_marginTop="4dp"
@@ -4578,7 +4578,7 @@ jobs:
         <item name="fontFamily">sans-serif-medium</item>
 
     </style>
-    <style name="Base.Theme.D.S Music" parent="Theme.Material3.DayNight">
+    <style name="Base.Theme.Dsmusic" parent="Theme.Material3.DayNight">
         <item name="colorPrimary">@color/md_theme_primary</item>
 
         <!-- System bars styling -->
@@ -4596,7 +4596,7 @@ jobs:
         <item name="android:textStyle">normal</item>
         <item name="fontFamily">sans-serif-medium</item>
     </style>
-    <style name="ShapeAppearance.D.S Music.CircleButton" parent="">
+    <style name="ShapeAppearance.Dsmusic.CircleButton" parent="">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">50%</item>
     </style>
@@ -4613,7 +4613,7 @@ jobs:
         <item name="backgroundTint">?attr/colorSurfaceContainerLow</item>
     </style>
 
-    <style name="ShapeAppearance.D.S Music.BottomSheet" parent="ShapeAppearance.Material3.MediumComponent">
+    <style name="ShapeAppearance.Dsmusic.BottomSheet" parent="ShapeAppearance.Material3.MediumComponent">
         <item name="cornerSizeTopLeft">32dp</item>
         <item name="cornerSizeTopRight">32dp</item>
         <item name="cornerSizeBottomLeft">0dp</item>
@@ -4629,7 +4629,7 @@ jobs:
 <resources>
 
     <!-- Light app theme -->
-    <style name="Theme.D.S Music" parent="Theme.Material3.DynamicColors.Light.NoActionBar">
+    <style name="Theme.Dsmusic" parent="Theme.Material3.DynamicColors.Light.NoActionBar">
         <!-- Status Bar -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
@@ -4739,7 +4739,7 @@ jobs:
 
 ``xml
 <resources>
-    <style name="Theme.D.S Music" parent="Theme.Material3.DynamicColors.Dark.NoActionBar">
+    <style name="Theme.Dsmusic" parent="Theme.Material3.DynamicColors.Dark.NoActionBar">
         <!-- Status Bar -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
@@ -4918,12 +4918,12 @@ jobs:
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
 
     <application
-        android:name=".D.S MusicApplication"
+        android:name=".DsmusicApplication"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.D.S Music"
+        android:theme="@style/Theme.Dsmusic"
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="31">
         <activity
@@ -4933,7 +4933,7 @@ jobs:
             android:resizeableActivity="true"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
             android:label="@string/app_name"
-            android:theme="@style/Theme.D.S Music">
+            android:theme="@style/Theme.Dsmusic">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -5179,13 +5179,13 @@ android.nonTransitiveRClass=true
 
 <p align="center">
   <!-- Downloads & Release -->
-  <img src="https://img.shields.io/github/downloads/DS-ann/D.S Music/total?color=5C7AEA&style=for-the-badge" />
-  <img src="https://img.shields.io/github/v/release/DS-ann/D.S Music?color=4ADE80&style=for-the-badge" />
-  <img src="https://img.shields.io/github/actions/workflow/status/DS-ann/D.S Music/release.yml?style=for-the-badge&label=BUILD" />
+  <img src="https://img.shields.io/github/downloads/DS-ann/D.S-Music2/total?color=5C7AEA&style=for-the-badge" />
+  <img src="https://img.shields.io/github/v/release/DS-ann/D.S-Music2?color=4ADE80&style=for-the-badge" />
+  <img src="https://img.shields.io/github/actions/workflow/status/DS-ann/D.S-Music2/release.yml?style=for-the-badge&label=BUILD" />
 
   <!-- Repo Health -->
 
-  <img src="https://img.shields.io/github/issues/DS-ann/D.S Music?color=EF4444&style=for-the-badge" />
+  <img src="https://img.shields.io/github/issues/DS-ann/D.S-Music2?color=EF4444&style=for-the-badge" />
 
   <!-- Tech Stack -->
 
@@ -5195,7 +5195,7 @@ android.nonTransitiveRClass=true
 
   <!-- License -->
 
-  <img src="https://img.shields.io/github/license/DS-ann/D.S Music?color=10B981&style=for-the-badge" />
+  <img src="https://img.shields.io/github/license/DS-ann/D.S-Music2?color=10B981&style=for-the-badge" />
 </p>
 
 ---
@@ -5264,7 +5264,7 @@ https://github.com/DS-ann/D.S-Music2/releases
 
 ```bash
 git clone https://github.com/DS-ann/D.S-Music2.git
-cd D.S Music
+cd D.S-Music2
 ```
 
 1. Open in Android Studio (JDK 17)
@@ -5354,7 +5354,7 @@ If you like this project:
 
 D.S Music, D.S Music Android App, D.S Music Music Player, D.S Music Audio Player, D.S Music Offline Music Player,
 
-Debarghya Sannigrahi, Debarghya Sannigrahi Developer, Apps by Debarghya Sannigrahi, Shubham Android Developer,
+Debarghya Sannigrahi, Debarghya Sannigrahi Developer, Apps by Debarghya Sannigrahi, Debarghya Sannigrahi Developer,
 
 Android Music Player, Offline Music Player Android, Android Audio Player App, Local Music Player Android, MP3 Player Android App,
 
