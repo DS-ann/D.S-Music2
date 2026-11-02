@@ -710,6 +710,7 @@ fun Scaffold(
     modifier: Modifier = Modifier,
     topBar: @Composable () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
+    bottomBarOverlay: Boolean = false,
     snackbarHost: @Composable () -> Unit = {},
     floatingActionButton: @Composable BoxScope.() -> Unit = {},
     containerColor: Color = DsmusicTheme.colorScheme.background,
@@ -724,8 +725,17 @@ fun Scaffold(
                 CompositionLocalProvider(LocalDsmusicContentColor provides contentColor) {
                     content(PaddingValues())
                 }
+                if (bottomBarOverlay) {
+                    // Place the dock inside the full-height content layer. It keeps a normal,
+                    // clickable layout size while drawing above the player sheet.
+                    Box(Modifier.align(Alignment.BottomCenter)) {
+                        bottomBar()
+                    }
+                }
             }
-            bottomBar()
+            if (!bottomBarOverlay) {
+                bottomBar()
+            }
         }
         Box(Modifier.align(Alignment.BottomEnd)) { floatingActionButton() }
         Box(Modifier.align(Alignment.BottomCenter)) { snackbarHost() }
