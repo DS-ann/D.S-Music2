@@ -59,6 +59,8 @@ import com.dsann.music.ui.theme.DsmusicTheme
 import com.dsann.music.ui.theme.Surface
 import com.dsann.music.ui.theme.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -89,14 +91,13 @@ import coil.compose.AsyncImage
 import com.dsann.music.R
 import com.dsann.music.model.SongItem
 import com.dsann.music.ui.theme.DsmusicAppTheme
+import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-import kotlin.time.Duration.Companion.milliseconds
 
 
 class QueueBottomSheet : BottomSheetDialogFragment() {
@@ -614,6 +615,7 @@ fun QueueSidebarItem(
 class DragDropState(
     val lazyListState: LazyListState,
     private val scope: CoroutineScope,
+    private val frameTimeNanos: State<Long>,
     private val onMove: (Int, Int) -> Unit
 ) {
     var draggedDistance by mutableFloatStateOf(0f)
@@ -707,11 +709,21 @@ class DragDropState(
         if (autoScrollJob?.isActive == true) return
 
         autoScrollJob = scope.launch {
-            while (currentIndexOfDraggedItem != null) {
-                val delta = autoScrollDeltaPx
-                if (delta == 0f) break
-                lazyListState.scrollBy(delta)
-                delay(16L.milliseconds)
+            var lastFrameNanos = 0L
+            // Sample the same configurable frame cadence as the player's other continuous
+            // visuals. Scale the scroll delta by elapsed time so 20 FPS does not slow the drag.
+            snapshotFlow { frameTimeNanos.value }.collect { frameNanos ->
+                if (currentIndexOfDraggedItem == null || autoScrollDeltaPx == 0f || frameNanos <= 0L) {
+                    return@collect
+                }
+                val elapsedNanos = if (lastFrameNanos > 0L && frameNanos > lastFrameNanos) {
+                    (frameNanos - lastFrameNanos).coerceAtMost(100_000_000L)
+                } else {
+                    16_666_667L
+                }
+                lastFrameNanos = frameNanos
+                val frameScale = elapsedNanos.toFloat() / 16_666_667f
+                lazyListState.scrollBy(autoScrollDeltaPx * frameScale)
             }
         }
     }
@@ -726,14 +738,16 @@ class DragDropState(
 @Composable
 fun rememberDragDropState(
     lazyListState: LazyListState,
-    onMove: (Int, Int) -> Unit
+    onMove: (Int, Int) -> Unit,
+    frameClockActive: Boolean = true
 ): DragDropState {
     val scope = rememberCoroutineScope()
+    val frameTimeNanos = rememberAppAnimationFrameTimeNanos(active = frameClockActive)
     // Keep the active move callback fresh while preserving drag state across recompositions.
     // Capturing onMove inside remember(lazyListState) can retain an obsolete callback.
     val currentOnMove = rememberUpdatedState(onMove)
-    return remember(lazyListState) {
-        DragDropState(lazyListState, scope) { from, to ->
+    return remember(lazyListState, frameTimeNanos) {
+        DragDropState(lazyListState, scope, frameTimeNanos) { from, to ->
             currentOnMove.value(from, to)
         }
     }
