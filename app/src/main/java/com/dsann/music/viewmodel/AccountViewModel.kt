@@ -11,8 +11,10 @@ import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.UserProfile
 import com.dsann.music.data.innertube.YouTubeMusic
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Orchestrates standard account retrieval loops sourcing aggregated library contents,
@@ -133,40 +135,47 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
                     android.util.Log.w("AccountViewModel", "Failed to load library artists", it)
                 }
 
-                val compiledMap = mutableMapOf<String, OnlineArtist>()
-                
-                // 1. Add explicitly followed artists
-                fetchedArtists.forEach { artist ->
-                    compiledMap[artist.browseId] = artist
-                }
+                // Snapshot the lists on the ViewModel thread, then merge/sort potentially large
+                // libraries away from Main so opening Library cannot hitch while artists are built.
+                val albumsSnapshot = _albums.value
+                val songsSnapshot = _songs.value
+                val mergedArtists = withContext(Dispatchers.Default) {
+                    val compiledMap = mutableMapOf<String, OnlineArtist>()
 
-                // 2. Add artists from saved albums
-                _albums.value.forEach { album ->
-                    album.artists.forEach { ref ->
-                        val artistId = ref.id
+                    // 1. Add explicitly followed artists
+                    fetchedArtists.forEach { artist ->
+                        compiledMap[artist.browseId] = artist
+                    }
+
+                    // 2. Add artists from saved albums
+                    albumsSnapshot.forEach { album ->
+                        album.artists.forEach { ref ->
+                            val artistId = ref.id
+                            if (artistId != null && !compiledMap.containsKey(artistId)) {
+                                compiledMap[artistId] = OnlineArtist(
+                                    browseId = artistId,
+                                    title = ref.name,
+                                    thumbnailUrl = album.thumbnailUrl
+                                )
+                            }
+                        }
+                    }
+
+                    // 3. Add artists from liked songs
+                    songsSnapshot.forEach { song ->
+                        val artistId = song.artistId
                         if (artistId != null && !compiledMap.containsKey(artistId)) {
                             compiledMap[artistId] = OnlineArtist(
                                 browseId = artistId,
-                                title = ref.name,
-                                thumbnailUrl = album.thumbnailUrl
+                                title = song.artist,
+                                thumbnailUrl = song.thumbnailUrl
                             )
                         }
                     }
-                }
 
-                // 3. Add artists from liked songs
-                _songs.value.forEach { song ->
-                    val artistId = song.artistId
-                    if (artistId != null && !compiledMap.containsKey(artistId)) {
-                        compiledMap[artistId] = OnlineArtist(
-                            browseId = artistId,
-                            title = song.artist,
-                            thumbnailUrl = song.thumbnailUrl
-                        )
-                    }
+                    compiledMap.values.toList().sortedBy { it.title.lowercase() }
                 }
-
-                _artists.value = compiledMap.values.toList().sortedBy { it.title.lowercase() }
+                _artists.value = mergedArtists
             } catch (e: Exception) {
                 android.util.Log.e("AccountViewModel", "Error fetching library", e)
             } finally {
