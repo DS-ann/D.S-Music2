@@ -1157,6 +1157,18 @@ fun SongListItem(
 ) {
     val context = LocalContext.current
     val artModel = remember(song) { song.getAlbumArtUri() ?: R.drawable.ic_music_note }
+    // The lazy list reuses rows while playback/favourite state changes. Keep the
+    // immutable Coil request stable instead of rebuilding it during each row recompose.
+    val artworkRequest = remember(context, artModel) {
+        ImageRequest.Builder(context)
+            .data(artModel)
+            .size(128, 128)
+            .crossfade(false)
+            .error(R.drawable.ic_music_note)
+            .placeholder(R.drawable.ic_music_note)
+            .fallback(R.drawable.ic_music_note)
+            .build()
+    }
     val shape = DsmusicTheme.shapes.medium
     val accent = DsmusicTheme.colorScheme.primary
     val titleColor = DsmusicTheme.colorScheme.onSurface
@@ -1186,14 +1198,7 @@ fun SongListItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(artModel)
-                .size(128, 128)
-                .crossfade(false)
-                .error(R.drawable.ic_music_note)
-                .placeholder(R.drawable.ic_music_note)
-                .fallback(R.drawable.ic_music_note)
-                .build(),
+            model = artworkRequest,
             contentDescription = "Album Art",
             modifier = Modifier
                 .size(48.dp)
