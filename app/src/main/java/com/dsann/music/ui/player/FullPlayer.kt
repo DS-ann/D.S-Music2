@@ -139,10 +139,10 @@ private fun PlayerVisualizer(
         if (!isVisible || !isPlaying || style == "Off") {
             phase.snapTo(0f)
         } else {
-            // API 23 devices have substantially less CPU headroom for Compose drawing.
-            // Keep the same visualizer styles, but lower their redraw cadence on Android 6.
+            // Keep every visualizer style available on API 23, but lower its visual
+            // refresh rate to about 6 fps and simplify its geometry on the older GPU.
             val legacyDevice = android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M
-            val frameDelayMs = if (legacyDevice) 84L else 42L
+            val frameDelayMs = if (legacyDevice) 167L else 42L
             val frameCount = if (legacyDevice) 12 else 24
             var frame = 0
             while (true) {
