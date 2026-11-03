@@ -61,7 +61,8 @@ fun WavyMusicSlider(
     isWaveEligible: Boolean = true,
     semanticsLabel: String? = null,
     semanticsProgressStep: Float = 0.01f,
-    frameTimeNanos: State<Long>? = null
+    frameTimeNanos: State<Long>? = null,
+    liveProgressProvider: (() -> Float)? = null
 ) {
     val isDragged by interactionSource.collectIsDraggedAsState()
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -177,11 +178,15 @@ fun WavyMusicSlider(
                     )
 
                     onDrawWithContent {
-                        // The caller supplies per-frame progress. Read the shared frame clock
-                        // in draw so the wave phase invalidates at the same cadence as the player.
-                        val renderNormalizedValue = normalizedValue
-                        val thumbInteractionFraction = thumbInteractionFractionState.value
+                        // Read the shared frame timestamp in draw, not composition. While
+                        // playing, sample Media3 directly for the visible progress line so the
+                        // slider moves every selected frame without recomposing its parent.
                         val frameNanos = activeFrameTimeNanos.value
+                        val liveProgress = if (
+                            isPlaying && !isInteracting && frameNanos > 0L
+                        ) liveProgressProvider?.invoke()?.takeIf { it.isFinite() } else null
+                        val renderNormalizedValue = (liveProgress ?: normalizedValue).coerceIn(0f, 1f)
+                        val thumbInteractionFraction = thumbInteractionFractionState.value
                         val phasePeriodNanos = waveAnimationDuration.coerceAtLeast(1).toLong() * 1_000_000L
                         val phaseShift = if (shouldShowWave && frameNanos > 0L && waveAnimationDuration > 0) {
                             ((frameNanos % phasePeriodNanos).toDouble() /
