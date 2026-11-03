@@ -15,8 +15,8 @@ import com.dsann.music.data.innertube.PlaylistPage
 import com.dsann.music.data.innertube.SearchFilter
 import com.dsann.music.data.innertube.SearchItem
 import com.dsann.music.data.innertube.YouTubeMusic
+import com.dsann.music.ui.explore.buildExploreImageRequest
 import coil.imageLoader
-import coil.request.ImageRequest
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -1243,10 +1243,14 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val loader = applicationContext.imageLoader
             selectedUrls.forEach { url ->
-                val req = ImageRequest.Builder(applicationContext)
-                    .data(url)
-                    .build()
-                loader.enqueue(req)
+                // Match the exact compact Explore cache key used by visible cards.
+                // API 23's shared request builder caps this to the same 60px decode target.
+                val request = buildExploreImageRequest(
+                    applicationContext,
+                    url,
+                    targetSizePx = 256
+                ) ?: return@forEach
+                loader.enqueue(request)
             }
         }
     }
