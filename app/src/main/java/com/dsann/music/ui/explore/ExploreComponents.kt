@@ -331,6 +331,7 @@ fun SearchResultItem(
     isLoading: Boolean,
     onSongMenuClick: ((OnlineSong) -> Unit)? = null,
     onTouchDown: (() -> Unit)? = null,
+    onCollectionMenuClick: ((SearchItem) -> Unit)? = null,
     onClick: () -> Unit
 ) {
     val backgroundColor = if (isCurrentlyPlaying)
@@ -380,8 +381,10 @@ fun SearchResultItem(
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
-                    if (item is SearchItem.Song && onSongMenuClick != null) {
-                        onSongMenuClick(item.song)
+                    when (item) {
+                        is SearchItem.Song -> onSongMenuClick?.invoke(item.song)
+                        is SearchItem.Album, is SearchItem.Playlist -> onCollectionMenuClick?.invoke(item)
+                        is SearchItem.Artist -> Unit
                     }
                 }
             )
@@ -523,6 +526,7 @@ fun SearchTopResultCard(
     isLoading: Boolean,
     onSongMenuClick: ((OnlineSong) -> Unit)? = null,
     onTouchDown: () -> Unit = {},
+    onCollectionMenuClick: ((SearchItem) -> Unit)? = null,
     onClick: () -> Unit
 ) {
     val thumbnail = when (item) {
@@ -568,7 +572,11 @@ fun SearchTopResultCard(
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
-                    if (item is SearchItem.Song) onSongMenuClick?.invoke(item.song)
+                    when (item) {
+                        is SearchItem.Song -> onSongMenuClick?.invoke(item.song)
+                        is SearchItem.Album, is SearchItem.Playlist -> onCollectionMenuClick?.invoke(item)
+                        is SearchItem.Artist -> Unit
+                    }
                 }
             )
             .padding(14.dp),
@@ -608,12 +616,22 @@ fun SearchTopResultCard(
                 LoadingIndicator(Modifier.size(18.dp))
             }
         }
-        if (item is SearchItem.Song && onSongMenuClick != null) {
-            DsmusicIconButton(onClick = { onSongMenuClick(item.song) }) {
-                Icon(Icons.Default.MoreVert, "More options")
+        when (item) {
+            is SearchItem.Song -> if (onSongMenuClick != null) {
+                DsmusicIconButton(onClick = { onSongMenuClick(item.song) }) {
+                    Icon(Icons.Default.MoreVert, "More options")
+                }
+            } else {
+                Icon(Icons.Default.PlayArrow, "Open result", tint = DsmusicTheme.colorScheme.primary)
             }
-        } else {
-            Icon(Icons.Default.PlayArrow, "Open result", tint = DsmusicTheme.colorScheme.primary)
+            is SearchItem.Album, is SearchItem.Playlist -> if (onCollectionMenuClick != null) {
+                DsmusicIconButton(onClick = { onCollectionMenuClick(item) }) {
+                    Icon(Icons.Default.MoreVert, "More options")
+                }
+            } else {
+                Icon(Icons.Default.PlayArrow, "Open result", tint = DsmusicTheme.colorScheme.primary)
+            }
+            is SearchItem.Artist -> Icon(Icons.Default.PlayArrow, "Open result", tint = DsmusicTheme.colorScheme.primary)
         }
     }
 }
@@ -676,7 +694,8 @@ fun BentoCell(
     item: SearchItem,
     modifier: Modifier = Modifier,
     isFeature: Boolean = false,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {}
 ) {
     val title = when (item) {
         is SearchItem.Song -> item.song.title
@@ -698,7 +717,10 @@ fun BentoCell(
     }
 
     Box(
-        modifier = modifier.clip(RoundedCornerShape(24.dp)).clickable(onClick = onClick)
+        modifier = modifier.clip(RoundedCornerShape(24.dp)).combinedClickable(
+            onClick = onClick,
+            onLongClick = onLongClick
+        )
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImage(
@@ -795,6 +817,18 @@ internal fun PrefetchExploreHomeSectionImages(
 
 // ===== Home Feed Section =====
 
+private fun openExploreItemMenu(
+    item: SearchItem,
+    onSongMenuClick: (OnlineSong) -> Unit,
+    onCollectionMenuClick: (SearchItem) -> Unit
+) {
+    when (item) {
+        is SearchItem.Song -> onSongMenuClick(item.song)
+        is SearchItem.Album, is SearchItem.Playlist -> onCollectionMenuClick(item)
+        is SearchItem.Artist -> Unit
+    }
+}
+
 @Composable
 fun HomeSectionRow(
     section: HomeSection,
@@ -805,6 +839,7 @@ fun HomeSectionRow(
     onPlaylistClick: (OnlinePlaylist) -> Unit,
     onSongMenuClick: (OnlineSong) -> Unit,
     onSongTouchDown: (OnlineSong) -> Unit = {},
+    onCollectionMenuClick: (SearchItem) -> Unit = {},
     onSectionClick: (browseId: String, params: String?, title: String) -> Unit = { _, _, _ -> }
 ) {
     val hasSongsOnly = remember(section.items) {
@@ -886,7 +921,8 @@ fun HomeSectionRow(
                                     is SearchItem.Artist -> onArtistClick(it.artist)
                                     is SearchItem.Playlist -> onPlaylistClick(it.playlist)
                                 }
-                            }
+                            },
+                            onLongClick = { openExploreItemMenu(items[0], onSongMenuClick, onCollectionMenuClick) }
                         )
                         // Column of stacked tiles
                         Column(modifier = Modifier.weight(0.75f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -897,7 +933,7 @@ fun HomeSectionRow(
                                     is SearchItem.Artist -> onArtistClick(it.artist)
                                     is SearchItem.Playlist -> onPlaylistClick(it.playlist)
                                 }
-                            })
+                            }, onLongClick = { openExploreItemMenu(items[1], onSongMenuClick, onCollectionMenuClick) })
                             BentoCell(item = items[2], modifier = Modifier.weight(1f).fillMaxWidth(), onClick = {
                                 when (val it = items[2]) {
                                     is SearchItem.Song -> onSongMenuClick(it.song)
@@ -905,7 +941,7 @@ fun HomeSectionRow(
                                     is SearchItem.Artist -> onArtistClick(it.artist)
                                     is SearchItem.Playlist -> onPlaylistClick(it.playlist)
                                 }
-                            })
+                            }, onLongClick = { openExploreItemMenu(items[2], onSongMenuClick, onCollectionMenuClick) })
                         }
                     }
                     Row(modifier = Modifier.height(130.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -917,7 +953,7 @@ fun HomeSectionRow(
                                 is SearchItem.Artist -> onArtistClick(it.artist)
                                 is SearchItem.Playlist -> onPlaylistClick(it.playlist)
                             }
-                        })
+                        }, onLongClick = { openExploreItemMenu(items[3], onSongMenuClick, onCollectionMenuClick) })
                         BentoCell(item = items[4], modifier = Modifier.weight(1f).fillMaxHeight(), onClick = {
                             when (val it = items[4]) {
                                 is SearchItem.Song -> onSongMenuClick(it.song)
@@ -925,7 +961,7 @@ fun HomeSectionRow(
                                 is SearchItem.Artist -> onArtistClick(it.artist)
                                 is SearchItem.Playlist -> onPlaylistClick(it.playlist)
                             }
-                        })
+                        }, onLongClick = { openExploreItemMenu(items[4], onSongMenuClick, onCollectionMenuClick) })
                     }
                     // The Bento layout uses five featured cards. Keep every remaining
                     // recommendation reachable instead of silently dropping the rest.
@@ -961,6 +997,8 @@ fun HomeSectionRow(
                                     item = item,
                                     isPlaying = item is SearchItem.Song &&
                                         item.song.videoId == currentOnlineSong?.videoId,
+                                    onSongMenuClick = onSongMenuClick,
+                                    onCollectionMenuClick = onCollectionMenuClick,
                                     onClick = {
                                         when (item) {
                                             is SearchItem.Song -> onSongMenuClick(item.song)
@@ -1002,14 +1040,19 @@ fun HomeSectionRow(
                                 Box(
                                     modifier = Modifier.weight(1f).aspectRatio(1f)
                                         .clip(RoundedCornerShape(12.dp))
-                                        .clickable {
-                                            when (item) {
-                                                is SearchItem.Song -> onSongMenuClick(item.song)
-                                                is SearchItem.Album -> onAlbumClick(item.album)
-                                                is SearchItem.Artist -> onArtistClick(item.artist)
-                                                is SearchItem.Playlist -> onPlaylistClick(item.playlist)
+                                        .combinedClickable(
+                                            onClick = {
+                                                when (item) {
+                                                    is SearchItem.Song -> onSongMenuClick(item.song)
+                                                    is SearchItem.Album -> onAlbumClick(item.album)
+                                                    is SearchItem.Artist -> onArtistClick(item.artist)
+                                                    is SearchItem.Playlist -> onPlaylistClick(item.playlist)
+                                                }
+                                            },
+                                            onLongClick = {
+                                                openExploreItemMenu(item, onSongMenuClick, onCollectionMenuClick)
                                             }
-                                        }
+                                        )
                                 ) {
                                     AsyncImage(
                                         model = rememberExploreImageRequest(thumbnailUrl, if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) 256 else 512),
@@ -1096,14 +1139,19 @@ fun HomeSectionRow(
                         Box(
                             modifier = Modifier.width(300.dp).height(300.dp)
                                 .clip(RoundedCornerShape(16.dp))
-                                .clickable {
-                                    when (item) {
-                                        is SearchItem.Song -> onSongClick(item.song)
-                                        is SearchItem.Album -> onAlbumClick(item.album)
-                                        is SearchItem.Artist -> onArtistClick(item.artist)
-                                        is SearchItem.Playlist -> onPlaylistClick(item.playlist)
+                                .combinedClickable(
+                                    onClick = {
+                                        when (item) {
+                                            is SearchItem.Song -> onSongClick(item.song)
+                                            is SearchItem.Album -> onAlbumClick(item.album)
+                                            is SearchItem.Artist -> onArtistClick(item.artist)
+                                            is SearchItem.Playlist -> onPlaylistClick(item.playlist)
+                                        }
+                                    },
+                                    onLongClick = {
+                                        openExploreItemMenu(item, onSongMenuClick, onCollectionMenuClick)
                                     }
-                                }
+                                )
                         ) {
                             AsyncImage(
                                 model = rememberExploreImageRequest(thumbnailUrl, if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) 384 else 512),
@@ -1207,6 +1255,19 @@ fun HomeSectionRow(
                             modifier = Modifier.width(320.dp).padding(vertical = 4.dp)
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(DsmusicTheme.colorScheme.surfaceContainerLow)
+                                .combinedClickable(
+                                    onClick = {
+                                        when (item) {
+                                            is SearchItem.Song -> onSongClick(item.song)
+                                            is SearchItem.Album -> onAlbumClick(item.album)
+                                            is SearchItem.Artist -> onArtistClick(item.artist)
+                                            is SearchItem.Playlist -> onPlaylistClick(item.playlist)
+                                        }
+                                    },
+                                    onLongClick = {
+                                        openExploreItemMenu(item, onSongMenuClick, onCollectionMenuClick)
+                                    }
+                                )
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1348,6 +1409,8 @@ fun HomeSectionRow(
                                 onTouchDown = if (item is SearchItem.Song) {
                                     { onSongTouchDown(item.song) }
                                 } else null,
+                                onSongMenuClick = onSongMenuClick,
+                                onCollectionMenuClick = onCollectionMenuClick,
                                 onClick = {
                                     when (item) {
                                         is SearchItem.Song -> onSongClick(item.song)
@@ -1373,7 +1436,9 @@ fun HomeCarouselItem(
     isPlaying: Boolean,
     onTouchDown: (() -> Unit)? = null,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier.width(160.dp)
+    modifier: Modifier = Modifier.width(160.dp),
+    onSongMenuClick: ((OnlineSong) -> Unit)? = null,
+    onCollectionMenuClick: ((SearchItem) -> Unit)? = null
 ) {
     val isCircle = item is SearchItem.Artist
     val imageShape = if (isCircle) CircleShape else RoundedCornerShape(8.dp)
@@ -1420,7 +1485,16 @@ fun HomeCarouselItem(
     Column(
         modifier = modifier
             .then(touchDownModifier)
-            .clickable(onClick = onClick),
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    when (item) {
+                        is SearchItem.Song -> onSongMenuClick?.invoke(item.song)
+                        is SearchItem.Album, is SearchItem.Playlist -> onCollectionMenuClick?.invoke(item)
+                        is SearchItem.Artist -> Unit
+                    }
+                }
+            ),
         horizontalAlignment = Alignment.Start
     ) {
         Box(
