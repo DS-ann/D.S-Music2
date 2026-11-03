@@ -477,14 +477,6 @@ fun resolveVerticalSheetTargetState(
     }
 }
 
-fun collapseSpringDampingForFraction(currentFraction: Float): Float {
-    return androidx.compose.ui.util.lerp(Spring.DampingRatioNoBouncy, Spring.DampingRatioLowBouncy, currentFraction)
-}
-
-fun collapseInitialSquashForFraction(currentFraction: Float): Float {
-    return androidx.compose.ui.util.lerp(1.0f, 0.97f, currentFraction)
-}
-
 class SheetVerticalDragGestureHandler(
     private val scope: CoroutineScope,
     private val velocityTracker: VelocityTracker,
@@ -495,7 +487,6 @@ class SheetVerticalDragGestureHandler(
     private val collapsedYProvider: () -> Float,
     private val miniHeightPxProvider: () -> Float,
     private val currentSheetStateProvider: () -> PlayerSheetState,
-    private val visualOvershootScaleY: Animatable<Float, AnimationVector1D>,
     private val onAnimateSheet: suspend (targetExpanded: Boolean, animationSpec: AnimationSpec<Float>?, initialVelocity: Float) -> Unit,
     private val onExpandSheetState: () -> Unit,
     private val onCollapseSheetState: () -> Unit,
@@ -564,25 +555,9 @@ class SheetVerticalDragGestureHandler(
                 onAnimateSheet(true, null, 0f)
                 onExpandSheetState()
             } else {
-                val dynamicDamping = collapseSpringDampingForFraction(currentFraction)
-
-                launch {
-                    val initialSquash = collapseInitialSquashForFraction(currentFraction)
-                    visualOvershootScaleY.snapTo(initialSquash)
-                    visualOvershootScaleY.animateTo(
-                        targetValue = 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessVeryLow
-                        )
-                    )
-                }
-
-                onAnimateSheet(
-                    false,
-                    spring(dampingRatio = dynamicDamping, stiffness = Spring.StiffnessLow),
-                    verticalVelocity
-                )
+                // Same non-overshooting transition as tap/Back collapse. Keeping one
+                // animation curve in both directions prevents the mini-player from wobbling.
+                onAnimateSheet(false, null, verticalVelocity)
                 onCollapseSheetState()
             }
         }
@@ -1136,9 +1111,9 @@ fun PlayerBottomSheetCompose(
             viewModel.setQueueExpanded(false)
             pendingSheetAnimation = SheetAnimationRequest(
                 targetExpanded = false,
-                animationSpec = spring(
-                    dampingRatio = 0.92f,
-                    stiffness = Spring.StiffnessMediumLow
+                animationSpec = tween(
+                    durationMillis = 280,
+                    easing = FastOutSlowInEasing
                 ),
                 initialVelocity = 0f
             )
@@ -1163,7 +1138,6 @@ fun PlayerBottomSheetCompose(
                 if (expanded) 0f else sheetCollapsedTargetYState.value.coerceIn(0f, screenHeightPx)
             )
         }
-        val visualOvershootScaleY = remember { Animatable(1f) }
         val offsetAnimatable = remember { Animatable(0f) }
 
         val screenWidthPx = with(density) { maxWidth.toPx() }
@@ -1174,7 +1148,7 @@ fun PlayerBottomSheetCompose(
         val isLegacyCompactArtwork by remember(playerContentExpansionFraction, isLyricsModeEnabled) {
             derivedStateOf {
                 android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M &&
-                    playerContentExpansionFraction.value < 0.5f &&
+                    playerContentExpansionFraction.value <= 0.015f &&
                     !isLyricsModeEnabled
             }
         }
@@ -1261,7 +1235,7 @@ fun PlayerBottomSheetCompose(
                 -initialVelocity / totalDistance
             } else 0f
             val resolvedAnimationSpec = animationSpec
-                ?: spring(dampingRatio = 0.85f, stiffness = 400f)
+                ?: tween(durationMillis = 280, easing = FastOutSlowInEasing)
 
             isSheetAnimating = true
             try {
@@ -1362,7 +1336,6 @@ fun PlayerBottomSheetCompose(
                 collapsedYProvider = { sheetCollapsedTargetYState.value },
                 miniHeightPxProvider = { miniHeightPx },
                 currentSheetStateProvider = { currentSheetContentState },
-                visualOvershootScaleY = visualOvershootScaleY,
                 onAnimateSheet = { target, animationSpec, velocity ->
                     pendingSheetAnimation = SheetAnimationRequest(target, animationSpec, velocity)
                     sheetAnimationRequestId += 1
@@ -1456,7 +1429,6 @@ fun PlayerBottomSheetCompose(
                                 )
                                 .graphicsLayer {
                                     translationX = offsetAnimatable.value
-                                    scaleY = visualOvershootScaleY.value
                                     transformOrigin = TransformOrigin(0.5f, 1f)
                                 }
                                 .shadow(
@@ -1467,7 +1439,11 @@ fun PlayerBottomSheetCompose(
                                     color = dynamicBgColor,
                                     shape = playerShellShape
                                 )
-                                .playerSheetVerticalDragGesture(enabled = !isLyricsModeEnabled && !isQueueExpanded, handler = sheetVerticalDragGestureHandler)
+                                .playerSheetVerticalDragGesture(
+                                    enabled = currentSheetContentState == PlayerSheetState.COLLAPSED &&
+                                        !isLyricsModeEnabled && !isQueueExpanded,
+                                    handler = sheetVerticalDragGestureHandler
+                                )
                                 .pointerInput(currentSheetContentState, isLyricsModeEnabled) {
                                     detectTapGestures(
                                         onTap = {
@@ -1536,9 +1512,7 @@ fun PlayerBottomSheetCompose(
 
                                 val miniSizePx = 48.dp.toPx()
                                 val fullSizePx = albumArtSizeDp.toPx()
-                                val artTransitionProgress = if (
-                                    android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M
-                                ) ((t - 0.5f) * 2f).coerceIn(0f, 1f) else t
+                                val artTransitionProgress = t.coerceIn(0f, 1f)
                                 val normalScale = androidx.compose.ui.util.lerp(
                                     miniSizePx / fullSizePx, 1f, artTransitionProgress
                                 )
