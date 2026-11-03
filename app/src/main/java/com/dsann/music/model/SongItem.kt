@@ -19,6 +19,7 @@ data class SongItem(
     @JvmField var thumbnailUrl: String? = null
     @JvmField var mediaStoreRelativePath: String? = null
     @JvmField var albumName: String? = null
+    @JvmField var playbackContextName: String? = null
     @JvmField var videoId: String? = null
     @JvmField var artistId: String? = null
     @JvmField var lufs: Float? = null
@@ -136,6 +137,7 @@ data class SongItem(
             thumbnailUrl = this@SongItem.thumbnailUrl
             mediaStoreRelativePath = this@SongItem.mediaStoreRelativePath
             albumName = this@SongItem.albumName
+            playbackContextName = this@SongItem.playbackContextName
             videoId = this@SongItem.videoId
             artistId = this@SongItem.artistId
             lufs = this@SongItem.lufs
