@@ -195,7 +195,8 @@ internal fun SyncedLyricsCompose(
                 shownMs = actualMs.toDouble()
                 lastFrameNanos = -1L
                 if (lyricClock.intValue != actualMs) lyricClock.intValue = actualMs
-                delay(40L)
+                // A paused lyrics screen needs to notice occasional seeks, not poll at 25 Hz.
+                delay(if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 250L else 120L)
             } else if (!isKaraokeMode) {
                 // Ordinary synced lyrics need line changes, not a per-frame word sweep.
                 val interval = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 84L else 40L
