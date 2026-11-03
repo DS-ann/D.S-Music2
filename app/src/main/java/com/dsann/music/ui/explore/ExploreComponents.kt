@@ -1935,7 +1935,7 @@ private fun PrefetchExploreRowImages(
             upcomingUrls.forEach { url ->
                 val request = buildExploreImageRequest(context, url, targetSizePx)
                     ?: return@forEach
-                imageLoader.enqueue(request)
+                imageLoader.execute(request)
             }
         }
     }
