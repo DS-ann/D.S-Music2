@@ -13,8 +13,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.History
 import com.dsann.music.ui.theme.Icon
 import com.dsann.music.ui.theme.IconButton
 import com.dsann.music.ui.theme.DsmusicTheme
@@ -62,7 +62,7 @@ fun HistoryScreen(
                     title = { Text("Listening History", fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -101,7 +101,7 @@ fun HistoryScreen(
                         modifier = Modifier.padding(24.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.History,
+                            imageVector = Icons.Rounded.History,
                             contentDescription = null,
                             modifier = Modifier.size(56.dp),
                             tint = DsmusicTheme.colorScheme.outline.copy(alpha = 0.5f)
