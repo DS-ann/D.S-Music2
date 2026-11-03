@@ -35,7 +35,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.rounded.MoreVert
 import com.dsann.music.ui.theme.CircularProgressIndicator
 import com.dsann.music.ui.theme.Icon
 import com.dsann.music.ui.theme.IconButton
@@ -361,7 +361,7 @@ internal fun FullScreenLyricsOverlay(
                     interactionSource = remember { MutableInteractionSource() }
                 ) {
                     Icon(
-                        imageVector = Icons.Default.MoreVert,
+                        imageVector = Icons.Rounded.MoreVert,
                         contentDescription = "Change Lyrics Provider",
                         tint = contentColor.copy(alpha = 0.8f),
                         modifier = Modifier.size(24.dp)
