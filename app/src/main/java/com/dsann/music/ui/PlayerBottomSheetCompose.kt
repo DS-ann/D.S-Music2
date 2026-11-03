@@ -1509,7 +1509,10 @@ fun PlayerBottomSheetCompose(
                         } else {
                             // Limit portrait artwork by both available width and height so the
                             // title, transport controls and queue handle remain in the window.
-                            minOf(containerWidthDp * albumArtScale, containerHeight * 0.40f)
+                            minOf(
+                                containerWidthDp * albumArtScale,
+                                containerHeight * (if (containerHeight < 760.dp) 0.36f else 0.40f)
+                            )
                         }
                     ) * artworkScaleFactor
                     val statusBarTopPx = WindowInsets.statusBars.getTop(density).toFloat()
