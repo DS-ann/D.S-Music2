@@ -912,12 +912,13 @@ fun FullPlayer(
         // Split-screen/freeform windows can be much smaller than LocalConfiguration's device size.
         val screenWidth = maxWidth
         val screenHeight = maxHeight
+        val artworkScaleFactor = playerArtworkScale.coerceIn(0.65f, 1f)
         val artScale = (when (playerLayout) {
             "Cover" -> 0.98f
             "Minimal" -> 0.68f
             "Vinyl", "Cassette" -> 0.82f
             else -> 0.9f
-        }) * playerArtworkScale.coerceIn(0.65f, 1f)
+        }) * artworkScaleFactor
         val isLandscapeWindow = screenWidth > screenHeight
         val useWidePlayer = screenWidth >= 840.dp ||
             (screenWidth >= 600.dp && isLandscapeWindow)
@@ -926,7 +927,7 @@ fun FullPlayer(
         val animatedQueueDockInset by animateDpAsState(
             targetValue = if (
                 useWidePlayer &&
-                configuration.orientation == Configuration.ORIENTATION_LANDSCAPE &&
+                isLandscapeWindow &&
                 isQueueExpanded
             ) screenWidth * 0.42f else 0.dp,
             animationSpec = spring(dampingRatio = 0.85f, stiffness = 300f),
@@ -943,7 +944,7 @@ fun FullPlayer(
             minOf(screenHeight * 0.50f, screenWidth * 0.42f) * (artScale / 0.9f)
         } else {
             // Keep portrait artwork proportional to the available window height as well as width.
-            minOf(screenWidth * artScale, screenHeight * 0.40f)
+            minOf(screenWidth * artScale, screenHeight * 0.40f * artworkScaleFactor)
         }
 
         val density = androidx.compose.ui.platform.LocalDensity.current
@@ -955,7 +956,9 @@ fun FullPlayer(
             isLandscapeWindow -> 60.dp
             else -> 76.dp
         }
-        val headerHeight = if (compactLandscape) 40.dp else 56.dp
+        // Preserve the shared-artwork vertical anchor; only the transport spacing compacts
+        // when a portrait window becomes short.
+        val headerHeight = if (isLandscapeWindow) 40.dp else 56.dp
 
         // Calculate top offset to perfectly match yEndPx in PlayerBottomSheetCompose
         val topOffset = if (useWidePlayer) minTopOffset
