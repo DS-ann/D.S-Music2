@@ -197,6 +197,7 @@ internal fun FullScreenLyricsOverlay(
     contentColor: Color,
     contentSecondary: Color,
     dynamicAccentColor: Color,
+    lyricsColorStyle: String = "Dynamic (Gradient)",
     onRetryLyrics: () -> Unit,
     onFetchLyrics: () -> Unit,
     onSeekTo: (Int) -> Unit,
@@ -395,6 +396,7 @@ internal fun FullScreenLyricsOverlay(
                             currentSong = currentSong,
                             selectedProvider = selectedProvider,
                             providerResults = providerResults,
+                            lyricsColorStyle = lyricsColorStyle,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -409,12 +411,16 @@ internal fun FullScreenLyricsOverlay(
                             Text(
                                 text = plainLyrics,
                                 style = DsmusicTheme.typography.titleLarge.copy(
+                                    brush = if (lyricsColorStyle == "Dynamic (Gradient)") {
+                                        Brush.horizontalGradient(listOf(dynamicAccentColor, contentColor))
+                                    } else null,
                                     fontSize = DsmusicTheme.typography.titleLarge.fontSize *
                                         if (compactLandscapeLyrics) 0.78f else 1f,
                                     lineHeight = DsmusicTheme.typography.titleLarge.lineHeight *
                                         if (compactLandscapeLyrics) 0.82f else 1f
                                 ),
-                                color = contentColor.copy(alpha = 0.9f)
+                                color = if (lyricsColorStyle == "Dynamic (Gradient)") Color.Unspecified
+                                    else contentColor.copy(alpha = 0.9f)
                             )
                             LyricsMetadataFooter(
                                 currentSong = currentSong,
