@@ -44,14 +44,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
-import androidx.compose.material.icons.filled.KeyboardDoubleArrowLeft
-import androidx.compose.material.icons.filled.KeyboardDoubleArrowRight
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.FastForward
+import androidx.compose.material.icons.rounded.FastRewind
+import androidx.compose.material.icons.rounded.KeyboardDoubleArrowLeft
+import androidx.compose.material.icons.rounded.KeyboardDoubleArrowRight
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import com.dsann.music.ui.theme.AlertDialog
 import com.dsann.music.ui.theme.CircularWavyProgressIndicator
 import com.dsann.music.ui.theme.Icon
@@ -2141,7 +2141,7 @@ private fun MiniPlayerContentInternal(
                     )
                 } else {
                     Icon(
-                        imageVector = if (controlIconSet == "Seek") Icons.Filled.FastRewind else Icons.Filled.ChevronLeft,
+                        imageVector = if (controlIconSet == "Seek") Icons.Rounded.FastRewind else Icons.Rounded.ChevronLeft,
                         contentDescription = "Previous",
                         tint = contentColor,
                         modifier = Modifier.size(24.dp)
@@ -2170,7 +2170,7 @@ private fun MiniPlayerContentInternal(
                     )
                 } else {
                     Icon(
-                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                         contentDescription = "Play/Pause",
                         tint = contentColor,
                         modifier = Modifier.size(23.dp)
@@ -2191,7 +2191,7 @@ private fun MiniPlayerContentInternal(
                     )
                 } else {
                     Icon(
-                        imageVector = if (controlIconSet == "Seek") Icons.Filled.FastForward else Icons.Filled.ChevronRight,
+                        imageVector = if (controlIconSet == "Seek") Icons.Rounded.FastForward else Icons.Rounded.ChevronRight,
                         contentDescription = "Next",
                         tint = contentColor,
                         modifier = Modifier.size(24.dp)
