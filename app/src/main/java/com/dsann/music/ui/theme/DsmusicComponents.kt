@@ -48,12 +48,12 @@ fun DsmusicCard(
     val scheme = DsmusicTheme.colorScheme
     val containerColor = colors?.containerColor ?: scheme.surfaceContainerLow
     val contentColor = colors?.contentColor ?: scheme.onSurface
-    val outline = scheme.outlineVariant.copy(alpha = 0.28f)
+    val outline = scheme.outlineVariant.copy(alpha = 0.86f)
     Column(
         modifier = modifier
             .clip(shape)
             .background(containerColor)
-            .border(BorderStroke(1.dp, outline.copy(alpha = 0.62f)), shape)
+            .border(BorderStroke(1.25.dp, outline), shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {
         CompositionLocalProvider(LocalDsmusicContentColor provides contentColor) {
@@ -77,7 +77,7 @@ fun DsmusicSurface(
     Box(
         modifier = modifier.clip(shape).background(color)
             .border(
-                BorderStroke(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)),
+                BorderStroke(1.25.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.88f)),
                 shape
             )
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
@@ -114,7 +114,7 @@ fun DsmusicListItem(
         selected -> colors.selectedContainerColor
         else -> colors.containerColor
     }
-    val itemBorder = scheme.outlineVariant.copy(alpha = 0.34f)
+    val itemBorder = scheme.outlineVariant.copy(alpha = 0.82f)
     Row(
         modifier = modifier.fillMaxWidth().clip(itemShape)
             .background(itemBackground)
@@ -240,7 +240,7 @@ fun DsmusicOutlinedButton(
                 if (border != null) Modifier.border(border, shape)
                 else Modifier.border(
                     1.dp,
-                    scheme.outlineVariant.copy(alpha = if (enabled) 0.55f else 0.28f),
+                    scheme.outlineVariant.copy(alpha = if (enabled) 0.84f else 0.48f),
                     shape
                 )
             )
@@ -323,7 +323,7 @@ fun DsmusicFilterChip(
             .background(background)
             .border(
                 1.dp,
-                if (selected && enabled) scheme.primary else scheme.outlineVariant.copy(alpha = 0.42f),
+                if (selected && enabled) scheme.primary else scheme.outlineVariant.copy(alpha = 0.82f),
                 shape
             )
             .clickable(enabled = enabled, onClick = onClick)
