@@ -381,9 +381,7 @@ fun QueueBottomSheetContent(
                         } else {
                             LazyColumn(
                                 state = lazyListState,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .dragContainer(dragDropState, enabled = true),
+                                modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(end = 20.dp, bottom = 24.dp),
                                 verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
                             ) {
@@ -415,6 +413,8 @@ fun QueueBottomSheetContent(
                                             isPlaying = isPlaying,
                                             shapes = shapes,
                                             showReorderControls = true,
+                                            dragDropState = dragDropState,
+                                            index = index,
                                             onMoveUp = {
                                                 if (index > 0) {
                                                     viewModel.reorderQueue(index, index - 1)
