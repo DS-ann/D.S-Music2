@@ -67,28 +67,28 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.ViewList
-import androidx.compose.material.icons.filled.Headset
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Podcasts
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.Clear
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.ViewList
+import androidx.compose.material.icons.rounded.Headset
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Podcasts
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.SkipNext
 import com.dsann.music.ui.theme.AlertDialog
 import com.dsann.music.ui.theme.Button
 import com.dsann.music.ui.theme.ButtonDefaults
@@ -423,7 +423,7 @@ fun LibraryScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = if (currentCollectionAsList) Icons.Default.GridView else Icons.Default.ViewList,
+                                    imageVector = if (currentCollectionAsList) Icons.Rounded.GridView else Icons.Rounded.ViewList,
                                     contentDescription = if (currentCollectionAsList) "Show as grid" else "Show as list",
                                     tint = DsmusicTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(21.dp)
@@ -465,7 +465,7 @@ fun LibraryScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.AccountCircle,
+                                    imageVector = Icons.Rounded.AccountCircle,
                                     contentDescription = "Account Settings",
                                     tint = DsmusicTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(25.dp)
@@ -583,7 +583,7 @@ fun LibraryScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
-                                        Icons.Default.Search,
+                                        Icons.Rounded.Search,
                                         contentDescription = "Search local songs",
                                         tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(21.dp)
@@ -613,7 +613,7 @@ fun LibraryScreen(
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
-                                                Icons.Default.Clear,
+                                                Icons.Rounded.Clear,
                                                 contentDescription = "Clear search",
                                                 tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.size(18.dp)
@@ -875,8 +875,8 @@ fun LibraryScreen(
                                                             else -> Color.Transparent
                                                         }
                                                         val icon = when (dismissState.dismissDirection) {
-                                                            SwipeToDismissBoxValue.StartToEnd -> Icons.Default.SkipNext
-                                                            SwipeToDismissBoxValue.EndToStart -> Icons.AutoMirrored.Filled.QueueMusic
+                                                            SwipeToDismissBoxValue.StartToEnd -> Icons.Rounded.SkipNext
+                                                            SwipeToDismissBoxValue.EndToStart -> Icons.AutoMirrored.Rounded.QueueMusic
                                                             else -> null
                                                         }
                                                         val alignment = when (dismissState.dismissDirection) {
@@ -1285,7 +1285,7 @@ fun SongListItem(
 
         if (isFavorite) {
             Icon(
-                imageVector = Icons.Default.Favorite,
+                imageVector = Icons.Rounded.Favorite,
                 contentDescription = "Favorite",
                 tint = accent,
                 modifier = Modifier.padding(end = 7.dp).size(17.dp)
@@ -1293,7 +1293,7 @@ fun SongListItem(
         }
         if (isPlaying) {
             Icon(
-                imageVector = Icons.Default.PlayArrow,
+                imageVector = Icons.Rounded.PlayArrow,
                 contentDescription = "Now Playing",
                 tint = accent,
                 modifier = Modifier.size(21.dp)
@@ -1334,22 +1334,22 @@ private fun UnifiedLibraryContent(
         // Keep the key library actions first, in a stable Prism-style tile order.
         list.addAll(
             listOf(
-                LibraryCategoryItem("Playlists", "Your playlists", Icons.AutoMirrored.Filled.PlaylistPlay) {
+                LibraryCategoryItem("Playlists", "Your playlists", Icons.AutoMirrored.Rounded.PlaylistPlay) {
                     navigateToTab.value("Playlists")
                 },
-                LibraryCategoryItem("Liked songs", "Your YouTube Music likes", Icons.Default.Favorite) {
+                LibraryCategoryItem("Liked songs", "Your YouTube Music likes", Icons.Rounded.Favorite) {
                     navigateToTab.value("Songs")
                 },
-                LibraryCategoryItem("Albums", "Browse saved albums", Icons.Default.Album) {
+                LibraryCategoryItem("Albums", "Browse saved albums", Icons.Rounded.Album) {
                     navigateToTab.value("Albums")
                 },
-                LibraryCategoryItem("Artists", "Browse artists", Icons.Default.Person) {
+                LibraryCategoryItem("Artists", "Browse artists", Icons.Rounded.Person) {
                     navigateToTab.value("Artists")
                 },
-                LibraryCategoryItem("Podcasts", "Podcast library", Icons.Default.Podcasts) {
+                LibraryCategoryItem("Podcasts", "Podcast library", Icons.Rounded.Podcasts) {
                     navigateToTab.value("Podcasts")
                 },
-                LibraryCategoryItem("Downloaded songs", "Music saved on this device", Icons.AutoMirrored.Filled.QueueMusic) {
+                LibraryCategoryItem("Downloaded songs", "Music saved on this device", Icons.AutoMirrored.Rounded.QueueMusic) {
                     navigateToTab.value("Downloaded songs")
                 },
             )
@@ -1358,7 +1358,7 @@ private fun UnifiedLibraryContent(
         // Keep the unsupported Recap destination out of Library's category grid too.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             list.add(
-                LibraryCategoryItem("Recap", "Your listening recap", Icons.Default.BarChart) {
+                LibraryCategoryItem("Recap", "Your listening recap", Icons.Rounded.BarChart) {
                     navigateToTab.value("Recap")
                 }
             )
@@ -1591,7 +1591,7 @@ private fun UnifiedLibraryCard(item: UnifiedLibraryItem) {
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = item.icon ?: if (item.isCircle) Icons.Default.Person else Icons.Default.MusicNote,
+                        imageVector = item.icon ?: if (item.isCircle) Icons.Rounded.Person else Icons.Rounded.MusicNote,
                         contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(36.dp)
@@ -1750,7 +1750,7 @@ private fun PlaylistsTabContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     DsmusicIconButton(onClick = { showCachePlaylist = false }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to playlists")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back to playlists")
                     }
                     Text("Cache", style = DsmusicTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
@@ -1783,7 +1783,7 @@ private fun PlaylistsTabContent(
                     maxLines = 1
                 )
                 DsmusicIconButton(onClick = { showCreatePlaylistDialog = true }) {
-                    Icon(Icons.Default.Add, contentDescription = "Create playlist", tint = DsmusicTheme.colorScheme.primary)
+                    Icon(Icons.Rounded.Add, contentDescription = "Create playlist", tint = DsmusicTheme.colorScheme.primary)
                 }
             }
 
@@ -1805,7 +1805,7 @@ private fun PlaylistsTabContent(
                             subtitle = "Cached audio, artwork and lyrics",
                             onClick = { showCachePlaylist = true }
                         ) {
-                            Icon(Icons.Default.Folder, null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
+                            Icon(Icons.Rounded.Folder, null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
                         }
                     } else {
                         DsmusicLibraryGridTile(
@@ -1814,7 +1814,7 @@ private fun PlaylistsTabContent(
                             iconColor = DsmusicTheme.colorScheme.onPrimaryContainer,
                             onClick = { showCachePlaylist = true }
                         ) {
-                            Icon(Icons.Default.Folder, null, modifier = Modifier.size(42.dp), tint = DsmusicTheme.colorScheme.onPrimaryContainer)
+                            Icon(Icons.Rounded.Folder, null, modifier = Modifier.size(42.dp), tint = DsmusicTheme.colorScheme.onPrimaryContainer)
                         }
                     }
                 }
@@ -1827,7 +1827,7 @@ private fun PlaylistsTabContent(
                             iconBackground = DsmusicTheme.colorScheme.secondaryContainer,
                             onClick = { showCreatePlaylistDialog = true }
                         ) {
-                            Icon(Icons.Default.Add, null, tint = DsmusicTheme.colorScheme.onSecondaryContainer)
+                            Icon(Icons.Rounded.Add, null, tint = DsmusicTheme.colorScheme.onSecondaryContainer)
                         }
                     } else {
                         DsmusicLibraryGridTile(
@@ -1836,7 +1836,7 @@ private fun PlaylistsTabContent(
                             iconColor = DsmusicTheme.colorScheme.onSecondaryContainer,
                             onClick = { showCreatePlaylistDialog = true }
                         ) {
-                            Icon(Icons.Default.Add, null, modifier = Modifier.size(42.dp), tint = DsmusicTheme.colorScheme.onSecondaryContainer)
+                            Icon(Icons.Rounded.Add, null, modifier = Modifier.size(42.dp), tint = DsmusicTheme.colorScheme.onSecondaryContainer)
                         }
                     }
                 }
@@ -1852,7 +1852,7 @@ private fun PlaylistsTabContent(
                             subtitle = "On this device",
                             onClick = { selectedLocalPlaylist = playlist }
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
+                            Icon(Icons.AutoMirrored.Rounded.PlaylistPlay, null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
                         }
                     } else {
                         DsmusicLibraryGridTile(
@@ -1862,7 +1862,7 @@ private fun PlaylistsTabContent(
                             onClick = { selectedLocalPlaylist = playlist }
                         ) {
                             Icon(
-                                Icons.AutoMirrored.Filled.PlaylistPlay,
+                                Icons.AutoMirrored.Rounded.PlaylistPlay,
                                 null,
                                 modifier = Modifier.size(42.dp),
                                 tint = DsmusicTheme.colorScheme.onPrimaryContainer
@@ -1965,7 +1965,7 @@ private fun LocalPlaylistDetailsScreen(
                 ) {
                     DsmusicIconButton(onClick = onDismiss) {
                         Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
+                            Icons.AutoMirrored.Rounded.ArrowBack,
                             contentDescription = "Back to Library",
                             tint = DsmusicTheme.colorScheme.onSurface
                         )
@@ -1986,7 +1986,7 @@ private fun LocalPlaylistDetailsScreen(
                         }
                     ) {
                         Icon(
-                            Icons.Default.Delete,
+                            Icons.Rounded.Delete,
                             contentDescription = "Delete playlist",
                             tint = DsmusicTheme.colorScheme.error
                         )
@@ -2024,7 +2024,7 @@ private fun LocalPlaylistDetailsScreen(
                                     )
                                 } else {
                                     Icon(
-                                        Icons.AutoMirrored.Filled.PlaylistPlay,
+                                        Icons.AutoMirrored.Rounded.PlaylistPlay,
                                         contentDescription = null,
                                         tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(72.dp)
@@ -2052,7 +2052,7 @@ private fun LocalPlaylistDetailsScreen(
                                         },
                                         modifier = Modifier.weight(1f)
                                     ) {
-                                        Icon(Icons.Default.PlayArrow, null)
+                                        Icon(Icons.Rounded.PlayArrow, null)
                                         Spacer(Modifier.width(8.dp))
                                         Text("Play All")
                                     }
@@ -2065,7 +2065,7 @@ private fun LocalPlaylistDetailsScreen(
                                         },
                                         modifier = Modifier.weight(1f)
                                     ) {
-                                        Icon(Icons.Default.Shuffle, null)
+                                        Icon(Icons.Rounded.Shuffle, null)
                                         Spacer(Modifier.width(8.dp))
                                         Text("Shuffle")
                                     }
@@ -2135,7 +2135,7 @@ private fun LocalPlaylistDetailsScreen(
                                             )
                                         } else {
                                             Icon(
-                                                Icons.Default.MusicNote,
+                                                Icons.Rounded.MusicNote,
                                                 null,
                                                 tint = DsmusicTheme.colorScheme.onSurfaceVariant
                                             )
@@ -2167,7 +2167,7 @@ private fun LocalPlaylistDetailsScreen(
                                         }
                                     ) {
                                         Icon(
-                                            Icons.Default.Close,
+                                            Icons.Rounded.Close,
                                             contentDescription = "Remove song",
                                             tint = DsmusicTheme.colorScheme.onSurfaceVariant
                                         )
@@ -2218,7 +2218,7 @@ private fun OnlinePlaylistCard(
                         Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(DsmusicTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
+                        Icon(Icons.AutoMirrored.Rounded.PlaylistPlay, null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
                     }
                 }
             },
@@ -2256,7 +2256,7 @@ private fun OnlinePlaylistCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            Icons.Default.MusicNote,
+                            Icons.Rounded.MusicNote,
                             null,
                             tint = DsmusicTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(48.dp)
@@ -2328,7 +2328,7 @@ private fun PodcastsTabContent(nestedScrollConnection: androidx.compose.ui.input
                     verticalArrangement = Arrangement.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Podcasts,
+                        imageVector = Icons.Rounded.Podcasts,
                         contentDescription = null,
                         modifier = Modifier
                             .size(80.dp)
@@ -2433,7 +2433,7 @@ private fun SongsTabContent(nestedScrollConnection: androidx.compose.ui.input.ne
                                     contentScale = ContentScale.Crop
                                 )
                             } else {
-                                Icon(Icons.Default.MusicNote, null, modifier = Modifier.size(48.dp))
+                                Icon(Icons.Rounded.MusicNote, null, modifier = Modifier.size(48.dp))
                             }
                         },
                         colors = ListItemDefaults.colors(containerColor = DsmusicTheme.colorScheme.surfaceContainer),
@@ -2554,7 +2554,7 @@ private fun OnlineAlbumCard(
                         Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(DsmusicTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Album, null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
+                        Icon(Icons.Rounded.Album, null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
                     }
                 }
             },
@@ -2596,7 +2596,7 @@ private fun OnlineAlbumCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            Icons.Default.Album,
+                            Icons.Rounded.Album,
                             null,
                             tint = DsmusicTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(48.dp)
@@ -2714,7 +2714,7 @@ private fun OnlineArtistCard(
                         Modifier.size(56.dp).clip(CircleShape).background(DsmusicTheme.colorScheme.surfaceContainerHigh),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Person, null, tint = DsmusicTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Rounded.Person, null, tint = DsmusicTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             },
@@ -2756,7 +2756,7 @@ private fun OnlineArtistCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Person,
+                        imageVector = Icons.Rounded.Person,
                         contentDescription = null,
                         tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(48.dp)
@@ -3017,7 +3017,7 @@ private fun RecapTabContent(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
-                            Icons.Default.BarChart,
+                            Icons.Rounded.BarChart,
                             contentDescription = null,
                             tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
                             modifier = Modifier.size(56.dp)
@@ -3107,7 +3107,7 @@ private fun RecapTabContent(
                                         Modifier.size(54.dp).clip(RoundedCornerShape(10.dp))
                                             .background(DsmusicTheme.colorScheme.surfaceVariant),
                                         contentAlignment = Alignment.Center
-                                    ) { Icon(Icons.Default.MusicNote, null) }
+                                    ) { Icon(Icons.Rounded.MusicNote, null) }
                                 }
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
@@ -3130,7 +3130,7 @@ private fun RecapTabContent(
                         modifier = Modifier.weight(1f).height(48.dp),
                         enabled = topSongs.isNotEmpty()
                     ) {
-                        Icon(Icons.Default.PlayArrow, null)
+                        Icon(Icons.Rounded.PlayArrow, null)
                         Spacer(Modifier.width(6.dp))
                         Text("Play")
                     }
@@ -3139,7 +3139,7 @@ private fun RecapTabContent(
                         modifier = Modifier.weight(1f).height(48.dp),
                         enabled = topSongs.isNotEmpty()
                     ) {
-                        Icon(Icons.Default.Shuffle, null)
+                        Icon(Icons.Rounded.Shuffle, null)
                         Spacer(Modifier.width(6.dp))
                         Text("Shuffle")
                     }
@@ -3166,7 +3166,7 @@ private fun RecapTabContent(
                                 }
                             }
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.PlaylistPlay, "Save Replay playlist")
+                            Icon(Icons.AutoMirrored.Rounded.PlaylistPlay, "Save Replay playlist")
                         }
                     }
                 }
@@ -3229,7 +3229,7 @@ private fun RecapTabContent(
                                                 .background(DsmusicTheme.colorScheme.secondaryContainer),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Icon(Icons.Default.Person, null, modifier = Modifier.size(36.dp))
+                                            Icon(Icons.Rounded.Person, null, modifier = Modifier.size(36.dp))
                                         }
                                     }
                                     Spacer(Modifier.height(6.dp))
@@ -3283,7 +3283,7 @@ private fun RecapTabContent(
                             Modifier.size(52.dp).clip(RoundedCornerShape(10.dp))
                                 .background(DsmusicTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center
-                        ) { Icon(Icons.Default.MusicNote, null) }
+                        ) { Icon(Icons.Rounded.MusicNote, null) }
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
@@ -3634,7 +3634,7 @@ private fun StreamCacheTabContent(
                             enabled = cacheQueue.isNotEmpty(),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                            Icon(Icons.Rounded.PlayArrow, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                             Text("Play all")
                         }
@@ -3643,7 +3643,7 @@ private fun StreamCacheTabContent(
                             enabled = cacheQueue.isNotEmpty(),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Filled.Shuffle, contentDescription = null)
+                            Icon(Icons.Rounded.Shuffle, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                             Text("Shuffle")
                         }
@@ -3675,7 +3675,7 @@ private fun StreamCacheTabContent(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Icon(
-                        Icons.Default.MusicNote,
+                        Icons.Rounded.MusicNote,
                         contentDescription = null,
                         modifier = Modifier.size(42.dp),
                         tint = DsmusicTheme.colorScheme.onSurfaceVariant
@@ -3725,7 +3725,7 @@ private fun StreamCacheTabContent(
                     },
                     trailingContent = {
                         Icon(
-                            if (isCurrentSong) Icons.Filled.PlayArrow else Icons.AutoMirrored.Filled.PlaylistPlay,
+                            if (isCurrentSong) Icons.Rounded.PlayArrow else Icons.AutoMirrored.Rounded.PlaylistPlay,
                             contentDescription = if (isCurrentSong) "Now playing" else "Play cached song",
                             tint = if (isCurrentSong) DsmusicTheme.colorScheme.primary
                                 else DsmusicTheme.colorScheme.onSurfaceVariant
