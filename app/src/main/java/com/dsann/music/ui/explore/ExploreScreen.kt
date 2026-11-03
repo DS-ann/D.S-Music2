@@ -875,32 +875,19 @@ fun ExploreScreen(
                                                                                 }
                                                                             ) { item ->
                                                                                 SearchBrowseCard(
-
                                                                                     item = item,
-
                                                                                     onClick = { activateSearchItem(item) },
-
                                                                                     onLongClick = {
-
                                                                                         when (item) {
-
                                                                                             is SearchItem.Song -> selectedSongForMenu = item.song
-                                                                                             is SearchItem.Album, is SearchItem.Playlist -> {
-
+                                                                                            is SearchItem.Album, is SearchItem.Playlist -> {
                                                                                                 selectedCollectionForMenu = item
-
                                                                                                 selectedCollectionMenuSongs = null
                                                                                                 selectedCollectionMenuContinuation = null
-
                                                                                             }
-                                                                                             is SearchItem.Artist -> Unit
-
-                                                                                            else -> Unit
-
+                                                                                            is SearchItem.Artist -> Unit
                                                                                         }
-
                                                                                     }
-
                                                                                 )
                                                                             }
                                                                         }
@@ -1259,7 +1246,6 @@ fun ExploreScreen(
                         onDismissRequest = {
                             selectedCollectionForMenu = null
                             selectedCollectionMenuSongs = null
-                            selectedCollectionMenuContinuation = null
                             selectedCollectionMenuContinuation = null
                         },
                         onAddToPlaylist = { songs ->
