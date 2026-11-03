@@ -881,7 +881,7 @@ fun HomeSectionRow(
                             isFeature = true,
                             onClick = {
                                 when (val it = items[0]) {
-                                    is SearchItem.Song -> onSongClick(it.song)
+                                    is SearchItem.Song -> onSongMenuClick(it.song)
                                     is SearchItem.Album -> onAlbumClick(it.album)
                                     is SearchItem.Artist -> onArtistClick(it.artist)
                                     is SearchItem.Playlist -> onPlaylistClick(it.playlist)
@@ -892,7 +892,7 @@ fun HomeSectionRow(
                         Column(modifier = Modifier.weight(0.75f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             BentoCell(item = items[1], modifier = Modifier.weight(1f).fillMaxWidth(), onClick = {
                                 when (val it = items[1]) {
-                                    is SearchItem.Song -> onSongClick(it.song)
+                                    is SearchItem.Song -> onSongMenuClick(it.song)
                                     is SearchItem.Album -> onAlbumClick(it.album)
                                     is SearchItem.Artist -> onArtistClick(it.artist)
                                     is SearchItem.Playlist -> onPlaylistClick(it.playlist)
@@ -900,7 +900,7 @@ fun HomeSectionRow(
                             })
                             BentoCell(item = items[2], modifier = Modifier.weight(1f).fillMaxWidth(), onClick = {
                                 when (val it = items[2]) {
-                                    is SearchItem.Song -> onSongClick(it.song)
+                                    is SearchItem.Song -> onSongMenuClick(it.song)
                                     is SearchItem.Album -> onAlbumClick(it.album)
                                     is SearchItem.Artist -> onArtistClick(it.artist)
                                     is SearchItem.Playlist -> onPlaylistClick(it.playlist)
@@ -912,7 +912,7 @@ fun HomeSectionRow(
                         // Lower row wide tiles
                         BentoCell(item = items[3], modifier = Modifier.weight(1f).fillMaxHeight(), onClick = {
                             when (val it = items[3]) {
-                                is SearchItem.Song -> onSongClick(it.song)
+                                is SearchItem.Song -> onSongMenuClick(it.song)
                                 is SearchItem.Album -> onAlbumClick(it.album)
                                 is SearchItem.Artist -> onArtistClick(it.artist)
                                 is SearchItem.Playlist -> onPlaylistClick(it.playlist)
@@ -920,12 +920,59 @@ fun HomeSectionRow(
                         })
                         BentoCell(item = items[4], modifier = Modifier.weight(1f).fillMaxHeight(), onClick = {
                             when (val it = items[4]) {
-                                is SearchItem.Song -> onSongClick(it.song)
+                                is SearchItem.Song -> onSongMenuClick(it.song)
                                 is SearchItem.Album -> onAlbumClick(it.album)
                                 is SearchItem.Artist -> onArtistClick(it.artist)
                                 is SearchItem.Playlist -> onPlaylistClick(it.playlist)
                             }
                         })
+                    }
+                    // The Bento layout uses five featured cards. Keep every remaining
+                    // recommendation reachable instead of silently dropping the rest.
+                    if (items.size > 5) {
+                        val additionalItems = items.drop(5)
+                        val additionalRowState = rememberLazyListState()
+                        val additionalImageUrls = remember(additionalItems) {
+                            additionalItems.map { it.exploreThumbnailUrl() }
+                        }
+                        PrefetchExploreRowImages(
+                            additionalImageUrls,
+                            additionalRowState,
+                            targetSizePx = 256
+                        )
+                        LazyRow(
+                            state = additionalRowState,
+                            contentPadding = PaddingValues(horizontal = 2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            itemsIndexed(
+                                items = additionalItems,
+                                key = { index, item ->
+                                    val itemKey = when (item) {
+                                        is SearchItem.Song -> "song-${item.song.videoId}"
+                                        is SearchItem.Album -> "album-${item.album.browseId}"
+                                        is SearchItem.Artist -> "artist-${item.artist.browseId}"
+                                        is SearchItem.Playlist -> "playlist-${item.playlist.playlistId}"
+                                    }
+                                    "mix-extra-$index-$itemKey"
+                                }
+                            ) { _, item ->
+                                HomeCarouselItem(
+                                    item = item,
+                                    isPlaying = item is SearchItem.Song &&
+                                        item.song.videoId == currentOnlineSong?.videoId,
+                                    onClick = {
+                                        when (item) {
+                                            is SearchItem.Song -> onSongMenuClick(item.song)
+                                            is SearchItem.Album -> onAlbumClick(item.album)
+                                            is SearchItem.Artist -> onArtistClick(item.artist)
+                                            is SearchItem.Playlist -> onPlaylistClick(item.playlist)
+                                        }
+                                    },
+                                    modifier = Modifier.width(144.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -957,7 +1004,7 @@ fun HomeSectionRow(
                                         .clip(RoundedCornerShape(12.dp))
                                         .clickable {
                                             when (item) {
-                                                is SearchItem.Song -> onSongClick(item.song)
+                                                is SearchItem.Song -> onSongMenuClick(item.song)
                                                 is SearchItem.Album -> onAlbumClick(item.album)
                                                 is SearchItem.Artist -> onArtistClick(item.artist)
                                                 is SearchItem.Playlist -> onPlaylistClick(item.playlist)
