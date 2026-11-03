@@ -1390,6 +1390,19 @@ object InnerTubeParser {
             ?: json.path("contents.twoColumnBrowseResultsRenderer.secondaryContents.sectionListRenderer.contents.0.musicPlaylistShelfRenderer.continuations.0.nextContinuationData.continuation")?.asString
     }
 
+    /**
+     * Parse playlist shelf continuation pages into playable songs while preserving the next
+     * token for bulk collection actions.
+     */
+    fun parsePlaylistContinuationSongs(json: JsonObject): Pair<List<OnlineSong>, String?> {
+        val (items, nextToken) = extractContinuationItemsAndNextToken(json)
+        val songs = items?.mapNotNull { element ->
+            val item = element.takeIf { it.isJsonObject }?.asJsonObject ?: return@mapNotNull null
+            (parseSearchItem(item) as? SearchItem.Song)?.song
+        }.orEmpty()
+        return songs to nextToken
+    }
+
     fun extractContinuationItemsAndNextToken(json: JsonObject): Pair<JsonArray?, String?> {
         val gridItems = json.path("continuationContents.gridContinuation.items")?.asJsonArray
             ?: json.path("continuationContents.musicGridContinuation.items")?.asJsonArray
