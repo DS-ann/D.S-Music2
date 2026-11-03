@@ -153,7 +153,9 @@ fun ShimmerModifier(
 fun Modifier.shimmerEffect(): Modifier {
     // Cached/inactive tabs stay static. Visible shimmer samples the shared app frame clock.
     val staticShimmerColor = DsmusicTheme.colorScheme.surfaceContainerHigh
-    if (!LocalRootTabActive.current) {
+    // Android 6's software-accelerated drawing path struggles with continuously
+    // invalidated gradient placeholders. Keep the skeleton static on API 23.
+    if (!LocalRootTabActive.current || Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
         return this.background(staticShimmerColor)
     }
 
@@ -810,6 +812,9 @@ internal fun PrefetchExploreHomeSectionImages(
 ) {
     val context = LocalContext.current
     val imageLoader = context.imageLoader
+    // On API 23, decoding off-screen images competes with list layout/drawing. Visible
+    // Coil requests are already capped to 60 px, so let LazyRows load only what enters view.
+    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) return
     LaunchedEffect(state, sections, sectionsAhead, imagesPerSection, imageLoader) {
         snapshotFlow {
             state.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -2064,6 +2069,8 @@ private fun PrefetchExploreRowImages(
 ) {
     val context = LocalContext.current
     val imageLoader = context.imageLoader
+    // Avoid background image decode bursts while an API 23 user is scrolling.
+    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) return
     LaunchedEffect(state, thumbnailUrls, targetSizePx, lookAheadCount, imageLoader) {
         snapshotFlow {
             state.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
