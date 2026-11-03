@@ -36,11 +36,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Face
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlayArrow
 import com.dsann.music.ui.theme.Card
 import com.dsann.music.ui.theme.CardDefaults
 import com.dsann.music.ui.theme.Icon
@@ -445,13 +445,13 @@ private fun CoverArtCard(
                 ExpressiveButton(
                     onClick = onChange,
                     text = "Change",
-                    icon = Icons.Filled.Add,
+                    icon = Icons.Rounded.Add,
                     modifier = Modifier.weight(1f)
                 )
                 ExpressiveButton(
                     onClick = onDownload,
                     text = "Save to Phone",
-                    icon = Icons.Filled.Download,
+                    icon = Icons.Rounded.Download,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -578,9 +578,9 @@ private fun TagEditorScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    CustomInputField(label = "Title", value = title, onValueChange = { title = it }, icon = Icons.Filled.PlayArrow)
-                    CustomInputField(label = "Artist", value = artist, onValueChange = { artist = it }, icon = Icons.Filled.Person)
-                    CustomInputField(label = "Album", value = album, onValueChange = { album = it }, icon = Icons.Filled.Face)
+                    CustomInputField(label = "Title", value = title, onValueChange = { title = it }, icon = Icons.Rounded.PlayArrow)
+                    CustomInputField(label = "Artist", value = artist, onValueChange = { artist = it }, icon = Icons.Rounded.Person)
+                    CustomInputField(label = "Album", value = album, onValueChange = { album = it }, icon = Icons.Rounded.Face)
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -631,9 +631,9 @@ private fun TagEditorScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                CustomInputField(label = "Title", value = title, onValueChange = { title = it }, icon = Icons.Filled.PlayArrow)
-                CustomInputField(label = "Artist", value = artist, onValueChange = { artist = it }, icon = Icons.Filled.Person)
-                CustomInputField(label = "Album", value = album, onValueChange = { album = it }, icon = Icons.Filled.Face)
+                CustomInputField(label = "Title", value = title, onValueChange = { title = it }, icon = Icons.Rounded.PlayArrow)
+                CustomInputField(label = "Artist", value = artist, onValueChange = { artist = it }, icon = Icons.Rounded.Person)
+                CustomInputField(label = "Album", value = album, onValueChange = { album = it }, icon = Icons.Rounded.Face)
 
                 Spacer(modifier = Modifier.height(32.dp))
 
