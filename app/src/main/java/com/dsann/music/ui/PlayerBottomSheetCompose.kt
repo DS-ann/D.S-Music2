@@ -1334,6 +1334,17 @@ fun PlayerBottomSheetCompose(
             miniPlayerStyle != "Card"
         ) 0.dp else if (currentSheetContentState == PlayerSheetState.COLLAPSED) 6.dp else 0.dp
 
+        // In landscape, keep the collapsed mini-player at half the usable tab width.
+        // Center it in the content area (to the right of the navigation rail), then
+        // expand it back to the full tab width with the full-player transition.
+        val playerShellWidthFraction by animateFloatAsState(
+            targetValue = if (
+                isLandscapeWindow && currentSheetContentState == PlayerSheetState.COLLAPSED
+            ) 0.5f else 1f,
+            animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+            label = "LandscapeMiniPlayerWidth"
+        )
+
         val velocityTracker = remember { VelocityTracker() }
         
         val sheetVerticalDragGestureHandler = remember(density) {
@@ -1374,7 +1385,8 @@ fun PlayerBottomSheetCompose(
         if (showPlayerContentArea) {
             DsmusicSurface(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth(playerShellWidthFraction)
                     .offset { IntOffset(0, sheetVisualState.visualSheetTranslationYProvider().roundToInt()) }
                     .height(containerHeight),
                 color = Color.Transparent
