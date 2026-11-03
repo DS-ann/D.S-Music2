@@ -1349,14 +1349,20 @@ private fun UnifiedLibraryContent(
                 LibraryCategoryItem("Podcasts", "Podcast library", Icons.Default.Podcasts) {
                     navigateToTab.value("Podcasts")
                 },
-                LibraryCategoryItem("Recap", "Your listening recap", Icons.Default.BarChart) {
-                    navigateToTab.value("Recap")
-                },
                 LibraryCategoryItem("Downloaded songs", "Music saved on this device", Icons.AutoMirrored.Filled.QueueMusic) {
                     navigateToTab.value("Downloaded songs")
                 },
             )
         )
+
+        // Keep the unsupported Recap destination out of Library's category grid too.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            list.add(
+                LibraryCategoryItem("Recap", "Your listening recap", Icons.Default.BarChart) {
+                    navigateToTab.value("Recap")
+                }
+            )
+        }
 
         onlinePlaylists.forEach { playlist ->
             list.add(object : UnifiedLibraryItem {
