@@ -34,14 +34,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.rounded.Clear
+import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Shuffle
 import com.dsann.music.ui.theme.Button
 import com.dsann.music.ui.theme.FilterChip
 import com.dsann.music.ui.theme.FilterChipDefaults
@@ -260,7 +260,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                     }
                 }
             ) {
-                Icon(Icons.Default.Refresh, contentDescription = "Rescan local music")
+                Icon(Icons.Rounded.Refresh, contentDescription = "Rescan local music")
             }
         }
 
@@ -277,11 +277,11 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     placeholder = { Text("Search local music") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
                             DsmusicIconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                                Icon(Icons.Rounded.Clear, contentDescription = "Clear search")
                             }
                         }
                     },
@@ -312,7 +312,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                         },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        Icon(Icons.Rounded.PlayArrow, contentDescription = null)
                         Spacer(Modifier.padding(horizontal = 2.dp))
                         Text("Play all")
                     }
@@ -325,7 +325,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                         },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.Shuffle, contentDescription = null)
+                        Icon(Icons.Rounded.Shuffle, contentDescription = null)
                         Spacer(Modifier.padding(horizontal = 2.dp))
                         Text("Shuffle")
                     }
@@ -366,7 +366,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                             currentFolderPath = storageRootPath
                         },
                         label = { Text("Folders", maxLines = 1) },
-                        leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) },
+                        leadingIcon = { Icon(Icons.Rounded.Folder, contentDescription = null) },
                         border = null,
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = DsmusicTheme.colorScheme.surfaceContainerHigh,
@@ -426,7 +426,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                                 .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.ChevronLeft, contentDescription = "Parent folder")
+                            Icon(Icons.Rounded.ChevronLeft, contentDescription = "Parent folder")
                             Column(modifier = Modifier.padding(start = 10.dp)) {
                                 Text("..", fontWeight = FontWeight.SemiBold)
                                 Text(
@@ -456,7 +456,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                Icons.Default.Folder,
+                                Icons.Rounded.Folder,
                                 contentDescription = "Folder",
                                 tint = DsmusicTheme.colorScheme.primary
                             )
@@ -474,7 +474,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                                 )
                             }
                             Icon(
-                                Icons.Default.ChevronRight,
+                                Icons.Rounded.ChevronRight,
                                 contentDescription = "Open folder",
                                 tint = DsmusicTheme.colorScheme.onSurfaceVariant
                             )
