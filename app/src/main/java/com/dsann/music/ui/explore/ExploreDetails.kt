@@ -86,7 +86,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.dsann.music.data.innertube.AlbumPage
 import com.dsann.music.data.innertube.ArtistPage
 import com.dsann.music.data.innertube.HomeSection
@@ -664,7 +663,7 @@ fun AdaptiveDetailContainer(
                         .clip(if (isCircular) CircleShape else RoundedCornerShape(24.dp))
 
                     AsyncImage(
-                        model = thumbnailUrl,
+                        model = rememberExploreImageRequest(thumbnailUrl, 512),
                         contentDescription = null,
                         modifier = if (sharedElementKey != null) {
                             baseModifier.sharedElementIfAvailable("image-$sharedElementKey")
@@ -783,7 +782,7 @@ fun AdaptiveDetailContainer(
                     translationY = scrollOffset
                 }
                 AsyncImage(
-                    model = thumbnailUrl,
+                    model = rememberExploreImageRequest(thumbnailUrl, 512),
                     contentDescription = null,
                     modifier = if (sharedElementKey != null) {
                         baseModifier.sharedElementIfAvailable("image-$sharedElementKey")
@@ -892,7 +891,7 @@ fun ArtistTopSongItem(
     ) {
         Box(modifier = Modifier.size(56.dp)) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current).data(song.thumbnailUrl).crossfade(false).build(),
+                model = rememberExploreImageRequest(song.thumbnailUrl, 128),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp)),
                 contentScale = ContentScale.Crop
