@@ -878,13 +878,15 @@ fun ExploreScreen(
 
                                                                                         when (item) {
 
-                                                                                            is SearchItem.Album, is SearchItem.Playlist -> {
+                                                                                            is SearchItem.Song -> selectedSongForMenu = item.song
+                                                                                             is SearchItem.Album, is SearchItem.Playlist -> {
 
                                                                                                 selectedCollectionForMenu = item
 
                                                                                                 selectedCollectionMenuSongs = null
 
                                                                                             }
+                                                                                             is SearchItem.Artist -> Unit
 
                                                                                             else -> Unit
 
