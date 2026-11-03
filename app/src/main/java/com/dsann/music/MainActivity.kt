@@ -125,6 +125,7 @@ class MainActivity : AppCompatActivity() {
 
     private val playerViewModel: PlayerSharedViewModel by viewModels()
     private val exploreViewModel: ExploreViewModel by viewModels()
+    private val searchViewModel: ExploreViewModel by viewModels(key = "search")
 
     private var navController: NavController? = null
     private var previousDestination = "explore"
@@ -351,7 +352,8 @@ class MainActivity : AppCompatActivity() {
                         else -> null
                     }
                     LaunchedEffect(currentDestination?.route) {
-                        exploreViewModel.setExplorePageActive(currentDestination?.route == "explore" || currentDestination?.route == "search")
+                        exploreViewModel.setExplorePageActive(currentDestination?.route == "explore")
+                        searchViewModel.setExplorePageActive(currentDestination?.route == "search")
                     }
                     val showBottomBar = !isPlayerExpanded && currentDestination?.route in listOf("explore", "search", "library", "local_music", "settings")
                     // Keep the rail persistent in wide layouts; scroll-driven bottom-bar hiding is phone-only.
@@ -478,7 +480,7 @@ class MainActivity : AppCompatActivity() {
                                             }
                                         )
                                         "search" -> ExploreScreen(
-                                            viewModel = exploreViewModel,
+                                            viewModel = searchViewModel,
                                             playerSharedViewModel = playerViewModel,
                                             isSearchDestination = true,
                                             onNavigateToLibrary = {
@@ -491,7 +493,7 @@ class MainActivity : AppCompatActivity() {
                                                 }
                                             },
                                             onLeaveSearchDestination = {
-                                                exploreViewModel.clearSearch()
+                                                searchViewModel.clearSearch()
                                                 currentNavController.navigate("explore") {
                                                     popUpTo(currentNavController.graph.findStartDestination().id) {
                                                         saveState = true
@@ -668,13 +670,13 @@ class MainActivity : AppCompatActivity() {
                                             )
                                             if (navLabelsMode == "Always" || (navLabelsMode == "Selected" && selected)) {
                                                 BasicText(
-                                                    text = label,
+                                                    text = if (label == "Local Music") "Local\nMusic" else label,
                                                     style = DsmusicTheme.typography.labelSmall.copy(
                                                         color = tint,
                                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
                                                     ),
-                                                    maxLines = 1,
-                                                    modifier = Modifier.padding(top = 2.dp)
+                                                    maxLines = 2,
+                                                    modifier = Modifier.padding(top = 2.dp).width(64.dp)
                                                 )
                                             }
                                         }
