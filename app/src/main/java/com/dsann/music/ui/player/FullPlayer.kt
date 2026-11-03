@@ -491,9 +491,12 @@ private fun LandscapePlayerDetailsPane(
                         plainLyrics.lineSequence().filter { it.isNotBlank() }.forEach { line ->
                             Text(
                                 text = line,
-                                color = if (lyricsColorStyle == "Dynamic (Gradient)") {
-                                    Color.Unspecified
-                                } else contentColor.copy(alpha = 0.88f),
+                                color = when (lyricsColorStyle) {
+                                    "Dynamic (Gradient)" -> Color.Unspecified
+                                    "White" -> Color.White
+                                    "UI Matching" -> accentColor
+                                    else -> contentColor.copy(alpha = 0.88f)
+                                },
                                 style = DsmusicTheme.typography.bodyLarge.copy(
                                     brush = if (lyricsColorStyle == "Dynamic (Gradient)") {
                                         Brush.horizontalGradient(listOf(accentColor, contentColor))
