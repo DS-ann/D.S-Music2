@@ -32,6 +32,9 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
@@ -885,6 +888,43 @@ class DsmusicSheetState(val skipPartiallyExpanded: Boolean = true) {
 @Composable
 fun rememberModalBottomSheetState(skipPartiallyExpanded: Boolean = true): DsmusicSheetState = remember { DsmusicSheetState(skipPartiallyExpanded) }
 
+data class DsmusicModalSheetGeometry(
+    val width: Dp,
+    val centerOffsetX: Dp
+)
+
+/**
+ * Match contextual windows to the landscape mini-player: half of the usable tab area,
+ * centered within that area rather than underneath the left navigation rail.
+ */
+@Composable
+fun rememberDsmusicModalSheetGeometry(): DsmusicModalSheetGeometry {
+    val configuration = LocalConfiguration.current
+    val context = LocalContext.current
+    val layoutDirection = LocalLayoutDirection.current
+    val preferences = remember(context) {
+        context.getSharedPreferences("AppSettings", android.content.Context.MODE_PRIVATE)
+    }
+    val navSize = remember(preferences) { preferences.getString("nav_bar_size", "Standard") ?: "Standard" }
+    val navStyle = remember(preferences) { preferences.getString("nav_bar_style", "Floating") ?: "Floating" }
+    val useNavigationRail = configuration.screenWidthDp >= 600
+    val railWidth = when (navSize) {
+        "Compact" -> 68.dp
+        "Tall" -> 84.dp
+        else -> 76.dp
+    }
+    val outerGap = if (navStyle == "Docked") 0.dp else 12.dp
+    val systemStartInset = if (useNavigationRail) {
+        WindowInsets.navigationBars.asPaddingValues().calculateStartPadding(layoutDirection)
+    } else 0.dp
+    val totalRailInset = if (useNavigationRail) systemStartInset + railWidth + outerGap else 0.dp
+    val usableTabWidth = (configuration.screenWidthDp.dp - totalRailInset).coerceAtLeast(0.dp)
+    return DsmusicModalSheetGeometry(
+        width = usableTabWidth * 0.5f,
+        centerOffsetX = totalRailInset * 0.5f
+    )
+}
+
 @Composable
 fun ModalBottomSheet(
     onDismissRequest: () -> Unit,
@@ -899,14 +939,28 @@ fun ModalBottomSheet(
     dragHandle: (@Composable () -> Unit)? = { BottomSheetDefaults.DragHandle() },
     windowInsets: WindowInsets = WindowInsets(0, 0, 0, 0),
     properties: DialogProperties = DialogProperties(usePlatformDefaultWidth = false),
+    centeredLandscape: Boolean = false,
+    centerOffsetX: Dp = 0.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val isLandscapeWindow = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val useCenteredLandscape = centeredLandscape && isLandscapeWindow
     if (sheetState.isVisible) {
         Dialog(onDismissRequest = { onDismissRequest(); sheetState.isVisible = false }, properties = properties) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+            Box(
+                Modifier.fillMaxSize(),
+                contentAlignment = if (useCenteredLandscape) Alignment.Center else Alignment.BottomCenter
+            ) {
                 Box(Modifier.fillMaxSize().background(scrimColor).clickable { onDismissRequest(); sheetState.isVisible = false })
                 Column(
-                    modifier = modifier.fillMaxWidth().widthIn(max = sheetMaxWidth).clip(shape).background(containerColor).padding(bottom = 12.dp),
+                    modifier = modifier
+                        .fillMaxWidth()
+                        .widthIn(max = sheetMaxWidth)
+                        .then(if (useCenteredLandscape) Modifier.offset(x = centerOffsetX) else Modifier)
+                        .clip(shape)
+                        .background(containerColor)
+                        .border(1.25.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.88f), shape)
+                        .padding(bottom = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     dragHandle?.invoke()
