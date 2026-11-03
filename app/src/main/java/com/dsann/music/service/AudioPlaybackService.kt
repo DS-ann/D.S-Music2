@@ -989,7 +989,16 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        if (mediaSession?.player?.playWhenReady == false) stopSelf()
+        val hasInstalledWidgets = DsmusicWidgetProvider.hasAnyWidgets(applicationContext)
+        if (mediaSession?.player?.playWhenReady == false && !hasInstalledWidgets) {
+            stopSelf()
+        } else if (hasInstalledWidgets && isPlayerInitialized) {
+            // A launcher widget is a playback surface in its own right. Do not tear down
+            // the paused MediaSession when the user dismisses MainActivity from Recents;
+            // that would invalidate widget actions and the dynamic screen-wake receiver.
+            updateWidgetState(player.isPlaying)
+            Log.i(TAG, "Keeping playback service alive for installed home-screen widgets")
+        }
         super.onTaskRemoved(rootIntent)
     }
 
