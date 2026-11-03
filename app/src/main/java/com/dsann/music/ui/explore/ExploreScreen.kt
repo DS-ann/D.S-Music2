@@ -146,6 +146,19 @@ val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> 
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
+private fun ExploreTransitionHost(
+    enabled: Boolean,
+    content: @Composable (SharedTransitionScope?) -> Unit
+) {
+    if (enabled) {
+        SharedTransitionLayout { content(this) }
+    } else {
+        content(null)
+    }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
 fun Modifier.sharedElementIfAvailable(key: String): Modifier {
     if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) return this
     val sharedScope = LocalSharedTransitionScope.current
@@ -495,8 +508,10 @@ fun ExploreScreen(
         ) {
             // ===== Main Content (Now encapsulates scrolling headers) =====
             Box(modifier = Modifier.fillMaxSize().nestedScroll(nestedScrollConnection)) {
-                SharedTransitionLayout {
-                    CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+                ExploreTransitionHost(
+                    enabled = android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.M
+                ) { sharedTransitionScope ->
+                    CompositionLocalProvider(LocalSharedTransitionScope provides sharedTransitionScope) {
                         // Keep full-page transitions responsive; the previous default motion
                         // scheme made heavy list/detail swaps feel unnecessarily slow.
                         val spatialSpec = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(
@@ -510,6 +525,14 @@ fun ExploreScreen(
 
                         AnimatedContent(
                             targetState = currentScreen,
+                            // Keep API 23 on one content identity. It has no shared-element
+                            // transitions, so retaining the outgoing page only adds another
+                            // large list tree during navigation.
+                            contentKey = { screen ->
+                                if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) {
+                                    "android6-single-screen"
+                                } else screen
+                            },
                             // Switching between large result/detail lists should not animate two
                             // complete LazyColumn trees simultaneously on low-memory phones.
                             transitionSpec = {
