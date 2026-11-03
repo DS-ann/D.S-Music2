@@ -133,6 +133,7 @@ internal fun SyncedLyricsCompose(
     currentSong: SongItem? = null,
     selectedProvider: String? = null,
     providerResults: Map<String, LyricsResult> = emptyMap(),
+    lyricsColorStyle: String = "Dynamic (Gradient)",
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -235,10 +236,17 @@ internal fun SyncedLyricsCompose(
         }
     }
 
-    // ── Improved Apple Music-style springy auto-scroll ──
-    LaunchedEffect(activeIndex) {
-        if (activeIndex >= 0 && !listState.isScrollInProgress) {
-            performSmoothedScroll(listState, activeIndex, displayItems)
+    // ── Keep each active lyric line centred. The effect runs on line changes only:
+    // karaoke word frames update lyricClock but leave activeIndex unchanged.
+    val density = LocalDensity.current
+    LaunchedEffect(activeIndex, density) {
+        if (activeIndex >= 0) {
+            performSmoothedScroll(
+                listState,
+                activeIndex,
+                displayItems,
+                with(density) { 36.dp.roundToPx() }
+            )
         }
     }
 
@@ -330,6 +338,7 @@ internal fun SyncedLyricsCompose(
                             },
                             contentColor = contentColor,
                             accentColor = dynamicAccentColor,
+                            lyricsColorStyle = lyricsColorStyle,
                             textScale = lyricsScale,
                             alignment = lyricsAlignment,
                             fontFamilyChoice = lyricsFontFamily,
@@ -370,6 +379,7 @@ private fun LyricLineItem(
     lineEndMs: Long,
     contentColor: Color,
     accentColor: Color,
+    lyricsColorStyle: String,
     textScale: Float,
     alignment: String,
     fontFamilyChoice: String,
@@ -426,8 +436,12 @@ private fun LyricLineItem(
         "Mono" -> FontFamily.Monospace
         else -> GoogleSansFlexNonRounded
     }
-    val dimColor = contentColor.copy(alpha = 0.35f)
-    val litColor = contentColor
+    val lyricsBrush = if (lyricsColorStyle == "Dynamic (Gradient)") {
+        Brush.horizontalGradient(listOf(accentColor, contentColor))
+    } else null
+    val renderedColor = if (lyricsColorStyle == "White") Color.White else contentColor
+    val dimColor = renderedColor.copy(alpha = 0.35f)
+    val litColor = renderedColor
 
     val commonModifier = Modifier
         .fillMaxWidth()
@@ -463,6 +477,7 @@ private fun LyricLineItem(
         else -> if (line.isRightAligned) TextAlign.End else TextAlign.Start
     }
     val mainTextStyle = DsmusicTheme.typography.headlineMedium.copy(
+        brush = lyricsBrush,
         fontFamily = lyricFontFamily,
         fontSize = 38.sp * textScale,
         fontWeight = FontWeight.Bold,
@@ -472,6 +487,7 @@ private fun LyricLineItem(
     )
 
     val bracketTextStyle = DsmusicTheme.typography.bodyLarge.copy(
+        brush = lyricsBrush,
         fontFamily = GoogleSansFlexNonRounded,
         fontSize = 20.sp * textScale,
         fontWeight = FontWeight.Medium,
@@ -490,7 +506,8 @@ private fun LyricLineItem(
             Text(
                 text = mainContent,
                 style = mainTextStyle,
-                color = if (isKaraoke) dimColor else (if (isActive) Color.White else dimColor),
+                color = if (isKaraoke) dimColor else if (isActive && lyricsBrush != null) Color.Unspecified
+                    else if (isActive) renderedColor else dimColor,
                 onTextLayout = { mainTextLayoutResult.value = it },
                 maxLines = Int.MAX_VALUE
             )
@@ -506,7 +523,7 @@ private fun LyricLineItem(
                             blurRadius = 7f
                         )
                     ),
-                    color = litColor,
+                    color = if (lyricsBrush != null) Color.Unspecified else litColor,
                     maxLines = Int.MAX_VALUE,
                     modifier = Modifier
                         .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
@@ -536,7 +553,8 @@ private fun LyricLineItem(
                 Text(
                     text = bracketContent,
                     style = bracketTextStyle,
-                    color = if (isKaraoke) dimColor else (if (isActive) Color.White else dimColor),
+                    color = if (isKaraoke) dimColor else if (isActive && lyricsBrush != null) Color.Unspecified
+                    else if (isActive) renderedColor else dimColor,
                     onTextLayout = { bracketTextLayoutResult.value = it },
                     maxLines = 1
                 )
@@ -552,7 +570,7 @@ private fun LyricLineItem(
                                 blurRadius = 7f
                             )
                         ),
-                        color = litColor,
+                        color = if (lyricsBrush != null) Color.Unspecified else litColor,
                         maxLines = 1,
                         modifier = Modifier
                             .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
@@ -911,7 +929,8 @@ private fun binarySearchActiveIndex(
 private suspend fun performSmoothedScroll(
     listState: androidx.compose.foundation.lazy.LazyListState,
     activeIndex: Int,
-    displayItems: List<LyricDisplayItem>
+    displayItems: List<LyricDisplayItem>,
+    estimatedItemHalfHeightPx: Int
 ) {
     if (activeIndex !in displayItems.indices) return
     val layout = listState.layoutInfo
@@ -919,18 +938,13 @@ private suspend fun performSmoothedScroll(
     if (viewportHeight <= 0) return
 
     val visibleItem = layout.visibleItemsInfo.firstOrNull { it.index == activeIndex }
-    if (visibleItem != null) {
-        val itemCenter = visibleItem.offset + visibleItem.size / 2
-        val viewportCenter = viewportHeight / 2
-        // Avoid starting a costly scroll animation on every line transition when the
-        // active line is already close to the reading focus.
-        if (kotlin.math.abs(itemCenter - viewportCenter) < viewportHeight * 0.22f) return
-    }
-
-    // Use LazyList's optimized scroll animation rather than a manual per-frame scrollBy loop.
+    val itemHalfHeight = visibleItem?.size?.div(2) ?: estimatedItemHalfHeightPx
+    // LazyList scroll offsets target the start of the row. Account for half the actual
+    // row height so the visible midpoint of the active line lands at viewport centre.
+    val centeredOffset = -(viewportHeight / 2 - itemHalfHeight)
     listState.animateScrollToItem(
         index = activeIndex,
-        scrollOffset = -(viewportHeight / 2)
+        scrollOffset = centeredOffset
     )
 }
 
