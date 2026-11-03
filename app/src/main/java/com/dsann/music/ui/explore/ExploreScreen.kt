@@ -1139,17 +1139,11 @@ fun ExploreScreen(
                                                                     item {
                                                                         Box(
                                                                             modifier = Modifier.fillMaxWidth(),
-                                                                            contentAlignment = Alignment.Center
+                                                                            contentAlignment = Alignment.TopStart
                                                                         ) {
-                                                                            Box(
-                                                                                modifier = if (isLandscape) Modifier.widthIn(
-                                                                                    max = 600.dp
-                                                                                ) else Modifier.fillMaxWidth()
-                                                                            ) {
-                                                                                WelcomeGreetingBanner(
-                                                                                    userName = userProfile?.name
-                                                                                )
-                                                                            }
+                                                                            WelcomeGreetingBanner(
+                                                                                userName = userProfile?.name
+                                                                            )
                                                                         }
                                                                     }
                                                                     items(
