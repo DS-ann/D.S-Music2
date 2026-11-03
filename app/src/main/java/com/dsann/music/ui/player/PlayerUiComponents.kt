@@ -232,12 +232,13 @@ internal fun PillChip(
                         size = size.copy(width = size.width * animatedFill)
                     )
                 }
-                if (rounded) {
+                if (style == "Round" || style == "Square") {
+                    val borderRadius = if (style == "Square") 4.dp.toPx() else 12.dp.toPx()
                     drawRoundRect(
                         color = (if (isSelected) accentColor else contentColor).copy(
                             alpha = if (isSelected) 0.78f else 0.28f
                         ),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx()),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(borderRadius),
                         style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
                     )
                 }
