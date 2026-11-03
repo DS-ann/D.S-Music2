@@ -3937,7 +3937,7 @@ private fun PlaybackScreen(
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
                     title = "Global animation frame rate",
-                    description = "Device follows display refresh. Fixed values cap continuous visual effects across playback, lyrics and loading indicators. Short touch/layout transitions stay on display vsync for responsiveness; audio playback is unchanged.",
+                    description = "Device follows display refresh. Fixed values cap continuous visual effects. Word-synced karaoke always uses native display VSYNC for accurate word timing; short touch/layout transitions also stay on display VSYNC. Audio playback is unchanged.",
                     selected = if (playerFrameRate == 0) "Device (Default)" else "$playerFrameRate FPS",
                     options = listOf("Device (Default)", "20 FPS", "30 FPS", "40 FPS", "60 FPS"),
                     onSelected = { selected ->
