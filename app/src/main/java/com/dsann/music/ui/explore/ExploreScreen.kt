@@ -389,14 +389,15 @@ fun ExploreScreen(
     fun setExploreSectionVisibility(title: String, visible: Boolean) {
         val updated = if (visible) hiddenExploreSections - title else hiddenExploreSections + title
         hiddenExploreSections = updated
-        prefs.edit().putStringSet("hidden_home_sections", updated).apply()
+        prefs.edit().putStringSet("hidden_home_sections", updated.toMutableSet()).apply()
     }
 
     fun moveExploreSection(title: String, direction: Int) {
         val updated = orderedExploreSectionTitles.toMutableList()
         val from = updated.indexOf(title)
+        if (from < 0) return
         val to = (from + direction).coerceIn(0, updated.lastIndex)
-        if (from < 0 || from == to) return
+        if (from == to) return
         val moved = updated.removeAt(from)
         updated.add(to, moved)
         exploreSectionOrder = updated
@@ -1230,6 +1231,7 @@ fun ExploreScreen(
                                                                         .collect { lastVisibleIndex ->
                                                                             if (
                                                                                 !isLoadingMoreHome &&
+                                                                                visibleHomeSections.isNotEmpty() &&
                                                                                 lastVisibleIndex != null &&
                                                                                 lastVisibleIndex >= visibleHomeSections.size
                                                                             ) {
