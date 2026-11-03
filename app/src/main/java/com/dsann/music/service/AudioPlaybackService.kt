@@ -1784,6 +1784,12 @@ class AudioPlaybackService : MediaSessionService() {
             pendingServiceActions.add(ACTION_PAUSE)
             return
         }
+        if (player.currentMediaItem == null && viewModel == null) {
+            // A stale widget may still carry the old Pause PendingIntent if Android killed
+            // the service during playback. Restore the saved item paused rather than no-op.
+            restorePersistedPlaybackForWidget(autoPlay = false)
+            return
+        }
         if (player.isPlaying) {
             player.pause()
             if (isCrossfading) {
@@ -1848,6 +1854,11 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     private fun widgetSongUri(song: SongItem): Uri? {
+        // Cached/downloaded tracks must restore from their exact offline URI, not re-resolve
+        // a new online stream merely because the SongItem also has a YouTube video ID.
+        if (song.isCachedTrack || song.isDownloadedOffline) {
+            return runCatching { song.contentUri }.getOrNull()
+        }
         val videoId = song.videoId?.takeIf { it.isNotBlank() }
         if (videoId != null) return "innertube://$videoId".toUri()
         return runCatching { song.contentUri }.getOrNull()
