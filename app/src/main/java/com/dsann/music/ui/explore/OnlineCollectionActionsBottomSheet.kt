@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
@@ -216,7 +216,7 @@ fun OnlineCollectionActionsBottomSheet(
             CollectionActionRow(
                 title = "Add to queue",
                 subtitle = "Add every track to the end of Up Next",
-                icon = { Icon(Icons.AutoMirrored.Filled.QueueMusic, null) },
+                icon = { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) },
                 enabled = !isWorking
             ) {
                 runTrackAction { songs ->
