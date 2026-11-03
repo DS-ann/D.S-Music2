@@ -2183,6 +2183,7 @@ private fun MiniPlayerContentInternal(
 }
 
 
+@OptIn(kotlinx.coroutines.FlowPreview::class)
 @Composable
 private fun MiniPlayerArtworkProgressOverlay(
     viewModel: PlayerSharedViewModel,
