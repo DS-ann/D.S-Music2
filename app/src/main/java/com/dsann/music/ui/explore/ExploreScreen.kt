@@ -816,7 +816,7 @@ fun ExploreScreen(
                                             onAccountVisibleChange = onSearchHeaderAccountVisibleChange,
                                             onCustomizeExplore = { showExploreCustomizer = true },
                                             userProfile = userProfile,
-                                            homeMoods = homeMoods,
+                                            homeMoods = if (showExploreMoodChips) homeMoods else emptyList(),
                                             currentMood = currentMood,
                                             onMoodClick = onSearchHeaderMoodClick,
                                             currentFilter = currentFilter,
@@ -2299,7 +2299,7 @@ private fun ExploreCustomizerDialog(
             }
 
             // Category Chips — fetched from YouTube Music (hidden during active search inputs, without animations)
-            if (showMoodChips && !isSearchActive && searchQuery.isBlank() && searchResults.isEmpty() && homeMoods.isNotEmpty()) {
+            if (!isSearchActive && searchQuery.isBlank() && searchResults.isEmpty() && homeMoods.isNotEmpty()) {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
