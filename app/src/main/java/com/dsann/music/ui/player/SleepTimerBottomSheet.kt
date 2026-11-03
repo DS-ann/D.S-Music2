@@ -32,11 +32,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.clickable
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.Stop
 import com.dsann.music.ui.theme.AlertDialog
 import com.dsann.music.ui.theme.BottomSheetDefaults
 import com.dsann.music.ui.theme.Button
@@ -150,7 +150,7 @@ fun SleepTimerBottomSheet(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Notifications,
+                            imageVector = Icons.Rounded.Notifications,
                             contentDescription = null,
                             tint = DsmusicTheme.colorScheme.primary,
                             modifier = Modifier.size(24.dp)
@@ -203,7 +203,7 @@ fun SleepTimerBottomSheet(
                                             .background(DsmusicTheme.colorScheme.primaryContainer, CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(Icons.Default.Timer, contentDescription = null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
+                                        Icon(Icons.Rounded.Timer, contentDescription = null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
                                     }
                                 },
                                 headlineContent = {
@@ -274,7 +274,7 @@ fun SleepTimerBottomSheet(
                                     .background(DsmusicTheme.colorScheme.primaryContainer, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Stop, contentDescription = null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
+                                Icon(Icons.Rounded.Stop, contentDescription = null, tint = DsmusicTheme.colorScheme.onPrimaryContainer)
                             }
                         },
                         content = {
@@ -324,7 +324,7 @@ fun SleepTimerBottomSheet(
                         .weight(1f)
                         .height(48.dp)
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = "Cancel Timer", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Rounded.Close, contentDescription = "Cancel Timer", modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Cancel", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 }
@@ -348,7 +348,7 @@ fun SleepTimerBottomSheet(
                         .weight(1f)
                         .height(48.dp)
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = "Custom Timer", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Rounded.Edit, contentDescription = "Custom Timer", modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Custom", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 }
