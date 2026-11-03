@@ -233,6 +233,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 val isPlayerExpanded by playerViewModel.isPlayerExpanded.collectAsStateWithLifecycle()
+                val currentSong by playerViewModel.currentSong.collectAsStateWithLifecycle()
 
                 var editingSong by remember { mutableStateOf<SongItem?>(null) }
                 val configuration = androidx.compose.ui.platform.LocalConfiguration.current
@@ -413,9 +414,21 @@ class MainActivity : AppCompatActivity() {
                         label = "BottomNavPadding"
                     )
 
-                    // Final padding does not scale down during expansion to prevent massive Layout invalidation
-                    // The player sheet covers the NavHost anyway, so keeping padding static is optimal
+                    // Final padding does not scale down during expansion to prevent massive Layout invalidation.
+                    // The player sheet covers the NavHost anyway, so keep the measured dock padding stable.
                     val finalPadding = animatedBasePaddingState.value
+                    val miniPlayerHeight = if (
+                        configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                    ) 64.dp else 80.dp
+                    val systemBottomInset = WindowInsets.navigationBars.asPaddingValues()
+                        .calculateBottomPadding()
+                    // Root tabs must measure their scroll viewport above the collapsed mini-player.
+                    // Otherwise the last rows can scroll underneath the overlay and become unreachable.
+                    val miniPlayerScrollReserve = if (
+                        currentSong != null && !isPlayerExpanded && currentRoute in rootTabRoutes
+                    ) {
+                        miniPlayerHeight + if (useNavigationRail) 8.dp + systemBottomInset else 4.dp
+                    } else 0.dp
 
                     Box(
                         modifier = Modifier.fillMaxSize()
@@ -425,7 +438,7 @@ class MainActivity : AppCompatActivity() {
                                 .fillMaxSize()
                                 .padding(
                                     start = railInset.coerceAtLeast(0.dp),
-                                    bottom = finalPadding.coerceAtLeast(0.dp)
+                                    bottom = (finalPadding + miniPlayerScrollReserve).coerceAtLeast(0.dp)
                                 )
                         ) {
                             // Only the active tab and the recent cache stay composed. On Android 6,
