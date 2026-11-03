@@ -43,13 +43,13 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Radio
-import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.Shuffle
 import com.dsann.music.ui.theme.ButtonDefaults
 import com.dsann.music.ui.theme.animateWidth
 import com.dsann.music.ui.theme.FilledTonalButton
@@ -139,7 +139,7 @@ fun AlbumDetailView(
                     )
                 }
                 DsmusicIconButton(onClick = onCollectionMenuClick) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Album options")
+                    Icon(Icons.Rounded.MoreVert, contentDescription = "Album options")
                 }
             }
         }
@@ -217,7 +217,7 @@ fun PlaylistDetailView(
                     )
                 }
                 DsmusicIconButton(onClick = onCollectionMenuClick) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Playlist options")
+                    Icon(Icons.Rounded.MoreVert, contentDescription = "Playlist options")
                 }
                 if (playlistPage.isOwned) {
                     DsmusicIconButton(
@@ -231,7 +231,7 @@ fun PlaylistDetailView(
                             .clip(CircleShape)
                             .background(DsmusicTheme.colorScheme.surfaceVariant)
                     ) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit playlist")
+                        Icon(Icons.Rounded.Edit, contentDescription = "Edit playlist")
                     }
                     DsmusicIconButton(
                         onClick = { confirmDelete = true },
@@ -241,7 +241,7 @@ fun PlaylistDetailView(
                             .background(DsmusicTheme.colorScheme.errorContainer.copy(alpha = 0.72f))
                     ) {
                         Icon(
-                            Icons.Default.Delete,
+                            Icons.Rounded.Delete,
                             contentDescription = "Delete playlist",
                             tint = DsmusicTheme.colorScheme.error
                         )
@@ -562,7 +562,7 @@ fun ArtistDetailView(
                                 )
                             }
                             Spacer(modifier = Modifier.width(4.dp))
-                            Icon(Icons.Default.ChevronRight, "See all",
+                            Icon(Icons.Rounded.ChevronRight, "See all",
                                 tint = DsmusicTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                         }
                     }
@@ -737,7 +737,7 @@ fun AdaptiveDetailContainer(
                     shape = IconButtonDefaults.filledShape
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack, 
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack, 
                         contentDescription = "Back", 
                         tint = DsmusicTheme.colorScheme.onSurface
                     )
@@ -876,7 +876,7 @@ fun AdaptiveDetailContainer(
                     modifier = Modifier.background(Color.Black.copy(alpha = 0.45f), CircleShape)
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack, 
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack, 
                         contentDescription = "Back", 
                         tint = Color.White
                     )
@@ -943,7 +943,7 @@ fun ArtistTopSongItem(
             )
         }
         DsmusicIconButton(onClick = onMenuClick) {
-            Icon(Icons.Default.MoreVert, "More", tint = DsmusicTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Rounded.MoreVert, "More", tint = DsmusicTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -1048,7 +1048,7 @@ fun ExpressiveConnectedButtonGroup(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            Icon(Icons.Default.Shuffle, null, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Rounded.Shuffle, null, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Shuffle", fontWeight = FontWeight.Bold)
                         }
@@ -1094,7 +1094,7 @@ fun ExpressiveConnectedButtonGroup(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            Icon(Icons.Default.Radio, null, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Rounded.Radio, null, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Radio", fontWeight = FontWeight.Bold)
                         }
