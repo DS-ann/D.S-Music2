@@ -1501,17 +1501,31 @@ fun PlayerBottomSheetCompose(
                         else -> 0.9f
                     }
                     val artworkScaleFactor = playerArtworkScale.coerceIn(0.65f, 1f)
+                    val portraitArtHeightFactor = when {
+                        containerHeight < 680.dp -> 0.30f
+                        containerHeight < 760.dp -> 0.34f
+                        else -> 0.40f
+                    }
+                    val landscapeArtHeightFactor = when {
+                        containerHeight < 520.dp -> 0.18f
+                        containerHeight < 640.dp -> 0.22f
+                        else -> 0.28f
+                    }
+                    val widePortraitArtHeightFactor =
+                        if (containerHeight < 760.dp) 0.34f else 0.50f
                     val albumArtSizeDp = (
                         if (isLandscapeWindow) {
-                            minOf(containerHeight * 0.28f, containerWidthDp * 0.30f) * (albumArtScale / 0.9f)
+                            minOf(containerHeight * landscapeArtHeightFactor, containerWidthDp * 0.30f) *
+                                (albumArtScale / 0.9f)
                         } else if (useWidePlayer) {
-                            minOf(containerHeight * 0.50f, containerWidthDp * 0.42f) * (albumArtScale / 0.9f)
+                            minOf(containerHeight * widePortraitArtHeightFactor, containerWidthDp * 0.42f) *
+                                (albumArtScale / 0.9f)
                         } else {
                             // Limit portrait artwork by both available width and height so the
                             // title, transport controls and queue handle remain in the window.
                             minOf(
                                 containerWidthDp * albumArtScale,
-                                containerHeight * (if (containerHeight < 760.dp) 0.36f else 0.40f)
+                                containerHeight * portraitArtHeightFactor
                             )
                         }
                     ) * artworkScaleFactor
