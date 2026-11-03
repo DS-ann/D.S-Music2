@@ -95,6 +95,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     private var searchContinuation: String? = null
     private var homeContinuationToken: String? = null
+    private var exploreContinuationToken: String? = null
     private var homeLoaded = false
     private var explorePageActive = false
 
@@ -496,6 +497,9 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private suspend fun fetchMergedHomeFeed(): List<HomeSection> = coroutineScope {
+        // Each source has its own continuation chain. Clear both before rebuilding the feed.
+        homeContinuationToken = null
+        exploreContinuationToken = null
         val sections = mutableListOf<HomeSection>()
         val mood = _uiState.value.currentMood
 
@@ -536,8 +540,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
         // 2. Await Network streams
         val homePage = homeTask?.await()
-        homeContinuationToken = homePage?.continuation
         val explorePage = exploreTask.await()
+        homeContinuationToken = homePage?.continuation
+        exploreContinuationToken = explorePage?.continuation
+            ?.takeIf { it != homeContinuationToken }
 
         // Extract Moods
         val allMoods = mutableListOf<String>()
@@ -680,7 +686,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     fun loadMoreHomeSections() {
         if (!explorePageActive) return
-        val token = homeContinuationToken ?: return
+        // Prefer the authenticated Home continuation, then continue the anonymous Explore
+        // feed. Without this fallback, signed-out users permanently stop after page one.
+        val loadingHomeContinuation = homeContinuationToken != null
+        val token = homeContinuationToken ?: exploreContinuationToken ?: return
         if (_uiState.value.isLoadingHome || _uiState.value.isLoadingMoreHome) return
 
         _uiState.update { it.copy(isLoadingMoreHome = true) }
@@ -696,7 +705,12 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                         }
                     }
                     _uiState.update { it.copy(homeSections = current) }
-                    homeContinuationToken = page.continuation
+                    val nextToken = page.continuation?.takeIf { it != token }
+                    if (loadingHomeContinuation) {
+                        homeContinuationToken = nextToken
+                    } else {
+                        exploreContinuationToken = nextToken
+                    }
                     prefetchThumbnails(page.sections.take(3).flatMap { it.items.take(4) })
                 }
             } catch (e: Exception) {
