@@ -129,6 +129,55 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         schedulePartialWidgetUpdateDrain();
     }
 
+    /**
+     * Re-apply the transport controls after the device wakes. Some launchers defer a
+     * RemoteViews update while keyguard is closing; this small partial update restores
+     * current play/pause PendingIntents without reloading or blurring artwork.
+     */
+    public static void refreshAllWidgetControls(Context context, boolean isPlaying) {
+        final Context appContext = context.getApplicationContext();
+        try {
+            PARTIAL_WIDGET_UPDATE_EXECUTOR.execute(() -> {
+                AppWidgetManager manager = AppWidgetManager.getInstance(appContext);
+                refreshWidgetControls(
+                        appContext, manager, WidgetSmallProvider.class,
+                        R.layout.widget_small, isPlaying);
+                refreshWidgetControls(
+                        appContext, manager, WidgetMediumProvider.class,
+                        R.layout.widget_medium, isPlaying);
+                refreshWidgetControls(
+                        appContext, manager, WidgetLargeProvider.class,
+                        R.layout.widget_large, isPlaying);
+            });
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Could not schedule widget control refresh", error);
+        }
+    }
+
+    private static void refreshWidgetControls(
+            Context context,
+            AppWidgetManager manager,
+            Class<?> providerClass,
+            int layoutId,
+            boolean isPlaying
+    ) {
+        int[] ids = manager.getAppWidgetIds(new ComponentName(context, providerClass));
+        int playPauseIcon = isPlaying ? R.drawable.ic_pause : R.drawable.ic_play;
+        for (int id : ids) {
+            try {
+                RemoteViews views = new RemoteViews(context.getPackageName(), layoutId);
+                views.setImageViewResource(R.id.widget_play_pause, playPauseIcon);
+                views.setInt(
+                        R.id.widget_play_pause, "setColorFilter",
+                        android.graphics.Color.WHITE);
+                setupPendingIntents(context, views, isPlaying, layoutId, providerClass);
+                manager.partiallyUpdateAppWidget(id, views);
+            } catch (Exception error) {
+                Log.w(TAG, "Could not refresh widget controls for " + id, error);
+            }
+        }
+    }
+
     private static void schedulePartialWidgetUpdateDrain() {
         if (!PARTIAL_WIDGET_UPDATE_SCHEDULED.compareAndSet(false, true)) {
             return;
