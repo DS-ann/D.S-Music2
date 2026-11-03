@@ -262,12 +262,15 @@ internal fun SyncedLyricsCompose(
         }
         val lyricsScale = (configuredLyricsScale * viewportScale).coerceIn(0.48f, 1.18f)
 
+        // Reserve half the viewport at both ends so even the first and last lines
+        // can occupy the same centred reading position as every line between them.
+        val activeLineEdgePadding = (maxHeight / 2f - 36.dp).coerceAtLeast(40.dp)
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                top = 40.dp,
-                bottom = 96.dp
+                top = activeLineEdgePadding,
+                bottom = activeLineEdgePadding
             ),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
