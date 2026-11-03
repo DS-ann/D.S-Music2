@@ -499,6 +499,19 @@ class AudioPlaybackService : MediaSessionService() {
             // defer or drop RemoteViews updates while the display is asleep.
             updateWidgetState(player.isPlaying)
             lastWidgetProgressUpdateAtMs = 0L
+            // Follow with a lightweight control/progress update once the launcher has
+            // finished restoring its widget host after keyguard dismissal.
+            handler.removeCallbacks(widgetWakeFollowUpRunnable)
+            handler.postDelayed(widgetWakeFollowUpRunnable, 1_200L)
+        }
+    }
+    private val widgetWakeFollowUpRunnable = Runnable {
+        if (isPlayerInitialized) {
+            val isPlaying = player.isPlaying
+            val position = player.currentPosition.coerceAtLeast(0L)
+            val duration = player.duration.coerceAtLeast(0L)
+            DsmusicWidgetProvider.refreshAllWidgetControls(this, isPlaying)
+            updateWidgetProgress(position, duration)
         }
     }
     private val screenWakeReceiver = object : BroadcastReceiver() {
@@ -1003,6 +1016,7 @@ class AudioPlaybackService : MediaSessionService() {
         }
         stopProgressFrameUpdates()
         handler.removeCallbacks(widgetRefreshAfterWakeRunnable)
+        handler.removeCallbacks(widgetWakeFollowUpRunnable)
         if (screenWakeReceiverRegistered) {
             runCatching { unregisterReceiver(screenWakeReceiver) }
             screenWakeReceiverRegistered = false
@@ -2262,6 +2276,7 @@ class AudioPlaybackService : MediaSessionService() {
             return
         }
         handler.removeCallbacks(widgetRefreshAfterWakeRunnable)
+        handler.removeCallbacks(widgetWakeFollowUpRunnable)
         // SCREEN_ON and USER_PRESENT can both fire for one unlock. Debounce them to one
         // complete widget refresh after the launcher/keyguard has resumed.
         handler.postDelayed(widgetRefreshAfterWakeRunnable, 500L)
