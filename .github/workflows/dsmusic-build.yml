@@ -51,7 +51,7 @@ jobs:
         run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0"
 
       - name: Run karaoke timing unit tests
-        run: gradle --no-daemon --warning-mode all testReleaseUnitTest
+        run: gradle --no-daemon --warning-mode all :app:testReleaseUnitTest
 
       - name: Assemble release APK
         run: |
