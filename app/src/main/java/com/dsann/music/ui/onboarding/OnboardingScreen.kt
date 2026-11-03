@@ -45,17 +45,17 @@ package com.dsann.music.ui.onboarding
     import androidx.compose.foundation.shape.CircleShape
     import androidx.compose.foundation.shape.RoundedCornerShape
     import androidx.compose.material.icons.Icons
-    import androidx.compose.material.icons.filled.ArrowBack
-    import androidx.compose.material.icons.filled.ArrowForward
-    import androidx.compose.material.icons.filled.Check
-    import androidx.compose.material.icons.filled.CheckCircle
-    import androidx.compose.material.icons.filled.DarkMode
-    import androidx.compose.material.icons.filled.Home
-    import androidx.compose.material.icons.filled.LibraryMusic
-    import androidx.compose.material.icons.filled.LightMode
-    import androidx.compose.material.icons.filled.Notifications
-    import androidx.compose.material.icons.filled.Search
-    import androidx.compose.material.icons.filled.Settings
+    import androidx.compose.material.icons.rounded.ArrowBack
+    import androidx.compose.material.icons.rounded.ArrowForward
+    import androidx.compose.material.icons.rounded.Check
+    import androidx.compose.material.icons.rounded.CheckCircle
+    import androidx.compose.material.icons.rounded.DarkMode
+    import androidx.compose.material.icons.rounded.Home
+    import androidx.compose.material.icons.rounded.LibraryMusic
+    import androidx.compose.material.icons.rounded.LightMode
+    import androidx.compose.material.icons.rounded.Notifications
+    import androidx.compose.material.icons.rounded.Search
+    import androidx.compose.material.icons.rounded.Settings
     import com.dsann.music.ui.theme.Card
     import com.dsann.music.ui.theme.CardDefaults
         import com.dsann.music.ui.theme.FloatingActionButton
@@ -494,9 +494,9 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                 modifier = Modifier.fillMaxWidth()
             ) {
                 listOf(
-                    Triple("system", "System Default", Icons.Default.Settings),
-                    Triple("dark", "Dark Mode", Icons.Default.DarkMode),
-                    Triple("light", "Light Mode", Icons.Default.LightMode)
+                    Triple("system", "System Default", Icons.Rounded.Settings),
+                    Triple("dark", "Dark Mode", Icons.Rounded.DarkMode),
+                    Triple("light", "Light Mode", Icons.Rounded.LightMode)
                 ).forEachIndexed { index, (mode, label, _) ->
                     Card(
                         onClick = { onThemeChanged(mode) },
@@ -525,7 +525,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (themeMode == mode) {
-                                    Icon(Icons.Default.Check, contentDescription = "Selected", tint = DsmusicTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
+                                    Icon(Icons.Rounded.Check, contentDescription = "Selected", tint = DsmusicTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
                                 }
                             }
                             Spacer(modifier = Modifier.width(16.dp))
@@ -591,7 +591,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                     tonalElevation = 0.dp,
                     windowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp)
                 ) {
-                    listOf("Home" to Icons.Default.Home, "Search" to Icons.Default.Search, "Library" to Icons.Default.LibraryMusic).forEachIndexed { index, item ->
+                    listOf("Home" to Icons.Rounded.Home, "Search" to Icons.Rounded.Search, "Library" to Icons.Rounded.LibraryMusic).forEachIndexed { index, item ->
                         val labelComposable: (@Composable () -> Unit)? = if (hideNavLabels) null else {
                             @Composable { Text(item.first) }
                         }
@@ -721,7 +721,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
             PermissionCard(
                 title = "Music Library",
                 description = "Access local audio files for offline playback.",
-                icon = Icons.Default.LibraryMusic,
+                icon = Icons.Rounded.LibraryMusic,
                 isGranted = audioGranted,
                 pageOffsetProvider = pageOffsetProvider,
                 offsetMultiplier = 200f,
@@ -735,7 +735,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                 PermissionCard(
                     title = "Playback Notifications",
                     description = "Control music from your lock screen.",
-                    icon = Icons.Default.Notifications,
+                    icon = Icons.Rounded.Notifications,
                     isGranted = notifGranted,
                     pageOffsetProvider = pageOffsetProvider,
                     offsetMultiplier = 300f,
@@ -789,7 +789,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (isGranted) Icons.Default.Check else icon,
+                        imageVector = if (isGranted) Icons.Rounded.Check else icon,
                         contentDescription = "Permission icon",
                         modifier = Modifier
                             .size(22.dp)
@@ -821,7 +821,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                 if (!isGranted) {
                     Spacer(modifier = Modifier.width(12.dp))
                     Icon(
-                        imageVector = Icons.Default.ArrowForward,
+                        imageVector = Icons.Rounded.ArrowForward,
                         contentDescription = "Grant $title permission",
                         modifier = Modifier.size(20.dp),
                         tint = DsmusicTheme.colorScheme.primary
@@ -897,7 +897,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                         }
                     ) {
                         Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp), tint = DsmusicTheme.colorScheme.primary)
+                            Icon(Icons.Rounded.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp), tint = DsmusicTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Login Successful", style = DsmusicTheme.typography.labelMedium, color = DsmusicTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         }
@@ -1177,7 +1177,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                                     modifier = Modifier.size(40.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.ArrowBack,
+                                        imageVector = Icons.Rounded.ArrowBack,
                                         contentDescription = "Back",
                                         tint = DsmusicTheme.colorScheme.onSurfaceVariant
                                     )
@@ -1206,7 +1206,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                             com.dsann.music.ui.theme.ExtendedFloatingActionButton(
                                 onClick = onFinishClicked,
                                 text = { Text("Start Listening") },
-                                icon = { Icon(Icons.Default.Check, contentDescription = "Finish") },
+                                icon = { Icon(Icons.Rounded.Check, contentDescription = "Finish") },
                                 containerColor = DsmusicTheme.colorScheme.primaryContainer,
                                 contentColor = DsmusicTheme.colorScheme.onPrimaryContainer,
                                 elevation = FloatingActionButtonDefaults.elevation(0.dp)
@@ -1228,7 +1228,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                                     .graphicsLayer { alpha = fabAlpha }
                             ) {
                                 Icon(
-                                    Icons.Default.ArrowForward,
+                                    Icons.Rounded.ArrowForward,
                                     contentDescription = "Next",
                                     modifier = Modifier.rotate(-animatedRotation)
                                 )
