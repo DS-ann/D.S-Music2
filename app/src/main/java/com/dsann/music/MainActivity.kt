@@ -82,6 +82,7 @@ import androidx.core.content.edit
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
@@ -125,7 +126,10 @@ class MainActivity : AppCompatActivity() {
 
     private val playerViewModel: PlayerSharedViewModel by viewModels()
     private val exploreViewModel: ExploreViewModel by viewModels()
-    private val searchViewModel: ExploreViewModel by viewModels(key = "search")
+    private val searchViewModel: ExploreViewModel by lazy(LazyThreadSafetyMode.NONE) {
+        ViewModelProvider(viewModelStore, defaultViewModelProviderFactory)
+            .get("search", ExploreViewModel::class.java)
+    }
 
     private var navController: NavController? = null
     private var previousDestination = "explore"
