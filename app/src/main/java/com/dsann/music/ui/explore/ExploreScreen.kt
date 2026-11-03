@@ -61,14 +61,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import com.dsann.music.ui.LocalPlaylistPickerDialog
 import com.dsann.music.ui.CreateLocalPlaylistDialog
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Done
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Done
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
 import com.dsann.music.ui.theme.LoadingIndicator
 import com.dsann.music.ui.theme.FilterChip
 import com.dsann.music.ui.theme.FilterChipDefaults
@@ -1091,7 +1091,7 @@ fun ExploreScreen(
                                                             verticalArrangement = Arrangement.spacedBy(8.dp)
                                                         ) {
                                                             Icon(
-                                                                imageVector = Icons.Default.Search,
+                                                                imageVector = Icons.Rounded.Search,
                                                                 contentDescription = null,
                                                                 modifier = Modifier.size(48.dp),
                                                                 tint = DsmusicTheme.colorScheme.onSurfaceVariant
@@ -1264,7 +1264,7 @@ fun ExploreScreen(
                                                                 ) {
                                                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                                         Icon(
-                                                                            Icons.Default.MusicNote,
+                                                                            Icons.Rounded.MusicNote,
                                                                             null,
                                                                             modifier = Modifier.size(
                                                                                 64.dp
@@ -1589,7 +1589,7 @@ private fun ExploreCustomizerDialog(
                 ) {
                     DsmusicIconButton(onClick = onBack) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             contentDescription = "Back",
                             tint = DsmusicTheme.colorScheme.onBackground
                         )
@@ -1889,7 +1889,7 @@ private fun ExploreCustomizerDialog(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                         contentDescription = "Back",
                         tint = DsmusicTheme.colorScheme.onSurface
                     )
@@ -1949,7 +1949,7 @@ private fun ExploreCustomizerDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Close,
+                            imageVector = Icons.Rounded.Close,
                             contentDescription = "Clear query",
                             tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(18.dp)
@@ -1975,7 +1975,7 @@ private fun ExploreCustomizerDialog(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Search,
+                        imageVector = Icons.Rounded.Search,
                         contentDescription = "Search",
                         tint = if (searchQuery.isNotBlank()) DsmusicTheme.colorScheme.onPrimary
                         else DsmusicTheme.colorScheme.onSurfaceVariant
@@ -2020,13 +2020,13 @@ private fun ExploreCustomizerDialog(
                             items(searchHistory) { historyItem ->
                                 DsmusicListItem(
                                     headlineContent = { Text(historyItem) },
-                                    leadingContent = { Icon(Icons.Default.History, null) },
+                                    leadingContent = { Icon(Icons.Rounded.History, null) },
                                     trailingContent = {
                                         DsmusicIconButton(
                                             onClick = { onRemoveFromSearchHistory(historyItem) }
                                         ) {
                                             Icon(
-                                                Icons.Default.Close,
+                                                Icons.Rounded.Close,
                                                 contentDescription = "Remove search",
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -2107,7 +2107,7 @@ private fun ExploreCustomizerDialog(
                         item(key = "typed-query") {
                             DsmusicListItem(
                                 headlineContent = { Text("Search for \"$searchQuery\"") },
-                                leadingContent = { Icon(Icons.Default.Search, null) },
+                                leadingContent = { Icon(Icons.Rounded.Search, null) },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                 modifier = Modifier.clickable { onSearch(searchQuery.trim()) }
                             )
@@ -2115,7 +2115,7 @@ private fun ExploreCustomizerDialog(
                         items(suggestions, key = { "suggestion:$it" }) { suggestion ->
                             DsmusicListItem(
                                 headlineContent = { Text(suggestion) },
-                                leadingContent = { Icon(Icons.Default.Search, null) },
+                                leadingContent = { Icon(Icons.Rounded.Search, null) },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                 modifier = Modifier.clickable { onSuggestionClick(suggestion) }
                             )
@@ -2148,7 +2148,7 @@ private fun ExploreCustomizerDialog(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Search,
+                                    imageVector = Icons.Rounded.Search,
                                     contentDescription = null,
                                     modifier = Modifier.size(32.dp),
                                     tint = DsmusicTheme.colorScheme.onSurfaceVariant
@@ -2203,7 +2203,7 @@ private fun ExploreCustomizerDialog(
                                 shape = RoundedCornerShape(13.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Settings,
+                                    imageVector = Icons.Rounded.Settings,
                                     contentDescription = "Customize Explore",
                                     modifier = Modifier.size(22.dp),
                                     tint = DsmusicTheme.colorScheme.onSurfaceVariant
@@ -2225,7 +2225,7 @@ private fun ExploreCustomizerDialog(
                                 )
                             } else {
                                 Icon(
-                                    imageVector = Icons.Default.AccountCircle,
+                                    imageVector = Icons.Rounded.AccountCircle,
                                     contentDescription = "Account",
                                     modifier = Modifier.size(26.dp),
                                     tint = DsmusicTheme.colorScheme.primary
@@ -2255,7 +2255,7 @@ private fun ExploreCustomizerDialog(
                     horizontalArrangement = Arrangement.spacedBy(11.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Search,
+                        imageVector = Icons.Rounded.Search,
                         contentDescription = null,
                         tint = DsmusicTheme.colorScheme.primary
                     )
@@ -2278,7 +2278,7 @@ private fun ExploreCustomizerDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Close,
+                            imageVector = Icons.Rounded.Close,
                             contentDescription = "Clear search",
                             tint = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
@@ -2299,7 +2299,7 @@ private fun ExploreCustomizerDialog(
                             )
                         } else {
                             Icon(
-                                imageVector = Icons.Default.AccountCircle,
+                                imageVector = Icons.Rounded.AccountCircle,
                                 contentDescription = "Account",
                                 modifier = Modifier.size(26.dp),
                                 tint = DsmusicTheme.colorScheme.primary
