@@ -1152,7 +1152,8 @@ fun LibraryScreen(
 private fun libraryArtworkRequestBuilder(
     context: Context,
     data: Any?
-): ImageRequest.Builder = libraryArtworkRequestBuilder(context, data)
+): ImageRequest.Builder = ImageRequest.Builder(context)
+    .data(data)
     .apply {
         if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) {
             size(100, 100)
