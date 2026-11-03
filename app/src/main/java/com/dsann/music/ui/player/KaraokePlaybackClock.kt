@@ -14,6 +14,18 @@ import kotlin.math.roundToInt
  * This class contains no Android or Compose dependencies so its timing behaviour is
  * deterministic and unit-testable.
  */
+internal fun calculateKaraokeWordProgress(
+    wordStartMs: Long,
+    wordDurationMs: Long,
+    playbackPositionMs: Long
+): Float {
+    val duration = wordDurationMs.coerceAtLeast(1L)
+    if (playbackPositionMs < wordStartMs) return 0f
+    if (playbackPositionMs >= wordStartMs + duration) return 1f
+    return ((playbackPositionMs - wordStartMs).toDouble() / duration.toDouble())
+        .toFloat().coerceIn(0f, 1f)
+}
+
 internal class KaraokePlaybackClock(
     private val discontinuityThresholdMs: Double = 70.0,
     private val correctionFactor: Double = 0.30,
