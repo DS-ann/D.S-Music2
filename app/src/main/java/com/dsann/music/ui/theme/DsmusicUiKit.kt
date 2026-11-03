@@ -954,8 +954,8 @@ fun ModalBottomSheet(
                 Box(Modifier.fillMaxSize().background(scrimColor).clickable { onDismissRequest(); sheetState.isVisible = false })
                 Column(
                     modifier = modifier
-                        .fillMaxWidth()
                         .widthIn(max = sheetMaxWidth)
+                        .fillMaxWidth()
                         .then(if (useCenteredLandscape) Modifier.offset(x = centerOffsetX) else Modifier)
                         .clip(shape)
                         .background(containerColor)
