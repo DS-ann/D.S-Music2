@@ -721,16 +721,12 @@ private fun eraseFutureText(
     }
 }
 
-private fun calculateWordProgress(word: LyricWord, pos: Long): Float {
-    val wordStartMs = word.absoluteStartTimeMs
-    val wordEndMs = wordStartMs + word.durationMs.coerceAtLeast(1L)
-    return when {
-        pos < wordStartMs -> 0f
-        pos >= wordEndMs -> 1f
-        else -> ((pos - wordStartMs).toFloat() /
-            (wordEndMs - wordStartMs).toFloat().coerceAtLeast(1f)).coerceIn(0f, 1f)
-    }
-}
+private fun calculateWordProgress(word: LyricWord, pos: Long): Float =
+    calculateKaraokeWordProgress(
+        wordStartMs = word.absoluteStartTimeMs,
+        wordDurationMs = word.durationMs,
+        playbackPositionMs = pos
+    )
 
 // ════════════════════════════════════════════════════════════════════════════════
 // ─ Interlude Item Composable
