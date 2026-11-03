@@ -1226,7 +1226,7 @@ fun ExploreScreen(
                                                                 }
                                                                 // Recreate the pagination observer when a page is appended or its loading
                                                                 // state changes; otherwise the captured section count becomes stale.
-                                                                LaunchedEffect(homeListState, homeSections.size, isLoadingMoreHome) {
+                                                                LaunchedEffect(homeListState, visibleHomeSections.size, isLoadingMoreHome) {
                                                                     snapshotFlow { homeListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
                                                                         .collect { lastVisibleIndex ->
                                                                             if (
