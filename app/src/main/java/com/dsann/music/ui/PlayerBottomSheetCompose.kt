@@ -541,7 +541,6 @@ class SheetVerticalDragGestureHandler(
     fun onDragEnd() {
         if (!isActivelyDragging) return
         isActivelyDragging = false
-        onDragStateChange(false)
         val channel = dragFrameChannel
         dragFrameChannel = null
         channel?.close()
@@ -570,6 +569,9 @@ class SheetVerticalDragGestureHandler(
                 onAnimateSheet(false, null, verticalVelocity)
                 onCollapseSheetState()
             }
+            // Keep the layout's drag guard active until the final pointer sample is applied
+            // and the snap request has been handed to the single animation owner.
+            onDragStateChange(false)
         }
     }
 }
@@ -778,7 +780,6 @@ fun PlayerBottomSheetCompose(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val context = LocalContext.current
         val density = LocalDensity.current
-        val configuration = LocalConfiguration.current
         // The player can be hosted in a resized/freeform window. Use its measured bounds
         // instead of the physical display configuration for every responsive breakpoint.
         val isLandscapeWindow = maxWidth > maxHeight
