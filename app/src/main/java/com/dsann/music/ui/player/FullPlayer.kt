@@ -6,7 +6,6 @@ import com.dsann.music.ui.theme.DsmusicTextButton
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -82,7 +81,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -907,7 +905,6 @@ fun FullPlayer(
             .background(backgroundBrush)
             .then(if (isQueueExpanded || isLyricsModeEnabled) Modifier else dragModifier) // Drag down anywhere to collapse
     ) {
-        val configuration = LocalConfiguration.current
         // Use the actual player window constraints, not the physical display metrics.
         // Split-screen/freeform windows can be much smaller than LocalConfiguration's device size.
         val screenWidth = maxWidth
