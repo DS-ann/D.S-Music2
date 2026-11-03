@@ -690,7 +690,9 @@ private fun eraseFutureText(
 ) {
     if (geometry.words.isEmpty()) return
 
-    val sweepWidthFraction = 0.35f
+    // Keep the feather narrow and centred on the true timestamp boundary. A broad
+    // sweep or easing curve makes words appear ahead of their source timing.
+    val sweepWidthFraction = 0.12f
     geometry.words.forEach { wordGeometry ->
         val word = words.getOrNull(wordGeometry.wordIndex) ?: return@forEach
         val progress = calculateWordProgress(word, pos)
@@ -707,14 +709,13 @@ private fun eraseFutureText(
 
         val bounds = wordGeometry.bounds
         val gradientWidth = (bounds.width * sweepWidthFraction).coerceAtLeast(1f)
-        val easedProgress = easeOutCubic(progress)
-        val sweepPosition = easedProgress * (1f + sweepWidthFraction)
-        val sweepCenter = bounds.left + bounds.width * sweepPosition
+        // Word time maps linearly to glyph position: 50% elapsed means 50% highlighted.
+        val sweepBoundary = bounds.left + bounds.width * progress
         val brush = Brush.horizontalGradient(
             0.0f to Color.Transparent,
             1.0f to Color.Black,
-            startX = sweepCenter - gradientWidth / 2f,
-            endX = sweepCenter + gradientWidth / 2f
+            startX = sweepBoundary - gradientWidth / 2f,
+            endX = sweepBoundary + gradientWidth / 2f
         )
         drawScope.drawPath(wordGeometry.path, brush = brush, blendMode = BlendMode.DstOut)
     }
