@@ -34,6 +34,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -900,23 +901,26 @@ fun FullPlayer(
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(backgroundBrush)
             .then(if (isQueueExpanded || isLyricsModeEnabled) Modifier else dragModifier) // Drag down anywhere to collapse
     ) {
         val configuration = LocalConfiguration.current
-        val screenWidth = configuration.screenWidthDp.dp
-        val screenHeight = configuration.screenHeightDp.dp
+        // Use the actual player window constraints, not the physical display metrics.
+        // Split-screen/freeform windows can be much smaller than LocalConfiguration's device size.
+        val screenWidth = maxWidth
+        val screenHeight = maxHeight
         val artScale = (when (playerLayout) {
             "Cover" -> 0.98f
             "Minimal" -> 0.68f
             "Vinyl", "Cassette" -> 0.82f
             else -> 0.9f
         }) * playerArtworkScale.coerceIn(0.65f, 1f)
-        val useWidePlayer = configuration.screenWidthDp >= 840 ||
-            (configuration.screenWidthDp >= 600 && configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
+        val isLandscapeWindow = screenWidth > screenHeight
+        val useWidePlayer = screenWidth >= 840.dp ||
+            (screenWidth >= 600.dp && isLandscapeWindow)
         // When the queue opens on a tablet-sized landscape layout, reserve its left pane
         // instead of letting the queue cover the player controls.
         val animatedQueueDockInset by animateDpAsState(
@@ -931,14 +935,15 @@ fun FullPlayer(
         // A spring can undershoot its zero target. Compose padding rejects negative values,
         // so clamp the animated inset before passing it to Modifier.padding.
         val queueDockInset = animatedQueueDockInset.coerceAtLeast(0.dp)
-        val compactLandscape =
-            configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val albumArtSize = if (compactLandscape) {
+        // Dense controls are used for landscape and short-height resized player windows.
+        val compactLandscape = isLandscapeWindow || screenHeight < 680.dp
+        val albumArtSize = if (isLandscapeWindow) {
             minOf(screenHeight * 0.28f, screenWidth * 0.30f) * (artScale / 0.9f)
         } else if (useWidePlayer) {
             minOf(screenHeight * 0.50f, screenWidth * 0.42f) * (artScale / 0.9f)
         } else {
-            screenWidth * artScale
+            // Keep portrait artwork proportional to the available window height as well as width.
+            minOf(screenWidth * artScale, screenHeight * 0.40f)
         }
 
         val density = androidx.compose.ui.platform.LocalDensity.current
@@ -946,8 +951,8 @@ fun FullPlayer(
         // Shared-artwork target: keep the portrait and landscape player content
         // slightly lower to avoid the top-heavy layout reported on compact phones.
         val minTopOffset = statusBarTopDp + when {
-            compactLandscape && useWidePlayer -> 84.dp
-            compactLandscape -> 60.dp
+            isLandscapeWindow && useWidePlayer -> 84.dp
+            isLandscapeWindow -> 60.dp
             else -> 76.dp
         }
         val headerHeight = if (compactLandscape) 40.dp else 56.dp
@@ -1347,7 +1352,7 @@ fun FullPlayer(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(if (compactLandscape) 52.dp else 76.dp)
+                        .height(if (compactLandscape) 60.dp else 76.dp)
                         .clip(transportShape)
                         .background(sideControlColor)
                         .clickable(onClick = onPreviousClick),
@@ -1364,7 +1369,7 @@ fun FullPlayer(
                 Box(
                     modifier = Modifier
                         .weight(1.2f)
-                        .height(if (compactLandscape) 52.dp else 76.dp)
+                        .height(if (compactLandscape) 60.dp else 76.dp)
                         .clip(transportShape)
                         .background(centerControlColor)
                         .clickable(enabled = !uiState.isLoading) { onPlayPauseClick() },
@@ -1391,7 +1396,7 @@ fun FullPlayer(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(if (compactLandscape) 52.dp else 76.dp)
+                        .height(if (compactLandscape) 60.dp else 76.dp)
                         .clip(transportShape)
                         .background(sideControlColor)
                         .clickable(onClick = onNextClick),
@@ -1412,7 +1417,7 @@ fun FullPlayer(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (compactLandscape) 24.dp else 48.dp)
+                    .height(if (compactLandscape) 36.dp else 48.dp)
                     .pointerInput(Unit) {
                         detectVerticalDragGestures { _, dragAmount ->
                             if (dragAmount < -10f && !isQueueExpanded && !isLyricsModeEnabled) {
@@ -1433,7 +1438,7 @@ fun FullPlayer(
                     contentDescription = "Open Queue",
                     tint = contentColor.copy(alpha = 0.5f),
                     modifier = Modifier
-                        .size(if (compactLandscape) 24.dp else 32.dp)
+                        .size(if (compactLandscape) 27.dp else 32.dp)
                         .graphicsLayer { rotationZ = 180f }
                 )
             }
@@ -1445,7 +1450,8 @@ fun FullPlayer(
                     .fillMaxSize()
                     .statusBarsPadding()
                     .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .padding(horizontal = 20.dp)
+                    .padding(top = if (compactLandscape) 8.dp else 12.dp, bottom = if (compactLandscape) 0.dp else 12.dp)
                     .padding(start = queueDockInset),
                 horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
@@ -1490,7 +1496,8 @@ fun FullPlayer(
                     .fillMaxSize()
                     .statusBarsPadding()
                     .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                    .padding(horizontal = 20.dp)
+                    .padding(top = if (compactLandscape) 8.dp else 12.dp, bottom = if (compactLandscape) 0.dp else 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 content = playerControlsContent
             )
