@@ -71,14 +71,17 @@ fun DsmusicSurface(
     tonalElevation: Any? = null,
     shadowElevation: Any? = null,
     border: Any? = null,
+    showBorder: Boolean = true,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
     Box(
         modifier = modifier.clip(shape).background(color)
-            .border(
-                BorderStroke(1.25.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.88f)),
-                shape
+            .then(
+                if (showBorder) Modifier.border(
+                    BorderStroke(1.25.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.88f)),
+                    shape
+                ) else Modifier
             )
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {

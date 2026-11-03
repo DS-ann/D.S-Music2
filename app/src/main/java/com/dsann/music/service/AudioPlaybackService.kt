@@ -1224,6 +1224,24 @@ class AudioPlaybackService : MediaSessionService() {
             forceWebRemixOnNextResolveVideoId = null
             forceCompatibleFallbackOnNextResolveVideoId = null
         }
+        // A manual track selection is immediate: stop the old item before resolving the
+        // new stream so the old song does not continue playing underneath the new title
+        // and loading state. Stream extraction and buffering still run asynchronously.
+        player.playWhenReady = false
+        player.pause()
+        player.stop()
+        player.clearMediaItems()
+        if (isCrossfading) {
+            nextPlayer?.playWhenReady = false
+            nextPlayer?.stop()
+            nextPlayer?.release()
+            nextPlayer = null
+            crossfadeAnimator?.cancel()
+            crossfadeAnimator = null
+            isCrossfading = false
+            crossfadeNextSongStarted = false
+            player.volume = currentBaseVolume.coerceIn(0f, 1f)
+        }
         shouldAutoPlay = true
         pendingSeekPos = startPosition
         resolveAndLoad(uri)

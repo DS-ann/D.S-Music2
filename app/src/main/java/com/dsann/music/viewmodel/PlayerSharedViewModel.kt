@@ -1551,6 +1551,10 @@ class PlayerSharedViewModel @Inject constructor(
         // null-frame flicker or a stale playing icon.
         _currentSong.value = song
         _songUri.value = song.contentUri
+        // Publish the new track's timeline immediately. The controls and progress display
+        // must not remain attached to the previous song while its stream is resolving.
+        _currentPosition.value = 0
+        _duration.value = song.duration.coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         _isPlaybackReady.value = false
         _isLoading.value = true
 
@@ -1705,13 +1709,8 @@ class PlayerSharedViewModel @Inject constructor(
         val songs = _songList.value
         if (songs.isEmpty()) return
 
-        // If current position is > 3 seconds, just restart the song
-        val pos = _currentPosition.value
-        if (pos > 3000) {
-            audioService?.seekTo(0)
-            return
-        }
-
+        // Previous is an explicit track-navigation command. Do not turn the first tap
+        // into a restart based on the current playback position.
         val currentIdx = _currentSongIndex.value
         val mode = _repeatMode.value
         val shuffle = _isShuffleEnabled.value

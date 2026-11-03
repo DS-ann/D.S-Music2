@@ -1124,7 +1124,7 @@ fun PlayerBottomSheetCompose(
             pendingSheetAnimation = SheetAnimationRequest(
                 targetExpanded = false,
                 animationSpec = tween(
-                    durationMillis = 280,
+                    durationMillis = 340,
                     easing = FastOutSlowInEasing
                 ),
                 initialVelocity = 0f
@@ -1247,7 +1247,7 @@ fun PlayerBottomSheetCompose(
                 -initialVelocity / totalDistance
             } else 0f
             val resolvedAnimationSpec = animationSpec
-                ?: tween(durationMillis = 280, easing = FastOutSlowInEasing)
+                ?: tween(durationMillis = 340, easing = FastOutSlowInEasing)
 
             isSheetAnimating = true
             try {
@@ -1272,8 +1272,8 @@ fun PlayerBottomSheetCompose(
             }
         }
 
-        // This is the only place that animates the sheet. Taps and Back use the default spring;
-        // drag gestures can supply their velocity/damping without starting a competing animation.
+        // This is the only place that animates the sheet. Taps and Back share one easing curve;
+        // drag gestures can supply their velocity without starting a competing animation.
         LaunchedEffect(currentSheetContentState, sheetAnimationRequestId) {
             val targetExpanded = currentSheetContentState == PlayerSheetState.EXPANDED
             val request = pendingSheetAnimation
@@ -1387,9 +1387,15 @@ fun PlayerBottomSheetCompose(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth(playerShellWidthFraction)
-                    .offset { IntOffset(0, sheetVisualState.visualSheetTranslationYProvider().roundToInt()) }
+                    // Apply per-frame movement in the draw layer rather than triggering
+                    // a fresh parent placement pass for every animation frame.
+                    .graphicsLayer {
+                        translationY = sheetVisualState.visualSheetTranslationYProvider()
+                    }
                     .height(containerHeight),
-                color = Color.Transparent
+                shape = playerShellShape,
+                color = Color.Transparent,
+                showBorder = false
             ) {
                 Box(modifier = Modifier.fillMaxSize().padding(bottom = sheetVisualState.currentBottomPadding.coerceAtLeast(0.dp))) {
                     Column(

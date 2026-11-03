@@ -1100,7 +1100,22 @@ fun DropdownMenuItem(
     colors: DsmusicListItemColors = ListItemDefaults.colors(),
     contentPadding: PaddingValues = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
 ) {
-    Row(modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick).padding(contentPadding), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    val itemShape = RoundedCornerShape(10.dp)
+    val itemBorder = DsmusicTheme.colorScheme.outlineVariant.copy(
+        alpha = if (enabled) 0.72f else 0.38f
+    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+            .clip(itemShape)
+            .background(colors.containerColor)
+            .border(1.dp, itemBorder, itemShape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(contentPadding),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
         leadingIcon?.invoke()
         Box(Modifier.weight(1f)) { CompositionLocalProvider(LocalDsmusicContentColor provides colors.headlineColor) { text() } }
         trailingIcon?.invoke()
