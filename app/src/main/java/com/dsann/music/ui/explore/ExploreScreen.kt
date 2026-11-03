@@ -196,6 +196,7 @@ fun ExploreScreen(
     val accountVM: AccountViewModel = viewModel()
     val userProfile by accountVM.userProfile.collectAsStateWithLifecycle()
     val accountHistory by accountVM.history.collectAsStateWithLifecycle()
+    val recentAccountHistory = remember(accountHistory) { accountHistory.take(10) }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -2036,7 +2037,6 @@ private fun ExploreCustomizerDialog(
                             }
                         }
 
-                        val recentAccountHistory = remember(accountHistory) { accountHistory.take(10) }
                         if (userProfile != null && recentAccountHistory.isNotEmpty()) {
                             item {
                                 Spacer(modifier = Modifier.height(16.dp))
