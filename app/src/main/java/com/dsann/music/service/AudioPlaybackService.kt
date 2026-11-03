@@ -1224,13 +1224,11 @@ class AudioPlaybackService : MediaSessionService() {
             forceWebRemixOnNextResolveVideoId = null
             forceCompatibleFallbackOnNextResolveVideoId = null
         }
-        // A manual track selection is immediate: stop the old item before resolving the
-        // new stream so the old song does not continue playing underneath the new title
-        // and loading state. Stream extraction and buffering still run asynchronously.
+        // Stop audible output immediately but retain the current MediaItem/session
+        // notification while the replacement stream is resolving. The new MediaItem
+        // replaces it only when loadAudioInternal has a usable source.
         player.playWhenReady = false
         player.pause()
-        player.stop()
-        player.clearMediaItems()
         if (isCrossfading) {
             nextPlayer?.playWhenReady = false
             nextPlayer?.stop()
@@ -1448,10 +1446,11 @@ class AudioPlaybackService : MediaSessionService() {
                 }
             }
         } else {
-            // Local or pre-determined resource, injection is instant
+            // Local or pre-determined resource, injection is instant. Preserve the current
+            // media-session notification until the new local item is installed.
             resolveJob?.cancel()
             resolveTargetSongId = null
-            loadAudioInternal(uri)
+            loadAudioInternal(uri, keepPlayingUntilReady = true)
         }
     }
 
