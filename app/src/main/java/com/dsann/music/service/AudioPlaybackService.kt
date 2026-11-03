@@ -2432,7 +2432,7 @@ class AudioPlaybackService : MediaSessionService() {
                     val dur = player.duration
                     val nowMs = System.currentTimeMillis()
                     val lyricsModeActive = viewModel?.isLyricsModeEnabled?.value == true
-                            // On API 23, publish only a 4 Hz UI snapshot. The full-player seek track
+                    // On API 23, publish only a 4 Hz UI snapshot. The full-player seek track
                     // and mini-player artwork ring read Media3 directly in their draw passes,
                     // so a 60 Hz StateFlow emission only recomposes unrelated UI for no gain.
                     if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M && player.isPlaying) {
@@ -2491,8 +2491,8 @@ class AudioPlaybackService : MediaSessionService() {
                         }
                     }
                 }
-                // Keep housekeeping deliberately low-frequency on API 23. The selected-rate
-                // UI position callback runs independently on display vsync on every Android version.
+                // Keep housekeeping low-frequency. Only newer Android versions publish
+                // shared position snapshots on display vsync; API 23 uses the 4 Hz Handler path.
                 val lyricsModeActive = viewModel?.isLyricsModeEnabled?.value == true
                 val intervalMs = when {
                     Build.VERSION.SDK_INT <= Build.VERSION_CODES.M && player.isPlaying -> 250L
