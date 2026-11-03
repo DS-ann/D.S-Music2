@@ -77,6 +77,7 @@ import com.dsann.music.ui.theme.ListItemShapes
 import com.dsann.music.ui.theme.DsmusicTheme
 import com.dsann.music.ui.theme.ModalBottomSheet
 import com.dsann.music.ui.theme.rememberModalBottomSheetState
+import com.dsann.music.ui.theme.rememberDsmusicModalSheetGeometry
 import com.dsann.music.ui.theme.OutlinedButton
 import com.dsann.music.ui.theme.Text
 import androidx.compose.runtime.Composable
@@ -1753,10 +1754,14 @@ fun OnlineSongBottomSheet(
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val modalGeometry = rememberDsmusicModalSheetGeometry()
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
+        sheetMaxWidth = if (isLandscape) modalGeometry.width else Dp.Unspecified,
+        centeredLandscape = true,
+        centerOffsetX = modalGeometry.centerOffsetX,
         containerColor = DsmusicTheme.colorScheme.surfaceContainerHigh,
         dragHandle = { BottomSheetDefaults.DragHandle() },
         modifier = modifier
