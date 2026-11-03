@@ -164,8 +164,11 @@ internal fun SyncedLyricsCompose(
     val isKaraokeMode = remember(lyrics) {
         lyrics.any { !it.isInterlude && it.isWordByWord && it.words.isNotEmpty() }
     }
+    // Word highlights are synchronization-critical, not decorative animation. Always
+    // sample native display VSYNC here, even when decorative animations use a lower FPS cap.
     val karaokeFrameTimeNanos = rememberAppAnimationFrameTimeNanos(
-        active = isPlaying && isKaraokeMode
+        active = isPlaying && isKaraokeMode,
+        forceDisplayRefresh = true
     )
 
     // ── Filter out interludes when in karaoke mode ──
@@ -179,57 +182,45 @@ internal fun SyncedLyricsCompose(
         }
     }
 
-    // Frame-paced karaoke clock. The player position is an uneven audio callback snapshot;
-    // advancing by frame time keeps the sweep smooth, while gentle correction prevents drift.
+    // Interpolate from Media3's live playback position at display-frame cadence. The
+    // dedicated clock applies bounded phase correction and re-anchors on seeks, pauses,
+    // invalid frame gaps and decoder clock discontinuities.
     val lyricClock = remember { mutableIntStateOf(currentPositionProvider().coerceAtLeast(0)) }
+    val karaokePlaybackClock = remember(currentSong?.id) { KaraokePlaybackClock() }
     LaunchedEffect(
         isPlaying, currentSong?.id, lyrics, currentPositionProvider, playbackSpeedProvider, isKaraokeMode
     ) {
-        var shownMs = currentPositionProvider().coerceAtLeast(0).toDouble()
-        var lastFrameNanos = -1L
-        lyricClock.intValue = shownMs.roundToInt()
+        val initialPosition = currentPositionProvider().coerceAtLeast(0)
+        karaokePlaybackClock.reset(initialPosition)
+        lyricClock.intValue = initialPosition
+
         while (true) {
             if (!isPlaying) {
-                // A paused playhead must stay still; this also reflects paused seeks promptly.
+                // Keep paused seeks responsive without running an idle display-frame loop.
                 val actualMs = currentPositionProvider().coerceAtLeast(0)
-                shownMs = actualMs.toDouble()
-                lastFrameNanos = -1L
+                karaokePlaybackClock.reset(actualMs)
                 if (lyricClock.intValue != actualMs) lyricClock.intValue = actualMs
-                // A paused lyrics screen needs to notice occasional seeks, not poll at 25 Hz.
-                delay(if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 250L else 120L)
+                delay(if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 80L else 60L)
             } else if (!isKaraokeMode) {
-                // Ordinary synced lyrics need line changes, not a per-frame word sweep.
+                // Ordinary synced lyrics only need accurate line changes, not word-sweep FPS.
                 val interval = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 84L else 40L
                 delay(interval)
                 val actualMs = currentPositionProvider().coerceAtLeast(0)
-                shownMs = actualMs.toDouble()
-                lastFrameNanos = -1L
                 if (lyricClock.intValue != actualMs) lyricClock.intValue = actualMs
             } else {
                 withFrameNanos {
-                    // Use the shared player frame timestamp rather than an independent
-                    // display callback, so karaoke, progress and visualizer obey one rate.
                     val frameNanos = karaokeFrameTimeNanos.value
-                    if (frameNanos <= 0L || frameNanos == lastFrameNanos) {
-                        return@withFrameNanos
+                    if (frameNanos <= 0L) return@withFrameNanos
+
+                    val framePosition = karaokePlaybackClock.update(
+                        frameTimeNanos = frameNanos,
+                        actualPositionMs = currentPositionProvider(),
+                        playbackSpeed = playbackSpeedProvider(),
+                        isPlaying = true
+                    )
+                    if (lyricClock.intValue != framePosition) {
+                        lyricClock.intValue = framePosition
                     }
-                    val actualMs = currentPositionProvider().coerceAtLeast(0).toDouble()
-                    if (lastFrameNanos < 0L || frameNanos <= lastFrameNanos) {
-                        shownMs = actualMs
-                    } else {
-                        val elapsedMs = (frameNanos - lastFrameNanos) / 1_000_000.0
-                        val speed = playbackSpeedProvider().takeIf { it.isFinite() && it > 0f } ?: 1f
-                        shownMs += elapsedMs * speed
-                        val errorMs = actualMs - shownMs
-                        shownMs = if (abs(errorMs) > 250.0) {
-                            actualMs
-                        } else {
-                            shownMs + errorMs * 0.06
-                        }
-                    }
-                    lastFrameNanos = frameNanos
-                    val framePosition = shownMs.roundToInt().coerceAtLeast(0)
-                    if (lyricClock.intValue != framePosition) lyricClock.intValue = framePosition
                 }
             }
         }
