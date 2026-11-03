@@ -425,7 +425,8 @@ class MainActivity : AppCompatActivity() {
                     // Root tabs must measure their scroll viewport above the collapsed mini-player.
                     // Otherwise the last rows can scroll underneath the overlay and become unreachable.
                     val miniPlayerScrollReserve = if (
-                        currentSong != null && !isPlayerExpanded && currentRoute in rootTabRoutes
+                        currentSong != null && !isPlayerExpanded &&
+                            currentRoute != null && currentRoute in rootTabRoutes
                     ) {
                         miniPlayerHeight + if (useNavigationRail) 8.dp + systemBottomInset else 4.dp
                     } else 0.dp
