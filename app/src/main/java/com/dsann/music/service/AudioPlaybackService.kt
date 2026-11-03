@@ -986,7 +986,9 @@ class AudioPlaybackService : MediaSessionService() {
             action == ACTION_WIDGET_FETCH_LYRICS -> requestWidgetLyrics()
             action == ACTION_WIDGET_REFRESH_STATE -> {
                 if (player.currentMediaItem == null && viewModel == null) {
-                    restorePersistedPlaybackForWidget(autoPlay = false)
+                    // Rebuild the widget's labels/artwork from disk without resolving a stream
+                    // or starting network work just because a widget is being refreshed.
+                    loadRestoredWidgetSnapshot()
                 }
                 updateWidgetState(player.isPlaying)
             }
@@ -1785,9 +1787,11 @@ class AudioPlaybackService : MediaSessionService() {
             return
         }
         if (player.currentMediaItem == null && viewModel == null) {
-            // A stale widget may still carry the old Pause PendingIntent if Android killed
-            // the service during playback. Restore the saved item paused rather than no-op.
-            restorePersistedPlaybackForWidget(autoPlay = false)
+            // A stale widget may still carry Pause after Android stopped the old service.
+            // Playback is already stopped; refresh the saved display state without resolving
+            // the stream. The next Play tap will rehydrate it when explicitly requested.
+            loadRestoredWidgetSnapshot()
+            updateWidgetState(false)
             return
         }
         if (player.isPlaying) {
@@ -2614,9 +2618,16 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     fun updateWidgetState(isPlaying: Boolean) {
-        val position = player.currentPosition.coerceAtLeast(0L)
-        val duration = player.duration.coerceAtLeast(0L)
         val activeSong = viewModel?.currentSong?.value ?: widgetRestoredSong
+        val playerHasItem = player.currentMediaItem != null
+        val position = if (playerHasItem) {
+            player.currentPosition.coerceAtLeast(0L)
+        } else {
+            com.dsann.music.util.PlaybackStateManager.getLastPosition(applicationContext).coerceAtLeast(0L)
+        }
+        val duration = player.duration.takeIf {
+            playerHasItem && it > 0L && it != androidx.media3.common.C.TIME_UNSET
+        } ?: activeSong?.duration?.coerceAtLeast(0L) ?: 0L
         val item = player.currentMediaItem
         val song = activeSong ?: item?.let { mediaItem ->
             val uri = mediaItem.localConfiguration?.uri
