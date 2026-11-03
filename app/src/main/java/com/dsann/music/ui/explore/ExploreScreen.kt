@@ -202,6 +202,7 @@ fun ExploreScreen(
     val sectionDetail = uiState.sectionDetail
     val isLoadingDetail = uiState.isLoadingDetail
     val isRefreshing = uiState.isRefreshing
+    val isLoadingMoreHome by viewModel.isLoadingMoreHome.collectAsStateWithLifecycle()
     val searchHistory = uiState.searchHistory
     val homeMoods = uiState.homeMoods
     val detailStack = uiState.detailStack
@@ -1065,8 +1066,7 @@ fun ExploreScreen(
                                                                         )
                                                                     }
                                                                     item {
-                                                                        val isLoadingMore by viewModel.isLoadingMoreHome.collectAsStateWithLifecycle()
-                                                                        if (isLoadingMore) {
+                                                                        if (isLoadingMoreHome) {
                                                                             Box(
                                                                                 modifier = Modifier.fillMaxWidth()
                                                                                     .padding(24.dp),
@@ -1081,10 +1081,16 @@ fun ExploreScreen(
                                                                         }
                                                                     }
                                                                 }
-                                                                LaunchedEffect(homeListState) {
+                                                                // Recreate the pagination observer when a page is appended or its loading
+                                                                // state changes; otherwise the captured section count becomes stale.
+                                                                LaunchedEffect(homeListState, homeSections.size, isLoadingMoreHome) {
                                                                     snapshotFlow { homeListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
                                                                         .collect { lastVisibleIndex ->
-                                                                            if (lastVisibleIndex != null && lastVisibleIndex >= homeSections.size) {
+                                                                            if (
+                                                                                !isLoadingMoreHome &&
+                                                                                lastVisibleIndex != null &&
+                                                                                lastVisibleIndex >= homeSections.size
+                                                                            ) {
                                                                                 viewModel.loadMoreHomeSections()
                                                                             }
                                                                         }
