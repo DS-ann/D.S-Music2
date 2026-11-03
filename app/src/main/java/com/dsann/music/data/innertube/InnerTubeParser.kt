@@ -753,42 +753,81 @@ object InnerTubeParser {
 
     fun parseHomePage(json: JsonObject): HomePage {
         val sections = mutableListOf<HomeSection>()
+        val seenSectionTitles = linkedSetOf<String>()
+
+        fun addSection(section: JsonObject) {
+            val parsed = parseHomeSection(section) ?: return
+            val key = parsed.title.trim().lowercase()
+            if (key.isNotEmpty() && seenSectionTitles.add(key)) {
+                sections.add(parsed)
+            }
+        }
+
+        fun addSectionContents(contents: JsonArray?) {
+            contents?.forEach { element ->
+                if (element.isJsonObject) addSection(element.asJsonObject)
+            }
+        }
 
         try {
-            val contents = json.path(
-                "contents.singleColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.contents"
-            )?.asJsonArray
-
-            contents?.forEach { section ->
-                parseHomeSection(section.asJsonObject)?.let { sections.add(it) }
+            // YouTube Music serves multiple browse layouts. Walk every section-list renderer
+            // instead of assuming all clients return singleColumnBrowseResultsRenderer.
+            findObjects(json, "sectionListRenderer").forEach { renderer ->
+                addSectionContents(renderer.getAsJsonArray("contents"))
+            }
+            findObjects(json, "sectionListContinuation").forEach { renderer ->
+                addSectionContents(renderer.getAsJsonArray("contents"))
             }
 
-            // Handle continuations
-            var continuation = json.path(
-                "contents.singleColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.continuations.0.nextContinuationData.continuation"
-            )?.asString
-
-            // Parse continuation sections too
-            val contSections = json.path("continuationContents.sectionListContinuation.contents")?.asJsonArray
-            contSections?.forEach { section ->
-                parseHomeSection(section.asJsonObject)?.let { sections.add(it) }
-            }
-            if (continuation == null) {
-                continuation = json.path("continuationContents.sectionListContinuation.continuations.0.nextContinuationData.continuation")?.asString
-            }
-            // Extract Moods / Categories from Header Chips
-            val moods = mutableListOf<String>()
-            val chips = json.path(
-                "contents.singleColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.header.chipCloudRenderer.chips"
-            )?.asJsonArray
-            chips?.forEach { chip ->
-                val text = chip.asJsonObject.path("chipCloudChipRenderer.text.runs.0.text")?.asString
-                if (!text.isNullOrBlank()) {
-                    moods.add(text)
+            // Some Explore categories are represented as shelves outside a section-list
+            // wrapper. Parse those supported shelf renderers as a fallback and deduplicate.
+            val shelfTypes = listOf(
+                "musicCarouselShelfRenderer",
+                "musicShelfRenderer",
+                "musicPlaylistShelfRenderer",
+                "musicCardShelfRenderer",
+                "gridRenderer"
+            )
+            shelfTypes.forEach { type ->
+                findObjects(json, type).forEach { renderer ->
+                    addSection(JsonObject().apply { add(type, renderer) })
                 }
             }
 
-            return HomePage(sections, continuation, moods)
+            val continuationCandidates =
+                findObjects(json, "sectionListRenderer").mapNotNull { renderer ->
+                    renderer.path("continuations.0.nextContinuationData.continuation")?.asString
+                } +
+                findObjects(json, "sectionListContinuation").mapNotNull { renderer ->
+                    renderer.path("continuations.0.nextContinuationData.continuation")?.asString
+                } +
+                findObjects(json, "musicCarouselShelfRenderer").mapNotNull { renderer ->
+                    renderer.path("continuations.0.nextContinuationData.continuation")?.asString
+                } +
+                findObjects(json, "musicShelfRenderer").mapNotNull { renderer ->
+                    renderer.path("continuations.0.nextContinuationData.continuation")?.asString
+                } +
+                findObjects(json, "musicPlaylistShelfRenderer").mapNotNull { renderer ->
+                    renderer.path("continuations.0.nextContinuationData.continuation")?.asString
+                } +
+                findObjects(json, "gridRenderer").mapNotNull { renderer ->
+                    renderer.path("continuations.0.nextContinuationData.continuation")?.asString
+                } +
+                findObjects(json, "continuationItemRenderer").mapNotNull { renderer ->
+                    renderer.path("continuationEndpoint.continuationCommand.token")?.asString
+                }
+            val continuation = continuationCandidates.firstOrNull { it.isNotBlank() }
+
+            // Header chips can appear in either single- or two-column browse responses.
+            val moods = mutableListOf<String>()
+            findFirstObject(json, "chipCloudRenderer")?.getAsJsonArray("chips")?.forEach { chip ->
+                val renderer = chip.takeIf { it.isJsonObject }?.asJsonObject ?: return@forEach
+                val text = renderer.path("chipCloudChipRenderer.text.runs.0.text")?.asString
+                    ?: renderer.path("chipCloudChipRenderer.text.simpleText")?.asString
+                if (!text.isNullOrBlank()) moods.add(text)
+            }
+
+            return HomePage(sections, continuation, moods.distinct())
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing home page", e)
         }
@@ -797,41 +836,79 @@ object InnerTubeParser {
     }
 
     private fun parseHomeSection(section: JsonObject): HomeSection? {
-        val carousel = section.getAsJsonObject("musicCarouselShelfRenderer") ?: return null
-        val header = carousel.path(
-            "header.musicCarouselShelfBasicHeaderRenderer.title.runs.0.text"
-        )?.asString ?: return null
+        val shelf = section.getAsJsonObject("musicCarouselShelfRenderer")
+            ?: section.getAsJsonObject("musicShelfRenderer")
+            ?: section.getAsJsonObject("musicPlaylistShelfRenderer")
+            ?: section.getAsJsonObject("musicCardShelfRenderer")
+            ?: section.getAsJsonObject("gridRenderer")
+            ?: return null
 
+        val titlePaths = listOf(
+            "header.musicCarouselShelfBasicHeaderRenderer.title.runs.0.text",
+            "header.musicCarouselShelfBasicHeaderRenderer.title.simpleText",
+            "header.musicShelfHeaderRenderer.title.runs.0.text",
+            "header.musicShelfHeaderRenderer.title.simpleText",
+            "header.musicPlaylistShelfHeaderRenderer.title.runs.0.text",
+            "header.musicPlaylistShelfHeaderRenderer.title.simpleText",
+            "header.musicCardShelfHeaderBasicRenderer.title.runs.0.text",
+            "header.musicCardShelfHeaderBasicRenderer.title.simpleText",
+            "header.gridHeaderRenderer.title.runs.0.text",
+            "header.gridHeaderRenderer.title.simpleText",
+            "title.runs.0.text",
+            "title.simpleText"
+        )
+        val title = titlePaths.asSequence()
+            .mapNotNull { path -> shelf.path(path)?.asString?.takeIf { it.isNotBlank() } }
+            .firstOrNull()
+            ?: return null
+
+        val contents = shelf.getAsJsonArray("contents") ?: shelf.getAsJsonArray("items")
         val items = mutableListOf<SearchItem>()
-        val contents = carousel.getAsJsonArray("contents")
-
-        contents?.forEach { content ->
-            val obj = content.asJsonObject
+        contents?.forEach { element ->
+            val obj = element.takeIf { it.isJsonObject }?.asJsonObject ?: return@forEach
             val twoRowRenderer = obj.getAsJsonObject("musicTwoRowItemRenderer")
             val listRenderer = obj.getAsJsonObject("musicResponsiveListItemRenderer")
 
-            if (twoRowRenderer != null) {
-                parseTwoRowItem(twoRowRenderer)?.let { items.add(it) }
-            } else if (listRenderer != null) {
-                parseSearchItem(obj)?.let { items.add(it) }
+            when {
+                twoRowRenderer != null -> parseTwoRowItem(twoRowRenderer)?.let { items.add(it) }
+                listRenderer != null -> parseSearchItem(obj)?.let { items.add(it) }
+                obj.getAsJsonObject("musicMultiRowListItemRenderer") != null -> {
+                    parsePodcastEpisodes(obj).forEach { items.add(SearchItem.Song(it)) }
+                }
+                else -> parseSearchItem(obj)?.let { items.add(it) }
             }
         }
 
-        if (items.isEmpty()) return null
+        val uniqueItems = items.distinctBy { item ->
+            when (item) {
+                is SearchItem.Song -> "song:${item.song.videoId}"
+                is SearchItem.Album -> "album:${item.album.browseId}"
+                is SearchItem.Artist -> "artist:${item.artist.browseId}"
+                is SearchItem.Playlist -> "playlist:${item.playlist.playlistId}"
+            }
+        }
+        if (uniqueItems.isEmpty()) return null
 
-        val browseEndpoint = carousel.path(
-            "header.musicCarouselShelfBasicHeaderRenderer.moreContentButton.buttonRenderer.navigationEndpoint.browseEndpoint.browseId"
-        )?.asString
-
-        val params = carousel.path(
-            "header.musicCarouselShelfBasicHeaderRenderer.moreContentButton.buttonRenderer.navigationEndpoint.browseEndpoint.params"
-        )?.asString
+        val browseEndpointPaths = listOf(
+            "header.musicCarouselShelfBasicHeaderRenderer.moreContentButton.buttonRenderer.navigationEndpoint.browseEndpoint.browseId",
+            "header.musicShelfHeaderRenderer.moreContentButton.buttonRenderer.navigationEndpoint.browseEndpoint.browseId",
+            "header.musicPlaylistShelfHeaderRenderer.moreContentButton.buttonRenderer.navigationEndpoint.browseEndpoint.browseId"
+        )
+        val paramsPaths = listOf(
+            "header.musicCarouselShelfBasicHeaderRenderer.moreContentButton.buttonRenderer.navigationEndpoint.browseEndpoint.params",
+            "header.musicShelfHeaderRenderer.moreContentButton.buttonRenderer.navigationEndpoint.browseEndpoint.params",
+            "header.musicPlaylistShelfHeaderRenderer.moreContentButton.buttonRenderer.navigationEndpoint.browseEndpoint.params"
+        )
 
         return HomeSection(
-            title = header,
-            items = items,
-            browseEndpoint = browseEndpoint,
-            params = params
+            title = title,
+            items = uniqueItems,
+            browseEndpoint = browseEndpointPaths.asSequence()
+                .mapNotNull { shelf.path(it)?.asString?.takeIf(String::isNotBlank) }
+                .firstOrNull(),
+            params = paramsPaths.asSequence()
+                .mapNotNull { shelf.path(it)?.asString?.takeIf(String::isNotBlank) }
+                .firstOrNull()
         )
     }
 
