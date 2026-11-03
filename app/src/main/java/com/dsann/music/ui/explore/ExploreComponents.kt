@@ -39,8 +39,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -84,6 +86,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -107,9 +110,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.imageLoader
 import coil.request.ImageRequest
 import coil.size.Precision
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -957,20 +962,26 @@ fun HomeSectionRow(
 
             // 2. YOUR DAILY DISCOVER â€” Large Immersive Cards
             section.title.contains("daily discover", ignoreCase = true) -> {
+                val rowState = rememberLazyListState()
+                val prefetchUrls = remember(section.items) {
+                    section.items.map { it.exploreThumbnailUrl() }
+                }
+                PrefetchExploreRowImages(prefetchUrls, rowState, targetSizePx = 384)
                 LazyRow(
+                    state = rowState,
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     itemsIndexed(
                         items = section.items,
-                        key = { index, item ->
+                        key = { _, item ->
                             val baseKey = when (item) {
                                 is SearchItem.Song -> "discover-song-${item.song.videoId}"
                                 is SearchItem.Album -> "discover-album-${item.album.browseId}"
                                 is SearchItem.Artist -> "discover-artist-${item.artist.browseId}"
                                 is SearchItem.Playlist -> "discover-playlist-${item.playlist.playlistId}"
                             }
-                            "$index-$baseKey"
+                            baseKey
                         }
                     ) { _, item ->
                         val title = when (item) {
@@ -1060,20 +1071,26 @@ fun HomeSectionRow(
 
             // 3. FROM THE COMMUNITY â€” Nested Card with Song Preview
             section.title.contains("community", ignoreCase = true) -> {
+                val rowState = rememberLazyListState()
+                val prefetchUrls = remember(section.items) {
+                    section.items.map { it.exploreThumbnailUrl() }
+                }
+                PrefetchExploreRowImages(prefetchUrls, rowState, targetSizePx = 256)
                 LazyRow(
+                    state = rowState,
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     itemsIndexed(
                         items = section.items,
-                        key = { index, item ->
+                        key = { _, item ->
                             val baseKey = when (item) {
                                 is SearchItem.Song -> "community-song-${item.song.videoId}"
                                 is SearchItem.Album -> "community-album-${item.album.browseId}"
                                 is SearchItem.Artist -> "community-artist-${item.artist.browseId}"
                                 is SearchItem.Playlist -> "community-playlist-${item.playlist.playlistId}"
                             }
-                            "$index-$baseKey"
+                            baseKey
                         }
                     ) { _, item ->
                         val title = when (item) {
@@ -1171,15 +1188,28 @@ fun HomeSectionRow(
                         section.items.filterIsInstance<SearchItem.Song>()
                     }
                     val chunkedSongs = remember(songItems) { songItems.chunked(4) }
+                    val rowState = rememberLazyListState()
+                    val prefetchUrls = remember(songItems) {
+                        songItems.map { it.song.thumbnailUrl }
+                    }
+                    PrefetchExploreRowImages(
+                        thumbnailUrls = prefetchUrls,
+                        state = rowState,
+                        targetSizePx = 192,
+                        lookAheadCount = 4
+                    )
                     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                         // Two four-song columns should fit inside the current viewport.
                         // A fixed 320dp width pushed the second column beyond phone screens.
                         val songColumnWidth = ((maxWidth - 48.dp) / 2f).coerceAtLeast(120.dp)
                         LazyRow(
+                            state = rowState,
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            itemsIndexed(items = chunkedSongs, key = { idx, _ -> "song-col-$idx-${section.title}" }) { _, songChunk ->
+                            itemsIndexed(items = chunkedSongs, key = { _, songChunk ->
+                                "song-col-${section.title}-${songChunk.firstOrNull()?.song?.videoId.orEmpty()}"
+                            }) { _, songChunk ->
                                 Column(
                                     modifier = Modifier.width(songColumnWidth),
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -1198,20 +1228,26 @@ fun HomeSectionRow(
                         }
                     }
                 } else {
+                    val rowState = rememberLazyListState()
+                    val prefetchUrls = remember(section.items) {
+                        section.items.map { it.exploreThumbnailUrl() }
+                    }
+                    PrefetchExploreRowImages(prefetchUrls, rowState, targetSizePx = 384)
                     LazyRow(
+                        state = rowState,
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         itemsIndexed(
                             items = section.items,
-                            key = { index, item ->
+                            key = { _, item ->
                                 val baseKey = when (item) {
                                     is SearchItem.Song -> "carousel-song-${item.song.videoId}-${section.title}"
                                     is SearchItem.Album -> "carousel-album-${item.album.browseId}-${section.title}"
                                     is SearchItem.Artist -> "carousel-artist-${item.artist.browseId}-${section.title}"
                                     is SearchItem.Playlist -> "carousel-playlist-${item.playlist.playlistId}-${section.title}"
                                 }
-                                "$index-$baseKey"
+                                baseKey
                             }
                         ) { _, item ->
                             HomeCarouselItem(
@@ -1793,23 +1829,73 @@ internal fun exploreImageRequestTargetPx(targetSizePx: Int): Int =
     }
 
 /**
- * Keeps Coil requests stable while LazyColumn/LazyRow parents recompose during scrolling.
- * A request is rebuilt only when its data or requested target size actually changes.
+ * Uses stable source + decode-size keys so an artwork tile can be restored from Coil's
+ * memory/disk cache after its LazyRow item leaves composition. The size is part of the
+ * memory key to prevent a small thumbnail from replacing a larger player/detail decode.
  */
+private fun buildExploreImageRequest(
+    context: android.content.Context,
+    data: Any?,
+    targetSizePx: Int
+): ImageRequest? {
+    val cacheIdentity = data?.toString()?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    val effectiveTargetSizePx = exploreImageRequestTargetPx(targetSizePx)
+    return ImageRequest.Builder(context)
+        .data(data)
+        .size(effectiveTargetSizePx, effectiveTargetSizePx)
+        .memoryCacheKey("dsmusic-explore:$cacheIdentity@$effectiveTargetSizePx")
+        .diskCacheKey("dsmusic-explore:$cacheIdentity")
+        .precision(Precision.INEXACT)
+        .crossfade(false)
+        .build()
+}
+
 @Composable
 private fun rememberExploreImageRequest(data: Any?, targetSizePx: Int): ImageRequest? {
     val context = LocalContext.current
-    // Older devices pay a high cost for large software bitmaps. All Explore cards remain
-    // fully functional, but API 23 uses a smaller decode target than their layout bounds.
     val effectiveTargetSizePx = exploreImageRequestTargetPx(targetSizePx)
     return remember(context, data, effectiveTargetSizePx) {
-        data?.let {
-            ImageRequest.Builder(context)
-                .data(it)
-                .size(effectiveTargetSizePx, effectiveTargetSizePx)
-                .precision(Precision.INEXACT)
-                .crossfade(false)
-                .build()
+        buildExploreImageRequest(context, data, effectiveTargetSizePx)
+    }
+}
+
+private fun SearchItem.exploreThumbnailUrl(): String = when (this) {
+    is SearchItem.Song -> song.thumbnailUrl
+    is SearchItem.Album -> album.thumbnailUrl
+    is SearchItem.Artist -> artist.thumbnailUrl
+    is SearchItem.Playlist -> playlist.thumbnailUrl
+}
+
+/**
+ * Decode the next off-screen cards before they enter the viewport. This gives horizontal
+ * shelves screenshot-like continuity without rasterizing the entire feed into one huge bitmap.
+ * collectLatest cancels obsolete prefetch work when the user rapidly swipes to another position.
+ */
+@Composable
+private fun PrefetchExploreRowImages(
+    thumbnailUrls: List<String>,
+    state: LazyListState,
+    targetSizePx: Int,
+    lookAheadCount: Int = 2
+) {
+    val context = LocalContext.current
+    val imageLoader = context.imageLoader
+    LaunchedEffect(state, thumbnailUrls, targetSizePx, lookAheadCount, imageLoader) {
+        snapshotFlow {
+            state.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+        }.distinctUntilChanged().collectLatest { lastVisibleIndex ->
+            val startIndex = (lastVisibleIndex + 1).coerceAtLeast(0)
+            val upcomingUrls = thumbnailUrls.asSequence()
+                .drop(startIndex)
+                .filter { it.isNotBlank() }
+                .distinct()
+                .take(lookAheadCount)
+                .toList()
+            upcomingUrls.forEach { url ->
+                val request = buildExploreImageRequest(context, url, targetSizePx)
+                    ?: return@forEach
+                imageLoader.execute(request)
+            }
         }
     }
 }
