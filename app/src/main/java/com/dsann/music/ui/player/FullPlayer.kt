@@ -934,14 +934,16 @@ fun FullPlayer(
         // so clamp the animated inset before passing it to Modifier.padding.
         val queueDockInset = animatedQueueDockInset.coerceAtLeast(0.dp)
         // Dense controls are used for landscape and short-height resized player windows.
-        val compactLandscape = isLandscapeWindow || screenHeight < 680.dp
+        val compactLandscape = isLandscapeWindow || screenHeight < 760.dp
+        val portraitArtHeightLimit = screenHeight * if (screenHeight < 760.dp) 0.36f else 0.40f *
+            artworkScaleFactor
         val albumArtSize = if (isLandscapeWindow) {
             minOf(screenHeight * 0.28f, screenWidth * 0.30f) * (artScale / 0.9f)
         } else if (useWidePlayer) {
             minOf(screenHeight * 0.50f, screenWidth * 0.42f) * (artScale / 0.9f)
         } else {
             // Keep portrait artwork proportional to the available window height as well as width.
-            minOf(screenWidth * artScale, screenHeight * 0.40f * artworkScaleFactor)
+            minOf(screenWidth * artScale, portraitArtHeightLimit)
         }
 
         val density = androidx.compose.ui.platform.LocalDensity.current
