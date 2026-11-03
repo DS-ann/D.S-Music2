@@ -1019,7 +1019,6 @@ class AudioPlaybackService : MediaSessionService() {
                 }
             }
             com.dsann.music.util.PlaybackStateManager.savePosition(applicationContext, position)
-            updateWidgetState(player.isPlaying)
         }
         // Respect Media3's task-removal lifecycle. Widget PendingIntents restore paused
         // playback on demand instead of keeping a paused MediaSessionService alive.
