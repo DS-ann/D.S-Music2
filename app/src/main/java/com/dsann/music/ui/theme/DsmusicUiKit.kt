@@ -28,6 +28,9 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
@@ -44,6 +47,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -915,6 +919,7 @@ fun ModalBottomSheet(
 
 class DsmusicPullToRefreshState {
     var progress by mutableFloatStateOf(0f)
+    internal var pullDistancePx by mutableFloatStateOf(0f)
 }
 @Composable fun rememberPullToRefreshState(): DsmusicPullToRefreshState = remember { DsmusicPullToRefreshState() }
 
@@ -943,24 +948,56 @@ fun PullToRefreshBox(
     content: @Composable BoxScope.() -> Unit
 ) {
     val density = LocalDensity.current
-    var drag by remember { mutableFloatStateOf(0f) }
-    Box(
-        modifier = modifier.pointerInput(isRefreshing) {
-            detectDragGestures(
-                onDragStart = { drag = 0f },
-                onDrag = { change, amount ->
-                    if (amount.y > 0f) drag += amount.y
-                    state.progress = (drag / with(density) { 72.dp.toPx() }).coerceIn(0f, 1f)
-                },
-                onDragEnd = {
-                    if (state.progress >= 0.9f && !isRefreshing) onRefresh()
-                    state.progress = 0f
-                    drag = 0f
-                },
-                onDragCancel = { state.progress = 0f; drag = 0f }
-            )
+    val thresholdPx = with(density) { 72.dp.toPx() }
+    val latestOnRefresh by rememberUpdatedState(onRefresh)
+    val latestIsRefreshing by rememberUpdatedState(isRefreshing)
+    val refreshConnection = remember(state, thresholdPx) {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (source != NestedScrollSource.UserInput || latestIsRefreshing) {
+                    return Offset.Zero
+                }
+
+                if (available.y > 0f) {
+                    // Only the unconsumed downward drag reaches here when the list is at
+                    // its top. Normal scrolling inside the feed remains owned by LazyColumn.
+                    state.pullDistancePx += available.y
+                    state.progress = (state.pullDistancePx / thresholdPx).coerceIn(0f, 1f)
+                    return Offset(0f, available.y)
+                }
+
+                if (available.y < 0f && state.pullDistancePx > 0f) {
+                    val consumedY = maxOf(available.y, -state.pullDistancePx)
+                    state.pullDistancePx = (state.pullDistancePx + consumedY).coerceAtLeast(0f)
+                    state.progress = (state.pullDistancePx / thresholdPx).coerceIn(0f, 1f)
+                    return Offset(0f, consumedY)
+                }
+
+                return Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                val shouldRefresh = state.progress >= 0.9f && !latestIsRefreshing
+                state.pullDistancePx = 0f
+                state.progress = 0f
+                if (shouldRefresh) latestOnRefresh()
+                return Velocity.Zero
+            }
         }
-    ) {
+    }
+
+    LaunchedEffect(isRefreshing, state) {
+        if (isRefreshing) {
+            state.pullDistancePx = 0f
+            state.progress = 0f
+        }
+    }
+
+    Box(modifier = modifier.nestedScroll(refreshConnection)) {
         content()
         indicator()
     }
