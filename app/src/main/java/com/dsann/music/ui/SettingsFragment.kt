@@ -2035,7 +2035,7 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
                     SettingsCategoryItem(
                         title = "Account & Sync",
                         subtitle = "YouTube Music login, history sync",
-                        icon = Icons.Rounded.AccountCircle,
+                        iconResId = R.drawable.ic_settings_account,
                         onClick = { navController.navigate(SettingsRoute.Account.route) }
                     )
                 },
@@ -2043,7 +2043,7 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
                     SettingsCategoryItem(
                         title = "Playback",
                         subtitle = "Audio behavior, crossfade, audio focus",
-                        icon = Icons.Rounded.PlayCircle,
+                        iconResId = R.drawable.ic_settings_playback,
                         onClick = { navController.navigate(SettingsRoute.Playback.route) }
                     )
                 },
@@ -2051,7 +2051,7 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
                     SettingsCategoryItem(
                         title = "Controls & Gestures",
                         subtitle = "Player swipes, double tap, long press and mini-player actions",
-                        icon = Icons.Rounded.TouchApp,
+                        iconResId = R.drawable.ic_settings_gestures,
                         onClick = { navController.navigate(SettingsRoute.Controls.route) }
                     )
                 },
@@ -2059,7 +2059,7 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
                     SettingsCategoryItem(
                         title = "Music Management",
                         subtitle = "Manage folders, refresh library, storage",
-                        icon = Icons.Rounded.LibraryMusic,
+                        iconResId = R.drawable.ic_settings_library,
                         onClick = { navController.navigate(SettingsRoute.MusicManagement.route) }
                     )
                 },
@@ -2067,7 +2067,7 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
                     SettingsCategoryItem(
                         title = "Customize",
                         subtitle = "Theme, colors, icons, player, lyrics, typography and navigation",
-                        icon = Icons.Rounded.Palette,
+                        iconResId = R.drawable.ic_settings_customize,
                         onClick = { navController.navigate(SettingsRoute.Appearance.route) }
                     )
                 },
@@ -2075,7 +2075,7 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
                     SettingsCategoryItem(
                         title = "Backup & Restore",
                         subtitle = "Export and import your library and settings",
-                        icon = Icons.Rounded.SettingsBackupRestore,
+                        iconResId = R.drawable.ic_settings_backup,
                         onClick = { navController.navigate(SettingsRoute.BackupRestore.route) }
                     )
                 },
@@ -2083,7 +2083,7 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
                     SettingsCategoryItem(
                         title = "Feedback & Bug Reports",
                         subtitle = "Report issues, request features, export logs",
-                        icon = Icons.Rounded.BugReport,
+                        iconResId = R.drawable.ic_settings_feedback,
                         onClick = { navController.navigate(SettingsRoute.Feedback.route) }
                     )
                 },
@@ -2091,7 +2091,7 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
                     SettingsCategoryItem(
                         title = "About",
                         subtitle = "App version, credits, updates",
-                        icon = Icons.Rounded.Info,
+                        iconResId = R.drawable.ic_settings_info,
                         onClick = { navController.navigate(SettingsRoute.About.route) }
                     )
                 }
@@ -2106,7 +2106,7 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
 private fun SettingsCategoryItem(
     title: String,
     subtitle: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconResId: Int,
     onClick: () -> Unit
 ) {
     DsmusicListItem(
@@ -2125,8 +2125,8 @@ private fun SettingsCategoryItem(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = icon, 
-                    contentDescription = null, 
+                    painter = androidx.compose.ui.res.painterResource(id = iconResId),
+                    contentDescription = null,
                     tint = DsmusicTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(28.dp)
                 )
