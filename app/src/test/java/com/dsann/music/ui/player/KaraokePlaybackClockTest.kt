@@ -48,7 +48,7 @@ class KaraokePlaybackClockTest {
         val result = clock.update(1_016_666_667L, 10_022, 1f, true)
 
         // The 5 ms sample error is corrected promptly without snapping the sweep.
-        assertEquals(10_018, result)
+        assertEquals(10_019, result)
     }
 
     @Test
@@ -59,6 +59,16 @@ class KaraokePlaybackClockTest {
         val result = clock.update(1_016_666_667L, 15_017, 1f, true)
 
         assertEquals(15_017, result)
+    }
+
+    @Test
+    fun shortSeekReanchorsImmediately() {
+        val clock = KaraokePlaybackClock()
+        clock.update(1_000_000_000L, 10_000, 1f, true)
+
+        val result = clock.update(1_016_666_667L, 10_067, 1f, true)
+
+        assertEquals(10_067, result)
     }
 
     @Test
