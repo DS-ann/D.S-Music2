@@ -945,6 +945,7 @@ fun ModalBottomSheet(
 ) {
     val isLandscapeWindow = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val useCenteredLandscape = centeredLandscape && isLandscapeWindow
+    val actualSheetShape = if (useCenteredLandscape) RoundedCornerShape(22.dp) else shape
     if (sheetState.isVisible) {
         Dialog(onDismissRequest = { onDismissRequest(); sheetState.isVisible = false }, properties = properties) {
             Box(
@@ -957,9 +958,9 @@ fun ModalBottomSheet(
                         .widthIn(max = sheetMaxWidth)
                         .fillMaxWidth()
                         .then(if (useCenteredLandscape) Modifier.offset(x = centerOffsetX) else Modifier)
-                        .clip(shape)
+                        .clip(actualSheetShape)
                         .background(containerColor)
-                        .border(1.25.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.88f), shape)
+                        .border(1.25.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.88f), actualSheetShape)
                         .padding(bottom = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
