@@ -543,31 +543,37 @@ fun QueueListItem(
                     
                     Spacer(modifier = Modifier.width(4.dp))
                     
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "Drag to reorder",
-                        tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    Box(
                         modifier = Modifier
-                            .size(32.dp)
-                            .padding(4.dp)
-                            .pointerInput(dragDropState) {
-                                if (dragDropState == null || index < 0) return@pointerInput
-                                detectDragGestures(
+                            .size(48.dp)
+                            .pointerInput(dragDropState, index) {
+                                val state = dragDropState ?: return@pointerInput
+                                if (index < 0) return@pointerInput
+                                detectDragGesturesAfterLongPress(
                                     onDragStart = { offset ->
-                                        val item = dragDropState.lazyListState.layoutInfo.visibleItemsInfo.find { it.index == index }
+                                        val item = state.lazyListState.layoutInfo.visibleItemsInfo
+                                            .firstOrNull { it.index == index }
                                         if (item != null) {
-                                            dragDropState.onDragStart(Offset(offset.x, offset.y + item.offset))
+                                            state.onDragStart(Offset(offset.x, offset.y + item.offset))
                                         }
                                     },
-                                    onDragEnd = { dragDropState.onDragInterrupted() },
-                                    onDragCancel = { dragDropState.onDragInterrupted() },
+                                    onDragEnd = { state.onDragInterrupted() },
+                                    onDragCancel = { state.onDragInterrupted() },
                                     onDrag = { change, dragAmount ->
                                         change.consume()
-                                        dragDropState.onDrag(dragAmount)
+                                        state.onDrag(dragAmount)
                                     }
                                 )
-                            }
-                    )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Drag to reorder",
+                            tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                            modifier = Modifier.size(25.dp)
+                        )
+                    }
                 }
             }
         },
