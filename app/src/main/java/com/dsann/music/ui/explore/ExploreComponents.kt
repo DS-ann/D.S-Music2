@@ -1276,7 +1276,9 @@ fun HomeSectionRow(
                     val chunkedSongs = remember(songItems) { songItems.chunked(4) }
                     val rowState = rememberLazyListState()
                     val prefetchUrls = remember(songItems) {
-                        songItems.map { it.song.thumbnailUrl }
+                        songItems.mapNotNull { item ->
+                            item.song.thumbnailUrl?.takeIf { it.isNotBlank() }
+                        }
                     }
                     PrefetchExploreRowImages(
                         thumbnailUrls = prefetchUrls,
@@ -1951,7 +1953,7 @@ private fun SearchItem.exploreThumbnailUrl(): String = when (this) {
     is SearchItem.Album -> album.thumbnailUrl
     is SearchItem.Artist -> artist.thumbnailUrl
     is SearchItem.Playlist -> playlist.thumbnailUrl
-}
+} ?: ""
 
 /**
  * Decode the next off-screen cards before they enter the viewport. This gives horizontal
