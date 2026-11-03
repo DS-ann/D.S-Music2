@@ -196,7 +196,6 @@ fun ExploreScreen(
     val accountVM: AccountViewModel = viewModel()
     val userProfile by accountVM.userProfile.collectAsStateWithLifecycle()
     val accountHistory by accountVM.history.collectAsStateWithLifecycle()
-    val recentAccountHistory = remember(accountHistory) { accountHistory.take(10) }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -1826,6 +1825,7 @@ private fun ExploreCustomizerDialog(
         isLandscape: Boolean,
         onClearSearch: () -> Unit
     ) {
+        val recentAccountHistory = remember(accountHistory) { accountHistory.take(10) }
         // Avoid Material3 SearchBar's expanded full-window implementation here. On
         // legacy Android runtimes it can open an empty-looking overlay. Render the
         // active query-entry page in the normal Compose tree instead.
