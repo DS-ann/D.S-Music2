@@ -61,22 +61,22 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.PlaylistPlay
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.DateRange
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Face
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.PlaylistAdd
+import androidx.compose.material.icons.rounded.PlaylistPlay
+import androidx.compose.material.icons.rounded.Share
 import com.dsann.music.ui.theme.AlertDialog
 import com.dsann.music.ui.theme.Button
 import com.dsann.music.ui.theme.ButtonDefaults
@@ -418,7 +418,7 @@ fun DestructiveActionRow(
                 contentColor = DsmusicTheme.colorScheme.onSecondaryContainer
             )
         ) {
-            Icon(Icons.Default.PlaylistAdd, null, tint = DsmusicTheme.colorScheme.onSecondaryContainer)
+            Icon(Icons.Rounded.PlaylistAdd, null, tint = DsmusicTheme.colorScheme.onSecondaryContainer)
             Spacer(Modifier.width(8.dp))
             Text("Add to Playlist", style = DsmusicTheme.typography.labelLarge, fontFamily = GoogleSansFlex, color = DsmusicTheme.colorScheme.onSecondaryContainer)
         }
@@ -437,7 +437,7 @@ fun DestructiveActionRow(
                 contentColor = DsmusicTheme.colorScheme.onErrorContainer
             )
         ) {
-            Icon(Icons.Filled.DeleteOutline, null, tint = DsmusicTheme.colorScheme.onErrorContainer)
+            Icon(Icons.Rounded.DeleteOutline, null, tint = DsmusicTheme.colorScheme.onErrorContainer)
             Spacer(Modifier.width(8.dp))
             Text("Delete", style = DsmusicTheme.typography.labelLarge, fontFamily = GoogleSansFlex, color = DsmusicTheme.colorScheme.onErrorContainer)
         }
@@ -472,7 +472,7 @@ fun LocalPlaylistPickerDialog(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = DsmusicTheme.colorScheme.primaryContainer, contentColor = DsmusicTheme.colorScheme.onPrimaryContainer)
                 ) {
-                    Icon(Icons.Default.Add, null)
+                    Icon(Icons.Rounded.Add, null)
                     Spacer(Modifier.width(8.dp))
                     Text("Create New Playlist")
                 }
@@ -508,7 +508,7 @@ fun LocalPlaylistPickerDialog(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
-                                        Icons.Default.PlaylistPlay,
+                                        Icons.Rounded.PlaylistPlay,
                                         null,
                                         tint = DsmusicTheme.colorScheme.primary,
                                         modifier = Modifier.size(24.dp)
@@ -627,7 +627,7 @@ fun HeaderSection(
                 onClick = onEdit,
                 modifier = Modifier.background(DsmusicTheme.colorScheme.surfaceVariant, CircleShape)
             ) {
-                Icon(Icons.Filled.Edit, null)
+                Icon(Icons.Rounded.Edit, null)
             }
         }
     } else {
@@ -661,7 +661,7 @@ fun HeaderSection(
                         .background(DsmusicTheme.colorScheme.primaryContainer, CircleShape)
                 ) {
                     Icon(
-                        Icons.Filled.Edit,
+                        Icons.Rounded.Edit,
                         null,
                         tint = DsmusicTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(16.dp)
@@ -750,7 +750,7 @@ fun ActionButtonRow1(
             )
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.PlayArrow, null, modifier = Modifier.size(28.dp), tint = DsmusicTheme.colorScheme.onPrimaryContainer)
+                Icon(Icons.Rounded.PlayArrow, null, modifier = Modifier.size(28.dp), tint = DsmusicTheme.colorScheme.onPrimaryContainer)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Play", color = DsmusicTheme.colorScheme.onPrimaryContainer, fontSize = 20.sp, fontWeight = FontWeight.Medium, fontFamily = GoogleSansFlex)
             }
@@ -775,7 +775,7 @@ fun ActionButtonRow1(
             )
         ) {
             Icon(
-                imageVector = if (favLocal) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                imageVector = if (favLocal) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                 contentDescription = null,
                 tint = if (favLocal) Color(0xFFE91E63) else DsmusicTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier.size(32.dp)
@@ -796,7 +796,7 @@ fun ActionButtonRow1(
                 contentColor = DsmusicTheme.colorScheme.onTertiaryContainer
             )
         ) {
-            Icon(Icons.Filled.Share, null, modifier = Modifier.size(32.dp), tint = DsmusicTheme.colorScheme.onTertiaryContainer)
+            Icon(Icons.Rounded.Share, null, modifier = Modifier.size(32.dp), tint = DsmusicTheme.colorScheme.onTertiaryContainer)
         }
     }
 }
@@ -943,7 +943,7 @@ fun ActionButtonRow2(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = if (isOnline) Icons.Default.Download else Icons.Default.Check,
+                    imageVector = if (isOnline) Icons.Rounded.Download else Icons.Rounded.Check,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp)
                 )
@@ -995,7 +995,7 @@ fun ExpressiveTabSwitcher(selectedTab: BottomSheetTab, onTabSelected: (BottomShe
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Filled.Menu,
+                        imageVector = Icons.Rounded.Menu,
                         contentDescription = null,
                         tint = if (selectedTab == BottomSheetTab.OPTIONS) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
@@ -1020,7 +1020,7 @@ fun ExpressiveTabSwitcher(selectedTab: BottomSheetTab, onTabSelected: (BottomShe
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Filled.Info,
+                        imageVector = Icons.Rounded.Info,
                         contentDescription = null,
                         tint = if (selectedTab == BottomSheetTab.INFO) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
@@ -1084,14 +1084,14 @@ fun InfoContent(song: SongItem?) {
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        InfoRow("Duration", info.duration, Icons.Filled.DateRange)
-        InfoRow("Album", info.album, Icons.Filled.Face)
-        InfoRow("Artist", info.artist, Icons.Filled.Person)
-        InfoRow("Size", info.size, Icons.Filled.Download)
-        InfoRow("Bitrate", info.bitrate, Icons.Filled.Info)
-        InfoRow("Format", info.format, Icons.Filled.Info)
-        InfoRow("Sample rate", info.sampleRate, Icons.Filled.Info)
-        InfoRow(if (song?.videoId.isNullOrBlank()) "Location" else "Source", info.location, Icons.Filled.Menu)
+        InfoRow("Duration", info.duration, Icons.Rounded.DateRange)
+        InfoRow("Album", info.album, Icons.Rounded.Face)
+        InfoRow("Artist", info.artist, Icons.Rounded.Person)
+        InfoRow("Size", info.size, Icons.Rounded.Download)
+        InfoRow("Bitrate", info.bitrate, Icons.Rounded.Info)
+        InfoRow("Format", info.format, Icons.Rounded.Info)
+        InfoRow("Sample rate", info.sampleRate, Icons.Rounded.Info)
+        InfoRow(if (song?.videoId.isNullOrBlank()) "Location" else "Source", info.location, Icons.Rounded.Menu)
     }
 }
 
