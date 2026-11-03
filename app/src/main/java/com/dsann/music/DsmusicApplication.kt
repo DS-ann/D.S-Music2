@@ -34,8 +34,9 @@ class DsmusicApplication : Application(), ImageLoaderFactory {
             .okHttpClient { InnerTubeClient.httpClient }
             .memoryCache {
                 MemoryCache.Builder(this)
-                    // Keep the image cache compact so artwork does not crowd playback buffers or UI state.
-                    .maxSizePercent(0.06)
+                    // Explore uses bounded 60px artwork on API 23; retain enough recent tiles
+                    // for normal vertical/horizontal scrolling without caching whole feed bitmaps.
+                    .maxSizePercent(if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) 0.10 else 0.06)
                     .strongReferencesEnabled(true)
                     .weakReferencesEnabled(true)
                     .build()
