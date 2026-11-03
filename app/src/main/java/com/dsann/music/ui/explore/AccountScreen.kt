@@ -26,13 +26,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Login
-import androidx.compose.material.icons.filled.CloudSync
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.PersonOutline
-import androidx.compose.material.icons.filled.PowerSettingsNew
-import androidx.compose.material.icons.filled.VpnKey
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Login
+import androidx.compose.material.icons.rounded.CloudSync
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.PersonOutline
+import androidx.compose.material.icons.rounded.PowerSettingsNew
+import androidx.compose.material.icons.rounded.VpnKey
 import com.dsann.music.ui.theme.AlertDialog
 import com.dsann.music.ui.theme.Button
 import com.dsann.music.ui.theme.ButtonDefaults
@@ -101,7 +101,7 @@ fun AccountScreen(
                 title = { Text("Account Settings", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     DsmusicIconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back")
                     }
                 },
                 scrollBehavior = scrollBehavior
@@ -168,7 +168,7 @@ fun AccountSettingsSection(
                         )
                     } else {
                         Icon(
-                            Icons.Default.PersonOutline,
+                            Icons.Rounded.PersonOutline,
                             contentDescription = null,
                             modifier = Modifier.size(56.dp),
                             tint = DsmusicTheme.colorScheme.onSurfaceVariant
@@ -231,7 +231,7 @@ fun AccountSettingsSection(
                                         )
                                     } else {
                                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                            Icon(Icons.Default.MusicNote, null, modifier = Modifier.size(32.dp), tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                                            Icon(Icons.Rounded.MusicNote, null, modifier = Modifier.size(32.dp), tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                                         }
                                     }
                                 }
@@ -265,7 +265,7 @@ fun AccountSettingsSection(
                         syncEnabled = next
                         viewModel.toggleSync(next)
                     },
-                    leadingContent = { Icon(Icons.Default.CloudSync, null) },
+                    leadingContent = { Icon(Icons.Rounded.CloudSync, null) },
                     trailingContent = {
                         DsmusicSwitchControl(checked = syncEnabled, onCheckedChange = null)
                     },
@@ -281,7 +281,7 @@ fun AccountSettingsSection(
 
                 DsmusicListItem(
                     onClick = { showTokenAlert = true },
-                    leadingContent = { Icon(Icons.Default.VpnKey, null) },
+                    leadingContent = { Icon(Icons.Rounded.VpnKey, null) },
                     shapes = ListItemDefaults.segmentedShapes(index = 1, count = 2).shape,
                     colors = ListItemDefaults.colors(containerColor = DsmusicTheme.colorScheme.surfaceContainer),
                     content = {
@@ -307,7 +307,7 @@ fun AccountSettingsSection(
                     ),
                     shape = RoundedCornerShape(20.dp)
                 ) {
-                    Icon(Icons.Default.PowerSettingsNew, null)
+                    Icon(Icons.Rounded.PowerSettingsNew, null)
                     Spacer(modifier = Modifier.width(12.dp))
                     Text("Disconnect Account", fontWeight = FontWeight.Bold)
                 }
@@ -321,7 +321,7 @@ fun AccountSettingsSection(
                         contentColor = DsmusicTheme.colorScheme.onPrimary
                     )
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Login, null)
+                    Icon(Icons.AutoMirrored.Rounded.Login, null)
                     Spacer(modifier = Modifier.width(12.dp))
                     Text("Sign In to YouTube Music", fontWeight = FontWeight.Bold)
                 }
