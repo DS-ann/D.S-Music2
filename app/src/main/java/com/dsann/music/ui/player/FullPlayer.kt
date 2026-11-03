@@ -935,12 +935,22 @@ fun FullPlayer(
         val queueDockInset = animatedQueueDockInset.coerceAtLeast(0.dp)
         // Dense controls are used for landscape and short-height resized player windows.
         val compactLandscape = isLandscapeWindow || screenHeight < 760.dp
-        val portraitArtHeightLimit = screenHeight *
-            (if (screenHeight < 760.dp) 0.36f else 0.40f) * artworkScaleFactor
+        val portraitArtHeightFactor = when {
+            screenHeight < 680.dp -> 0.30f
+            screenHeight < 760.dp -> 0.34f
+            else -> 0.40f
+        }
+        val landscapeArtHeightFactor = when {
+            screenHeight < 520.dp -> 0.18f
+            screenHeight < 640.dp -> 0.22f
+            else -> 0.28f
+        }
+        val widePortraitArtHeightFactor = if (screenHeight < 760.dp) 0.34f else 0.50f
+        val portraitArtHeightLimit = screenHeight * portraitArtHeightFactor * artworkScaleFactor
         val albumArtSize = if (isLandscapeWindow) {
-            minOf(screenHeight * 0.28f, screenWidth * 0.30f) * (artScale / 0.9f)
+            minOf(screenHeight * landscapeArtHeightFactor, screenWidth * 0.30f) * (artScale / 0.9f)
         } else if (useWidePlayer) {
-            minOf(screenHeight * 0.50f, screenWidth * 0.42f) * (artScale / 0.9f)
+            minOf(screenHeight * widePortraitArtHeightFactor, screenWidth * 0.42f) * (artScale / 0.9f)
         } else {
             // Keep portrait artwork proportional to the available window height as well as width.
             minOf(screenWidth * artScale, portraitArtHeightLimit)
