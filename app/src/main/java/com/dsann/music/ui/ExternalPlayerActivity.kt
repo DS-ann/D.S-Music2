@@ -300,6 +300,7 @@ class ExternalPlayerActivity : ComponentActivity() {
     }
 }
 
+@OptIn(kotlinx.coroutines.FlowPreview::class)
 @Composable
 fun PopupPlayerContent(
     uri: Uri?,
