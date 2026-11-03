@@ -974,14 +974,14 @@ fun HomeSectionRow(
                 ) {
                     itemsIndexed(
                         items = section.items,
-                        key = { _, item ->
+                        key = { index, item ->
                             val baseKey = when (item) {
                                 is SearchItem.Song -> "discover-song-${item.song.videoId}"
                                 is SearchItem.Album -> "discover-album-${item.album.browseId}"
                                 is SearchItem.Artist -> "discover-artist-${item.artist.browseId}"
                                 is SearchItem.Playlist -> "discover-playlist-${item.playlist.playlistId}"
                             }
-                            baseKey
+                            "$index-$baseKey"
                         }
                     ) { _, item ->
                         val title = when (item) {
@@ -1083,14 +1083,14 @@ fun HomeSectionRow(
                 ) {
                     itemsIndexed(
                         items = section.items,
-                        key = { _, item ->
+                        key = { index, item ->
                             val baseKey = when (item) {
                                 is SearchItem.Song -> "community-song-${item.song.videoId}"
                                 is SearchItem.Album -> "community-album-${item.album.browseId}"
                                 is SearchItem.Artist -> "community-artist-${item.artist.browseId}"
                                 is SearchItem.Playlist -> "community-playlist-${item.playlist.playlistId}"
                             }
-                            baseKey
+                            "$index-$baseKey"
                         }
                     ) { _, item ->
                         val title = when (item) {
@@ -1196,7 +1196,8 @@ fun HomeSectionRow(
                         thumbnailUrls = prefetchUrls,
                         state = rowState,
                         targetSizePx = 192,
-                        lookAheadCount = 4
+                        lookAheadCount = 4,
+                        itemsPerListEntry = 4
                     )
                     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                         // Two four-song columns should fit inside the current viewport.
@@ -1207,8 +1208,8 @@ fun HomeSectionRow(
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            itemsIndexed(items = chunkedSongs, key = { _, songChunk ->
-                                "song-col-${section.title}-${songChunk.firstOrNull()?.song?.videoId.orEmpty()}"
+                            itemsIndexed(items = chunkedSongs, key = { idx, _ ->
+                                "song-col-$idx-${section.title}"
                             }) { _, songChunk ->
                                 Column(
                                     modifier = Modifier.width(songColumnWidth),
@@ -1240,14 +1241,14 @@ fun HomeSectionRow(
                     ) {
                         itemsIndexed(
                             items = section.items,
-                            key = { _, item ->
+                            key = { index, item ->
                                 val baseKey = when (item) {
                                     is SearchItem.Song -> "carousel-song-${item.song.videoId}-${section.title}"
                                     is SearchItem.Album -> "carousel-album-${item.album.browseId}-${section.title}"
                                     is SearchItem.Artist -> "carousel-artist-${item.artist.browseId}-${section.title}"
                                     is SearchItem.Playlist -> "carousel-playlist-${item.playlist.playlistId}-${section.title}"
                                 }
-                                baseKey
+                                "$index-$baseKey"
                             }
                         ) { _, item ->
                             HomeCarouselItem(
@@ -1876,7 +1877,8 @@ private fun PrefetchExploreRowImages(
     thumbnailUrls: List<String>,
     state: LazyListState,
     targetSizePx: Int,
-    lookAheadCount: Int = 2
+    lookAheadCount: Int = 2,
+    itemsPerListEntry: Int = 1
 ) {
     val context = LocalContext.current
     val imageLoader = context.imageLoader
@@ -1884,7 +1886,7 @@ private fun PrefetchExploreRowImages(
         snapshotFlow {
             state.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
         }.distinctUntilChanged().collectLatest { lastVisibleIndex ->
-            val startIndex = (lastVisibleIndex + 1).coerceAtLeast(0)
+            val startIndex = (lastVisibleIndex + 1).coerceAtLeast(0) * itemsPerListEntry
             val upcomingUrls = thumbnailUrls.asSequence()
                 .drop(startIndex)
                 .filter { it.isNotBlank() }
