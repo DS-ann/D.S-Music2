@@ -45,8 +45,11 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -927,7 +930,14 @@ private fun binarySearchActiveIndex(
 }
 
 /**
- * Performs smoothed scroll animation with spring physics
+ * Keeps the active karaoke/synced lyric line on a fixed centre anchor.
+ *
+ * Wait for the LazyColumn to be measured before calculating its target. On first
+ * opening, the previous implementation could run while the viewport was still zero,
+ * return early, and leave the first highlighted line off-centre.
+ *
+ * Karaoke word frames do not call this function: activeIndex changes only when the
+ * highlighted line changes, so the word sweep stays smooth while the list advances.
  */
 private suspend fun performSmoothedScroll(
     listState: androidx.compose.foundation.lazy.LazyListState,
@@ -936,19 +946,40 @@ private suspend fun performSmoothedScroll(
     estimatedItemHalfHeightPx: Int
 ) {
     if (activeIndex !in displayItems.indices) return
-    val layout = listState.layoutInfo
-    val viewportHeight = layout.viewportEndOffset - layout.viewportStartOffset
-    if (viewportHeight <= 0) return
 
-    val visibleItem = layout.visibleItemsInfo.firstOrNull { it.index == activeIndex }
-    val itemHalfHeight = visibleItem?.size?.div(2) ?: estimatedItemHalfHeightPx
-    // LazyList scroll offsets target the start of the row. Account for half the actual
-    // row height so the visible midpoint of the active line lands at viewport centre.
-    val centeredOffset = -(viewportHeight / 2 - itemHalfHeight)
+    // Wait for a real measurement rather than silently skipping the initial active line.
+    val viewportHeight = snapshotFlow { listState.layoutInfo.viewportSize.height }
+        .first { it > 0 }
+
+    val initialLayout = listState.layoutInfo
+    val initialItemHalfHeight = initialLayout.visibleItemsInfo
+        .firstOrNull { it.index == activeIndex }
+        ?.size?.div(2)
+        ?: estimatedItemHalfHeightPx
+
+    // Position the row's visual centre on the actual viewport centre.
+    val initialCenteredOffset = -(viewportHeight / 2 - initialItemHalfHeight)
     listState.animateScrollToItem(
         index = activeIndex,
-        scrollOffset = centeredOffset
+        scrollOffset = initialCenteredOffset
     )
+
+    // Wrapped lyric lines can be taller than the fallback estimate. Re-measure once
+    // the active row is visible, then correct the target so the whole line is centred.
+    withFrameNanos { }
+    val measuredLayout = listState.layoutInfo
+    val measuredItem = measuredLayout.visibleItemsInfo.firstOrNull { it.index == activeIndex }
+        ?: return
+    val measuredViewportHeight = measuredLayout.viewportSize.height
+    if (measuredViewportHeight <= 0) return
+
+    val measuredCenteredOffset = -(measuredViewportHeight / 2 - measuredItem.size / 2)
+    if (abs(measuredCenteredOffset - initialCenteredOffset) > 2) {
+        listState.animateScrollToItem(
+            index = activeIndex,
+            scrollOffset = measuredCenteredOffset
+        )
+    }
 }
 
 /**
