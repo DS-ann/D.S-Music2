@@ -44,9 +44,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.PlayArrow
 import com.dsann.music.ui.theme.DropdownMenu
 import com.dsann.music.ui.theme.DropdownMenuItem
 import com.dsann.music.ui.theme.HorizontalDivider
@@ -344,7 +344,7 @@ fun QueueBottomSheetContent(
                             isSelected = true,
                             icon = { 
                                 Icon(
-                                    imageVector = Icons.Filled.PlayArrow, 
+                                    imageVector = Icons.Rounded.PlayArrow, 
                                     contentDescription = null,
                                     modifier = Modifier.size(22.dp)
                                 ) 
@@ -482,7 +482,7 @@ fun QueueListItem(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.PlayArrow,
+                            imageVector = Icons.Rounded.PlayArrow,
                             contentDescription = "Playing",
                             tint = Color.White,
                             modifier = Modifier.size(24.dp)
@@ -515,7 +515,7 @@ fun QueueListItem(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     DsmusicIconButton(onClick = { showMenu = true }) {
                         Icon(
-                            imageVector = Icons.Default.MoreVert,
+                            imageVector = Icons.Rounded.MoreVert,
                             contentDescription = "Options",
                             tint = if (isPlaying) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurfaceVariant
                         )
@@ -568,7 +568,7 @@ fun QueueListItem(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Menu,
+                            imageVector = Icons.Rounded.Menu,
                             contentDescription = "Drag to reorder",
                             tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
                             modifier = Modifier.size(25.dp)
