@@ -40,6 +40,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
+import com.dsann.music.R
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
@@ -497,7 +499,68 @@ fun Text(
 
 @Composable
 fun Icon(imageVector: ImageVector, contentDescription: String? = null, modifier: Modifier = Modifier, tint: Color = LocalDsmusicContentColor.current) {
-    Image(painter = rememberVectorPainter(imageVector), contentDescription = contentDescription, modifier = modifier, colorFilter = if (tint == Color.Unspecified) null else androidx.compose.ui.graphics.ColorFilter.tint(tint))
+    // Use D.S Music's own semantic icon drawings for the common app actions. This
+    // keeps every screen on one icon language instead of mixing default Material glyphs.
+    val customResource = when (imageVector.name.substringAfterLast('.')) {
+        "Search" -> R.drawable.ic_search
+        "Explore" -> R.drawable.ic_explore
+        "LibraryMusic" -> R.drawable.ic_library_music
+        "MusicNote" -> R.drawable.ic_music_note
+        "Settings" -> R.drawable.ic_settings
+        "MoreVert", "Menu" -> R.drawable.ic_more
+        "ChevronRight" -> R.drawable.ic_chevron_right
+        "ChevronLeft" -> R.drawable.ic_chevron_left
+        "ArrowBack" -> R.drawable.ic_arrow_back
+        "Close", "Clear" -> R.drawable.ic_close
+        "Delete", "DeleteOutline" -> R.drawable.ic_delete
+        "Edit" -> R.drawable.ic_edit
+        "Add" -> R.drawable.ic_add
+        "Share" -> R.drawable.ic_share
+        "Download" -> R.drawable.ic_download
+        "PlayArrow" -> R.drawable.ic_play
+        "Pause" -> R.drawable.ic_pause
+        "PlayCircle" -> R.drawable.ic_play_circle
+        "Favorite" -> R.drawable.ic_favorite
+        "FavoriteBorder" -> R.drawable.ic_favorite_border
+        "ThumbDown" -> R.drawable.ic_thumb_down
+        "ThumbUp" -> R.drawable.ic_thumb_up
+        "Info" -> R.drawable.ic_info
+        "Shuffle" -> R.drawable.ic_shuffle
+        "Repeat" -> R.drawable.ic_repeat
+        "RepeatOne" -> R.drawable.ic_repeat_one
+        "History" -> R.drawable.ic_history
+        "Timer", "AccessTime" -> R.drawable.ic_timer
+        "Notifications" -> R.drawable.ic_notifications
+        "NightsStay", "Bedtime" -> R.drawable.ic_bedtime
+        "AccountCircle", "Person", "PersonOutline" -> R.drawable.ic_settings_account
+        "PlaylistAdd" -> R.drawable.ic_playlist_add
+        "Folder" -> R.drawable.ic_folder
+        "Album" -> R.drawable.ic_album
+        "Refresh" -> R.drawable.ic_update
+        "Done", "Check" -> R.drawable.ic_check
+        "Warning" -> R.drawable.ic_warning
+        "Cloud" -> R.drawable.ic_cloud
+        "CloudSync" -> R.drawable.ic_cloud_sync
+        "BugReport" -> R.drawable.ic_settings_feedback
+        "Palette" -> R.drawable.ic_settings_customize
+        "SettingsBackupRestore" -> R.drawable.ic_settings_backup
+        "TouchApp" -> R.drawable.ic_settings_gestures
+        "FastForward", "SkipNext" -> R.drawable.ic_skip_next
+        "FastRewind", "SkipPrevious" -> R.drawable.ic_skip_previous
+        else -> null
+    }
+    val iconPainter = if (customResource != null) {
+        painterResource(customResource)
+    } else {
+        rememberVectorPainter(imageVector)
+    }
+    Image(
+        painter = iconPainter,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        colorFilter = if (tint == Color.Unspecified) null
+            else androidx.compose.ui.graphics.ColorFilter.tint(tint)
+    )
 }
 @Composable
 fun Icon(painter: Painter, contentDescription: String? = null, modifier: Modifier = Modifier, tint: Color = LocalDsmusicContentColor.current) {
