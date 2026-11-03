@@ -49,6 +49,7 @@ import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
 import com.dsann.music.R
+import com.dsann.music.model.SongItem
 import com.dsann.music.data.innertube.YouTubeMusic
 import com.dsann.music.ui.widget.DsmusicWidgetProvider
 import com.dsann.music.ui.player.AppAnimationFrameRateController
@@ -484,6 +485,11 @@ class AudioPlaybackService : MediaSessionService() {
     )
     private var mediaSession: MediaSession? = null
     private var viewModel: PlayerSharedViewModel? = null
+    // Minimal persisted song/queue snapshot used when widget actions cold-start the service
+    // after MediaSessionService has stopped normally on a paused task removal.
+    private var widgetRestoredSong: SongItem? = null
+    private var widgetRestoredQueue: List<SongItem> = emptyList()
+    private var widgetRestoredIndex: Int = 0
     private var widgetLyricsObserverJob: Job? = null
     private lateinit var handler: Handler
     // The Handler below does slower playback housekeeping; position snapshots use vsync.
@@ -979,6 +985,9 @@ class AudioPlaybackService : MediaSessionService() {
                 handleSessionAction(action.removePrefix(ACTION_SESSION_CUSTOM_PREFIX))
             action == ACTION_WIDGET_FETCH_LYRICS -> requestWidgetLyrics()
             action == ACTION_WIDGET_REFRESH_STATE -> {
+                if (player.currentMediaItem == null && viewModel == null) {
+                    restorePersistedPlaybackForWidget(autoPlay = false)
+                }
                 updateWidgetState(player.isPlaying)
             }
         }
@@ -989,16 +998,31 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        val hasInstalledWidgets = DsmusicWidgetProvider.hasAnyWidgets(applicationContext)
-        if (mediaSession?.player?.playWhenReady == false && !hasInstalledWidgets) {
-            stopSelf()
-        } else if (hasInstalledWidgets && isPlayerInitialized) {
-            // A launcher widget is a playback surface in its own right. Do not tear down
-            // the paused MediaSession when the user dismisses MainActivity from Recents;
-            // that would invalidate widget actions and the dynamic screen-wake receiver.
+        if (DsmusicWidgetProvider.hasAnyWidgets(applicationContext) && isPlayerInitialized) {
+            // MediaSessionService stops itself when a paused task is removed. Persist the
+            // selected song, queue and exact playback head before that normal teardown.
+            val position = player.currentPosition.coerceAtLeast(0L)
+            viewModel?.setCurrentPosition(
+                position.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            )
+            if (viewModel != null) {
+                viewModel?.savePlaybackState()
+            } else {
+                widgetRestoredSong?.let { song ->
+                    com.dsann.music.util.PlaybackStateManager.saveState(
+                        applicationContext,
+                        song,
+                        position,
+                        widgetRestoredQueue.ifEmpty { listOf(song) },
+                        widgetRestoredIndex
+                    )
+                }
+            }
+            com.dsann.music.util.PlaybackStateManager.savePosition(applicationContext, position)
             updateWidgetState(player.isPlaying)
-            Log.i(TAG, "Keeping playback service alive for installed home-screen widgets")
         }
+        // Respect Media3's task-removal lifecycle. Widget PendingIntents restore paused
+        // playback on demand instead of keeping a paused MediaSessionService alive.
         super.onTaskRemoved(rootIntent)
     }
 
@@ -1742,6 +1766,9 @@ class AudioPlaybackService : MediaSessionService() {
                 loadAndPlay(uri, pos.toLong())
                 return
             }
+            if (viewModel == null && restorePersistedPlaybackForWidget(autoPlay = true)) {
+                return
+            }
         }
         if (!player.isPlaying) {
             player.play()
@@ -1798,19 +1825,92 @@ class AudioPlaybackService : MediaSessionService() {
         player.seekTo(position.toLong())
     }
 
-    fun playPrevious() = viewModel?.playPreviousSong()
-    fun playNext() = viewModel?.playNextSong()
+    fun playPrevious() {
+        val vm = viewModel
+        if (vm != null) vm.playPreviousSong() else moveRestoredWidgetQueue(-1)
+    }
+
+    fun playNext() {
+        val vm = viewModel
+        if (vm != null) vm.playNextSong() else moveRestoredWidgetQueue(1)
+    }
+
+    private fun loadRestoredWidgetSnapshot(): Boolean {
+        if (widgetRestoredSong != null) return true
+        val song = com.dsann.music.util.PlaybackStateManager.getLastSong(applicationContext)
+            ?: return false
+        widgetRestoredSong = song
+        widgetRestoredQueue = com.dsann.music.util.PlaybackStateManager.getLastQueue(applicationContext)
+            .ifEmpty { listOf(song) }
+        widgetRestoredIndex = com.dsann.music.util.PlaybackStateManager.getLastIndex(applicationContext)
+            .coerceIn(0, widgetRestoredQueue.lastIndex.coerceAtLeast(0))
+        currentSongName = song.title
+        return true
+    }
+
+    private fun widgetSongUri(song: SongItem): Uri? {
+        val videoId = song.videoId?.takeIf { it.isNotBlank() }
+        if (videoId != null) return "innertube://$videoId".toUri()
+        return runCatching { song.contentUri }.getOrNull()
+    }
+
+    private fun restorePersistedPlaybackForWidget(autoPlay: Boolean): Boolean {
+        if (!loadRestoredWidgetSnapshot()) return false
+        val song = widgetRestoredSong ?: return false
+        if (player.currentMediaItem != null) return true
+        val uri = widgetSongUri(song) ?: return false
+        val position = com.dsann.music.util.PlaybackStateManager
+            .getLastPosition(applicationContext)
+            .coerceAtLeast(0L)
+
+        Log.i(TAG, "Restoring widget playback target '${song.title}' at $position ms")
+        if (autoPlay) loadAndPlay(uri, position) else loadAudio(uri, position)
+        return true
+    }
+
+    private fun moveRestoredWidgetQueue(delta: Int) {
+        if (!loadRestoredWidgetSnapshot()) return
+        val queue = widgetRestoredQueue
+        if (queue.isEmpty()) return
+        val currentIndex = queue.indexOfFirst { it.id == widgetRestoredSong?.id }
+            .takeIf { it >= 0 } ?: widgetRestoredIndex
+
+        if (delta < 0 && player.currentPosition > 3_000L) {
+            player.seekTo(0L)
+            com.dsann.music.util.PlaybackStateManager.savePosition(applicationContext, 0L)
+            return
+        }
+
+        val nextIndex = ((currentIndex + delta) % queue.size + queue.size) % queue.size
+        val nextSong = queue[nextIndex]
+        val uri = widgetSongUri(nextSong) ?: return
+        widgetRestoredIndex = nextIndex
+        widgetRestoredSong = nextSong
+        currentSongName = nextSong.title
+        com.dsann.music.util.PlaybackStateManager.saveState(
+            applicationContext, nextSong, 0L, queue, nextIndex
+        )
+        loadAndPlay(uri, 0L)
+        updateWidgetState(true)
+    }
 
     private fun buildMediaItem(uri: Uri): MediaItem {
-        val songId = viewModel?.currentSong?.value?.id?.toString() ?: ""
-        return buildMediaItem(uri, currentSongName, viewModel?.currentSong?.value?.artist ?: "Unknown Artist", songId)
+        val song = viewModel?.currentSong?.value ?: widgetRestoredSong
+        val songId = song?.id?.toString() ?: ""
+        return buildMediaItem(
+            uri,
+            song?.title ?: currentSongName,
+            song?.artist ?: "Unknown Artist",
+            songId
+        )
     }
 
     private fun buildMediaItem(uri: Uri, title: String, artist: String, songId: String = ""): MediaItem {
         val metadataBuilder = androidx.media3.common.MediaMetadata.Builder()
             .setTitle(title)
             .setArtist(artist)
-        val activeSong = viewModel?.currentSong?.value?.takeIf { it.id.toString() == songId }
+        val activeSong = (viewModel?.currentSong?.value ?: widgetRestoredSong)
+            ?.takeIf { it.id.toString() == songId }
         activeSong?.albumName?.takeIf { it.isNotBlank() }?.let { metadataBuilder.setAlbumTitle(it) }
         activeSong?.thumbnailUrl?.takeIf { it.isNotBlank() }?.let { metadataBuilder.setArtworkUri(it.toUri()) }
 
@@ -2506,7 +2606,7 @@ class AudioPlaybackService : MediaSessionService() {
     fun updateWidgetState(isPlaying: Boolean) {
         val position = player.currentPosition.coerceAtLeast(0L)
         val duration = player.duration.coerceAtLeast(0L)
-        val activeSong = viewModel?.currentSong?.value
+        val activeSong = viewModel?.currentSong?.value ?: widgetRestoredSong
         val item = player.currentMediaItem
         val song = activeSong ?: item?.let { mediaItem ->
             val uri = mediaItem.localConfiguration?.uri
