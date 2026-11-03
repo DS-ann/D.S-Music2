@@ -1834,7 +1834,7 @@ internal fun exploreImageRequestTargetPx(targetSizePx: Int): Int =
  * memory/disk cache after its LazyRow item leaves composition. The size is part of the
  * memory key to prevent a small thumbnail from replacing a larger player/detail decode.
  */
-private fun buildExploreImageRequest(
+internal fun buildExploreImageRequest(
     context: android.content.Context,
     data: Any?,
     targetSizePx: Int
@@ -1852,7 +1852,7 @@ private fun buildExploreImageRequest(
 }
 
 @Composable
-private fun rememberExploreImageRequest(data: Any?, targetSizePx: Int): ImageRequest? {
+internal fun rememberExploreImageRequest(data: Any?, targetSizePx: Int): ImageRequest? {
     val context = LocalContext.current
     val effectiveTargetSizePx = exploreImageRequestTargetPx(targetSizePx)
     return remember(context, data, effectiveTargetSizePx) {
