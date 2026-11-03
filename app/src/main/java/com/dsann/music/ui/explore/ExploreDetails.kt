@@ -112,7 +112,8 @@ fun AlbumDetailView(
     onBack: () -> Unit,
     onSongClick: (OnlineSong, List<OnlineSong>, Int) -> Unit,
     onSongMenuClick: (OnlineSong) -> Unit,
-    onStartRadioClick: (String) -> Unit
+    onStartRadioClick: (String) -> Unit,
+    onCollectionMenuClick: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -125,11 +126,22 @@ fun AlbumDetailView(
         sharedElementKey = albumPage.album.browseId,
         onBack = onBack,
         headerActions = {
-            ExpressiveConnectedButtonGroup(
-                onShuffleClick = { if (albumPage.songs.isNotEmpty()) onSongClick(albumPage.songs.first(), albumPage.songs.shuffled(), 0) },
-                onRadioClick = { if (albumPage.songs.isNotEmpty()) onStartRadioClick(albumPage.songs.first().videoId) },
-                modifier = Modifier.fillMaxWidth()
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.weight(1f)) {
+                    ExpressiveConnectedButtonGroup(
+                        onShuffleClick = { if (albumPage.songs.isNotEmpty()) onSongClick(albumPage.songs.first(), albumPage.songs.shuffled(), 0) },
+                        onRadioClick = { if (albumPage.songs.isNotEmpty()) onStartRadioClick(albumPage.songs.first().videoId) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                DsmusicIconButton(onClick = onCollectionMenuClick) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Album options")
+                }
+            }
         }
     ) {
         item {
@@ -166,7 +178,8 @@ fun PlaylistDetailView(
     onSongMenuClick: (OnlineSong) -> Unit,
     onStartRadioClick: (String) -> Unit,
     onPlaylistSaved: (String, String, String) -> Unit = { _, _, _ -> },
-    onPlaylistDeleted: () -> Unit = {}
+    onPlaylistDeleted: () -> Unit = {},
+    onCollectionMenuClick: () -> Unit = {}
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -202,6 +215,9 @@ fun PlaylistDetailView(
                         onRadioClick = { if (playlistPage.songs.isNotEmpty()) onStartRadioClick(playlistPage.songs.first().videoId) },
                         modifier = Modifier.fillMaxWidth()
                     )
+                }
+                DsmusicIconButton(onClick = onCollectionMenuClick) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Playlist options")
                 }
                 if (playlistPage.isOwned) {
                     DsmusicIconButton(
