@@ -216,6 +216,7 @@ fun ExploreScreen(
     var selectedSongForMenu by remember { mutableStateOf<OnlineSong?>(null) }
     var selectedCollectionForMenu by remember { mutableStateOf<SearchItem?>(null) }
     var selectedCollectionMenuSongs by remember { mutableStateOf<List<OnlineSong>?>(null) }
+    var selectedCollectionMenuContinuation by remember { mutableStateOf<String?>(null) }
     var showCreditsForSong by remember { mutableStateOf<OnlineSong?>(null) }
 
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
@@ -555,6 +556,7 @@ fun ExploreScreen(
                                             onCollectionMenuClick = {
                                                 selectedCollectionForMenu = SearchItem.Album(detail.album)
                                                 selectedCollectionMenuSongs = detail.songs
+                                                selectedCollectionMenuContinuation = null
                                             },
                                             onStartRadioClick = { videoId ->
                                                 viewModel.startRadio(
@@ -581,6 +583,7 @@ fun ExploreScreen(
                                             onCollectionMenuClick = {
                                                 selectedCollectionForMenu = SearchItem.Playlist(detail.playlist)
                                                 selectedCollectionMenuSongs = detail.songs
+                                                selectedCollectionMenuContinuation = detail.continuation
                                             },
                                             onStartRadioClick = { videoId ->
                                                 viewModel.startRadio(
@@ -727,6 +730,7 @@ fun ExploreScreen(
                                             onCollectionMenuClick = { item ->
                                                 selectedCollectionForMenu = item
                                                 selectedCollectionMenuSongs = null
+                                                selectedCollectionMenuContinuation = null
                                             },
                                             onAccountVisibleChange = onSearchHeaderAccountVisibleChange,
                                             userProfile = userProfile,
@@ -773,6 +777,7 @@ fun ExploreScreen(
                                                                         onCollectionMenuClick = { item ->
                                                                             selectedCollectionForMenu = item
                                                                             selectedCollectionMenuSongs = null
+                                                                            selectedCollectionMenuContinuation = null
                                                                         },
                                                                         onTouchDown = {
                                                                             if (top is SearchItem.Song) {
@@ -836,6 +841,7 @@ fun ExploreScreen(
                                                                             onCollectionMenuClick = { item ->
                                                                                 selectedCollectionForMenu = item
                                                                                 selectedCollectionMenuSongs = null
+                                                                                selectedCollectionMenuContinuation = null
                                                                             },
                                                                             onTouchDown = {
                                                                                 if (item is SearchItem.Song) {
@@ -884,6 +890,7 @@ fun ExploreScreen(
                                                                                                 selectedCollectionForMenu = item
 
                                                                                                 selectedCollectionMenuSongs = null
+                                                                                                selectedCollectionMenuContinuation = null
 
                                                                                             }
                                                                                              is SearchItem.Artist -> Unit
@@ -925,6 +932,7 @@ fun ExploreScreen(
                                                                         onCollectionMenuClick = { collection ->
                                                                             selectedCollectionForMenu = collection
                                                                             selectedCollectionMenuSongs = null
+                                                                            selectedCollectionMenuContinuation = null
                                                                         },
                                                                         onClick = { activateSearchItem(item) }
                                                                     )
@@ -947,6 +955,7 @@ fun ExploreScreen(
                                                                     onCollectionMenuClick = { item ->
                                                                         selectedCollectionForMenu = item
                                                                         selectedCollectionMenuSongs = null
+                                                                        selectedCollectionMenuContinuation = null
                                                                     },
                                                                     onTouchDown = {
                                                                         if (item is SearchItem.Song) {
@@ -1115,6 +1124,7 @@ fun ExploreScreen(
                                                                             onCollectionMenuClick = { item ->
                                                                                  selectedCollectionForMenu = item
                                                                                  selectedCollectionMenuSongs = null
+                                                                                 selectedCollectionMenuContinuation = null
                                                                              },
                                                                              onSectionClick = { browseId, params, title ->
                                                                                 viewModel.loadSectionDetails(
@@ -1243,11 +1253,14 @@ fun ExploreScreen(
                     OnlineCollectionActionsBottomSheet(
                         collection = collection,
                         initialSongs = selectedCollectionMenuSongs,
+                        initialContinuation = selectedCollectionMenuContinuation,
                         playerSharedViewModel = playerSharedViewModel,
                         exploreViewModel = viewModel,
                         onDismissRequest = {
                             selectedCollectionForMenu = null
                             selectedCollectionMenuSongs = null
+                            selectedCollectionMenuContinuation = null
+                            selectedCollectionMenuContinuation = null
                         },
                         onAddToPlaylist = { songs ->
                             songsToAddPlaylist = songs
