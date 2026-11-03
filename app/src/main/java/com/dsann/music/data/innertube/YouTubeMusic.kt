@@ -808,6 +808,19 @@ object YouTubeMusic {
         }
     }
 
+    /**
+     * Fetch the next page of a playlist's tracks.
+     */
+    suspend fun playlistContinuation(
+        continuation: String
+    ): Result<Pair<List<OnlineSong>, String?>> = withContext(Dispatchers.IO) {
+        runCatching {
+            require(continuation.isNotBlank()) { "Missing playlist continuation token" }
+            val response = InnerTubeClient.browse(continuation = continuation)
+            InnerTubeParser.parsePlaylistContinuationSongs(response)
+        }
+    }
+
     // ========== Lyrics ==========
 
     /**
