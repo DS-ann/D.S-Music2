@@ -17,6 +17,10 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -994,8 +998,18 @@ object PullToRefreshDefaults {
 @Composable
 private fun PullRefreshIndicator(modifier: Modifier, active: Boolean) {
     val accent = DsmusicTheme.colorScheme.primary
-    if (active) Box(modifier.padding(8.dp).size(24.dp).clip(CircleShape).background(accent.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.size(16.dp)) { drawArc(accent, -90f, 270f, false, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round)) }
+    if (active) {
+        Box(
+            modifier.padding(8.dp).size(24.dp).clip(CircleShape)
+                .background(accent.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                color = accent,
+                strokeWidth = 2.dp
+            )
+        }
     }
 }
 @Composable
@@ -1314,10 +1328,29 @@ fun CircularProgressIndicator(
     strokeWidth: Dp = 3.dp,
     strokeCap: StrokeCap = StrokeCap.Round
 ) {
+    val rotation = if (progress == null) {
+        val transition = rememberInfiniteTransition(label = "DsmusicIndeterminateLoader")
+        transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 850, easing = LinearEasing)
+            ),
+            label = "DsmusicLoaderRotation"
+        ).value
+    } else 0f
     Canvas(modifier.size(32.dp)) {
         val width = strokeWidth.toPx()
-        if (trackColor != Color.Transparent) drawArc(trackColor, -90f, 360f, false, style = Stroke(width, cap = strokeCap))
-        drawArc(color, -90f, (progress?.coerceIn(0f, 1f) ?: 0.72f) * 360f, false, style = Stroke(width, cap = strokeCap))
+        if (trackColor != Color.Transparent) {
+            drawArc(trackColor, -90f, 360f, false, style = Stroke(width, cap = strokeCap))
+        }
+        drawArc(
+            color,
+            -90f + rotation,
+            if (progress == null) 265f else progress.coerceIn(0f, 1f) * 360f,
+            false,
+            style = Stroke(width, cap = strokeCap)
+        )
     }
 }
 @Composable
