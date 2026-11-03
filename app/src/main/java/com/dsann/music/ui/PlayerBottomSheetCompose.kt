@@ -743,10 +743,11 @@ private fun androidx.compose.foundation.layout.BoxScope.VideoOverlayControls(
             color = Color.Black.copy(alpha = 0.62f)
         ) {
             DsmusicIconButton(onClick = onOpenQuality, enabled = qualityEnabled) {
-                Text(
-                    text = "⚙",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
+                Icon(
+                    painter = painterResource(R.drawable.ic_settings),
+                    contentDescription = "Video quality",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
@@ -755,10 +756,13 @@ private fun androidx.compose.foundation.layout.BoxScope.VideoOverlayControls(
             color = Color.Black.copy(alpha = 0.62f)
         ) {
             DsmusicIconButton(onClick = onToggleFullscreen) {
-                Text(
-                    text = if (fullscreen) "⛶" else "⛶",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
+                Icon(
+                    painter = painterResource(
+                        if (fullscreen) R.drawable.ic_fullscreen_exit else R.drawable.ic_fullscreen
+                    ),
+                    contentDescription = if (fullscreen) "Exit fullscreen" else "Enter fullscreen",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
