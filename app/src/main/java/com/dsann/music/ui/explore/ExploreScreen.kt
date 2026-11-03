@@ -208,6 +208,7 @@ fun ExploreScreen(
     val isLoadingStream = uiState.isLoadingStream
     val currentMood = uiState.currentMood
     val currentOnlineSong = uiState.currentOnlineSong
+    val isPlaybackActive by playerSharedViewModel.isPlaying.collectAsStateWithLifecycle()
     val error = uiState.error
     val albumDetail = uiState.albumDetail
     val artistDetail = uiState.artistDetail
@@ -860,6 +861,7 @@ fun ExploreScreen(
                                                                                 item.song.videoId == currentOnlineSong?.videoId,
                                                                             isLoading = item is SearchItem.Song && isLoadingStream &&
                                                                                 item.song.videoId == currentOnlineSong?.videoId,
+                                                                            isPlaybackActive = isPlaybackActive,
                                                                             onSongMenuClick = { selectedSongForMenu = it },
                                                                             onCollectionMenuClick = { item ->
                                                                                 selectedCollectionForMenu = item
@@ -938,6 +940,7 @@ fun ExploreScreen(
                                                                         item = item,
                                                                         isCurrentlyPlaying = item is SearchItem.Song && item.song.videoId == currentOnlineSong?.videoId,
                                                                         isLoading = item is SearchItem.Song && isLoadingStream && item.song.videoId == currentOnlineSong?.videoId,
+                                                                        isPlaybackActive = isPlaybackActive,
                                                                         onSongMenuClick = { selectedSongForMenu = it },
                                                                         onCollectionMenuClick = { collection ->
                                                                             selectedCollectionForMenu = collection
@@ -961,6 +964,7 @@ fun ExploreScreen(
                                                                     item = item,
                                                                     isCurrentlyPlaying = item is SearchItem.Song && item.song.videoId == currentOnlineSong?.videoId,
                                                                     isLoading = item is SearchItem.Song && isLoadingStream && item.song.videoId == currentOnlineSong?.videoId,
+                                                                    isPlaybackActive = isPlaybackActive,
                                                                     onSongMenuClick = { selectedSongForMenu = it },
                                                                     onCollectionMenuClick = { item ->
                                                                         selectedCollectionForMenu = item
@@ -1086,6 +1090,7 @@ fun ExploreScreen(
                                                                         HomeSectionRow(
                                                                             section = section,
                                                                             currentOnlineSong = currentOnlineSong,
+                                                                            isPlaybackActive = isPlaybackActive,
                                                                             onSongTouchDown = { song ->
                                                                                 playerSharedViewModel.specPrefetch(
                                                                                     SongItem.createOnlineSong(
