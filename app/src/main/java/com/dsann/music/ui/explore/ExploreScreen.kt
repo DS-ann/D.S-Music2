@@ -124,8 +124,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import coil.size.Precision
 import com.dsann.music.MainActivity
 import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.SearchFilter
@@ -1252,9 +1250,7 @@ fun ExploreScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(song.thumbnailUrl)
-                                    .size(exploreImageRequestTargetPx(96), exploreImageRequestTargetPx(96)).precision(Precision.INEXACT).crossfade(false).build(),
+                                model = rememberExploreImageRequest(song.thumbnailUrl, 96),
                                 contentDescription = null,
                                 modifier = Modifier
                                     .size(24.dp)
@@ -1300,9 +1296,7 @@ fun ExploreScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(song.thumbnailUrl)
-                                    .size(exploreImageRequestTargetPx(512), exploreImageRequestTargetPx(512)).precision(Precision.INEXACT).crossfade(false).build(),
+                                model = rememberExploreImageRequest(song.thumbnailUrl, 512),
                                 contentDescription = song.title,
                                 modifier = Modifier
                                     .size(240.dp)
@@ -1366,9 +1360,7 @@ fun ExploreScreen(
 
                         // Center Cover Art
                         AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(song.thumbnailUrl)
-                                .size(exploreImageRequestTargetPx(640), exploreImageRequestTargetPx(640)).precision(Precision.INEXACT).crossfade(false).build(),
+                            model = rememberExploreImageRequest(song.thumbnailUrl, 640),
                             contentDescription = song.title,
                             modifier = Modifier
                                 .size(320.dp)
@@ -1720,9 +1712,7 @@ fun ExploreScreen(
                                     },
                                     leadingContent = {
                                         AsyncImage(
-                                            model = ImageRequest.Builder(LocalContext.current)
-                                                .data(song.thumbnailUrl)
-                                                .size(exploreImageRequestTargetPx(128), exploreImageRequestTargetPx(128)).precision(Precision.INEXACT).crossfade(false).build(),
+                                            model = rememberExploreImageRequest(song.thumbnailUrl, 128),
                                             contentDescription = null,
                                             modifier = Modifier
                                                 .size(40.dp)
@@ -1853,12 +1843,7 @@ fun ExploreScreen(
                         ) {
                             if (userProfile?.avatarUrl != null) {
                                 AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(userProfile.avatarUrl)
-                                        .size(exploreImageRequestTargetPx(96), exploreImageRequestTargetPx(96))
-                                        .precision(Precision.INEXACT)
-                                        .crossfade(false)
-                                        .build(),
+                                    model = rememberExploreImageRequest(userProfile.avatarUrl, 96),
                                     contentDescription = "Account",
                                     modifier = Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)),
                                     contentScale = ContentScale.Crop
@@ -1932,12 +1917,7 @@ fun ExploreScreen(
                     ) {
                         if (userProfile?.avatarUrl != null) {
                             AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(userProfile.avatarUrl)
-                                    .size(exploreImageRequestTargetPx(96), exploreImageRequestTargetPx(96))
-                                    .precision(Precision.INEXACT)
-                                    .crossfade(false)
-                                    .build(),
+                                model = rememberExploreImageRequest(userProfile.avatarUrl, 96),
                                 contentDescription = "Account",
                                 modifier = Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)),
                                 contentScale = ContentScale.Crop
