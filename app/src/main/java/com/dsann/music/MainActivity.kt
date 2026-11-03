@@ -170,11 +170,6 @@ class MainActivity : AppCompatActivity() {
         val splashScreen = installSplashScreen()
         enableEdgeToEdge()
 
-        val splashStartTime = System.currentTimeMillis()
-        splashScreen.setKeepOnScreenCondition {
-            System.currentTimeMillis() - splashStartTime < SPLASH_DURATION
-        }
-
         super.onCreate(savedInstanceState)
 
         setupSystemBars()
@@ -214,7 +209,11 @@ class MainActivity : AppCompatActivity() {
                 val dynamicNavStyle by navigationSettings.dynamicNavStyle.collectAsStateWithLifecycle()
                 val navBarStyle by navigationSettings.navBarStyle.collectAsStateWithLifecycle()
                 val navBarSize by navigationSettings.navBarSize.collectAsStateWithLifecycle()
-                val hasSeenOnboarding by prefs.observeKey("has_seen_onboarding_1_8", false)
+                // Read synchronously before building NavHost. An observeKey(default=false)
+                // subscription briefly routes returning users to Welcome before preferences load.
+                val hasSeenOnboarding = remember(prefs) {
+                    prefs.getBoolean("has_seen_onboarding_1_8", false)
+                }
 
                 val currentNavController = rememberNavController()
                 val rootTabRoutes = remember { setOf("explore", "search", "library", "local_music", "settings") }
@@ -1073,7 +1072,6 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "MainActivity"
         private const val AUDIO_PERMISSION_REQUEST = 100
-        private const val SPLASH_DURATION = 800L
         private const val KEY_PREVIOUS_DESTINATION = "key_previous_destination"
         const val EXTRA_OPEN_PLAYER = "open_player"
     }
