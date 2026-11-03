@@ -48,24 +48,24 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
-import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Radio
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material.icons.filled.ThumbUpOffAlt
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
+import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.Block
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.PushPin
+import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.ThumbUp
+import androidx.compose.material.icons.rounded.ThumbUpOffAlt
 import com.dsann.music.ui.theme.BottomSheetDefaults
 import com.dsann.music.ui.theme.ButtonDefaults
 import com.dsann.music.ui.theme.HorizontalDivider
@@ -498,7 +498,7 @@ fun SearchResultItem(
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.MoreVert,
+                                imageVector = Icons.Rounded.MoreVert,
                                 contentDescription = "More Options",
                                 tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
@@ -515,7 +515,7 @@ fun SearchResultItem(
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.MoreVert,
+                                imageVector = Icons.Rounded.MoreVert,
                                 contentDescription = "More options",
                                 tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
@@ -527,7 +527,7 @@ fun SearchResultItem(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.ChevronRight,
+                                imageVector = Icons.Rounded.ChevronRight,
                                 contentDescription = null,
                                 modifier = Modifier.size(20.dp),
                                 tint = DsmusicTheme.colorScheme.onSurfaceVariant
@@ -647,19 +647,19 @@ fun SearchTopResultCard(
         when (item) {
             is SearchItem.Song -> if (onSongMenuClick != null) {
                 DsmusicIconButton(onClick = { onSongMenuClick(item.song) }) {
-                    Icon(Icons.Default.MoreVert, "More options")
+                    Icon(Icons.Rounded.MoreVert, "More options")
                 }
             } else {
-                Icon(Icons.Default.PlayArrow, "Open result", tint = DsmusicTheme.colorScheme.primary)
+                Icon(Icons.Rounded.PlayArrow, "Open result", tint = DsmusicTheme.colorScheme.primary)
             }
             is SearchItem.Album, is SearchItem.Playlist -> if (onCollectionMenuClick != null) {
                 DsmusicIconButton(onClick = { onCollectionMenuClick(item) }) {
-                    Icon(Icons.Default.MoreVert, "More options")
+                    Icon(Icons.Rounded.MoreVert, "More options")
                 }
             } else {
-                Icon(Icons.Default.PlayArrow, "Open result", tint = DsmusicTheme.colorScheme.primary)
+                Icon(Icons.Rounded.PlayArrow, "Open result", tint = DsmusicTheme.colorScheme.primary)
             }
-            is SearchItem.Artist -> Icon(Icons.Default.PlayArrow, "Open result", tint = DsmusicTheme.colorScheme.primary)
+            is SearchItem.Artist -> Icon(Icons.Rounded.PlayArrow, "Open result", tint = DsmusicTheme.colorScheme.primary)
         }
     }
 }
@@ -928,7 +928,7 @@ fun HomeSectionRow(
                         modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.ChevronRight,
+                            imageVector = Icons.Rounded.ChevronRight,
                             contentDescription = "See All",
                             tint = DsmusicTheme.colorScheme.onBackground,
                             modifier = Modifier.size(24.dp)
@@ -1351,7 +1351,7 @@ fun HomeSectionRow(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
-                                            Icons.Default.PlayArrow,
+                                            Icons.Rounded.PlayArrow,
                                             contentDescription = "Play",
                                             tint = DsmusicTheme.colorScheme.onPrimaryContainer,
                                             modifier = Modifier.size(32.dp)
@@ -1662,7 +1662,7 @@ fun HomeSongListItem(
             )
         }
         DsmusicIconButton(onClick = onMenuClick) {
-            Icon(Icons.Default.MoreVert, "More", tint = DsmusicTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Rounded.MoreVert, "More", tint = DsmusicTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -1806,7 +1806,7 @@ fun OnlineSongBottomSheet(
                     }
                 ) {
                     Icon(
-                        imageVector = if (isFavorite) Icons.Filled.ThumbUp else Icons.Filled.ThumbUpOffAlt,
+                        imageVector = if (isFavorite) Icons.Rounded.ThumbUp else Icons.Rounded.ThumbUpOffAlt,
                         contentDescription = "Like",
                         tint = if (isFavorite) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurface,
                         modifier = Modifier.size(22.dp)
@@ -1815,7 +1815,7 @@ fun OnlineSongBottomSheet(
 
                 DsmusicIconButton(onClick = onDismissRequest) {
                     Icon(
-                        imageVector = Icons.Default.Close,
+                        imageVector = Icons.Rounded.Close,
                         contentDescription = "Close",
                         modifier = Modifier.size(22.dp)
                     )
@@ -1853,7 +1853,7 @@ fun OnlineSongBottomSheet(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.PlaylistPlay,
+                            imageVector = Icons.AutoMirrored.Rounded.PlaylistPlay,
                             contentDescription = null,
                             modifier = Modifier.size(24.dp)
                         )
@@ -1888,7 +1888,7 @@ fun OnlineSongBottomSheet(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Share,
+                            imageVector = Icons.Rounded.Share,
                             contentDescription = null,
                             modifier = Modifier.size(24.dp)
                         )
@@ -1901,21 +1901,21 @@ fun OnlineSongBottomSheet(
 
             // Optimized 2-Pane Actions for Landscape Width
             val baseMenuItems = listOf(
-                Triple("Start mix", Icons.Default.Radio) {
+                Triple("Start mix", Icons.Rounded.Radio) {
                     exploreViewModel.startRadio(song)
                     com.dsann.music.ui.SnackbarController.showMessage("Starting mix based on ${song.title}")
                     onDismissRequest()
                 },
-                Triple("Add to queue", Icons.AutoMirrored.Filled.PlaylistPlay) {
+                Triple("Add to queue", Icons.AutoMirrored.Rounded.PlaylistPlay) {
                     playerSharedViewModel.addToQueue(onlineSongItem)
                     exploreViewModel.addToQueueLast(song)
                     com.dsann.music.ui.SnackbarController.showMessage(
                         "Added to queue",
-                        iconVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.PlaylistAdd
+                        iconVector = androidx.compose.material.icons.Icons.AutoMirrored.Rounded.PlaylistAdd
                     )
                     onDismissRequest()
                 },
-                Triple("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) {
+                Triple("Add to playlist", Icons.AutoMirrored.Rounded.PlaylistAdd) {
                     onPlaylistAddClick(onlineSongItem)
                     onDismissRequest()
                 },
@@ -1926,9 +1926,9 @@ fun OnlineSongBottomSheet(
                         else -> "Download"
                     },
                     when {
-                        isSongDownloading -> Icons.Default.Close
-                        isDownloaded -> Icons.Default.Check
-                        else -> Icons.Default.Download
+                        isSongDownloading -> Icons.Rounded.Close
+                        isDownloaded -> Icons.Rounded.Check
+                        else -> Icons.Rounded.Download
                     }
                 ) {
                     when {
@@ -1940,7 +1940,7 @@ fun OnlineSongBottomSheet(
                     }
                     onDismissRequest()
                 },
-                Triple("Go to album", Icons.Default.Album) {
+                Triple("Go to album", Icons.Rounded.Album) {
                     val id = song.albumId
                     if (!id.isNullOrBlank()) {
                         exploreViewModel.loadAlbum(id)
@@ -1949,7 +1949,7 @@ fun OnlineSongBottomSheet(
                         com.dsann.music.ui.SnackbarController.showMessage("Album information unavailable")
                     }
                 },
-                Triple("Go to artist", Icons.Default.Person) {
+                Triple("Go to artist", Icons.Rounded.Person) {
                     val aId = song.artistId
                     if (!aId.isNullOrBlank()) {
                         exploreViewModel.loadArtist(aId)
@@ -1959,27 +1959,27 @@ fun OnlineSongBottomSheet(
                         onDismissRequest()
                     }
                 },
-                Triple("View song credits", Icons.Default.Groups) {
+                Triple("View song credits", Icons.Rounded.Groups) {
                     onViewCreditsClick(song)
                     onDismissRequest()
                 },
                 Triple(
                     if (isPinned) "Unpin from Speed dial" else "Pin to Speed dial",
-                    Icons.Default.PushPin
+                    Icons.Rounded.PushPin
                 ) {
                     exploreViewModel.pinToSpeedDial(song)
                     val msg = if (isPinned) "Song removed from Speed Dial!" else "Song pinned to Speed Dial!"
                     com.dsann.music.ui.SnackbarController.showMessage(msg)
                     onDismissRequest()
                 },
-                Triple("Not interested", Icons.Default.Block) {
+                Triple("Not interested", Icons.Rounded.Block) {
                     exploreViewModel.setNotInterested(song)
                     com.dsann.music.ui.SnackbarController.showMessage("We will suggest fewer songs like this")
                     onDismissRequest()
                 }
             )
             val menuItems = if (onRemoveFromCache != null) {
-                baseMenuItems + Triple("Remove from cache", Icons.Default.DeleteOutline) {
+                baseMenuItems + Triple("Remove from cache", Icons.Rounded.DeleteOutline) {
                     onRemoveFromCache()
                     onDismissRequest()
                 }
