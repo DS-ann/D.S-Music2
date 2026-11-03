@@ -31,8 +31,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import com.dsann.music.ui.theme.Button
 import com.dsann.music.ui.theme.ButtonDefaults
 import com.dsann.music.ui.theme.ExtendedFloatingActionButton
@@ -563,7 +563,7 @@ fun ExpressivePlayPauseButton(
         )
     ) {
         Icon(
-            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+            imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
             contentDescription = "Play/Pause",
             modifier = Modifier.size(36.dp) // Prominent icon size
         )
