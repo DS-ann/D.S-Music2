@@ -194,9 +194,12 @@ fun Modifier.shimmerEffect(): Modifier {
 @Composable
 fun AnimatedEqualizerBars(
     modifier: Modifier = Modifier,
-    color: Color = DsmusicTheme.colorScheme.primary
+    color: Color = DsmusicTheme.colorScheme.primary,
+    isPlaying: Boolean = false
 ) {
-    if (!LocalRootTabActive.current) {
+    // Do not leave an animation frame loop running for a selected-but-paused track.
+    // Android 6 also uses a static indicator here to keep scrolling inexpensive.
+    if (!isPlaying || !LocalRootTabActive.current || Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
         Row(
             modifier = modifier,
             horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -331,6 +334,7 @@ fun SearchResultItem(
     item: SearchItem,
     isCurrentlyPlaying: Boolean,
     isLoading: Boolean,
+    isPlaybackActive: Boolean = false,
     onSongMenuClick: ((OnlineSong) -> Unit)? = null,
     onTouchDown: (() -> Unit)? = null,
     onCollectionMenuClick: ((SearchItem) -> Unit)? = null,
@@ -402,24 +406,30 @@ fun SearchResultItem(
                 contentScale = ContentScale.Crop
             )
             if (isLoading) {
-                val loadingFrameTimeNanos = rememberAppAnimationFrameTimeNanos(
-                    active = LocalRootTabActive.current
-                )
                 val loadingShimmerColor = DsmusicTheme.colorScheme.surfaceContainerHigh
-                Box(
-                    modifier = Modifier.fillMaxSize().clip(imageShape).drawBehind {
-                        val frameNanos = loadingFrameTimeNanos.value
-                        val phase = if (frameNanos > 0L) {
-                            (frameNanos % 800_000_000L).toFloat() / 800_000_000f
-                        } else 0.5f
-                        val pulse = (1f - kotlin.math.cos(phase * (2f * Math.PI.toFloat()))) * 0.5f
-                        drawRect(
-                            loadingShimmerColor.copy(alpha = 0.3f + pulse * 0.4f)
-                        )
-                    },
-                    contentAlignment = Alignment.Center
-                ) {
-                    LoadingIndicator(modifier = Modifier.size(20.dp))
+                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
+                    // Static API 23 loading marker; avoid a continuously invalidated shimmer/spinner.
+                    Box(
+                        modifier = Modifier.fillMaxSize().clip(imageShape)
+                            .background(loadingShimmerColor.copy(alpha = 0.6f))
+                    )
+                } else {
+                    val loadingFrameTimeNanos = rememberAppAnimationFrameTimeNanos(
+                        active = LocalRootTabActive.current
+                    )
+                    Box(
+                        modifier = Modifier.fillMaxSize().clip(imageShape).drawBehind {
+                            val frameNanos = loadingFrameTimeNanos.value
+                            val phase = if (frameNanos > 0L) {
+                                (frameNanos % 800_000_000L).toFloat() / 800_000_000f
+                            } else 0.5f
+                            val pulse = (1f - kotlin.math.cos(phase * (2f * Math.PI.toFloat()))) * 0.5f
+                            drawRect(loadingShimmerColor.copy(alpha = 0.3f + pulse * 0.4f))
+                        },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        LoadingIndicator(modifier = Modifier.size(20.dp))
+                    }
                 }
             }
         }
@@ -471,10 +481,11 @@ fun SearchResultItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (item is SearchItem.Song && isCurrentlyPlaying && !isLoading) {
+            if (item is SearchItem.Song && isCurrentlyPlaying && isPlaybackActive && !isLoading) {
                 AnimatedEqualizerBars(
                     modifier = Modifier.size(20.dp).height(12.dp),
-                    color = DsmusicTheme.colorScheme.primary
+                    color = DsmusicTheme.colorScheme.primary,
+                    isPlaying = isPlaybackActive
                 )
             }
             
@@ -858,6 +869,7 @@ private fun openExploreItemMenu(
 fun HomeSectionRow(
     section: HomeSection,
     currentOnlineSong: OnlineSong?,
+    isPlaybackActive: Boolean = false,
     onSongClick: (OnlineSong) -> Unit,
     onAlbumClick: (OnlineAlbum) -> Unit,
     onArtistClick: (OnlineArtist) -> Unit,
@@ -1020,7 +1032,7 @@ fun HomeSectionRow(
                             ) { _, item ->
                                 HomeCarouselItem(
                                     item = item,
-                                    isPlaying = item is SearchItem.Song &&
+                                    isPlaying = isPlaybackActive && item is SearchItem.Song &&
                                         item.song.videoId == currentOnlineSong?.videoId,
                                     onSongMenuClick = onSongMenuClick,
                                     onCollectionMenuClick = onCollectionMenuClick,
@@ -1392,7 +1404,7 @@ fun HomeSectionRow(
                                     songChunk.forEach { item ->
                                         HomeSongListItem(
                                             song = item.song,
-                                            isPlaying = item.song.videoId == currentOnlineSong?.videoId,
+                                            isPlaying = isPlaybackActive && item.song.videoId == currentOnlineSong?.videoId,
                                             onTouchDown = { onSongTouchDown(item.song) },
                                             onClick = { onSongClick(item.song) },
                                             onMenuClick = { onSongMenuClick(item.song) }
@@ -1427,7 +1439,7 @@ fun HomeSectionRow(
                         ) { _, item ->
                             HomeCarouselItem(
                                 item = item,
-                                isPlaying = when (item) {
+                                isPlaying = isPlaybackActive && when (item) {
                                     is SearchItem.Song -> item.song.videoId == currentOnlineSong?.videoId
                                     else -> false
                                 },
@@ -1547,7 +1559,8 @@ fun HomeCarouselItem(
                         ) {
                             AnimatedEqualizerBars(
                                 modifier = Modifier.size(32.dp).height(24.dp),
-                                color = DsmusicTheme.colorScheme.inverseOnSurface
+                                color = DsmusicTheme.colorScheme.inverseOnSurface,
+                                isPlaying = isPlaying
                             )
                         }
                     }
@@ -1622,7 +1635,8 @@ fun HomeSongListItem(
                 ) {
                     AnimatedEqualizerBars(
                         modifier = Modifier.size(24.dp).height(16.dp),
-                        color = DsmusicTheme.colorScheme.inverseOnSurface
+                        color = DsmusicTheme.colorScheme.inverseOnSurface,
+                        isPlaying = isPlaying
                     )
                 }
             }
