@@ -167,7 +167,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        val splashScreen = installSplashScreen()
+        installSplashScreen()
         enableEdgeToEdge()
 
         super.onCreate(savedInstanceState)
