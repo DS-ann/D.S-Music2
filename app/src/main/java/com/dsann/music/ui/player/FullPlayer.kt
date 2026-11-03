@@ -917,6 +917,13 @@ fun FullPlayer(
         }) * playerArtworkScale.coerceIn(0.65f, 1f)
         val useWidePlayer = configuration.screenWidthDp >= 840 ||
             (configuration.screenWidthDp >= 600 && configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
+        // When the queue opens on a tablet-sized landscape layout, reserve its left pane
+        // instead of letting the queue cover the player controls.
+        val queueDockInset by animateDpAsState(
+            targetValue = if (useWidePlayer && isQueueExpanded) screenWidth * 0.42f else 0.dp,
+            animationSpec = spring(dampingRatio = 0.85f, stiffness = 300f),
+            label = "QueueDockInset"
+        )
         val compactLandscape =
             configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val albumArtSize = if (compactLandscape) {
@@ -1431,7 +1438,8 @@ fun FullPlayer(
                     .fillMaxSize()
                     .statusBarsPadding()
                     .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .padding(start = queueDockInset),
                 horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 Column(
