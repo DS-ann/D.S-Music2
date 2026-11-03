@@ -638,7 +638,11 @@ fun SearchTopResultCard(
 
 /** Compact image cards for albums, artists, and playlists in a Top results shelf. */
 @Composable
-fun SearchBrowseCard(item: SearchItem, onClick: () -> Unit) {
+fun SearchBrowseCard(
+    item: SearchItem,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null
+) {
     val (thumbnail, title, subtitle, isArtist) = when (item) {
         is SearchItem.Song -> QuadSearchCard(
             item.song.thumbnailUrl, item.song.title,
@@ -663,8 +667,10 @@ fun SearchBrowseCard(item: SearchItem, onClick: () -> Unit) {
         )
     }
     Column(
-        modifier = Modifier.width(132.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick)
-            .padding(4.dp)
+        modifier = Modifier.width(132.dp).clip(RoundedCornerShape(12.dp)).combinedClickable(
+            onClick = onClick,
+            onLongClick = { onLongClick?.invoke() }
+        ).padding(4.dp)
     ) {
         AsyncImage(
             model = rememberExploreImageRequest(thumbnail, 260),
