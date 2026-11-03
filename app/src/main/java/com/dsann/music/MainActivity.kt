@@ -233,7 +233,6 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 val isPlayerExpanded by playerViewModel.isPlayerExpanded.collectAsStateWithLifecycle()
-                val currentSong by playerViewModel.currentSong.collectAsStateWithLifecycle()
 
                 var editingSong by remember { mutableStateOf<SongItem?>(null) }
                 val configuration = androidx.compose.ui.platform.LocalConfiguration.current
