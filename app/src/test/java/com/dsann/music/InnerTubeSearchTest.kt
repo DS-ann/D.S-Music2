@@ -3,10 +3,14 @@ package com.dsann.music
 import com.dsann.music.data.innertube.YouTubeMusic
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
+import org.junit.Ignore
 import org.junit.Test
 
 class InnerTubeSearchTest {
 
+    // This is a live-network integration test, not a deterministic unit test. CI runners
+    // may be rate-limited or blocked by YouTube; keep it opt-in instead of failing APK builds.
+    @Ignore("Requires live YouTube Music network access; run manually when validating the API")
     @Test
     fun testYouTubeMusicSearchFacade() {
         runBlocking {
