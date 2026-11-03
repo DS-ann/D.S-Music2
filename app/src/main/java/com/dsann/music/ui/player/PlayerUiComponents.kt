@@ -320,6 +320,19 @@ internal fun WavySliderWithLabels(
     var isScrubbing by remember { mutableStateOf(false) }
     var sliderScrubPos by remember { mutableFloatStateOf(0f) }
 
+    // API 23 progress is a continuously moving control, not a decorative effect.
+    // Give its draw pass a display-vsync clock even when the global animation cap is low.
+    val isApi23 = android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M
+    val api23ProgressFrameTimeNanos = rememberAppAnimationFrameTimeNanos(
+        active = isApi23 && isPlayerVisible && isPlaying,
+        forceDisplayRefresh = true
+    )
+    val sliderFrameTimeNanos = if (isApi23) {
+        api23ProgressFrameTimeNanos
+    } else {
+        frameTimeNanos
+    }
+
     // The service can publish at 20-60 FPS. Time labels only need a 4 Hz snapshot;
     // the actual slider line samples Media3 in the draw pass below on every selected frame.
     val labelPositionFlow = remember(currentPositionFlow) {
@@ -396,7 +409,7 @@ internal fun WavySliderWithLabels(
             waveAmplitudeWhenPlaying = if (waveEnabled) 6.dp else 0.dp,
             waveLength = 48.dp,
             isWaveEligible = waveEnabled && isPlayerVisible,
-            frameTimeNanos = frameTimeNanos,
+            frameTimeNanos = sliderFrameTimeNanos,
             liveProgressProvider = liveProgressProvider
         )
 

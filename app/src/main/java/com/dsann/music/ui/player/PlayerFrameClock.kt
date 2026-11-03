@@ -65,7 +65,10 @@ internal object AppAnimationFrameRateController {
  * remain aligned to the device's presented frames.
  */
 @Composable
-internal fun rememberAppAnimationFrameTimeNanos(active: Boolean): State<Long> {
+internal fun rememberAppAnimationFrameTimeNanos(
+    active: Boolean,
+    forceDisplayRefresh: Boolean = false
+): State<Long> {
     val context = LocalContext.current.applicationContext
     val frameRate by AppAnimationFrameRateController.frameRate.collectAsState()
     val frameTimeNanos = remember { mutableLongStateOf(0L) }
@@ -80,7 +83,14 @@ internal fun rememberAppAnimationFrameTimeNanos(active: Boolean): State<Long> {
             return@LaunchedEffect
         }
 
-        val intervalNanos = if (frameRate > 0) 1_000_000_000L / frameRate else 0L
+        // Playback progress can opt out of the decorative-animation FPS cap.
+        // This keeps the seek bar and mini-player progress aligned to every display vsync
+        // on API 23 without forcing the visualizer or other effects to run at full rate.
+        val intervalNanos = if (!forceDisplayRefresh && frameRate > 0) {
+            1_000_000_000L / frameRate
+        } else {
+            0L
+        }
         var lastBucket = Long.MIN_VALUE
 
         while (true) {

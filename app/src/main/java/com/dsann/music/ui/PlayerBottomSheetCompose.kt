@@ -2205,8 +2205,10 @@ private fun MiniPlayerArtworkProgressOverlay(
 
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val audioService by viewModel.audioServiceState.collectAsStateWithLifecycle()
+    val forceDisplayRefresh = android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M
     val frameTimeNanos = rememberAppAnimationFrameTimeNanos(
-        active = isMiniLayerVisible && isPlaying
+        active = isMiniLayerVisible && isPlaying,
+        forceDisplayRefresh = forceDisplayRefresh
     )
     // The service snapshot may run at 20-60 FPS. Sample only the paused/fallback value
     // for composition; the visible progress arc reads Media3 directly in its Canvas draw.
