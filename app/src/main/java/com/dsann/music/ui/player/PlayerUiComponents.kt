@@ -201,26 +201,18 @@ internal fun PillChip(
     } else {
         contentColor.copy(alpha = if (isDark) 0.08f else 0.06f)
     }
-    
+
     val tintColor = if (isSelected) accentColor else contentColor.copy(alpha = 0.8f)
     val progressColor = accentColor.copy(alpha = if (isDark) 0.35f else 0.25f)
-    val minimal = style == "Minimal"
-    val rounded = style == "Rounded"
+    val noBackground = style == "None"
     val chipShape = when (style) {
-        "Rounded" -> RoundedCornerShape(12.dp)
-        "Minimal" -> RoundedCornerShape(10.dp)
-        else -> CircleShape
+        "Round" -> RoundedCornerShape(14.dp)
+        "Pill" -> CircleShape
+        "Square" -> RoundedCornerShape(5.dp)
+        else -> RoundedCornerShape(0.dp)
     }
-    val chipHeight = when {
-        minimal -> 34.dp
-        rounded -> 40.dp
-        else -> 36.dp
-    }
-    val chipBackground = when {
-        minimal -> Color.Transparent
-        rounded -> contentColor.copy(alpha = if (isDark) 0.035f else 0.025f)
-        else -> backgroundColor
-    }
+    val chipHeight = if (style == "Pill") 36.dp else 40.dp
+    val chipBackground = if (noBackground) Color.Transparent else backgroundColor
     
     val animatedFill by animateFloatAsState(
         targetValue = progress ?: 0f,
@@ -255,11 +247,7 @@ internal fun PillChip(
     ) {
         Row(
             modifier = Modifier.padding(
-                horizontal = when {
-                    minimal -> 8.dp
-                    rounded -> 12.dp
-                    else -> 14.dp
-                }
+                horizontal = if (noBackground) 8.dp else 14.dp
             ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -282,15 +270,13 @@ internal fun PillChip(
                     )
                 }
             }
-            if (!minimal) {
-                Text(
-                    text = label,
-                    style = DsmusicTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 12.sp,
-                    color = tintColor
-                )
-            }
+            Text(
+                text = label,
+                style = DsmusicTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.sp,
+                color = tintColor
+            )
         }
     }
 }
