@@ -214,11 +214,13 @@ fun ExploreScreen(
         if (isSearchDestination) isSearchActive = true
     }
     var selectedSongForMenu by remember { mutableStateOf<OnlineSong?>(null) }
+    var selectedCollectionForMenu by remember { mutableStateOf<SearchItem?>(null) }
+    var selectedCollectionMenuSongs by remember { mutableStateOf<List<OnlineSong>?>(null) }
     var showCreditsForSong by remember { mutableStateOf<OnlineSong?>(null) }
 
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
-    var songToAddPlaylist by remember { mutableStateOf<SongItem?>(null) }
+    var songsToAddPlaylist by remember { mutableStateOf<List<SongItem>?>(null) }
     val localPlaylists by playerSharedViewModel.localPlaylistsFlow.collectAsStateWithLifecycle(
         emptyList()
     )
@@ -550,6 +552,10 @@ fun ExploreScreen(
                                                 )
                                             },
                                             onSongMenuClick = { selectedSongForMenu = it },
+                                            onCollectionMenuClick = {
+                                                selectedCollectionForMenu = SearchItem.Album(detail.album)
+                                                selectedCollectionMenuSongs = detail.songs
+                                            },
                                             onStartRadioClick = { videoId ->
                                                 viewModel.startRadio(
                                                     videoId
@@ -572,6 +578,10 @@ fun ExploreScreen(
                                                 )
                                             },
                                             onSongMenuClick = { selectedSongForMenu = it },
+                                            onCollectionMenuClick = {
+                                                selectedCollectionForMenu = SearchItem.Playlist(detail.playlist)
+                                                selectedCollectionMenuSongs = detail.songs
+                                            },
                                             onStartRadioClick = { videoId ->
                                                 viewModel.startRadio(
                                                     videoId
@@ -714,6 +724,10 @@ fun ExploreScreen(
                                             onSuggestionItemClick = { item ->
                                                 activateSearchItem(item)
                                             },
+                                            onCollectionMenuClick = { item ->
+                                                selectedCollectionForMenu = item
+                                                selectedCollectionMenuSongs = null
+                                            },
                                             onAccountVisibleChange = onSearchHeaderAccountVisibleChange,
                                             userProfile = userProfile,
                                             homeMoods = homeMoods,
@@ -756,6 +770,10 @@ fun ExploreScreen(
                                                                         isLoading = top is SearchItem.Song && isLoadingStream &&
                                                                             top.song.videoId == currentOnlineSong?.videoId,
                                                                         onSongMenuClick = { selectedSongForMenu = it },
+                                                                        onCollectionMenuClick = { item ->
+                                                                            selectedCollectionForMenu = item
+                                                                            selectedCollectionMenuSongs = null
+                                                                        },
                                                                         onTouchDown = {
                                                                             if (top is SearchItem.Song) {
                                                                                 playerSharedViewModel.specPrefetch(
@@ -815,6 +833,10 @@ fun ExploreScreen(
                                                                             isLoading = item is SearchItem.Song && isLoadingStream &&
                                                                                 item.song.videoId == currentOnlineSong?.videoId,
                                                                             onSongMenuClick = { selectedSongForMenu = it },
+                                                                            onCollectionMenuClick = { item ->
+                                                                                selectedCollectionForMenu = item
+                                                                                selectedCollectionMenuSongs = null
+                                                                            },
                                                                             onTouchDown = {
                                                                                 if (item is SearchItem.Song) {
                                                                                     playerSharedViewModel.specPrefetch(
@@ -846,7 +868,31 @@ fun ExploreScreen(
                                                                                     }
                                                                                 }
                                                                             ) { item ->
-                                                                                SearchBrowseCard(item) { activateSearchItem(item) }
+                                                                                SearchBrowseCard(
+
+                                                                                    item = item,
+
+                                                                                    onClick = { activateSearchItem(item) },
+
+                                                                                    onLongClick = {
+
+                                                                                        when (item) {
+
+                                                                                            is SearchItem.Album, is SearchItem.Playlist -> {
+
+                                                                                                selectedCollectionForMenu = item
+
+                                                                                                selectedCollectionMenuSongs = null
+
+                                                                                            }
+
+                                                                                            else -> Unit
+
+                                                                                        }
+
+                                                                                    }
+
+                                                                                )
                                                                             }
                                                                         }
                                                                     }
@@ -874,6 +920,10 @@ fun ExploreScreen(
                                                                         isCurrentlyPlaying = item is SearchItem.Song && item.song.videoId == currentOnlineSong?.videoId,
                                                                         isLoading = item is SearchItem.Song && isLoadingStream && item.song.videoId == currentOnlineSong?.videoId,
                                                                         onSongMenuClick = { selectedSongForMenu = it },
+                                                                        onCollectionMenuClick = { collection ->
+                                                                            selectedCollectionForMenu = collection
+                                                                            selectedCollectionMenuSongs = null
+                                                                        },
                                                                         onClick = { activateSearchItem(item) }
                                                                     )
                                                                 }
@@ -892,6 +942,10 @@ fun ExploreScreen(
                                                                     isCurrentlyPlaying = item is SearchItem.Song && item.song.videoId == currentOnlineSong?.videoId,
                                                                     isLoading = item is SearchItem.Song && isLoadingStream && item.song.videoId == currentOnlineSong?.videoId,
                                                                     onSongMenuClick = { selectedSongForMenu = it },
+                                                                    onCollectionMenuClick = { item ->
+                                                                        selectedCollectionForMenu = item
+                                                                        selectedCollectionMenuSongs = null
+                                                                    },
                                                                     onTouchDown = {
                                                                         if (item is SearchItem.Song) {
                                                                             playerSharedViewModel.specPrefetch(
@@ -1056,7 +1110,11 @@ fun ExploreScreen(
                                                                                 selectedSongForMenu =
                                                                                     it
                                                                             },
-                                                                            onSectionClick = { browseId, params, title ->
+                                                                            onCollectionMenuClick = { item ->
+                                                                                 selectedCollectionForMenu = item
+                                                                                 selectedCollectionMenuSongs = null
+                                                                             },
+                                                                             onSectionClick = { browseId, params, title ->
                                                                                 viewModel.loadSectionDetails(
                                                                                     browseId,
                                                                                     params,
@@ -1170,7 +1228,7 @@ fun ExploreScreen(
                         playerSharedViewModel = playerSharedViewModel,
                         exploreViewModel = viewModel,
                         onPlaylistAddClick = { onlineSongItem ->
-                            songToAddPlaylist = onlineSongItem
+                            songsToAddPlaylist = listOf(onlineSongItem)
                             showAddToPlaylistDialog = true
                         },
                         onViewCreditsClick = { s ->
@@ -1179,11 +1237,28 @@ fun ExploreScreen(
                     )
                 }
 
+                selectedCollectionForMenu?.let { collection ->
+                    OnlineCollectionActionsBottomSheet(
+                        collection = collection,
+                        initialSongs = selectedCollectionMenuSongs,
+                        playerSharedViewModel = playerSharedViewModel,
+                        exploreViewModel = viewModel,
+                        onDismissRequest = {
+                            selectedCollectionForMenu = null
+                            selectedCollectionMenuSongs = null
+                        },
+                        onAddToPlaylist = { songs ->
+                            songsToAddPlaylist = songs
+                            showAddToPlaylistDialog = true
+                        }
+                    )
+                }
+
 
             }
         }
 
-        if (showAddToPlaylistDialog && songToAddPlaylist != null) {
+        if (showAddToPlaylistDialog && !songsToAddPlaylist.isNullOrEmpty()) {
             LocalPlaylistPickerDialog(
                 playlists = localPlaylists,
                 onCreateNew = {
@@ -1191,14 +1266,19 @@ fun ExploreScreen(
                     showAddToPlaylistDialog = false
                 },
                 onPlaylistSelected = { playlist ->
-                    playerSharedViewModel.addSongToLocalPlaylist(playlist.id, songToAddPlaylist!!)
+                    val songs = songsToAddPlaylist.orEmpty()
+                    songs.forEach { song ->
+                        playerSharedViewModel.addSongToLocalPlaylist(playlist.id, song)
+                    }
                     showAddToPlaylistDialog = false
-                    songToAddPlaylist = null
-                    com.dsann.music.ui.SnackbarController.showMessage("Added to playlist: ${playlist.title}")
+                    songsToAddPlaylist = null
+                    com.dsann.music.ui.SnackbarController.showMessage(
+                        "Added ${songs.size} tracks to playlist: ${playlist.title}"
+                    )
                 },
                 onDismiss = {
                     showAddToPlaylistDialog = false
-                    songToAddPlaylist = null
+                    songsToAddPlaylist = null
                 }
             )
         }
@@ -1472,6 +1552,7 @@ fun ExploreScreen(
         suggestionItems: List<SearchItem>,
         onSuggestionClick: (String) -> Unit,
         onSuggestionItemClick: (SearchItem) -> Unit,
+        onCollectionMenuClick: (SearchItem) -> Unit,
         onAccountVisibleChange: (Boolean) -> Unit,
         userProfile: UserProfile?,
         homeMoods: List<String>,
@@ -1785,6 +1866,7 @@ fun ExploreScreen(
                                 item = item,
                                 isCurrentlyPlaying = false,
                                 isLoading = false,
+                                onCollectionMenuClick = onCollectionMenuClick,
                                 onClick = { onSuggestionItemClick(item) }
                             )
                         }
