@@ -499,7 +499,8 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                             viewModel.setSongList(visibleSongsInView)
                             viewModel.playSongAtIndex(index)
                         },
-                        onLongClick = { }
+                        onLongClick = { },
+                        artworkRequestSizePx = 60
                     )
                 }
             }

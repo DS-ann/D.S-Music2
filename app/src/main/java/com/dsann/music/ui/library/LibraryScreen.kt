@@ -443,8 +443,7 @@ fun LibraryScreen(
                         val userProfile by accountViewModel?.userProfile?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(null) }
                         if (userProfile?.avatarUrl != null) {
                             AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(userProfile?.avatarUrl)
+                                model = libraryArtworkRequestBuilder(LocalContext.current, userProfile?.avatarUrl)
                                     .build(),
                                 contentDescription = "Account Settings",
                                 modifier = Modifier
@@ -1150,6 +1149,16 @@ fun LibraryScreen(
 }
 }
 
+private fun libraryArtworkRequestBuilder(
+    context: Context,
+    data: Any?
+): ImageRequest.Builder = libraryArtworkRequestBuilder(context, data)
+    .apply {
+        if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) {
+            size(100, 100)
+        }
+    }
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SongListItem(
@@ -1159,7 +1168,8 @@ fun SongListItem(
     localIndex: Int,
     localCount: Int,
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
+    artworkRequestSizePx: Int = 128
 ) {
     val context = LocalContext.current
     val artModel = remember(song) { song.getAlbumArtUri() ?: R.drawable.ic_music_note }
@@ -1168,7 +1178,18 @@ fun SongListItem(
     val artworkRequest = remember(context, artModel) {
         ImageRequest.Builder(context)
             .data(artModel)
-            .size(128, 128)
+            .size(
+                if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) {
+                    artworkRequestSizePx.coerceAtMost(100)
+                } else {
+                    artworkRequestSizePx
+                },
+                if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) {
+                    artworkRequestSizePx.coerceAtMost(100)
+                } else {
+                    artworkRequestSizePx
+                }
+            )
             .crossfade(false)
             .error(R.drawable.ic_music_note)
             .placeholder(R.drawable.ic_music_note)
@@ -1523,8 +1544,7 @@ private fun UnifiedLibraryCard(item: UnifiedLibraryItem) {
             if (hasArtwork) {
                 androidx.compose.foundation.Image(
                     painter = coil.compose.rememberAsyncImagePainter(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(item.thumbnailUrl)
+                        model = libraryArtworkRequestBuilder(LocalContext.current, item.thumbnailUrl)
                             .crossfade(false)
                             .build()
                     ),
@@ -1855,8 +1875,7 @@ private fun LocalPlaylistDetailsScreen(
         if (!artworkUrl.isNullOrBlank()) {
             withContext(Dispatchers.IO) {
                 runCatching {
-                    val request = ImageRequest.Builder(context)
-                        .data(artworkUrl)
+                    val request = libraryArtworkRequestBuilder(context, artworkUrl)
                         .allowHardware(false)
                         .build()
                     val result = context.imageLoader.execute(request)
@@ -1963,8 +1982,7 @@ private fun LocalPlaylistDetailsScreen(
                             ) {
                                 if (!artworkUrl.isNullOrBlank()) {
                                     AsyncImage(
-                                        model = ImageRequest.Builder(context)
-                                            .data(artworkUrl)
+                                        model = libraryArtworkRequestBuilder(context, artworkUrl)
                                             .crossfade(false)
                                             .build(),
                                         contentDescription = "Playlist artwork",
@@ -2077,7 +2095,7 @@ private fun LocalPlaylistDetailsScreen(
                                     ) {
                                         if (!song.thumbnailUrl.isNullOrBlank()) {
                                             AsyncImage(
-                                                model = song.thumbnailUrl,
+                                                model = libraryArtworkRequestBuilder(LocalContext.current, song.thumbnailUrl).crossfade(false).build(),
                                                 contentDescription = null,
                                                 modifier = Modifier.fillMaxSize(),
                                                 contentScale = ContentScale.Crop
@@ -2140,8 +2158,7 @@ private fun OnlinePlaylistCard(
     val context = LocalContext.current
     val thumbnailRequest = remember(context, playlist.thumbnailUrl) {
         playlist.thumbnailUrl?.takeIf { it.isNotBlank() }?.let { url ->
-            ImageRequest.Builder(context)
-                .data(url)
+            libraryArtworkRequestBuilder(context, url)
                 .crossfade(false)
                 .build()
         }
@@ -2372,8 +2389,7 @@ private fun SongsTabContent(nestedScrollConnection: androidx.compose.ui.input.ne
                             if (song.thumbnailUrl?.isNotEmpty() == true) {
                                 androidx.compose.foundation.Image(
                                     painter = coil.compose.rememberAsyncImagePainter(
-                                        model = ImageRequest.Builder(LocalContext.current)
-                                            .data(song.thumbnailUrl)
+                                        model = libraryArtworkRequestBuilder(LocalContext.current, song.thumbnailUrl)
                                             .crossfade(false)
                                             .build()
                                     ),
@@ -2495,7 +2511,7 @@ private fun OnlineAlbumCard(
             leadingContent = {
                 if (!album.thumbnailUrl.isNullOrBlank()) {
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(album.thumbnailUrl).crossfade(false).build(),
+                        model = libraryArtworkRequestBuilder(LocalContext.current, album.thumbnailUrl).crossfade(false).build(),
                         contentDescription = null,
                         modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)),
                         contentScale = ContentScale.Crop
@@ -2531,8 +2547,7 @@ private fun OnlineAlbumCard(
                 if (album.thumbnailUrl?.isNotEmpty() == true) {
                     androidx.compose.foundation.Image(
                         painter = coil.compose.rememberAsyncImagePainter(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(album.thumbnailUrl)
+                            model = libraryArtworkRequestBuilder(LocalContext.current, album.thumbnailUrl)
                                 .crossfade(false)
                                 .build()
                         ),
@@ -2656,7 +2671,7 @@ private fun OnlineArtistCard(
             leadingContent = {
                 if (!artist.thumbnailUrl.isNullOrBlank()) {
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(artist.thumbnailUrl).crossfade(false).build(),
+                        model = libraryArtworkRequestBuilder(LocalContext.current, artist.thumbnailUrl).crossfade(false).build(),
                         contentDescription = null,
                         modifier = Modifier.size(56.dp).clip(CircleShape),
                         contentScale = ContentScale.Crop
@@ -2694,8 +2709,7 @@ private fun OnlineArtistCard(
             if (artist.thumbnailUrl?.isNotEmpty() == true) {
                 androidx.compose.foundation.Image(
                     painter = coil.compose.rememberAsyncImagePainter(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(artist.thumbnailUrl)
+                        model = libraryArtworkRequestBuilder(LocalContext.current, artist.thumbnailUrl)
                             .crossfade(false)
                             .build()
                     ),
@@ -3050,7 +3064,7 @@ private fun RecapTabContent(
                             ) {
                                 if (!first.thumbnailUrl.isNullOrBlank()) {
                                     AsyncImage(
-                                        model = ImageRequest.Builder(context).data(first.thumbnailUrl).crossfade(false).build(),
+                                        model = libraryArtworkRequestBuilder(context, first.thumbnailUrl).crossfade(false).build(),
                                         contentDescription = null,
                                         modifier = Modifier.size(54.dp).clip(RoundedCornerShape(10.dp)),
                                         contentScale = ContentScale.Crop
@@ -3171,7 +3185,7 @@ private fun RecapTabContent(
                                     val image = viewModel.artistProfileMap[artist.name]
                                     if (!image.isNullOrBlank()) {
                                         AsyncImage(
-                                            model = image,
+                                            model = libraryArtworkRequestBuilder(LocalContext.current, image).crossfade(false).build(),
                                             contentDescription = null,
                                             modifier = Modifier.size(88.dp).clip(CircleShape),
                                             contentScale = ContentScale.Crop
@@ -3226,7 +3240,7 @@ private fun RecapTabContent(
                     )
                     if (!item.thumbnailUrl.isNullOrBlank()) {
                         AsyncImage(
-                            model = ImageRequest.Builder(context).data(item.thumbnailUrl).crossfade(false).build(),
+                            model = libraryArtworkRequestBuilder(context, item.thumbnailUrl).crossfade(false).build(),
                             contentDescription = null,
                             modifier = Modifier.size(52.dp).clip(RoundedCornerShape(10.dp)),
                             contentScale = ContentScale.Crop
@@ -3555,7 +3569,7 @@ private fun StreamCacheTabContent(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         AsyncImage(
-                            model = AudioPlaybackService.getCachedMediaArtworkFile(context, cacheEntries.first().songId),
+                            model = libraryArtworkRequestBuilder(context, AudioPlaybackService.getCachedMediaArtworkFile(context, cacheEntries.first().songId)).crossfade(false).build(),
                             contentDescription = "Cache playlist artwork",
                             modifier = Modifier
                                 .size(216.dp)
@@ -3652,7 +3666,7 @@ private fun StreamCacheTabContent(
                 DsmusicListItem(
                     leadingContent = {
                         AsyncImage(
-                            model = artwork,
+                            model = libraryArtworkRequestBuilder(LocalContext.current, artwork).crossfade(false).build(),
                             contentDescription = item.title + " cover art",
                             modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)),
                             contentScale = ContentScale.Crop

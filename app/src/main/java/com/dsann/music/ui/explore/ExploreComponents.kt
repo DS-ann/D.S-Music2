@@ -1782,6 +1782,17 @@ fun OnlineSongBottomSheet(
 
 
 /**
+ * Android 6 uses compact artwork requests throughout Explore and search results.
+ * Newer Android versions retain the requested card-specific size.
+ */
+internal fun exploreImageRequestTargetPx(targetSizePx: Int): Int =
+    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
+        targetSizePx.coerceAtMost(60)
+    } else {
+        targetSizePx
+    }
+
+/**
  * Keeps Coil requests stable while LazyColumn/LazyRow parents recompose during scrolling.
  * A request is rebuilt only when its data or requested target size actually changes.
  */
@@ -1790,9 +1801,7 @@ private fun rememberExploreImageRequest(data: Any?, targetSizePx: Int): ImageReq
     val context = LocalContext.current
     // Older devices pay a high cost for large software bitmaps. All Explore cards remain
     // fully functional, but API 23 uses a smaller decode target than their layout bounds.
-    val effectiveTargetSizePx = if (
-        Build.VERSION.SDK_INT <= Build.VERSION_CODES.M
-    ) targetSizePx.coerceAtMost(256) else targetSizePx
+    val effectiveTargetSizePx = exploreImageRequestTargetPx(targetSizePx)
     return remember(context, data, effectiveTargetSizePx) {
         data?.let {
             ImageRequest.Builder(context)

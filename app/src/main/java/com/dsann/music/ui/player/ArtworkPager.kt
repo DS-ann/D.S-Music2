@@ -76,7 +76,7 @@ fun ArtworkPager(
             .roundToInt()
             .coerceIn(
                 256,
-                if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 384 else 768
+                if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 256 else 768
             )
     }
 

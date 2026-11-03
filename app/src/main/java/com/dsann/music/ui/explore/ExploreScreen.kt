@@ -1254,7 +1254,7 @@ fun ExploreScreen(
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data(song.thumbnailUrl)
-                                    .size(96, 96).precision(Precision.INEXACT).crossfade(false).build(),
+                                    .size(exploreImageRequestTargetPx(96), exploreImageRequestTargetPx(96)).precision(Precision.INEXACT).crossfade(false).build(),
                                 contentDescription = null,
                                 modifier = Modifier
                                     .size(24.dp)
@@ -1302,7 +1302,7 @@ fun ExploreScreen(
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data(song.thumbnailUrl)
-                                    .size(512, 512).precision(Precision.INEXACT).crossfade(false).build(),
+                                    .size(exploreImageRequestTargetPx(512), exploreImageRequestTargetPx(512)).precision(Precision.INEXACT).crossfade(false).build(),
                                 contentDescription = song.title,
                                 modifier = Modifier
                                     .size(240.dp)
@@ -1368,7 +1368,7 @@ fun ExploreScreen(
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)
                                 .data(song.thumbnailUrl)
-                                .size(640, 640).precision(Precision.INEXACT).crossfade(false).build(),
+                                .size(exploreImageRequestTargetPx(640), exploreImageRequestTargetPx(640)).precision(Precision.INEXACT).crossfade(false).build(),
                             contentDescription = song.title,
                             modifier = Modifier
                                 .size(320.dp)
@@ -1722,7 +1722,7 @@ fun ExploreScreen(
                                         AsyncImage(
                                             model = ImageRequest.Builder(LocalContext.current)
                                                 .data(song.thumbnailUrl)
-                                                .size(128, 128).precision(Precision.INEXACT).crossfade(false).build(),
+                                                .size(exploreImageRequestTargetPx(128), exploreImageRequestTargetPx(128)).precision(Precision.INEXACT).crossfade(false).build(),
                                             contentDescription = null,
                                             modifier = Modifier
                                                 .size(40.dp)
@@ -1855,7 +1855,7 @@ fun ExploreScreen(
                                 AsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)
                                         .data(userProfile.avatarUrl)
-                                        .size(96, 96)
+                                        .size(exploreImageRequestTargetPx(96), exploreImageRequestTargetPx(96))
                                         .precision(Precision.INEXACT)
                                         .crossfade(false)
                                         .build(),
@@ -1934,7 +1934,7 @@ fun ExploreScreen(
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data(userProfile.avatarUrl)
-                                    .size(96, 96)
+                                    .size(exploreImageRequestTargetPx(96), exploreImageRequestTargetPx(96))
                                     .precision(Precision.INEXACT)
                                     .crossfade(false)
                                     .build(),

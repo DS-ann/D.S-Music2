@@ -1995,7 +1995,10 @@ private fun MiniPlayerContentInternal(
         miniArtworkModel?.let { model ->
             ImageRequest.Builder(context)
                 .data(model)
-                .size(96, 96)
+                .size(
+                    if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 40 else 96,
+                    if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 40 else 96
+                )
                 .precision(Precision.INEXACT)
                 .crossfade(false)
                 .build()
