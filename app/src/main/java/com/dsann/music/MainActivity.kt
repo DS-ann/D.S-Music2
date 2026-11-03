@@ -418,7 +418,7 @@ class MainActivity : AppCompatActivity() {
                     // The player sheet covers the NavHost anyway, so keep the measured dock padding stable.
                     val finalPadding = animatedBasePaddingState.value
                     val miniPlayerHeight = if (
-                        configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                        configuration.screenWidthDp > configuration.screenHeightDp
                     ) 64.dp else 80.dp
                     val systemBottomInset = WindowInsets.navigationBars.asPaddingValues()
                         .calculateBottomPadding()
