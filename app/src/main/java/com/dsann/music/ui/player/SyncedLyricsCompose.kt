@@ -445,7 +445,13 @@ private fun LyricLineItem(
     val lyricsBrush = if (lyricsColorStyle == "Dynamic (Gradient)") {
         Brush.horizontalGradient(listOf(accentColor, contentColor))
     } else null
-    val renderedColor = if (lyricsColorStyle == "White") Color.White else contentColor
+    val renderedColor = when (lyricsColorStyle) {
+        "White" -> Color.White
+        // UI Matching uses the app accent for the active lyric line, so it remains
+        // visually distinct from the explicit pure-white mode on dark themes.
+        "UI Matching" -> accentColor
+        else -> contentColor
+    }
     val dimColor = renderedColor.copy(alpha = 0.35f)
     val litColor = renderedColor
 
