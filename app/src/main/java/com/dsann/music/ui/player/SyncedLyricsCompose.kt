@@ -15,6 +15,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -953,38 +954,43 @@ private suspend fun performSmoothedScroll(
 ) {
     if (activeIndex !in displayItems.indices) return
 
-    // Wait for a real measurement rather than silently skipping the initial active line.
-    val viewportHeight = snapshotFlow { listState.layoutInfo.viewportSize.height }
-        .first { it > 0 }
+    // Don't calculate a target until Compose has measured the real lyrics viewport.
+    snapshotFlow {
+        listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
+    }.first { it > 0 }
 
-    val initialLayout = listState.layoutInfo
-    val initialItemHalfHeight = initialLayout.visibleItemsInfo
-        .firstOrNull { it.index == activeIndex }
-        ?.size?.div(2)
-        ?: estimatedItemHalfHeightPx
+    var layout = listState.layoutInfo
+    var item = layout.visibleItemsInfo.firstOrNull { it.index == activeIndex }
 
-    // Position the row's visual centre on the actual viewport centre.
-    val initialCenteredOffset = -(viewportHeight / 2 - initialItemHalfHeight)
-    listState.animateScrollToItem(
-        index = activeIndex,
-        scrollOffset = initialCenteredOffset
-    )
-
-    // Wrapped lyric lines can be taller than the fallback estimate. Re-measure once
-    // the active row is visible, then correct the target so the whole line is centred.
-    withFrameNanos { }
-    val measuredLayout = listState.layoutInfo
-    val measuredItem = measuredLayout.visibleItemsInfo.firstOrNull { it.index == activeIndex }
-        ?: return
-    val measuredViewportHeight = measuredLayout.viewportSize.height
-    if (measuredViewportHeight <= 0) return
-
-    val measuredCenteredOffset = -(measuredViewportHeight / 2 - measuredItem.size / 2)
-    if (abs(measuredCenteredOffset - initialCenteredOffset) > 2) {
+    // On the first frame the active row may not yet be composed. Bring it near the
+    // centre, then correct from its actual measured bounds.
+    if (item == null) {
+        val viewportCenter = (layout.viewportStartOffset + layout.viewportEndOffset) / 2
         listState.animateScrollToItem(
             index = activeIndex,
-            scrollOffset = measuredCenteredOffset
+            scrollOffset = -(viewportCenter - estimatedItemHalfHeightPx),
+            animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing)
         )
+        withFrameNanos { }
+        layout = listState.layoutInfo
+        item = layout.visibleItemsInfo.firstOrNull { it.index == activeIndex } ?: return
+    }
+
+    // Use item and viewport coordinates from the same LazyListLayoutInfo. This avoids
+    // content-padding and device-inset assumptions in a hand-calculated scrollOffset.
+    repeat(2) {
+        val viewportCenter = (layout.viewportStartOffset + layout.viewportEndOffset) / 2f
+        val itemCenter = item!!.offset + item!!.size / 2f
+        val correctionPx = itemCenter - viewportCenter
+        if (abs(correctionPx) <= 1.5f) return
+
+        listState.animateScrollBy(
+            value = correctionPx,
+            animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing)
+        )
+        withFrameNanos { }
+        layout = listState.layoutInfo
+        item = layout.visibleItemsInfo.firstOrNull { it.index == activeIndex } ?: return
     }
 }
 
