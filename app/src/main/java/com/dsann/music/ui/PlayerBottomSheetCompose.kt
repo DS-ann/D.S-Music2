@@ -1398,7 +1398,10 @@ fun PlayerBottomSheetCompose(
                         translationY = sheetVisualState.visualSheetTranslationYProvider()
                     }
                     .height(containerHeight),
-                shape = playerShellShape,
+                // This wrapper measures the full window height. Applying the collapsed
+                // mini-player's CircleShape here clips the whole window into a giant oval.
+                // The actual 80dp player content below applies playerShellShape itself.
+                shape = androidx.compose.ui.graphics.RectangleShape,
                 color = Color.Transparent,
                 showBorder = false
             ) {
