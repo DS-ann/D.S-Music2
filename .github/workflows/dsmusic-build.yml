@@ -50,6 +50,9 @@ jobs:
       - name: Install Android 17 SDK and Build Tools
         run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0"
 
+      - name: Run karaoke timing unit tests
+        run: gradle --no-daemon --warning-mode all testReleaseUnitTest
+
       - name: Assemble release APK
         run: |
           set -euo pipefail
