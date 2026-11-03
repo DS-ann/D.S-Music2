@@ -1343,7 +1343,7 @@ fun PlayerBottomSheetCompose(
         // expand it back to the full tab width with the full-player transition.
         val playerShellWidthFraction by animateFloatAsState(
             targetValue = if (
-                isLandscapeWindow && !useNavigationRail &&
+                isLandscapeWindow &&
                 currentSheetContentState == PlayerSheetState.COLLAPSED
             ) 0.5f else 1f,
             animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
