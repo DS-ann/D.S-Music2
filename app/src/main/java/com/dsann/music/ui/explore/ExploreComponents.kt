@@ -754,6 +754,45 @@ fun BentoCell(
     }
 }
 
+/**
+ * Keeps upcoming vertical feed sections warm as the outer Explore LazyColumn scrolls.
+ * The first LazyColumn item is the greeting banner, so list index 1 maps to section 0.
+ * Only a few small thumbnails are decoded ahead; the page itself remains live and interactive.
+ */
+@Composable
+internal fun PrefetchExploreHomeSectionImages(
+    sections: List<HomeSection>,
+    state: LazyListState,
+    sectionsAhead: Int = 2,
+    imagesPerSection: Int = 3
+) {
+    val context = LocalContext.current
+    val imageLoader = context.imageLoader
+    LaunchedEffect(state, sections, sectionsAhead, imagesPerSection, imageLoader) {
+        snapshotFlow {
+            state.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+        }.distinctUntilChanged().collectLatest { lastVisibleListIndex ->
+            val nextSectionIndex = lastVisibleListIndex.coerceAtLeast(0)
+            val urls = sections.asSequence()
+                .drop(nextSectionIndex)
+                .take(sectionsAhead)
+                .flatMap { section ->
+                    section.items.asSequence().map { it.exploreThumbnailUrl() }
+                }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .take(sectionsAhead * imagesPerSection)
+                .toList()
+
+            urls.forEach { url ->
+                val request = buildExploreImageRequest(context, url, targetSizePx = 256)
+                    ?: return@forEach
+                imageLoader.enqueue(request)
+            }
+        }
+    }
+}
+
 // ===== Home Feed Section =====
 
 @Composable
