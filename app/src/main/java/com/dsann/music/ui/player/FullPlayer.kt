@@ -19,15 +19,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.ThumbDown
-import androidx.compose.material.icons.filled.NightsStay
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.ThumbDown
+import androidx.compose.material.icons.rounded.NightsStay
+import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.RepeatOne
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -450,7 +450,7 @@ private fun LandscapePlayerDetailsPane(
             Spacer(Modifier.weight(1f))
             if (!showQueue) {
                 DsmusicIconButton(onClick = { showProviderPicker = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Choose lyrics source")
+                    Icon(Icons.Rounded.MoreVert, contentDescription = "Choose lyrics source")
                 }
             }
             Text(
@@ -1133,7 +1133,7 @@ fun FullPlayer(
                     modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Info,
+                        imageVector = Icons.Rounded.Info,
                         contentDescription = "Song information",
                         tint = contentSecondary,
                         modifier = Modifier.size(24.dp)
@@ -1291,7 +1291,7 @@ fun FullPlayer(
                         }
                         "like" -> PillChip(
                             style = playerButtonStyle,
-                            icon = if (uiState.isCurrentSongFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            icon = if (uiState.isCurrentSongFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                             label = "Like",
                             isSelected = uiState.isCurrentSongFavorite,
                             onClick = onFavoriteClick,
@@ -1301,7 +1301,7 @@ fun FullPlayer(
                         )
                         "dislike" -> PillChip(
                             style = playerButtonStyle,
-                            icon = Icons.Default.ThumbDown,
+                            icon = Icons.Rounded.ThumbDown,
                             label = "Not for me",
                             isSelected = uiState.isCurrentSongDisliked,
                             onClick = onDislikeClick,
@@ -1311,7 +1311,7 @@ fun FullPlayer(
                         )
                         "sleep" -> PillChip(
                             style = playerButtonStyle,
-                            icon = Icons.Default.NightsStay,
+                            icon = Icons.Rounded.NightsStay,
                             label = "Sleep timer",
                             isSelected = sleepTimerEndTime != null,
                             onClick = { showSleepTimerDialog = true },
@@ -1321,7 +1321,7 @@ fun FullPlayer(
                         )
                         "shuffle" -> PillChip(
                             style = playerButtonStyle,
-                            icon = Icons.Default.Shuffle,
+                            icon = Icons.Rounded.Shuffle,
                             label = "Shuffle",
                             isSelected = isShuffleEnabled,
                             onClick = { viewModel.toggleShuffle() },
@@ -1331,7 +1331,7 @@ fun FullPlayer(
                         )
                         "repeat" -> PillChip(
                             style = playerButtonStyle,
-                            icon = if (repeatMode == PlayerSharedViewModel.REPEAT_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
+                            icon = if (repeatMode == PlayerSharedViewModel.REPEAT_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
                             label = when (repeatMode) {
                                 PlayerSharedViewModel.REPEAT_ONE -> "Repeat one"
                                 PlayerSharedViewModel.REPEAT_ALL -> "Repeat all"
