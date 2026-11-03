@@ -626,7 +626,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _playerButtonStyle = MutableStateFlow(prefs.getString("player_button_style", "Pill") ?: "Pill")
     val playerButtonStyle: StateFlow<String> = _playerButtonStyle.asStateFlow()
     fun setPlayerButtonStyle(value: String) {
-        val safe = value.takeIf { it in listOf("Pill", "Rounded", "Minimal") } ?: "Pill"
+        val safe = value.takeIf { it in listOf("Round", "Pill", "None", "Square") } ?: "Pill"
         _playerButtonStyle.value = safe
         prefs.edit { putString("player_button_style", safe) }
     }
@@ -673,6 +673,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val safe = value.takeIf { it in listOf("Original", "Left", "Center") } ?: "Original"
         _lyricsAlignment.value = safe
         prefs.edit { putString("lyrics_alignment", safe) }
+    }
+
+    private val _lyricsColorStyle = MutableStateFlow(
+        prefs.getString("lyrics_color_style", "Dynamic (Gradient)") ?: "Dynamic (Gradient)"
+    )
+    val lyricsColorStyle: StateFlow<String> = _lyricsColorStyle.asStateFlow()
+    fun setLyricsColorStyle(value: String) {
+        val safe = value.takeIf { it in listOf("Dynamic (Gradient)", "UI Matching", "White") }
+            ?: "Dynamic (Gradient)"
+        _lyricsColorStyle.value = safe
+        prefs.edit { putString("lyrics_color_style", safe) }
     }
 
     private val _lyricsFontFamily = MutableStateFlow(
@@ -738,7 +749,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         "player_title_weight", "player_title_scroll", "player_times", "scrubber_style",
         "scrubber_color", "player_visualizer", "player_button_style", "scrubber_thickness",
         "scrubber_thumb_style", "visualizer_color", "lyrics_text_size", "lyrics_alignment",
-        "lyrics_font_family", "ui_density", "ui_font_family", "ui_font_scale",
+        "lyrics_font_family", "lyrics_color_style", "ui_density", "ui_font_family", "ui_font_scale",
         "ui_font_weight", "ui_letter_spacing", "nav_label_mode", "hide_nav_labels",
         "dynamic_nav_style", "nav_bar_style", "nav_bar_size"
     )
@@ -821,6 +832,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         setLyricsTextSize(look.optString("lyrics_text_size", _lyricsTextSize.value))
         setLyricsAlignment(look.optString("lyrics_alignment", _lyricsAlignment.value))
         setLyricsFontFamily(look.optString("lyrics_font_family", _lyricsFontFamily.value))
+        setLyricsColorStyle(look.optString("lyrics_color_style", _lyricsColorStyle.value))
         setUiDensity(look.optString("ui_density", _uiDensity.value))
         setUiFontFamily(look.optString("ui_font_family", _uiFontFamily.value))
         setUiFontScale(look.optDouble("ui_font_scale", _uiFontScale.value.toDouble()).toFloat())
@@ -1357,6 +1369,7 @@ fun SettingsScreenContent(
     val lyricsTextSize by viewModel.lyricsTextSize.collectAsStateWithLifecycle()
     val lyricsAlignment by viewModel.lyricsAlignment.collectAsStateWithLifecycle()
     val lyricsFontFamily by viewModel.lyricsFontFamily.collectAsStateWithLifecycle()
+    val lyricsColorStyle by viewModel.lyricsColorStyle.collectAsStateWithLifecycle()
     val uiDensity by viewModel.uiDensity.collectAsStateWithLifecycle()
     val uiFontFamily by viewModel.uiFontFamily.collectAsStateWithLifecycle()
     val uiFontScale by viewModel.uiFontScale.collectAsStateWithLifecycle()
@@ -1577,6 +1590,8 @@ fun SettingsScreenContent(
                 onLyricsAlignmentChange = { viewModel.setLyricsAlignment(it) },
                 lyricsFontFamily = lyricsFontFamily,
                 onLyricsFontFamilyChange = { viewModel.setLyricsFontFamily(it) },
+                lyricsColorStyle = lyricsColorStyle,
+                onLyricsColorStyleChange = { viewModel.setLyricsColorStyle(it) },
                 uiDensity = uiDensity,
                 onUiDensityChange = { viewModel.setUiDensity(it) },
                 uiFontFamily = uiFontFamily,
@@ -2664,6 +2679,8 @@ private fun AppearanceScreen(
     onLyricsAlignmentChange: (String) -> Unit,
     lyricsFontFamily: String,
     onLyricsFontFamilyChange: (String) -> Unit,
+    lyricsColorStyle: String,
+    onLyricsColorStyleChange: (String) -> Unit,
     uiDensity: String,
     onUiDensityChange: (String) -> Unit,
     uiFontFamily: String,
@@ -2824,9 +2841,9 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Button presentation",
-                        description = "Choose pill, rounded-outline or icon-first action controls.",
+                        description = "Choose rounded corners, a pill, no background, or a square background for player action buttons.",
                         selected = playerButtonStyle,
-                        options = listOf("Pill", "Rounded", "Minimal"),
+                        options = listOf("Round", "Pill", "None", "Square"),
                         onSelected = onPlayerButtonStyleChange
                     )
                 }
@@ -3020,6 +3037,15 @@ private fun AppearanceScreen(
                         selected = lyricsTextSize,
                         options = listOf("Small", "Standard", "Large"),
                         onSelected = onLyricsTextSizeChange
+                    )
+                },
+                {
+                    SettingsChoiceRow(
+                        title = "Lyrics colour",
+                        description = "Choose album-art dynamic gradients, interface-matched colours, or white.",
+                        selected = lyricsColorStyle,
+                        options = listOf("Dynamic (Gradient)", "UI Matching", "White"),
+                        onSelected = onLyricsColorStyleChange
                     )
                 },
                 {
