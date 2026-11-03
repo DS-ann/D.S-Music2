@@ -400,6 +400,7 @@ private fun LandscapePlayerDetailsPane(
     accentColor: Color,
     selectedProvider: String?,
     providerResults: Map<String, LyricsResult>,
+    lyricsColorStyle: String = "Dynamic (Gradient)",
     onProviderSelected: (String) -> Unit,
     onSeekTo: (Int) -> Unit,
     onFetchLyrics: () -> Unit,
@@ -475,6 +476,7 @@ private fun LandscapePlayerDetailsPane(
                     currentSong = currentSong,
                     selectedProvider = selectedProvider,
                     providerResults = providerResults,
+                    lyricsColorStyle = lyricsColorStyle,
                     modifier = Modifier.fillMaxSize()
                 )
 
@@ -655,6 +657,7 @@ fun FullPlayerScreen(
     val scrubberThickness by customizeViewModel.scrubberThickness.collectAsStateWithLifecycle()
     val scrubberThumbStyle by customizeViewModel.scrubberThumbStyle.collectAsStateWithLifecycle()
     val visualizerColor by customizeViewModel.visualizerColor.collectAsStateWithLifecycle()
+    val lyricsColorStyle by customizeViewModel.lyricsColorStyle.collectAsStateWithLifecycle()
 
     // The saved Lyrics layout controls appearance only. Opening the mini player must
     // always show the normal player; lyrics are entered through the explicit Lyrics action.
@@ -690,6 +693,7 @@ fun FullPlayerScreen(
         visualizerStyle = visualizerStyle,
         playerBackgroundStyle = playerBackgroundStyle,
         playerButtonStyle = playerButtonStyle,
+        lyricsColorStyle = lyricsColorStyle,
         scrubberThickness = scrubberThickness,
         scrubberThumbStyle = scrubberThumbStyle,
         visualizerColor = visualizerColor,
@@ -782,6 +786,7 @@ fun FullPlayer(
     visualizerStyle: String = "Off",
     playerBackgroundStyle: String = "Artwork",
     playerButtonStyle: String = "Pill",
+    lyricsColorStyle: String = "Dynamic (Gradient)",
     scrubberThickness: Float = 1f,
     scrubberThumbStyle: String = "Auto",
     visualizerColor: String = "Accent",
@@ -812,6 +817,17 @@ fun FullPlayer(
                 Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
             }
         }
+    }
+    val lyricsTextColor = when (lyricsColorStyle) {
+        "White" -> Color.White
+        "UI Matching" -> DsmusicTheme.colorScheme.onSurface
+        else -> contentColor
+    }
+    val lyricsSecondaryColor = lyricsTextColor.copy(alpha = if (lyricsColorStyle == "White") 0.68f else 0.58f)
+    val lyricsAccentColor = when (lyricsColorStyle) {
+        "White" -> Color.White
+        "UI Matching" -> DsmusicTheme.colorScheme.primary
+        else -> dynamicAccentColor
     }
 
     val themePlayerBackground = DsmusicTheme.colorScheme.background
@@ -967,7 +983,7 @@ fun FullPlayer(
         }
         // Preserve the shared-artwork vertical anchor; only the transport spacing compacts
         // when a portrait window becomes short.
-        val headerHeight = if (isLandscapeWindow) 40.dp else 56.dp
+        val headerHeight = if (isLandscapeWindow) 44.dp else 68.dp
 
         // Calculate top offset to perfectly match yEndPx in PlayerBottomSheetCompose
         val topOffset = if (useWidePlayer) minTopOffset
@@ -988,7 +1004,12 @@ fun FullPlayer(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(headerHeight),
+                    .height(headerHeight)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onCollapse
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -1007,12 +1028,26 @@ fun FullPlayer(
                     )
                 }
 
-                Text(
-                    text = "NOW PLAYING",
-                    style = DsmusicTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = contentSecondary
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "NOW PLAYING",
+                        style = DsmusicTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = contentSecondary
+                    )
+                    Text(
+                        text = uiState.currentSong?.playbackContextName?.takeIf { it.isNotBlank() }
+                            ?: uiState.currentSong?.albumName?.takeIf { it.isNotBlank() }
+                            ?: "Random",
+                        style = DsmusicTheme.typography.labelSmall,
+                        color = contentSecondary.copy(alpha = 0.78f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 Spacer(modifier = Modifier.size(48.dp))
             }
@@ -1339,17 +1374,18 @@ fun FullPlayer(
 
             Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 16.dp))
 
-            val minimalTransport = playerButtonStyle == "Minimal"
+            val noTransportBackground = playerButtonStyle == "None"
             val transportShape = when (playerButtonStyle) {
+                "Round" -> RoundedCornerShape(14.dp)
                 "Pill" -> CircleShape
-                "Rounded" -> RoundedCornerShape(18.dp)
-                else -> CircleShape
+                "Square" -> RoundedCornerShape(5.dp)
+                else -> RoundedCornerShape(0.dp)
             }
-            val sideControlColor = if (minimalTransport) Color.Transparent
+            val sideControlColor = if (noTransportBackground) Color.Transparent
                 else contentColor.copy(alpha = if (isDark) 0.08f else 0.06f)
-            val sideIconColor = if (minimalTransport) dynamicAccentColor else contentColor
-            val centerControlColor = if (minimalTransport) Color.Transparent else dynamicAccentColor
-            val centerIconColor = if (minimalTransport) dynamicAccentColor
+            val sideIconColor = if (noTransportBackground) dynamicAccentColor else contentColor
+            val centerControlColor = if (noTransportBackground) Color.Transparent else dynamicAccentColor
+            val centerIconColor = if (noTransportBackground) dynamicAccentColor
                 else if (isDark) Color(0xFF1C1B1F) else Color.White
 
             // D.S Launcher-style transport controls: flat rounded touch targets with
@@ -1425,7 +1461,12 @@ fun FullPlayer(
 
             // Keep the queue opener attached to the bottom edge of the player pane.
             // Any unused vertical space belongs above the opener, not below it.
-            Spacer(modifier = Modifier.weight(1f))
+            val isTabletPortrait = screenWidth >= 600.dp && !isLandscapeWindow
+            if (isTabletPortrait) {
+                Spacer(modifier = Modifier.height(10.dp))
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
             Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 16.dp))
 
             // Swipe Up / Click Chevron Up Indicator to expand Queue
@@ -1491,9 +1532,10 @@ fun FullPlayer(
                         currentPositionProvider = currentPositionProvider,
                         playbackSpeedProvider = playbackSpeedProvider,
                         isPlaying = uiState.isPlaying,
-                        contentColor = contentColor,
-                        secondaryColor = contentSecondary,
-                        accentColor = dynamicAccentColor,
+                        contentColor = lyricsTextColor,
+                        secondaryColor = lyricsSecondaryColor,
+                        accentColor = lyricsAccentColor,
+                        lyricsColorStyle = lyricsColorStyle,
                         selectedProvider = selectedProvider,
                         providerResults = providerResults,
                         onProviderSelected = onProviderSelected,
@@ -1531,9 +1573,10 @@ fun FullPlayer(
                 backgroundBrush = lyricsBackgroundBrush,
                 revealProgressProvider = { lyricsRevealProgress },
                 revealCenterProvider = { lyricsButtonCenterInRoot },
-                contentColor = contentColor,
-                contentSecondary = contentSecondary,
-                dynamicAccentColor = dynamicAccentColor,
+                contentColor = lyricsTextColor,
+                contentSecondary = lyricsSecondaryColor,
+                dynamicAccentColor = lyricsAccentColor,
+                lyricsColorStyle = lyricsColorStyle,
                 onRetryLyrics = onRetryLyrics,
                 onFetchLyrics = onFetchLyrics,
                 onSeekTo = onSeekTo,
