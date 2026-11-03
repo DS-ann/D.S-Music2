@@ -974,6 +974,10 @@ fun ExploreScreen(
                                                     ) {
                                                         when {
                                                             homeSections.isNotEmpty() -> {
+                                                                PrefetchExploreHomeSectionImages(
+                                                                    sections = homeSections,
+                                                                    state = homeListState
+                                                                )
                                                                 LazyColumn(
                                                                     state = homeListState,
                                                                     modifier = Modifier.fillMaxSize()
