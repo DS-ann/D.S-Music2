@@ -81,8 +81,8 @@ data class DsmusicColorScheme(
     val surfaceVariant: Color = Color(0xFF192540),
     val onSurfaceVariant: Color = Color(0xFFB7C3D5),
     val surfaceTint: Color = Color(0xFF7C9CFF),
-    val outline: Color = Color(0xFF65748A),
-    val outlineVariant: Color = Color(0xFF354255),
+    val outline: Color = Color(0xFF9AADC9),
+    val outlineVariant: Color = Color(0xFF61748F),
     val error: Color = Color(0xFFFF8C91),
     val onError: Color = Color(0xFF2B080D),
     val errorContainer: Color = Color(0xFF5B2028),
@@ -684,7 +684,7 @@ fun RadioButton(selected: Boolean, onClick: (() -> Unit)?, modifier: Modifier = 
 
 
 @Composable
-fun HorizontalDivider(modifier: Modifier = Modifier, thickness: Dp = 1.dp, color: Color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)) {
+fun HorizontalDivider(modifier: Modifier = Modifier, thickness: Dp = 1.dp, color: Color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.78f)) {
     Box(modifier.fillMaxWidth().height(thickness).background(color))
 }
 
@@ -865,7 +865,7 @@ fun AlertDialog(
 ) {
     Dialog(onDismissRequest = onDismissRequest, properties = properties) {
         Column(
-            modifier = modifier.fillMaxWidth().clip(shape).background(containerColor).border(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.45f), shape).padding(22.dp),
+            modifier = modifier.fillMaxWidth().clip(shape).background(containerColor).border(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.86f), shape).padding(22.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             if (icon != null) CompositionLocalProvider(LocalDsmusicContentColor provides iconContentColor) { Box(Modifier.align(Alignment.CenterHorizontally)) { icon() } }
@@ -1344,7 +1344,7 @@ fun ToggleButton(
     Row(
         modifier = modifier.clip(actualShape)
             .background(background)
-            .border(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.48f), actualShape)
+            .border(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.86f), actualShape)
             .clickable(enabled = enabled, interactionSource = interactionSource, indication = null) { onCheckedChange(!checked) }
             .padding(contentPadding),
         horizontalArrangement = Arrangement.Center,
@@ -1392,7 +1392,7 @@ fun Snackbar(
     actionColor: Color = DsmusicTheme.colorScheme.primary,
     content: @Composable () -> Unit
 ) {
-    Row(modifier.clip(shape).background(containerColor).border(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), shape).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier.clip(shape).background(containerColor).border(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.82f), shape).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.weight(1f)) { CompositionLocalProvider(LocalDsmusicContentColor provides contentColor) { content() } }
         action?.invoke()
         dismissAction?.invoke()
