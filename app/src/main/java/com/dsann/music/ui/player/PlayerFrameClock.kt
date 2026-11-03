@@ -74,7 +74,7 @@ internal fun rememberAppAnimationFrameTimeNanos(active: Boolean): State<Long> {
         AppAnimationFrameRateController.load(context)
     }
 
-    LaunchedEffect(active, frameRate) {
+    LaunchedEffect(active, frameRate, forceDisplayRefresh) {
         if (!active) {
             frameTimeNanos.longValue = 0L
             return@LaunchedEffect
