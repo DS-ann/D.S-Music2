@@ -1423,6 +1423,9 @@ fun FullPlayer(
                 }
             }
 
+            // Keep the queue opener attached to the bottom edge of the player pane.
+            // Any unused vertical space belongs above the opener, not below it.
+            Spacer(modifier = Modifier.weight(1f))
             Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 16.dp))
 
             // Swipe Up / Click Chevron Up Indicator to expand Queue
