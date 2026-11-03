@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -67,6 +68,7 @@ import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import com.dsann.music.ui.theme.LoadingIndicator
 import com.dsann.music.ui.theme.FilterChip
 import com.dsann.music.ui.theme.FilterChipDefaults
@@ -114,6 +116,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -356,6 +359,60 @@ fun ExploreScreen(
     }
 
     var isAccountVisible by rememberSaveable { mutableStateOf(false) }
+    var showExploreCustomizer by rememberSaveable { mutableStateOf(false) }
+    var hiddenExploreSections by remember {
+        mutableStateOf(prefs.getStringSet("hidden_home_sections", emptySet())?.toSet().orEmpty())
+    }
+    var exploreSectionOrder by remember {
+        mutableStateOf(prefs.getString("home_section_order", "").orEmpty()
+            .split("||").filter { it.isNotBlank() })
+    }
+    var showExploreMoodChips by rememberSaveable {
+        mutableStateOf(prefs.getBoolean("show_home_mood_chips", true))
+    }
+    val orderedExploreSectionTitles = remember(homeSections, exploreSectionOrder) {
+        val loadedTitles = homeSections.map { it.title }
+        (exploreSectionOrder.filter { it in loadedTitles } +
+            loadedTitles.filter { it !in exploreSectionOrder }).distinct()
+    }
+    val visibleHomeSections = remember(homeSections, hiddenExploreSections, orderedExploreSectionTitles) {
+        val order = orderedExploreSectionTitles.withIndex().associate { it.value to it.index }
+        homeSections.filterNot { it.title in hiddenExploreSections }
+            .sortedBy { order[it.title] ?: Int.MAX_VALUE }
+    }
+
+    fun setExploreMoodChipsVisible(visible: Boolean) {
+        showExploreMoodChips = visible
+        prefs.edit().putBoolean("show_home_mood_chips", visible).apply()
+    }
+
+    fun setExploreSectionVisibility(title: String, visible: Boolean) {
+        val updated = if (visible) hiddenExploreSections - title else hiddenExploreSections + title
+        hiddenExploreSections = updated
+        prefs.edit().putStringSet("hidden_home_sections", updated).apply()
+    }
+
+    fun moveExploreSection(title: String, direction: Int) {
+        val updated = orderedExploreSectionTitles.toMutableList()
+        val from = updated.indexOf(title)
+        val to = (from + direction).coerceIn(0, updated.lastIndex)
+        if (from < 0 || from == to) return
+        val moved = updated.removeAt(from)
+        updated.add(to, moved)
+        exploreSectionOrder = updated
+        prefs.edit().putString("home_section_order", updated.joinToString("||")).apply()
+    }
+
+    fun resetExploreCustomizer() {
+        hiddenExploreSections = emptySet()
+        exploreSectionOrder = homeSections.map { it.title }
+        showExploreMoodChips = true
+        prefs.edit()
+            .remove("hidden_home_sections")
+            .remove("home_section_order")
+            .putBoolean("show_home_mood_chips", true)
+            .apply()
+    }
 
     val detailScreenActive = detailStack.isNotEmpty() || isLoadingDetail
 
@@ -505,7 +562,6 @@ fun ExploreScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (isLandscape) Modifier.padding(start = 88.dp) else Modifier)
         ) {
             // ===== Main Content (Now encapsulates scrolling headers) =====
             Box(modifier = Modifier.fillMaxSize().nestedScroll(nestedScrollConnection)) {
@@ -757,6 +813,7 @@ fun ExploreScreen(
                                                 selectedCollectionMenuContinuation = null
                                             },
                                             onAccountVisibleChange = onSearchHeaderAccountVisibleChange,
+                                            onCustomizeExplore = { showExploreCustomizer = true },
                                             userProfile = userProfile,
                                             homeMoods = homeMoods,
                                             currentMood = currentMood,
@@ -1055,7 +1112,7 @@ fun ExploreScreen(
                                                         when {
                                                             homeSections.isNotEmpty() -> {
                                                                 PrefetchExploreHomeSectionImages(
-                                                                    sections = homeSections,
+                                                                    sections = visibleHomeSections,
                                                                     state = homeListState
                                                                 )
                                                                 LazyColumn(
@@ -1084,7 +1141,7 @@ fun ExploreScreen(
                                                                         }
                                                                     }
                                                                     items(
-                                                                        items = homeSections,
+                                                                        items = visibleHomeSections,
                                                                         key = { section -> "section-${section.title}" }
                                                                     ) { section ->
                                                                         HomeSectionRow(
@@ -1174,7 +1231,7 @@ fun ExploreScreen(
                                                                             if (
                                                                                 !isLoadingMoreHome &&
                                                                                 lastVisibleIndex != null &&
-                                                                                lastVisibleIndex >= homeSections.size
+                                                                                lastVisibleIndex >= visibleHomeSections.size
                                                                             ) {
                                                                                 viewModel.loadMoreHomeSections()
                                                                             }
@@ -1324,6 +1381,174 @@ fun ExploreScreen(
                     showAddToPlaylistDialog = true
                 }
             )
+        }
+
+        if (showExploreCustomizer) {
+            ExploreCustomizerDialog(
+                sectionTitles = orderedExploreSectionTitles,
+                hiddenSectionTitles = hiddenExploreSections,
+                showMoodChips = showExploreMoodChips,
+                onMoodChipsChange = ::setExploreMoodChipsVisible,
+                onSectionVisibilityChange = ::setExploreSectionVisibility,
+                onMoveSection = ::moveExploreSection,
+                onReset = ::resetExploreCustomizer,
+                onDismiss = { showExploreCustomizer = false }
+            )
+        }
+    }
+}
+
+
+@Composable
+private fun ExploreCustomizerDialog(
+    sectionTitles: List<String>,
+    hiddenSectionTitles: Set<String>,
+    showMoodChips: Boolean,
+    onMoodChipsChange: (Boolean) -> Unit,
+    onSectionVisibilityChange: (String, Boolean) -> Unit,
+    onMoveSection: (String, Int) -> Unit,
+    onReset: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        DsmusicSurface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 520.dp)
+                .heightIn(max = 680.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = DsmusicTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Explore customizer",
+                            style = DsmusicTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Arrange your home feed",
+                            style = DsmusicTheme.typography.bodySmall,
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    DsmusicTextButton(onClick = onDismiss) { Text("Done") }
+                }
+
+                DsmusicSurface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = DsmusicTheme.colorScheme.surfaceContainerLow
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Mood categories", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Show or hide the category chips at the top",
+                                style = DsmusicTheme.typography.bodySmall,
+                                color = DsmusicTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        DsmusicSwitchControl(
+                            checked = showMoodChips,
+                            onCheckedChange = onMoodChipsChange
+                        )
+                    }
+                }
+
+                Text(
+                    "HOME SECTIONS",
+                    style = DsmusicTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
+                )
+
+                if (sectionTitles.isEmpty()) {
+                    Text(
+                        "Home sections will appear here after Explore has loaded its feed.",
+                        style = DsmusicTheme.typography.bodyMedium,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    sectionTitles.forEachIndexed { index, title ->
+                        val visible = title !in hiddenSectionTitles
+                        DsmusicSurface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            color = DsmusicTheme.colorScheme.surfaceContainerLow
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        title,
+                                        style = DsmusicTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 2
+                                    )
+                                    Text(
+                                        if (visible) "Shown on Explore" else "Hidden",
+                                        style = DsmusicTheme.typography.labelSmall,
+                                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                DsmusicSwitchControl(
+                                    checked = visible,
+                                    onCheckedChange = { onSectionVisibilityChange(title, it) }
+                                )
+                                DsmusicIconButton(
+                                    onClick = { onMoveSection(title, -1) },
+                                    enabled = index > 0,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Text(
+                                        "↑",
+                                        style = DsmusicTheme.typography.titleMedium,
+                                        color = if (index > 0) DsmusicTheme.colorScheme.onSurface
+                                            else DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                                    )
+                                }
+                                DsmusicIconButton(
+                                    onClick = { onMoveSection(title, 1) },
+                                    enabled = index < sectionTitles.lastIndex,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Text(
+                                        "↓",
+                                        style = DsmusicTheme.typography.titleMedium,
+                                        color = if (index < sectionTitles.lastIndex) DsmusicTheme.colorScheme.onSurface
+                                            else DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    DsmusicTextButton(onClick = onReset) { Text("Reset layout") }
+                    DsmusicTextButton(onClick = onDismiss) { Text("Done") }
+                }
+            }
         }
     }
 }
@@ -1583,6 +1808,7 @@ fun ExploreScreen(
         onSuggestionItemClick: (SearchItem) -> Unit,
         onCollectionMenuClick: (SearchItem) -> Unit,
         onAccountVisibleChange: (Boolean) -> Unit,
+        onCustomizeExplore: () -> Unit,
         userProfile: UserProfile?,
         homeMoods: List<String>,
         currentMood: String?,
@@ -1956,6 +2182,20 @@ fun ExploreScreen(
                         )
                     )
                     if (!showSearchEntry) {
+                        if (!isSearchDestination) {
+                            DsmusicIconButton(
+                                onClick = onCustomizeExplore,
+                                modifier = Modifier.size(40.dp),
+                                shape = RoundedCornerShape(13.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "Customize Explore",
+                                    modifier = Modifier.size(22.dp),
+                                    tint = DsmusicTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                         Box(
                             Modifier.size(40.dp).clip(RoundedCornerShape(13.dp))
                                 .background(DsmusicTheme.colorScheme.surfaceContainerLow)
@@ -2057,7 +2297,7 @@ fun ExploreScreen(
             }
 
             // Category Chips — fetched from YouTube Music (hidden during active search inputs, without animations)
-            if (!isSearchActive && searchQuery.isBlank() && searchResults.isEmpty() && homeMoods.isNotEmpty()) {
+            if (showMoodChips && !isSearchActive && searchQuery.isBlank() && searchResults.isEmpty() && homeMoods.isNotEmpty()) {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
