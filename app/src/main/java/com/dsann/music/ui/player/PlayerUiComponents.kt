@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.sample
 import com.dsann.music.R
 import com.dsann.music.data.lyrics.LyricsResult
 import com.dsann.music.model.SongItem
@@ -318,13 +319,20 @@ internal fun WavySliderWithLabels(
     var isScrubbing by remember { mutableStateOf(false) }
     var sliderScrubPos by remember { mutableFloatStateOf(0f) }
 
-    val frameNanos by frameTimeNanos
-    val observedPosition by currentPositionFlow.collectAsStateWithLifecycle()
-    val currentPosition = when {
-        isPlayerVisible && isPlaying && frameNanos > 0L -> currentPositionProvider()
-        isPlayerVisible -> observedPosition
-        else -> currentPositionProvider()
-    }.coerceAtLeast(0)
+    // The service can publish at 20-60 FPS. Time labels only need a 4 Hz snapshot;
+    // the actual slider line samples Media3 in the draw pass below on every selected frame.
+    val labelPositionFlow = remember(currentPositionFlow) {
+        currentPositionFlow.sample(250L)
+    }
+    val observedPosition by labelPositionFlow.collectAsStateWithLifecycle(
+        initialValue = currentPositionFlow.value
+    )
+    val liveProgressEnabled = isPlayerVisible && isPlaying
+    val currentPosition = (
+        if (liveProgressEnabled) currentPositionProvider()
+        else if (isPlayerVisible) observedPosition
+        else currentPositionProvider()
+    ).coerceAtLeast(0)
     // A missing duration is not a one-millisecond track. Treat progress as unknown/zero
     // until Media3 publishes a valid duration, otherwise any restored position renders full.
     val safeDur = duration.takeIf { it > 0 }?.toFloat()
@@ -336,6 +344,14 @@ internal fun WavySliderWithLabels(
     val progressRatio = safeDur?.let {
         (currentPosition.toFloat() / it).coerceIn(0f, 1f)
     } ?: 0f
+    val liveProgressProvider: (() -> Float)? = safeDur
+        ?.takeIf { liveProgressEnabled && !isScrubbing }
+        ?.let { liveDuration ->
+            {
+                (currentPositionProvider().coerceAtLeast(0).toFloat() / liveDuration)
+                    .coerceIn(0f, 1f)
+            }
+        }
 
     Column(
         modifier = modifier
@@ -380,6 +396,7 @@ internal fun WavySliderWithLabels(
             waveLength = 48.dp,
             isWaveEligible = waveEnabled && isPlayerVisible,
             frameTimeNanos = frameTimeNanos,
+            liveProgressProvider = liveProgressProvider
         )
 
         if (playerTimes != "None") {
