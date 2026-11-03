@@ -2430,6 +2430,14 @@ class AudioPlaybackService : MediaSessionService() {
                 if (player.playbackState != Player.STATE_IDLE && player.playbackState != Player.STATE_ENDED) {
                     val pos = player.currentPosition
                     val dur = player.duration
+                    // API 23 intentionally does not run a Choreographer publisher. Publish a
+                    // 4 Hz shared snapshot here for elapsed-time labels and non-draw consumers;
+                    // the visible mini/full-player seek bars sample Media3 directly during draw.
+                    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M && player.isPlaying) {
+                        viewModel?.setCurrentPosition(
+                            pos.coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                        )
+                    }
                     val nowMs = System.currentTimeMillis()
                     val lyricsModeActive = viewModel?.isLyricsModeEnabled?.value == true
                     // On API 23, publish only a 4 Hz UI snapshot. The full-player seek track
