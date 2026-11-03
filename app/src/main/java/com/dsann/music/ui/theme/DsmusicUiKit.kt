@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -921,7 +922,11 @@ fun rememberDsmusicModalSheetGeometry(): DsmusicModalSheetGeometry {
     val usableTabWidth = (configuration.screenWidthDp.dp - totalRailInset).coerceAtLeast(0.dp)
     return DsmusicModalSheetGeometry(
         width = usableTabWidth * 0.5f,
-        centerOffsetX = totalRailInset * 0.5f
+        centerOffsetX = if (layoutDirection == LayoutDirection.Ltr) {
+            totalRailInset * 0.5f
+        } else {
+            -(totalRailInset * 0.5f)
+        }
     )
 }
 
