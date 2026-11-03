@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,6 +48,7 @@ import com.dsann.music.ui.theme.LoadingIndicator
 import com.dsann.music.ui.theme.ModalBottomSheet
 import com.dsann.music.ui.theme.Text
 import com.dsann.music.ui.theme.rememberModalBottomSheetState
+import com.dsann.music.ui.theme.rememberDsmusicModalSheetGeometry
 import com.dsann.music.util.SongDownloader
 import com.dsann.music.viewmodel.ExploreViewModel
 import com.dsann.music.viewmodel.PlayerSharedViewModel
@@ -63,6 +65,9 @@ fun OnlineCollectionActionsBottomSheet(
     onAddToPlaylist: (List<SongItem>) -> Unit
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val modalGeometry = rememberDsmusicModalSheetGeometry()
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var cachedSongs by remember(collection, initialSongs, initialContinuation) {
@@ -175,6 +180,9 @@ fun OnlineCollectionActionsBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
+        sheetMaxWidth = if (isLandscape) modalGeometry.width else androidx.compose.ui.unit.Dp.Unspecified,
+        centeredLandscape = true,
+        centerOffsetX = modalGeometry.centerOffsetX,
         containerColor = DsmusicTheme.colorScheme.surfaceContainerHigh
     ) {
         Column(
