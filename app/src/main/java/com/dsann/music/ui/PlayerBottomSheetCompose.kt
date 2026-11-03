@@ -123,6 +123,7 @@ import com.dsann.music.viewmodel.PlayerSharedViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.sample
@@ -496,23 +497,34 @@ class SheetVerticalDragGestureHandler(
     private var initialYOnDragStart = 0f
     private var accumulatedDragYSinceStart = 0f
     private var dragJob: Job? = null
+    private var dragFrameChannel: Channel<SheetVerticalDragFrame>? = null
     private var isActivelyDragging = false
 
     fun onDragStart() {
         isActivelyDragging = true
         onDragStateChange(true)
         dragJob?.cancel()
+        dragFrameChannel?.close()
         velocityTracker.resetTracking()
         initialFractionOnDragStart = playerContentExpansionFraction.value
         initialYOnDragStart = currentSheetTranslationY.value
         accumulatedDragYSinceStart = 0f
+
+        // Keep one writer for both Animatables. A conflated stream drops stale pointer
+        // samples instead of racing a cancelled coroutine against the next frame.
+        val channel = Channel<SheetVerticalDragFrame>(Channel.CONFLATED)
+        dragFrameChannel = channel
+        dragJob = scope.launch {
+            for (frame in channel) {
+                currentSheetTranslationY.snapTo(frame.translationY)
+                playerContentExpansionFraction.snapTo(frame.expansionFraction)
+            }
+        }
     }
 
     fun onVerticalDrag(uptimeMillis: Long, position: Offset, dragAmount: Float) {
-        if (currentSheetStateProvider() == PlayerSheetState.EXPANDED && dragAmount < 0) {
-            // Dragging UP when fully expanded: Ignore vertical sheet movement completely
-            return
-        }
+        // Allow the finger to reverse direction mid-gesture. The stored sheet state is not
+        // updated until drag end, so checking it here incorrectly discarded upward deltas.
         accumulatedDragYSinceStart += dragAmount
         val dragFrame = computeSheetVerticalDragFrame(
             accumulatedDragY = accumulatedDragYSinceStart,
@@ -522,11 +534,7 @@ class SheetVerticalDragGestureHandler(
             initialFractionOnDragStart = initialFractionOnDragStart,
             initialYOnDragStart = initialYOnDragStart
         )
-        dragJob?.cancel()
-        dragJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            currentSheetTranslationY.snapTo(dragFrame.translationY)
-            playerContentExpansionFraction.snapTo(dragFrame.expansionFraction)
-        }
+        dragFrameChannel?.trySend(dragFrame)
         velocityTracker.addPosition(uptimeMillis, position)
     }
 
@@ -534,29 +542,31 @@ class SheetVerticalDragGestureHandler(
         if (!isActivelyDragging) return
         isActivelyDragging = false
         onDragStateChange(false)
-        dragJob?.cancel()
+        val channel = dragFrameChannel
+        dragFrameChannel = null
+        channel?.close()
+        val pendingFrameJob = dragJob
+        dragJob = null
         val verticalVelocity = velocityTracker.calculateVelocity().y
-        val currentFraction = playerContentExpansionFraction.value
         val minDragThresholdPx = with(densityProvider()) { 5.dp.toPx() }
-        
-        val targetState = resolveVerticalSheetTargetState(
-            currentSheetContentState = currentSheetStateProvider(),
-            accumulatedDragY = accumulatedDragYSinceStart,
-            minDragThresholdPx = minDragThresholdPx,
-            verticalVelocity = verticalVelocity,
-            velocityThreshold = 150f,
-            currentFraction = currentFraction
-        )
 
         scope.launch {
+            // Finish the final conflated pointer frame before resolving the snap target.
+            pendingFrameJob?.join()
+            val currentFraction = playerContentExpansionFraction.value
+            val targetState = resolveVerticalSheetTargetState(
+                currentSheetContentState = currentSheetStateProvider(),
+                accumulatedDragY = accumulatedDragYSinceStart,
+                minDragThresholdPx = minDragThresholdPx,
+                verticalVelocity = verticalVelocity,
+                velocityThreshold = 150f,
+                currentFraction = currentFraction
+            )
+
             if (targetState == PlayerSheetState.EXPANDED) {
-                // Request the transition before changing the state. The composable owns the
-                // single animation job so the gesture and state observer cannot race each other.
                 onAnimateSheet(true, null, 0f)
                 onExpandSheetState()
             } else {
-                // Same non-overshooting transition as tap/Back collapse. Keeping one
-                // animation curve in both directions prevents the mini-player from wobbling.
                 onAnimateSheet(false, null, verticalVelocity)
                 onCollapseSheetState()
             }
@@ -769,12 +779,13 @@ fun PlayerBottomSheetCompose(
         val context = LocalContext.current
         val density = LocalDensity.current
         val configuration = LocalConfiguration.current
-        val useNavigationRail = configuration.screenWidthDp >= 600
-        val useWidePlayer = configuration.screenWidthDp >= 840 ||
-            (useNavigationRail && configuration.screenWidthDp > configuration.screenHeightDp)
-        val miniPlayerHeight = if (
-            configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        ) 64.dp else MiniPlayerHeight
+        // The player can be hosted in a resized/freeform window. Use its measured bounds
+        // instead of the physical display configuration for every responsive breakpoint.
+        val isLandscapeWindow = maxWidth > maxHeight
+        val useNavigationRail = maxWidth >= 600.dp
+        val useWidePlayer = maxWidth >= 840.dp ||
+            (useNavigationRail && isLandscapeWindow)
+        val miniPlayerHeight = if (isLandscapeWindow) 64.dp else MiniPlayerHeight
         val scope = rememberCoroutineScope()
         val playerPreferences = remember(context) {
             context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
@@ -1482,24 +1493,24 @@ fun PlayerBottomSheetCompose(
 
                     // Integrated shared artwork layer. In lyrics mode the same ArtworkPager
                     // moves into the app bar as a compact thumbnail instead of being hidden.
-                    val screenWidth = configuration.screenWidthDp
                     val albumArtScale = when (playerLayout) {
                         "Cover" -> 0.98f
                         "Minimal" -> 0.68f
                         "Vinyl", "Cassette" -> 0.82f
                         else -> 0.9f
                     }
+                    val artworkScaleFactor = playerArtworkScale.coerceIn(0.65f, 1f)
                     val albumArtSizeDp = (
-                        if (
-                            configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-                        ) {
-                            minOf(containerHeight * 0.28f, screenWidth.dp * 0.30f) * (albumArtScale / 0.9f)
+                        if (isLandscapeWindow) {
+                            minOf(containerHeight * 0.28f, containerWidthDp * 0.30f) * (albumArtScale / 0.9f)
                         } else if (useWidePlayer) {
-                            minOf(containerHeight * 0.50f, screenWidth.dp * 0.42f) * (albumArtScale / 0.9f)
+                            minOf(containerHeight * 0.50f, containerWidthDp * 0.42f) * (albumArtScale / 0.9f)
                         } else {
-                            (screenWidth * albumArtScale).dp
+                            // Limit portrait artwork by both available width and height so the
+                            // title, transport controls and queue handle remain in the window.
+                            minOf(containerWidthDp * albumArtScale, containerHeight * 0.40f)
                         }
-                    ) * playerArtworkScale.coerceIn(0.65f, 1f)
+                    ) * artworkScaleFactor
                     val statusBarTopPx = WindowInsets.statusBars.getTop(density).toFloat()
 
                     if (!isLegacyCompactArtwork) {
@@ -1522,17 +1533,13 @@ fun PlayerBottomSheetCompose(
 
                                 // Position relative to the Surface top-left
                                 val xStartPx = startPaddingPx +
-                                    (if (configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
-                                        10.dp
-                                    } else {
-                                        16.dp
-                                    }).toPx()
+                                    (if (isLandscapeWindow) 10.dp else 16.dp).toPx()
                                 val xEndPx = if (useWidePlayer) {
                                     with(density) {
                                         (20.dp + (containerWidthDp - 60.dp) * 0.54f / 2f - albumArtSizeDp / 2f).toPx()
                                     }
                                 } else {
-                                    (with(density) { screenWidth.dp.toPx() } - fullSizePx) / 2f
+                                    (with(density) { containerWidthDp.toPx() } - fullSizePx) / 2f
                                 }
 
                                 val miniPlayerArtworkStartInset = with(density) {
@@ -1541,9 +1548,8 @@ fun PlayerBottomSheetCompose(
                                 val yStartPx = miniPlayerArtworkStartInset
                                 val minTopOffsetDp = with(density) { statusBarTopPx.toDp() } +
                                     when {
-                                        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE &&
-                                            useWidePlayer -> 84.dp
-                                        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE -> 60.dp
+                                        isLandscapeWindow && useWidePlayer -> 84.dp
+                                        isLandscapeWindow -> 60.dp
                                         else -> 76.dp
                                     }
                                 val topOffsetDp = if (useWidePlayer) {
