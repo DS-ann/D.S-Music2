@@ -2406,6 +2406,7 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     private fun startProgressFrameUpdates() {
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) return
         if (progressFrameUpdatesRunning || viewModel == null || !isPlayerInitialized || !player.isPlaying) {
             return
         }
@@ -2431,9 +2432,15 @@ class AudioPlaybackService : MediaSessionService() {
                     val dur = player.duration
                     val nowMs = System.currentTimeMillis()
                     val lyricsModeActive = viewModel?.isLyricsModeEnabled?.value == true
-                    // Current position is published by Choreographer at the selected global
-                    // frame rate. Duration stays in this slower path because it rarely changes.
-                    if (dur > 0) viewModel?.setDuration(dur.toInt())
+                            // On API 23, publish only a 4 Hz UI snapshot. The full-player seek track
+                    // and mini-player artwork ring read Media3 directly in their draw passes,
+                    // so a 60 Hz StateFlow emission only recomposes unrelated UI for no gain.
+                    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M && player.isPlaying) {
+                        viewModel?.setCurrentPosition(
+                            pos.coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                        )
+                    }
+                    if (dur > 0) viewModel?.setDuration(dur.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
 
                     // Telemetry has second-level heartbeat semantics; update it once per second.
                     if (nowMs - lastTelemetryUpdateAtMs >= 1_000L) {
@@ -2488,9 +2495,9 @@ class AudioPlaybackService : MediaSessionService() {
                 // UI position callback runs independently on display vsync on every Android version.
                 val lyricsModeActive = viewModel?.isLyricsModeEnabled?.value == true
                 val intervalMs = when {
+                    Build.VERSION.SDK_INT <= Build.VERSION_CODES.M && player.isPlaying -> 250L
                     lyricsModeActive && player.isPlaying -> 180L
-                    // Audio stays on Media3's precise playback clock. API 23 runs background
-                    // housekeeping every 2s outside lyrics mode; the UI snapshot is vsync-driven.
+                    // API 23 uses a 4 Hz shared UI snapshot; newer versions publish on vsync.
                     Build.VERSION.SDK_INT <= Build.VERSION_CODES.M -> 2_000L
                     else -> 400L
                 }
