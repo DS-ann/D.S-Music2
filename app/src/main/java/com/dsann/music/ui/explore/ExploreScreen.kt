@@ -275,6 +275,13 @@ fun ExploreScreen(
                 val videoId = song.videoId
                 val durationMs = song.durationMs
                 val onlineQueue = viewModel.onlineQueue.value
+                val playbackContextTitle = viewModel.uiState.value.let { state ->
+                    when (state.detailStack.lastOrNull()?.name) {
+                        "PLAYLIST" -> state.playlistDetail?.playlist?.title
+                        "ALBUM" -> state.albumDetail?.album?.title
+                        else -> null
+                    }
+                }
                 if (onlineQueue.isNotEmpty()) {
                     val songItems = onlineQueue.map { os ->
                         SongItem.createOnlineSong(
@@ -286,7 +293,9 @@ fun ExploreScreen(
                             os.thumbnailUrl,
                             os.artistId,
                             os.albumName
-                        )
+                        ).apply {
+                            playbackContextName = playbackContextTitle
+                        }
                     }
                     playerSharedViewModel.setSongList(songItems)
                     val currentIdx = viewModel.currentOnlineIndex.value
@@ -301,7 +310,9 @@ fun ExploreScreen(
                         song.thumbnailUrl,
                         song.artistId,
                         song.albumName
-                    )
+                    ).apply {
+                        playbackContextName = playbackContextTitle
+                    }
                     playerSharedViewModel.playSong(songItem)
                 }
             }
@@ -2031,7 +2042,8 @@ private fun ExploreCustomizerDialog(
                             }
                         }
 
-                        if (userProfile != null && accountHistory.isNotEmpty()) {
+                        val recentAccountHistory = remember(accountHistory) { accountHistory.take(10) }
+                        if (userProfile != null && recentAccountHistory.isNotEmpty()) {
                             item {
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
@@ -2042,7 +2054,7 @@ private fun ExploreCustomizerDialog(
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                 )
                             }
-                            itemsIndexed(accountHistory) { idx, song ->
+                            itemsIndexed(recentAccountHistory) { idx, song ->
                                 DsmusicListItem(
                                     headlineContent = {
                                         Text(
@@ -2073,7 +2085,7 @@ private fun ExploreCustomizerDialog(
                                     ),
                                     modifier = Modifier.clickable {
                                         onSearchActiveChange(false)
-                                        onAccountHistorySongClick(song, accountHistory, idx)
+                                        onAccountHistorySongClick(song, recentAccountHistory, idx)
                                     }
                                 )
                             }
