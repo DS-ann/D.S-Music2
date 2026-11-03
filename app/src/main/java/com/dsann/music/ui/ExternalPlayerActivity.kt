@@ -49,6 +49,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,6 +70,8 @@ import com.dsann.music.ui.theme.DsmusicAppTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
@@ -319,10 +322,17 @@ fun PopupPlayerContent(
     val frameTimeNanos = rememberAppAnimationFrameTimeNanos(
         active = player != null && isPlaying && !isScrubbing
     )
-    val frameNanos by frameTimeNanos
-    val liveCurrentPosition = if (
-        player != null && isPlaying && !isScrubbing && frameNanos > 0L
-    ) player.currentPosition else currentPos
+    // Keep timestamp labels at 4 Hz; the visible slider reads Media3 directly during
+    // drawing, so it can move at the selected frame rate without recomposing this screen.
+    val liveCurrentPosition = currentPos
+    LaunchedEffect(player, isPlaying, isScrubbing, frameTimeNanos) {
+        if (player == null || !isPlaying || isScrubbing) return@LaunchedEffect
+        snapshotFlow { frameTimeNanos.value }
+            .sample(250L)
+            .collect { frameNanos ->
+                if (frameNanos > 0L) currentPos = player.currentPosition.coerceAtLeast(0L)
+            }
+    }
 
     // Attach core listeners to ExoPlayer to sync UI triggers
     DisposableEffect(player) {
@@ -476,6 +486,12 @@ fun PopupPlayerContent(
                 waveAmplitudeWhenPlaying = 6.dp,
                 waveLength = 48.dp,
                 frameTimeNanos = frameTimeNanos,
+                liveProgressProvider = if (player != null && isPlaying && !isScrubbing && duration > 0L) {
+                    {
+                        (player.currentPosition.coerceAtLeast(0L).toFloat() / duration.toFloat())
+                            .coerceIn(0f, 1f)
+                    }
+                } else null,
                 modifier = Modifier.fillMaxWidth()
             )
 
