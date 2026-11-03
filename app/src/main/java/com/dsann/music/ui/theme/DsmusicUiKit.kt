@@ -450,7 +450,12 @@ fun Text(
     style: TextStyle = DsmusicTheme.typography.bodyLarge
 ) {
     val resolved = style.copy(
-        color = if (color != Color.Unspecified) color else style.color.takeUnless { it == Color.Unspecified } ?: LocalDsmusicContentColor.current,
+        color = when {
+            color != Color.Unspecified -> color
+            style.brush != null -> Color.Unspecified
+            style.color != Color.Unspecified -> style.color
+            else -> LocalDsmusicContentColor.current
+        },
         fontSize = fontSize.takeUnless { it == TextUnit.Unspecified } ?: style.fontSize,
         fontStyle = fontStyle ?: style.fontStyle,
         fontWeight = fontWeight ?: style.fontWeight,
@@ -484,7 +489,12 @@ fun Text(
     style: TextStyle = DsmusicTheme.typography.bodyLarge
 ) {
     val resolved = style.copy(
-        color = if (color != Color.Unspecified) color else style.color.takeUnless { it == Color.Unspecified } ?: LocalDsmusicContentColor.current,
+        color = when {
+            color != Color.Unspecified -> color
+            style.brush != null -> Color.Unspecified
+            style.color != Color.Unspecified -> style.color
+            else -> LocalDsmusicContentColor.current
+        },
         fontSize = fontSize.takeUnless { it == TextUnit.Unspecified } ?: style.fontSize,
         fontStyle = fontStyle ?: style.fontStyle,
         fontWeight = fontWeight ?: style.fontWeight,
