@@ -64,14 +64,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.NightsStay
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.NightsStay
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.ContentCopy
@@ -1755,7 +1755,7 @@ private fun SettingsDetailTopBar(title: String, onBack: () -> Unit) {
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                 contentDescription = "Back",
                 tint = DsmusicTheme.colorScheme.onSurface,
                 modifier = Modifier.size(21.dp)
@@ -1938,7 +1938,7 @@ private fun ControlsAndGesturesScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Restore Prism-style defaults", modifier = Modifier.weight(1f), color = DsmusicTheme.colorScheme.primary)
-                    Icon(Icons.Default.Refresh, contentDescription = null, tint = DsmusicTheme.colorScheme.primary)
+                    Icon(Icons.Rounded.Refresh, contentDescription = null, tint = DsmusicTheme.colorScheme.primary)
                 }
             })
         }
@@ -1963,7 +1963,7 @@ private fun GestureSettingRow(
         ) {
             Text(title, modifier = Modifier.weight(1f), style = DsmusicTheme.typography.bodyLarge)
             Text(selected.label, color = DsmusicTheme.colorScheme.onSurfaceVariant, style = DsmusicTheme.typography.labelLarge)
-            Icon(Icons.Default.ChevronRight, contentDescription = "Change $title", tint = DsmusicTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 6.dp).size(18.dp))
+            Icon(Icons.Rounded.ChevronRight, contentDescription = "Change $title", tint = DsmusicTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 6.dp).size(18.dp))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { action ->
@@ -1974,7 +1974,7 @@ private fun GestureSettingRow(
                         onSelect(action)
                     },
                     trailingIcon = if (action == selected) {
-                        { Icon(Icons.Default.Refresh, contentDescription = "Selected") }
+                        { Icon(Icons.Rounded.Refresh, contentDescription = "Selected") }
                     } else null
                 )
             }
@@ -2433,7 +2433,7 @@ private fun AddHiddenFolderRow(onClick: () -> Unit) {
         },
         leadingContent = {
             Icon(
-                imageVector = Icons.Default.Add,
+                imageVector = Icons.Rounded.Add,
                 contentDescription = null,
                 tint = DsmusicTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)
@@ -2625,7 +2625,7 @@ private fun ManualSyncRow() {
                 )
             } else {
                 Icon(
-                    imageVector = Icons.Default.Refresh,
+                    imageVector = Icons.Rounded.Refresh,
                     contentDescription = "Sync Now",
                     tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(24.dp)
@@ -4564,7 +4564,7 @@ private fun SleepTimerSection(
             },
             trailingContent = {
                 Icon(
-                    imageVector = Icons.Default.ChevronRight,
+                    imageVector = Icons.Rounded.ChevronRight,
                     contentDescription = null,
                     tint = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
@@ -4669,7 +4669,7 @@ private fun AddMorePathRow(onClick: () -> Unit) {
         },
         leadingContent = {
             Icon(
-                imageVector = Icons.Default.Add,
+                imageVector = Icons.Rounded.Add,
                 contentDescription = null,
                 tint = DsmusicTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)
@@ -4817,7 +4817,7 @@ private fun CacheSizeRow(
         trailingContent = {
             DsmusicIconButton(onClick = onClear) {
                 Icon(
-                    imageVector = Icons.Default.Delete,
+                    imageVector = Icons.Rounded.Delete,
                     contentDescription = "Clear Cache",
                     tint = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
