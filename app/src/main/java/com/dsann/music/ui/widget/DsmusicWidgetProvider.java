@@ -98,6 +98,23 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         }
     }
 
+    /** Returns whether any D.S Music widget is installed on the current launcher. */
+    public static boolean hasAnyWidgets(Context context) {
+        try {
+            AppWidgetManager manager = AppWidgetManager.getInstance(context.getApplicationContext());
+            return manager.getAppWidgetIds(
+                    new ComponentName(context, WidgetSmallProvider.class)).length > 0
+                    || manager.getAppWidgetIds(
+                    new ComponentName(context, WidgetMediumProvider.class)).length > 0
+                    || manager.getAppWidgetIds(
+                    new ComponentName(context, WidgetLargeProvider.class)).length > 0;
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Could not query installed widgets", error);
+            // Preserve the playback service if launcher state cannot be queried safely.
+            return true;
+        }
+    }
+
     public static void updateAllWidgets(Context context, SongItem currentSong, boolean isPlaying, int position,
             int duration, String currentLyric) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
