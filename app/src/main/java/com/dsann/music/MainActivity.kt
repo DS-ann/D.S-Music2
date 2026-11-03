@@ -371,9 +371,9 @@ class MainActivity : AppCompatActivity() {
                     // attaches to the screen edge; Floating keeps a margin and rounded shell;
                     // Minimal removes the shell surface.
                     val railWidth = when (navBarSize) {
-                        "Compact" -> 68.dp
-                        "Tall" -> 84.dp
-                        else -> 76.dp
+                        "Compact" -> 80.dp
+                        "Tall" -> 96.dp
+                        else -> 88.dp
                     }
                     val railOuterGap = if (navBarStyle == "Docked") 0.dp else 12.dp
                     val railStartPadding = railSystemInset + railOuterGap
@@ -677,10 +677,13 @@ class MainActivity : AppCompatActivity() {
                                                     text = if (label == "Local Music") "Local\nMusic" else label,
                                                     style = DsmusicTheme.typography.labelSmall.copy(
                                                         color = tint,
-                                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                                     ),
                                                     maxLines = 2,
-                                                    modifier = Modifier.padding(top = 2.dp).width(64.dp)
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(top = 2.dp)
                                                 )
                                             }
                                         }
