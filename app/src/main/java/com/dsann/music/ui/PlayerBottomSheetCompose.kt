@@ -125,6 +125,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.sample
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sign
@@ -2206,7 +2207,14 @@ private fun MiniPlayerArtworkProgressOverlay(
     val frameTimeNanos = rememberAppAnimationFrameTimeNanos(
         active = isMiniLayerVisible && isPlaying
     )
-    val observedPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
+    // The service snapshot may run at 20-60 FPS. Sample only the paused/fallback value
+    // for composition; the visible progress arc reads Media3 directly in its Canvas draw.
+    val sampledPositionFlow = remember(viewModel.currentPosition) {
+        viewModel.currentPosition.sample(250L)
+    }
+    val observedPosition by sampledPositionFlow.collectAsStateWithLifecycle(
+        initialValue = viewModel.currentPosition.value
+    )
     val duration by viewModel.duration.collectAsStateWithLifecycle()
 
     // The frame timestamp is read inside Canvas so only the artwork-progress drawing
