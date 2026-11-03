@@ -18,6 +18,7 @@ import com.dsann.music.ui.theme.DsmusicSwitchControl
 import android.app.Activity
 import androidx.activity.compose.BackHandler
 import android.content.Context
+import android.os.Build
 import android.content.ContextWrapper
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
@@ -209,8 +210,12 @@ fun LibraryScreen(
 
     var activeTab by rememberSaveable { mutableStateOf("Playlists") }
     LaunchedEffect(activeTab) {
-        // Migrate a previously saved selection of the removed Device Files destination.
-        if (activeTab == "Device Files") activeTab = "Playlists"
+        // Migrate removed destinations and hide Listening Recap on Android 10 and lower.
+        if (activeTab == "Device Files" ||
+            (activeTab == "Recap" && Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q)
+        ) {
+            activeTab = "Playlists"
+        }
     }
     var searchQuery by rememberSaveable { mutableStateOf("")}
     var sortOrder by rememberSaveable { mutableStateOf(SortOrder.A_Z) }
@@ -478,9 +483,12 @@ fun LibraryScreen(
                     "Artists" to "Artists",
                     "History" to "History",
                     "Downloads" to "Downloaded songs",
-                    "Podcasts" to "Podcasts",
-                    "Recap" to "Recap"
-                )
+                    "Podcasts" to "Podcasts"
+                ) + if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    listOf("Recap" to "Recap")
+                } else {
+                    emptyList()
+                }
 
                 Row(
                     modifier = Modifier
@@ -510,6 +518,15 @@ fun LibraryScreen(
                     }
                 }
 
+                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+                    Text(
+                        text = "Recap is not supported on your version of Android.",
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 4.dp),
+                        style = DsmusicTheme.typography.bodySmall,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -526,7 +543,16 @@ fun LibraryScreen(
                     "Songs" -> SongsTabContent(nestedScrollConnection, viewModel)
                     "Albums" -> AlbumsTabContent(nestedScrollConnection, albumsAsList)
                     "Artists" -> ArtistsTabContent(nestedScrollConnection, artistsAsList)
-                    "Recap" -> RecapTabContent(nestedScrollConnection, viewModel, onNavigateToExplore)
+                    "Recap" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        RecapTabContent(nestedScrollConnection, viewModel, onNavigateToExplore)
+                    } else {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                "Recap is not supported on your version of Android.",
+                                color = DsmusicTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                     "Downloaded songs" -> {
                         // Scan Local Files helper
                         val onRefreshAction = {
