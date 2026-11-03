@@ -920,7 +920,11 @@ fun FullPlayer(
         // When the queue opens on a tablet-sized landscape layout, reserve its left pane
         // instead of letting the queue cover the player controls.
         val queueDockInset by animateDpAsState(
-            targetValue = if (useWidePlayer && isQueueExpanded) screenWidth * 0.42f else 0.dp,
+            targetValue = if (
+                useWidePlayer &&
+                configuration.orientation == Configuration.ORIENTATION_LANDSCAPE &&
+                isQueueExpanded
+            ) screenWidth * 0.42f else 0.dp,
             animationSpec = spring(dampingRatio = 0.85f, stiffness = 300f),
             label = "QueueDockInset"
         )
