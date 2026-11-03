@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
+import android.os.Build
 import android.util.Log
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.core.content.edit
@@ -53,6 +54,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -135,62 +137,72 @@ class PlayerSharedViewModel @Inject constructor(
         emptyList()
     )
 
-    // Reactive flow that live-aggregates history records
-    val listeningRecapFlow = playlistDao.getAllHistoryEventsFlow().map { events ->
-        if (events.isEmpty()) return@map null
-        
-        val totalPlayCount = events.size
-        val totalMs = events.sumOf { it.duration }
-        val totalMinutes = totalMs / 1000 / 60
-        
-        val topSongs = events.groupBy { it.songId }
-            .map { (songId, list) ->
-                val first = list.first()
-                TopSongStat(
-                    songId = songId,
-                    title = first.title,
-                    artist = first.artist,
-                    thumbnailUrl = first.thumbnailUrl,
-                    count = list.size
-                )
-            }
-            .sortedByDescending { it.count }
-            .take(10)
-            
-        val topArtists = events.groupBy { it.artist }
-            .map { (artist, list) ->
-                TopArtistStat(
-                    artist = artist,
-                    count = list.size,
-                    thumbnailUrl = list.firstOrNull { !it.thumbnailUrl.isNullOrEmpty() }?.thumbnailUrl
-                )
-            }
-            .sortedByDescending { it.count }
-            .take(5)
-            
-        val hourCounts = events.groupBy { it.hourOfDay }.mapValues { it.value.size }
-        val peakHour = hourCounts.maxByOrNull { it.value }?.key ?: 12
-        
-        val (peakMood, peakMoodDescription) = when (peakHour) {
-            in 5..11 -> "Morning Spark" to "You find your energy in morning melodies."
-            in 12..16 -> "Afternoon Groove" to "Midday rhythms keep you focused and moving."
-            in 17..21 -> "Evening Harmony" to "Winding down with perfect sunset soundtracks."
-            else -> "Midnight Mystique" to "Late night is when your true music flow awakens."
-        }
-        
-        ListeningRecap(
-            totalPlayCount = totalPlayCount,
-            totalMinutes = totalMinutes,
-            topSongs = topSongs,
-            topArtists = topArtists,
-            peakMood = peakMood,
-            peakMoodDescription = peakMoodDescription
+    // Listening Recap is unavailable through Android 10. Do not subscribe to history
+    // or aggregate the entire event table on those runtimes; the Replay history flow above
+    // remains separate and continues to serve its own feature.
+    val listeningRecapFlow = if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+        flowOf<ListeningRecap?>(null).stateIn(
+            bgScope,
+            SharingStarted.WhileSubscribed(5000),
+            null
         )
-    }.flowOn(Dispatchers.Default).stateIn(
-        bgScope,
-        SharingStarted.WhileSubscribed(5000),
-        null
-    )
+    } else {
+        playlistDao.getAllHistoryEventsFlow().map { events ->
+            if (events.isEmpty()) return@map null
+
+            val totalPlayCount = events.size
+            val totalMs = events.sumOf { it.duration }
+            val totalMinutes = totalMs / 1000 / 60
+
+            val topSongs = events.groupBy { it.songId }
+                .map { (songId, list) ->
+                    val first = list.first()
+                    TopSongStat(
+                        songId = songId,
+                        title = first.title,
+                        artist = first.artist,
+                        thumbnailUrl = first.thumbnailUrl,
+                        count = list.size
+                    )
+                }
+                .sortedByDescending { it.count }
+                .take(10)
+
+            val topArtists = events.groupBy { it.artist }
+                .map { (artist, list) ->
+                    TopArtistStat(
+                        artist = artist,
+                        count = list.size,
+                        thumbnailUrl = list.firstOrNull { !it.thumbnailUrl.isNullOrEmpty() }?.thumbnailUrl
+                    )
+                }
+                .sortedByDescending { it.count }
+                .take(5)
+
+            val hourCounts = events.groupBy { it.hourOfDay }.mapValues { it.value.size }
+            val peakHour = hourCounts.maxByOrNull { it.value }?.key ?: 12
+
+            val (peakMood, peakMoodDescription) = when (peakHour) {
+                in 5..11 -> "Morning Spark" to "You find your energy in morning melodies."
+                in 12..16 -> "Afternoon Groove" to "Midday rhythms keep you focused and moving."
+                in 17..21 -> "Evening Harmony" to "Winding down with perfect sunset soundtracks."
+                else -> "Midnight Mystique" to "Late night is when your true music flow awakens."
+            }
+
+            ListeningRecap(
+                totalPlayCount = totalPlayCount,
+                totalMinutes = totalMinutes,
+                topSongs = topSongs,
+                topArtists = topArtists,
+                peakMood = peakMood,
+                peakMoodDescription = peakMoodDescription
+            )
+        }.flowOn(Dispatchers.Default).stateIn(
+            bgScope,
+            SharingStarted.WhileSubscribed(5000),
+            null
+        )
+    }
 
     val artistProfileMap = mutableStateMapOf<String, String>()
 
