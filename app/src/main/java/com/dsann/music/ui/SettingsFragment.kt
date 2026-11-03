@@ -623,7 +623,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putBoolean("player_buttons_pill", enabled) }
     }
 
-    private val _playerButtonStyle = MutableStateFlow(prefs.getString("player_button_style", "Pill") ?: "Pill")
+    private val _playerButtonStyle = MutableStateFlow(
+        when (prefs.getString("player_button_style", "Pill") ?: "Pill") {
+            "Rounded" -> "Round"
+            "Minimal" -> "None"
+            "Round", "Pill", "None", "Square" -> prefs.getString("player_button_style", "Pill") ?: "Pill"
+            else -> "Pill"
+        }
+    )
     val playerButtonStyle: StateFlow<String> = _playerButtonStyle.asStateFlow()
     fun setPlayerButtonStyle(value: String) {
         val safe = value.takeIf { it in listOf("Round", "Pill", "None", "Square") } ?: "Pill"
