@@ -72,6 +72,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -321,6 +322,7 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
     baseAccentColor: Color,
     context: Context,
     playerContentExpansionFraction: Animatable<Float, AnimationVector1D>,
+    isSheetExpanded: Boolean,
     containerHeight: Dp,
     onCollapse: () -> Unit,
     onExpand: () -> Unit,
@@ -337,9 +339,19 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
     }
     // Mini-player gesture mappings can open Lyrics or Queue directly. Keep those states
     // functional even when the sheet has not crossed the normal full-player threshold.
-    val shouldComposeFullPlayer by remember(playerContentExpansionFraction, isLyricsModeEnabled, isQueueExpanded) {
+    val shouldComposeFullPlayer by remember(
+        playerContentExpansionFraction,
+        isLyricsModeEnabled,
+        isQueueExpanded,
+        isSheetExpanded
+    ) {
         derivedStateOf {
-            playerContentExpansionFraction.value > 0.015f || isLyricsModeEnabled || isQueueExpanded
+            // Mount the expensive full-player tree before the first animated frame.
+            // This keeps lyrics, artwork and visualizers from being composed mid-transition.
+            isSheetExpanded ||
+                playerContentExpansionFraction.value > 0.015f ||
+                isLyricsModeEnabled ||
+                isQueueExpanded
         }
     }
 
@@ -1284,6 +1296,9 @@ fun PlayerBottomSheetCompose(
                 ?.takeIf { it.targetExpanded == targetExpanded }
             pendingSheetAnimation = null
 
+            // The expanded state mounts UnifiedPlayerMiniAndFullLayers' full player.
+            // Let its composition and first layout finish before starting sheet motion.
+            if (targetExpanded) withFrameNanos { }
             if (request != null) {
                 animatePlayerSheet(
                     targetExpanded = request.targetExpanded,
@@ -1509,6 +1524,7 @@ fun PlayerBottomSheetCompose(
                                 baseAccentColor = baseAccentColor,
                                 context = context,
                                 playerContentExpansionFraction = playerContentExpansionFraction,
+                                isSheetExpanded = currentSheetContentState == PlayerSheetState.EXPANDED,
                                 containerHeight = containerHeight,
                                 onCollapse = { collapsePlayerFully() },
                                 onExpand = { currentSheetContentState = PlayerSheetState.EXPANDED },
