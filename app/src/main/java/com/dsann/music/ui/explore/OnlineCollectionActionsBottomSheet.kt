@@ -56,6 +56,7 @@ import kotlinx.coroutines.launch
 fun OnlineCollectionActionsBottomSheet(
     collection: SearchItem,
     initialSongs: List<OnlineSong>? = null,
+    initialContinuation: String? = null,
     playerSharedViewModel: PlayerSharedViewModel,
     exploreViewModel: ExploreViewModel,
     onDismissRequest: () -> Unit,
@@ -64,7 +65,7 @@ fun OnlineCollectionActionsBottomSheet(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var cachedSongs by remember(collection) {
+    var cachedSongs by remember(collection, initialSongs, initialContinuation) {
         mutableStateOf(initialSongs?.takeIf { it.isNotEmpty() })
     }
     var isWorking by remember(collection) { mutableStateOf(false) }
@@ -85,11 +86,47 @@ fun OnlineCollectionActionsBottomSheet(
         else -> null
     }
 
+    suspend fun loadAllPlaylistTracks(
+        firstPageSongs: List<OnlineSong>,
+        firstContinuation: String?
+    ): List<OnlineSong> {
+        val songs = firstPageSongs.toMutableList()
+        val seenContinuations = HashSet<String>()
+        var continuation = firstContinuation
+        var pageCount = 0
+
+        // Avoid unbounded requests if a continuation token is repeated or a huge playlist
+        // has an unusually long tail. Normal playlists complete well before this limit.
+        while (!continuation.isNullOrBlank() && pageCount < 40 && seenContinuations.add(continuation)) {
+            val (nextSongs, nextContinuation) =
+                YouTubeMusic.playlistContinuation(continuation).getOrThrow()
+            if (nextSongs.isEmpty()) break
+            songs.addAll(nextSongs)
+            continuation = nextContinuation
+            pageCount++
+        }
+        return songs.distinctBy { it.videoId }
+    }
+
     suspend fun resolveSongs(): List<OnlineSong> {
-        cachedSongs?.let { return it }
+        cachedSongs?.let { songs ->
+            val completeSongs = if (collection is SearchItem.Playlist) {
+                loadAllPlaylistTracks(songs, initialContinuation)
+            } else {
+                songs
+            }
+            if (completeSongs.isNotEmpty()) {
+                cachedSongs = completeSongs
+                return completeSongs
+            }
+        }
+
         val songs = when (collection) {
             is SearchItem.Album -> YouTubeMusic.album(collection.album.browseId).getOrThrow().songs
-            is SearchItem.Playlist -> YouTubeMusic.playlist(collection.playlist.playlistId).getOrThrow().songs
+            is SearchItem.Playlist -> {
+                val firstPage = YouTubeMusic.playlist(collection.playlist.playlistId).getOrThrow()
+                loadAllPlaylistTracks(firstPage.songs, firstPage.continuation)
+            }
             else -> emptyList()
         }
         if (songs.isEmpty()) {
