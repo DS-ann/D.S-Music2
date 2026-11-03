@@ -295,6 +295,7 @@ internal fun PillChip(
     }
 }
 
+@OptIn(kotlinx.coroutines.FlowPreview::class)
 @Composable
 internal fun WavySliderWithLabels(
     currentPositionProvider: () -> Int,
