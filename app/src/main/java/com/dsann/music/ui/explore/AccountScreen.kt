@@ -161,7 +161,7 @@ fun AccountSettingsSection(
                 ) {
                     if (isLoggedIn && !userProfile?.avatarUrl.isNullOrEmpty()) {
                         AsyncImage(
-                            model = userProfile!!.avatarUrl,
+                            model = rememberExploreImageRequest(userProfile!!.avatarUrl, 96),
                             contentDescription = "Profile Picture",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
@@ -224,7 +224,7 @@ fun AccountSettingsSection(
                                 ) {
                                     if (!song.thumbnailUrl.isNullOrEmpty()) {
                                         AsyncImage(
-                                            model = song.thumbnailUrl,
+                                            model = rememberExploreImageRequest(song.thumbnailUrl, 128),
                                             contentDescription = song.title,
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier.fillMaxSize()
