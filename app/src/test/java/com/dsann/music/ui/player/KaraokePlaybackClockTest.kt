@@ -107,6 +107,22 @@ class KaraokePlaybackClockTest {
     }
 
     @Test
+    fun wordSweepProgressIsLinearInSourceTime() {
+        assertEquals(0f, calculateKaraokeWordProgress(1_000L, 400L, 999L), 0f)
+        assertEquals(0.25f, calculateKaraokeWordProgress(1_000L, 400L, 1_100L), 0.0001f)
+        assertEquals(0.5f, calculateKaraokeWordProgress(1_000L, 400L, 1_200L), 0.0001f)
+        assertEquals(0.75f, calculateKaraokeWordProgress(1_000L, 400L, 1_300L), 0.0001f)
+        assertEquals(1f, calculateKaraokeWordProgress(1_000L, 400L, 1_400L), 0f)
+    }
+
+    @Test
+    fun zeroWordDurationRemainsNumericallySafe() {
+        assertEquals(0f, calculateKaraokeWordProgress(1_000L, 0L, 999L), 0f)
+        assertEquals(0f, calculateKaraokeWordProgress(1_000L, 0L, 1_000L), 0f)
+        assertEquals(1f, calculateKaraokeWordProgress(1_000L, 0L, 1_001L), 0f)
+    }
+
+    @Test
     fun negativePositionIsNeverReturned() {
         val clock = KaraokePlaybackClock()
 
