@@ -419,8 +419,12 @@ internal fun FullScreenLyricsOverlay(
                                     lineHeight = DsmusicTheme.typography.titleLarge.lineHeight *
                                         if (compactLandscapeLyrics) 0.82f else 1f
                                 ),
-                                color = if (lyricsColorStyle == "Dynamic (Gradient)") Color.Unspecified
-                                    else contentColor.copy(alpha = 0.9f)
+                                color = when (lyricsColorStyle) {
+                                    "Dynamic (Gradient)" -> Color.Unspecified
+                                    "White" -> Color.White
+                                    "UI Matching" -> dynamicAccentColor
+                                    else -> contentColor.copy(alpha = 0.9f)
+                                }
                             )
                             LyricsMetadataFooter(
                                 currentSong = currentSong,
