@@ -966,10 +966,11 @@ private suspend fun performSmoothedScroll(
     // centre, then correct from its actual measured bounds.
     if (item == null) {
         val viewportCenter = (layout.viewportStartOffset + layout.viewportEndOffset) / 2
+        // animateScrollToItem uses the LazyList's built-in fling animation;
+        // its API does not accept an AnimationSpec parameter.
         listState.animateScrollToItem(
             index = activeIndex,
-            scrollOffset = -(viewportCenter - estimatedItemHalfHeightPx),
-            animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing)
+            scrollOffset = -(viewportCenter - estimatedItemHalfHeightPx)
         )
         withFrameNanos { }
         layout = listState.layoutInfo
