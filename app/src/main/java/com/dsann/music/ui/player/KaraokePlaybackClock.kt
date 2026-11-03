@@ -21,14 +21,14 @@ internal fun calculateKaraokeWordProgress(
 ): Float {
     val duration = wordDurationMs.coerceAtLeast(1L)
     if (playbackPositionMs < wordStartMs) return 0f
-    if (playbackPositionMs >= wordStartMs + duration) return 1f
-    return ((playbackPositionMs - wordStartMs).toDouble() / duration.toDouble())
-        .toFloat().coerceIn(0f, 1f)
+    val elapsed = playbackPositionMs.toDouble() - wordStartMs.toDouble()
+    if (elapsed >= duration.toDouble()) return 1f
+    return (elapsed / duration.toDouble()).toFloat().coerceIn(0f, 1f)
 }
 
 internal class KaraokePlaybackClock(
-    private val discontinuityThresholdMs: Double = 70.0,
-    private val correctionFactor: Double = 0.30,
+    private val discontinuityThresholdMs: Double = 45.0,
+    private val correctionFactor: Double = 0.40,
     private val maxCorrectionPerFrameMs: Double = 12.0,
     private val maxFrameGapMs: Double = 120.0
 ) {
