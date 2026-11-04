@@ -309,10 +309,20 @@ class MainActivity : AppCompatActivity() {
                             barStyle = navBarStyle,
                             modifier = Modifier
                                 .graphicsLayer {
-                                    val translationY = animatedBaseTranslationState.value
+                                    val baseTranslation = animatedBaseTranslationState.value
                                         .coerceIn(0f, totalSlideDistPx)
-                                    this.translationY = translationY
-                                    this.alpha = if (translationY >= totalSlideDistPx - 1f) 0f else 1f
+                                    val playerCoverProgress = if (showBottomBar) {
+                                        playerViewModel.playerExpansionProgress.coerceIn(0f, 1f)
+                                    } else {
+                                        0f
+                                    }
+                                    // Slide and fade the dock in sync with the expanding opaque
+                                    // player surface. The bottom dock is uncovered again on collapse.
+                                    this.translationY = (
+                                        baseTranslation + totalSlideDistPx * playerCoverProgress
+                                    ).coerceIn(0f, totalSlideDistPx)
+                                    val baseVisible = if (baseTranslation >= totalSlideDistPx - 1f) 0f else 1f
+                                    this.alpha = baseVisible * (1f - playerCoverProgress)
                                 }
                                 .height(navBarHeight + bottomPadding)
                                 .onGloballyPositioned { coordinates ->
