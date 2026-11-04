@@ -395,10 +395,9 @@ object SongDownloader {
 
             updateNotification(context, cleanTitleStr, 0, notificationId, videoId)
 
-            // Reuse playback cache only when playback and download are both in Auto mode
-            // with the same target bitrate. Otherwise resolve a fresh stream so the download
-            // format and bitrate selectors are actually applied (cached spans have no MIME
-            // metadata, so they cannot safely satisfy a different format choice).
+            // Reuse a playback cache entry only when its actual MIME type matches the
+            // selected download container and its target bitrate is unchanged. This keeps an
+            // Opus stream distinct from the per-track M4A playback fallback.
             val settings = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
             val downloadFormat = NewPipeStreamExtractor.normalizeDownloadAudioFormat(
                 settings.getString("download_audio_format", "m4a")

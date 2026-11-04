@@ -314,6 +314,7 @@ object NewPipeStreamExtractor {
     ): AudioStream? {
         val requestedFormat = normalizeAudioFormat(preferredFormat)
         val requestedCandidates = candidatesForFormat(audioStreams, requestedFormat)
+            .filter { it.content.startsWith("https://", ignoreCase = true) }
         // Playback is fixed to Opus, with M4A as the only automatic fallback.
         // Downloads retain their explicit format selection and never silently switch formats.
         val selectedCandidates = if (
@@ -322,12 +323,11 @@ object NewPipeStreamExtractor {
             requestedCandidates.isEmpty()
         ) {
             candidatesForFormat(audioStreams, "m4a")
+                .filter { it.content.startsWith("https://", ignoreCase = true) }
         } else {
             requestedCandidates
         }
-        val candidates = selectedCandidates.filter {
-            it.content.startsWith("https://", ignoreCase = true)
-        }
+        val candidates = selectedCandidates
         if (candidates.isNotEmpty()) {
             return candidates.minByOrNull { stream ->
                 val bitrate = streamBitrateKbps(stream)
