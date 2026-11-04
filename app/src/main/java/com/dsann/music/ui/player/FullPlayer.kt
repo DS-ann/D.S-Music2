@@ -790,13 +790,14 @@ fun FullPlayer(
         // Split-screen/freeform windows can be much smaller than LocalConfiguration's device size.
         val screenWidth = maxWidth
         val screenHeight = maxHeight
-        val artworkScaleFactor = playerArtworkScale.coerceIn(0.65f, 1f)
-        val artScale = (when (playerLayout) {
+        // The artwork preference scales only the floating cover layer. The reserved
+        // artwork slot remains constant so title, slider and transport controls do not move.
+        val artScale = when (playerLayout) {
             "Cover" -> 0.98f
             "Minimal" -> 0.68f
             "Vinyl", "Cassette" -> 0.82f
             else -> 0.9f
-        }) * artworkScaleFactor
+        }
         val isLandscapeWindow = screenWidth > screenHeight
         val useWidePlayer = screenWidth >= 840.dp ||
             (screenWidth >= 600.dp && isLandscapeWindow)
@@ -849,13 +850,13 @@ fun FullPlayer(
             else -> 0.28f
         }
         val widePortraitArtHeightFactor = if (screenHeight < 760.dp) 0.34f else 0.50f
-        val portraitArtHeightLimit = screenHeight * portraitArtHeightFactor * artworkScaleFactor
-        val albumArtSize = if (isLandscapeWindow) {
+        val portraitArtHeightLimit = screenHeight * portraitArtHeightFactor
+        val albumArtSlotSize = if (isLandscapeWindow) {
             minOf(screenHeight * landscapeArtHeightFactor, screenWidth * 0.30f) * (artScale / 0.9f)
         } else if (useWidePlayer) {
             minOf(screenHeight * widePortraitArtHeightFactor, screenWidth * 0.42f) * (artScale / 0.9f)
         } else {
-            // Keep portrait artwork proportional to the available window height as well as width.
+            // Keep the reserved portrait slot proportional to the window, not the cover scale.
             minOf(screenWidth * artScale, portraitArtHeightLimit)
         }
 
@@ -874,7 +875,7 @@ fun FullPlayer(
 
         // Calculate top offset to perfectly match yEndPx in PlayerBottomSheetCompose
         val topOffset = if (useWidePlayer) minTopOffset
-            else ((screenHeight - albumArtSize) / 2f - 220.dp).coerceAtLeast(minTopOffset)
+            else ((screenHeight - albumArtSlotSize) / 2f - 220.dp).coerceAtLeast(minTopOffset)
 
         var lyricsButtonCenterInRoot by remember { mutableStateOf<Offset?>(null) }
         val lyricsRevealProgress by animateFloatAsState(
@@ -949,8 +950,9 @@ fun FullPlayer(
 
             // Album Art Container Placeholder (ArtworkPager is rendered at this absolute position)
             Box(
-                modifier = Modifier
-                    .size(albumArtSize)
+                // Fixed layout reservation: the cover itself is drawn in a separate layer
+                // and may be resized without changing the dock's measured position.
+                modifier = Modifier.size(albumArtSlotSize)
             )
 
             Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 12.dp))
