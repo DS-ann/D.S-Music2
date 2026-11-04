@@ -88,6 +88,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Precision
@@ -128,6 +129,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.sample
+import kotlinx.coroutines.flow.first
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sign
@@ -323,6 +325,7 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
     context: Context,
     playerContentExpansionFraction: Animatable<Float, AnimationVector1D>,
     isSheetExpanded: Boolean,
+    onFullPlayerLayoutReady: () -> Unit,
     containerHeight: Dp,
     onCollapse: () -> Unit,
     onExpand: () -> Unit,
@@ -409,6 +412,11 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
             modifier = Modifier
                 .fillMaxWidth()
                 .requiredHeight(containerHeight)
+                .onGloballyPositioned { coordinates ->
+                    if (coordinates.size.width > 0 && coordinates.size.height > 0) {
+                        onFullPlayerLayoutReady()
+                    }
+                }
                 .graphicsLayer {
                     val fraction = playerContentExpansionFraction.value
                     alpha = fraction.coerceIn(0f, 1f)
@@ -1057,6 +1065,10 @@ fun PlayerBottomSheetCompose(
         val playerContentExpansionFraction = remember(viewModel) {
             Animatable(restoredExpansionFraction)
         }
+        // Delay the first opening animation until the expanded player tree has actually
+        // completed layout. A single withFrameNanos wait could still start while the
+        // heavyweight lyrics/artwork/controls subtree was measuring.
+        var fullPlayerLayoutReady by remember(viewModel) { mutableStateOf(false) }
 
         // Observe the animation through a threshold, not as a raw Float in composition.
         // The old direct reads recomposed the player subtree on every animation frame.
@@ -1296,9 +1308,11 @@ fun PlayerBottomSheetCompose(
                 ?.takeIf { it.targetExpanded == targetExpanded }
             pendingSheetAnimation = null
 
-            // The expanded state mounts UnifiedPlayerMiniAndFullLayers' full player.
-            // Let its composition and first layout finish before starting sheet motion.
-            if (targetExpanded) withFrameNanos { }
+            // Let the expanded player finish its first real layout before animating. This
+            // moves its one-time composition/measurement cost out of the animated frames.
+            if (targetExpanded && !fullPlayerLayoutReady) {
+                snapshotFlow { fullPlayerLayoutReady }.first { it }
+            }
             if (request != null) {
                 animatePlayerSheet(
                     targetExpanded = request.targetExpanded,
@@ -1308,6 +1322,7 @@ fun PlayerBottomSheetCompose(
             } else {
                 animatePlayerSheet(targetExpanded = targetExpanded)
             }
+            if (!targetExpanded) fullPlayerLayoutReady = false
         }
 
         LaunchedEffect(playerContentExpansionFraction) {
@@ -1525,6 +1540,7 @@ fun PlayerBottomSheetCompose(
                                 context = context,
                                 playerContentExpansionFraction = playerContentExpansionFraction,
                                 isSheetExpanded = currentSheetContentState == PlayerSheetState.EXPANDED,
+                                onFullPlayerLayoutReady = { fullPlayerLayoutReady = true },
                                 containerHeight = containerHeight,
                                 onCollapse = { collapsePlayerFully() },
                                 onExpand = { currentSheetContentState = PlayerSheetState.EXPANDED },
