@@ -1540,8 +1540,6 @@ fun PlayerBottomSheetCompose(
                                 onExpand = { currentSheetContentState = PlayerSheetState.EXPANDED },
                                 dragModifier = verticalDragModifier,
                                 miniPlayerHeight = miniPlayerHeight,
-                                currentSheetTranslationY = currentSheetTranslationY,
-                                collapsedSheetOffsetY = sheetCollapsedTargetYState.value,
                                 miniPlayerWidthFraction = miniPlayerWidthFraction,
                                 miniPlayerBackgroundColor = dynamicBgColor,
                                 miniPlayerShape = miniPlayerShape,
