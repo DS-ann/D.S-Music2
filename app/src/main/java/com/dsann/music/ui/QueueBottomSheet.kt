@@ -2,14 +2,15 @@ package com.dsann.music.ui
 
 import com.dsann.music.ui.theme.DsmusicCard
 import com.dsann.music.ui.theme.DsmusicSurface
-import com.dsann.music.ui.theme.DsmusicListItem
 import com.dsann.music.ui.theme.DsmusicButton
 import com.dsann.music.ui.theme.DsmusicOutlinedButton
 import com.dsann.music.ui.theme.DsmusicTextButton
-import com.dsann.music.ui.theme.DsmusicIconButton
 import com.dsann.music.ui.theme.DsmusicFilterChip
 import com.dsann.music.ui.theme.DsmusicSwitchControl
 import android.annotation.SuppressLint
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -17,6 +18,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
@@ -45,10 +47,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
-import com.dsann.music.ui.theme.DropdownMenu
-import com.dsann.music.ui.theme.DropdownMenuItem
 import com.dsann.music.ui.theme.HorizontalDivider
 import com.dsann.music.ui.theme.Icon
 import com.dsann.music.ui.theme.IconButton
@@ -87,6 +86,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.fragment.app.FragmentActivity
+import com.dsann.music.util.FavoritesManager
 import coil.compose.AsyncImage
 import com.dsann.music.R
 import com.dsann.music.model.SongItem
@@ -119,7 +120,10 @@ class QueueBottomSheet : BottomSheetDialogFragment() {
             setContent {
                 DsmusicAppTheme(darkTheme = isSystemInDarkTheme()) {
                     QueueBottomSheetContent(
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        onSongLongClick = { song ->
+                            showQueueSongActions(requireContext(), song, viewModel)
+                        }
                     )
                 }
             }
@@ -130,7 +134,8 @@ class QueueBottomSheet : BottomSheetDialogFragment() {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun QueueBottomSheetContent(
-    viewModel: PlayerSharedViewModel
+    viewModel: PlayerSharedViewModel,
+    onSongLongClick: (SongItem) -> Unit = {}
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -279,6 +284,7 @@ fun QueueBottomSheetContent(
                                         showReorderControls = true,
                                         dragDropState = dragDropState,
                                         index = index,
+                                        onLongClick = { onSongLongClick(song) },
                                         onMoveUp = {
                                             if (index > 0) {
                                                 viewModel.reorderQueue(index, index - 1)
@@ -415,6 +421,7 @@ fun QueueBottomSheetContent(
                                             showReorderControls = true,
                                             dragDropState = dragDropState,
                                             index = index,
+                                            onLongClick = { onSongLongClick(song) },
                                             onMoveUp = {
                                                 if (index > 0) {
                                                     viewModel.reorderQueue(index, index - 1)
@@ -451,14 +458,30 @@ fun QueueListItem(
     onMoveDown: () -> Unit,
     dragDropState: DragDropState? = null,
     index: Int = -1,
+    onLongClick: () -> Unit = {},
     @SuppressLint("ModifierParameter") modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    var showMenu by remember { mutableStateOf(false) }
+    val latestIndex = rememberUpdatedState(index)
 
-    DsmusicListItem(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shapes.shape)
+            .background(
+                if (isPlaying) DsmusicTheme.colorScheme.primary.copy(alpha = 0.18f)
+                else Color.Transparent
+            )
+            .padding(start = 12.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
         leadingContent = {
             val albumArtModel = remember(song.id) { song.getAlbumArtUri() ?: R.drawable.default_album_art }
             Box(
@@ -510,78 +533,40 @@ fun QueueListItem(
                 overflow = TextOverflow.Ellipsis
             )
         },
-        trailingContent = {
-            if (showReorderControls) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    DsmusicIconButton(onClick = { showMenu = true }) {
-                        Icon(
-                            imageVector = Icons.Rounded.MoreVert,
-                            contentDescription = "Options",
-                            tint = if (isPlaying) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Move Up") },
-                            onClick = {
-                                showMenu = false
-                                onMoveUp()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Move Down") },
-                            onClick = {
-                                showMenu = false
-                                onMoveDown()
-                            }
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.width(4.dp))
-                    
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .pointerInput(dragDropState, index) {
-                                val state = dragDropState ?: return@pointerInput
-                                if (index < 0) return@pointerInput
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = {
-                                        state.onDragStartAtIndex(index)
-                                    },
-                                    onDragEnd = { state.onDragInterrupted() },
-                                    onDragCancel = { state.onDragInterrupted() },
-                                    onDrag = { change, dragAmount ->
-                                        change.consume()
-                                        state.onDrag(dragAmount)
-                                    }
-                                )
+        }
+        if (showReorderControls) {
+            Spacer(modifier = Modifier.width(4.dp))
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    // Do not key this pointer input by index: the index changes after every
+                    // reorder, and restarting the detector cancels a long drag after one row.
+                    .pointerInput(dragDropState, song.id) {
+                        val state = dragDropState ?: return@pointerInput
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = {
+                                val startIndex = latestIndex.value
+                                if (startIndex >= 0) state.onDragStartAtIndex(startIndex)
                             },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Menu,
-                            contentDescription = "Drag to reorder",
-                            tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                            modifier = Modifier.size(25.dp)
+                            onDragEnd = { state.onDragInterrupted() },
+                            onDragCancel = { state.onDragInterrupted() },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                state.onDrag(dragAmount)
+                            }
                         )
-                    }
-                }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Menu,
+                    contentDescription = "Drag to reorder",
+                    tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                    modifier = Modifier.size(25.dp)
+                )
             }
-        },
-        shapes = shapes.shape,
-        colors = ListItemDefaults.colors(
-            containerColor = if (isPlaying) {
-                DsmusicTheme.colorScheme.primary.copy(alpha = 0.18f)
-            } else {
-                Color.Transparent
-            }
-        )
-    )
+        }
+    }
 }
 
 @Composable
@@ -784,4 +769,61 @@ fun Modifier.dragContainer(dragDropState: DragDropState, enabled: Boolean): Modi
             )
         }
     )
+}
+
+
+/**
+ * Opens the regular song action sheet from a queue row, excluding the redundant
+ * "Add to queue" action because the track is already in the active queue.
+ */
+fun showQueueSongActions(
+    context: Context,
+    song: SongItem,
+    viewModel: PlayerSharedViewModel
+) {
+    val activity = context.findFragmentActivity() ?: return
+    val fragmentManager = activity.supportFragmentManager
+    if (fragmentManager.isStateSaved) return
+
+    val sheet = SongActionsBottomSheet.newInstance(song, showAddToQueue = false)
+    sheet.setActionListener(object : SongActionsBottomSheet.ActionListener {
+        override fun onPlay(song: SongItem) {
+            viewModel.playSong(song)
+        }
+
+        override fun onPlayNext(song: SongItem) {
+            viewModel.addToQueueNext(song)
+        }
+
+        override fun onAddToQueue(song: SongItem) = Unit
+        override fun onDelete(song: SongItem) = Unit
+        override fun onEdit(song: SongItem) = Unit
+
+        override fun onFavorite(song: SongItem, isFav: Boolean) {
+            FavoritesManager(context).setFavorite(song.id, isFav)
+        }
+
+        override fun onShare(song: SongItem) {
+            runCatching {
+                val shareText = song.videoId?.takeIf { it.isNotBlank() }
+                    ?.let { "https://music.youtube.com/watch?v=$it" }
+                    ?: song.contentUri.toString()
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, "Listen to ${song.title}: $shareText")
+                }
+                context.startActivity(Intent.createChooser(intent, "Share Song"))
+            }
+        }
+    })
+    sheet.show(fragmentManager, "QueueSongActionsBottomSheet")
+}
+
+private fun Context.findFragmentActivity(): FragmentActivity? {
+    var current: Context = this
+    while (current is ContextWrapper) {
+        if (current is FragmentActivity) return current
+        current = current.baseContext
+    }
+    return current as? FragmentActivity
 }
