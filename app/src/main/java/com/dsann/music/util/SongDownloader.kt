@@ -671,11 +671,12 @@ object SongDownloader {
                 fromCache = cachedStream != null,
                 artworkBytes = artworkBytes
             )
-            // Never report a successful M4A download if its metadata writer failed.
-            // Previously this format could silently publish the untouched source after a
-            // jaudiotagger failure, leaving the local library with no embedded title/cover.
+            // M4A metadata writing is best-effort after the audio bytes have been downloaded.
+            // AudioFileManager writes title/artist/album into MediaStore on Android 10+ and
+            // updates the scanned MediaStore row on Android 6-9, so a tagger limitation must
+            // not delete an otherwise valid audio download.
             if (outputFile.extension.equals("m4a", ignoreCase = true) && !metadataEmbedded) {
-                throw IOException("Could not embed and verify title, artist and cover metadata in the M4A file")
+                Log.w(TAG, "M4A download will continue with MediaStore metadata fallback because embedded tagging was incomplete")
             }
             // A failed WebM-to-Ogg remux must never publish WebM bytes with a .opus name.
             if (outputFile.extension.equals("opus", ignoreCase = true) && !metadataEmbedded) {
@@ -701,6 +702,8 @@ object SongDownloader {
                         cachedStream != null && metadataEmbedded -> "Saved cached audio offline: $cleanTitleStr"
                         cachedStream != null -> "Saved cached audio offline: $cleanTitleStr (metadata tags unavailable)"
                         metadataEmbedded -> "Downloaded with embedded metadata: $cleanTitleStr"
+                        outputFile.extension.equals("m4a", ignoreCase = true) ->
+                            "Downloaded: $cleanTitleStr (music-library metadata saved; some embedded tags were unavailable)"
                         else -> "Downloaded: $cleanTitleStr (this audio format could not store embedded tags)"
                     },
                     iconResId = R.drawable.ic_downloaded
@@ -966,19 +969,28 @@ object SongDownloader {
                     .onFailure { Log.d(TAG, "Comment tag not supported by ${extension}: ${it.message}") }
             }
 
+            var optionalMetadataComplete = true
             if (artworkBytes != null && artworkBytes.isNotEmpty()) {
-                runCatching {
-                    if (tag is org.jaudiotagger.tag.mp4.Mp4Tag) {
+                // Cover art is an optional MP4 atom. Use Jaudiotagger's documented add-field
+                // path for covr; setField can replace the in-memory field without reliably
+                // preserving multiple MP4 binary atoms in every library version.
+                val artworkWrite = runCatching {
+                    if (tag.artworkList.isNotEmpty()) {
                         tag.deleteArtworkField()
-                        tag.setField(tag.createArtworkField(artworkBytes))
+                    }
+                    if (tag is org.jaudiotagger.tag.mp4.Mp4Tag) {
+                        tag.addField(tag.createArtworkField(artworkBytes))
                     } else {
                         val artwork = org.jaudiotagger.tag.images.StandardArtwork()
                         artwork.binaryData = artworkBytes
                         artwork.mimeType = "image/jpeg"
-                        tag.deleteArtworkField()
-                        tag.setField(artwork)
+                        tag.addField(artwork)
                     }
-                }.onFailure { Log.w(TAG, "Could not embed cover art in ${extension}: ${it.message}") }
+                }
+                if (artworkWrite.isFailure) {
+                    optionalMetadataComplete = false
+                    Log.w(TAG, "Could not add embedded cover art to ${extension}; retaining audio and text tags", artworkWrite.exceptionOrNull())
+                }
             }
 
             audioFile.commit()
@@ -1003,6 +1015,8 @@ object SongDownloader {
             ) {
                 throw IOException("Metadata verification failed: the exact M4A title or artist was not persisted")
             }
+            // Album and artwork are best-effort fields. A failure to write either must
+            // not discard an otherwise valid M4A download after title/artist were committed.
             if (!album.isNullOrBlank()) {
                 val writtenAlbum = if (writtenTag is org.jaudiotagger.tag.mp4.Mp4Tag) {
                     writtenTag.getFirst(org.jaudiotagger.tag.mp4.Mp4FieldKey.ALBUM)
@@ -1010,15 +1024,18 @@ object SongDownloader {
                     writtenTag.getFirst(org.jaudiotagger.tag.FieldKey.ALBUM)
                 }
                 if (!writtenAlbum.equals(album.trim(), ignoreCase = true)) {
-                    throw IOException("Metadata verification failed: album was not persisted")
+                    optionalMetadataComplete = false
+                    Log.w(TAG, "M4A album atom was not persisted; title and artist tags remain usable")
                 }
             }
             if (artworkBytes != null && artworkBytes.isNotEmpty()) {
-                val writtenArtwork = writtenTag.artworkList.firstOrNull()?.binaryData
-                if (writtenArtwork == null || writtenArtwork.isEmpty() ||
-                    !writtenArtwork.contentEquals(artworkBytes)
-                ) {
-                    throw IOException("Metadata verification failed: the exact cover artwork was not persisted")
+                val artworkPersisted = writtenTag.artworkList.any { artwork ->
+                    runCatching { artwork.binaryData?.contentEquals(artworkBytes) == true }
+                        .getOrDefault(false)
+                }
+                if (!artworkPersisted) {
+                    optionalMetadataComplete = false
+                    Log.w(TAG, "M4A cover atom was not persisted; keeping the audio and required text tags")
                 }
             }
             if (isMp4Container) {
@@ -1051,9 +1068,12 @@ object SongDownloader {
                 throw IOException("Could not install the tagged audio file")
             }
             backupFile.delete()
-            return true
+            if (!optionalMetadataComplete) {
+                Log.w(TAG, "M4A was tagged with required title/artist; one or more optional tags could not be verified")
+            }
+            return optionalMetadataComplete
         } catch (error: Exception) {
-            Log.w(TAG, "Metadata embedding failed safely for ${outputFile.name}", error)
+            Log.w(TAG, "Metadata embedding failed safely for ${outputFile.name}; original audio will be preserved", error)
             taggedFile.delete()
             if (backupFile?.exists() == true && !outputFile.exists()) {
                 backupFile.renameTo(outputFile)
