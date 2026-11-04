@@ -1209,6 +1209,45 @@ class AudioPlaybackService : MediaSessionService() {
         resolveAndLoad(uri)
     }
 
+    /**
+     * Publish the selected track to MediaSession before network stream resolution starts.
+     * The temporary URI is never prepared or played; it only carries the new song metadata
+     * so Android's notification changes immediately while the actual audio URL is loading.
+     */
+    private fun publishPendingTrackToMediaSession() {
+        if (!isPlayerInitialized) return
+        val song = viewModel?.currentSong?.value ?: return
+        val songId = song.id.toString()
+        val albumTitle = song.playbackContextName?.takeIf { it.isNotBlank() }
+            ?: song.albumName?.takeIf { it.isNotBlank() }
+        val metadata = androidx.media3.common.MediaMetadata.Builder()
+            .setTitle(song.title)
+            .setDisplayTitle(song.title)
+            .setArtist(song.artist.ifBlank { "Unknown Artist" })
+            .apply {
+                if (!albumTitle.isNullOrBlank()) setAlbumTitle(albumTitle)
+                song.thumbnailUrl?.takeIf { it.isNotBlank() }?.let { setArtworkUri(it.toUri()) }
+            }
+            .build()
+        val pendingItem = MediaItem.Builder()
+            .setMediaId(songId)
+            .setUri(Uri.parse("dsmusic-pending://$songId"))
+            .setMediaMetadata(metadata)
+            .build()
+
+        val currentIndex = player.currentMediaItemIndex
+        if (currentIndex != C.INDEX_UNSET && currentIndex in 0 until player.mediaItemCount) {
+            player.replaceMediaItem(currentIndex, pendingItem)
+        } else {
+            player.setMediaItem(pendingItem)
+        }
+
+        currentSongName = song.title
+        currentAlbumArt = null
+        currentAlbumArtSongId = null
+        refreshMediaNotification()
+    }
+
     @JvmOverloads
     fun loadAndPlay(uri: Uri, startPosition: Long = -1) {
         if (!isPlayerInitialized) {
@@ -1229,6 +1268,9 @@ class AudioPlaybackService : MediaSessionService() {
         // replaces it only when loadAudioInternal has a usable source.
         player.playWhenReady = false
         player.pause()
+        // Change the system notification to the selected song now, before the network
+        // resolver runs. loadAudioInternal later replaces this placeholder with the real URI.
+        publishPendingTrackToMediaSession()
         if (isCrossfading) {
             nextPlayer?.playWhenReady = false
             nextPlayer?.stop()
