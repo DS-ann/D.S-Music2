@@ -246,7 +246,6 @@ internal fun SyncedLyricsCompose(
                     ) {
                         // Re-anchor word timing when a track restarts from the beginning.
                         karaokePlaybackClock.reset(actualMs)
-                        listState.scrollToItem(0)
                         actualMs
                     } else {
                         karaokePlaybackClock.update(
