@@ -352,12 +352,16 @@ class MainActivity : AppCompatActivity() {
                     LaunchedEffect(currentRoute) {
                         if (currentRoute != null && currentRoute in rootTabRoutes) {
                             lastRootTab = currentRoute
-                            visitedRootTabs.remove(currentRoute)
-                            visitedRootTabs.add(currentRoute)
-                            while (visitedRootTabs.size > maxRetainedRootTabs) {
-                                val leastRecentlyUsed = visitedRootTabs.firstOrNull { it != currentRoute } ?: break
-                                visitedRootTabs.remove(leastRecentlyUsed)
+                            if (!isLegacyAndroid6) {
+                                visitedRootTabs.remove(currentRoute)
+                                visitedRootTabs.add(currentRoute)
+                                while (visitedRootTabs.size > maxRetainedRootTabs) {
+                                    val leastRecentlyUsed = visitedRootTabs.firstOrNull { it != currentRoute } ?: break
+                                    visitedRootTabs.remove(leastRecentlyUsed)
+                                }
                             }
+                            // API 23 retains only the outgoing tab during its fade-out.
+                            // The incoming tab is composed only after that page is removed.
                         }
                     }
                     val activeCachedRootTab = when {
@@ -375,13 +379,26 @@ class MainActivity : AppCompatActivity() {
                     }
                     LaunchedEffect(activeCachedRootTab) {
                         if (activeCachedRootTab != null && activeCachedRootTab != renderedRootTab) {
-                            rootTabOpacity.animateTo(
-                                targetValue = 0f,
-                                animationSpec = androidx.compose.animation.core.tween(
-                                    durationMillis = 140,
-                                    easing = androidx.compose.animation.core.LinearEasing
+                            if (renderedRootTab != null) {
+                                rootTabOpacity.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = androidx.compose.animation.core.tween(
+                                        durationMillis = 140,
+                                        easing = androidx.compose.animation.core.LinearEasing
+                                    )
                                 )
-                            )
+                            } else {
+                                // First app entry has no outgoing page to fade.
+                                rootTabOpacity.snapTo(0f)
+                            }
+
+                            if (isLegacyAndroid6) {
+                                // Keep only the outgoing tree alive until it reaches zero,
+                                // then replace it. Never compose two complete root pages
+                                // together on the low-memory API 23 path.
+                                visitedRootTabs.clear()
+                                visitedRootTabs.add(activeCachedRootTab)
+                            }
                             renderedRootTab = activeCachedRootTab
                             rootTabOpacity.snapTo(0f)
                             rootTabOpacity.animateTo(
