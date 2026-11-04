@@ -96,6 +96,9 @@ import com.dsann.music.data.lyrics.LyricsResult
 import com.dsann.music.model.SongItem
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import com.dsann.music.data.innertube.YouTubeMusic
+import com.dsann.music.data.innertube.OnlineArtistRef
+import androidx.compose.ui.window.Dialog
+import androidx.compose.material.icons.rounded.ChevronRight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
@@ -680,6 +683,25 @@ fun FullPlayer(
     val playerFrameTimeNanos = rememberAppAnimationFrameTimeNanos(
         active = isPlayerVisible && uiState.isPlaying
     )
+    val artistOptions = remember(
+        uiState.currentSong?.artistRefs,
+        uiState.currentSong?.artist,
+        uiState.currentSong?.artistId
+    ) {
+        val current = uiState.currentSong
+        val linked = current?.artistRefs.orEmpty().filter { it.name.isNotBlank() }
+        if (linked.isNotEmpty()) {
+            linked.distinctBy { it.id ?: it.name.trim().lowercase() }
+        } else {
+            val names = current?.artist.orEmpty().split(
+                Regex(",\\s*|\\s*•\\s*|\\s*&\\s*|\\s+and\\s+|\\s+feat\\.?\\s+|\\s+ft\\.?\\s+", RegexOption.IGNORE_CASE)
+            ).map { it.trim() }.filter { it.isNotBlank() }.distinctBy { it.lowercase() }
+            names.mapIndexed { index, name ->
+                OnlineArtistRef(name, if (index == 0) current?.artistId else null)
+            }
+        }
+    }
+    var showArtistPicker by remember(uiState.currentSong?.id) { mutableStateOf(false) }
 
     val dynamicAccentColor = remember(accentColor, isDark) {
         val hsl = FloatArray(3)
@@ -778,6 +800,67 @@ fun FullPlayer(
             lightSaturationRange = 0.30f..0.48f
         )
         androidx.compose.ui.graphics.SolidColor(finalColor)
+    }
+
+    if (showArtistPicker && artistOptions.size > 1) {
+        Dialog(onDismissRequest = { showArtistPicker = false }) {
+            DsmusicSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                color = DsmusicTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 8.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "Choose an artist",
+                        style = DsmusicTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = DsmusicTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        "Open the artist page directly.",
+                        style = DsmusicTheme.typography.bodySmall,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
+                    artistOptions.forEach { artist ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable {
+                                    showArtistPicker = false
+                                    onArtistClick(artist.id, artist.name)
+                                }
+                                .padding(horizontal = 12.dp, vertical = 13.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                artist.name,
+                                modifier = Modifier.weight(1f),
+                                style = DsmusicTheme.typography.bodyLarge,
+                                color = DsmusicTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Icon(
+                                Icons.Rounded.ChevronRight,
+                                contentDescription = null,
+                                tint = DsmusicTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    DsmusicTextButton(
+                        onClick = { showArtistPicker = false },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            }
+        }
     }
 
     BoxWithConstraints(
@@ -1026,7 +1109,14 @@ fun FullPlayer(
                             .clickable {
                                 val song = uiState.currentSong
                                 if (song != null) {
-                                    onArtistClick(song.artistId, song.artist)
+                                    when {
+                                        artistOptions.size > 1 -> showArtistPicker = true
+                                        artistOptions.size == 1 -> {
+                                            val artist = artistOptions.first()
+                                            onArtistClick(artist.id ?: song.artistId, artist.name)
+                                        }
+                                        else -> onArtistClick(song.artistId, song.artist)
+                                    }
                                 }
                             }
                     )

@@ -1,5 +1,6 @@
 package com.dsann.music.model
 
+import com.dsann.music.data.innertube.OnlineArtistRef
 import android.net.Uri
 import java.io.File
 import java.io.Serializable
@@ -22,6 +23,7 @@ data class SongItem(
     @JvmField var playbackContextName: String? = null
     @JvmField var videoId: String? = null
     @JvmField var artistId: String? = null
+    @JvmField var artistRefs: ArrayList<OnlineArtistRef> = arrayListOf()
     @JvmField var lufs: Float? = null
     /** True when this queue entry resolves to a fully cached Media3 stream, not a live URL. */
     @JvmField var isCachedTrack: Boolean = false
@@ -140,6 +142,7 @@ data class SongItem(
             playbackContextName = this@SongItem.playbackContextName
             videoId = this@SongItem.videoId
             artistId = this@SongItem.artistId
+            artistRefs = ArrayList(this@SongItem.artistRefs)
             lufs = this@SongItem.lufs
             contentUri = uri
             isCachedTrack = cached
@@ -197,13 +200,24 @@ data class SongItem(
 
         @JvmStatic
         @JvmOverloads
-        fun createOnlineSong(videoId: String?, title: String?, artist: String?, streamUrl: String?, durationMs: Long, thumbnailUrl: String?, artistId: String? = null, albumName: String? = null): SongItem {
+        fun createOnlineSong(
+            videoId: String?,
+            title: String?,
+            artist: String?,
+            streamUrl: String?,
+            durationMs: Long,
+            thumbnailUrl: String?,
+            artistId: String? = null,
+            albumName: String? = null,
+            artistRefs: List<OnlineArtistRef> = emptyList()
+        ): SongItem {
             val id = videoId?.hashCode()?.toLong() ?: (streamUrl?.hashCode()?.toLong() ?: System.currentTimeMillis())
             val song = SongItem(id, title ?: "Unknown Title", artist ?: "Unknown Artist", -1, streamUrl, durationMs, System.currentTimeMillis())
             song.contentUri = (streamUrl ?: "").toUri()
             song.thumbnailUrl = thumbnailUrl?.let { enhanceThumbnailUrl(it) }
             song.videoId = videoId
             song.artistId = artistId
+            song.artistRefs = ArrayList(artistRefs)
             song.albumName = albumName?.takeIf { it.isNotBlank() }
             return song
         }

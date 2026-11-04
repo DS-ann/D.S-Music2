@@ -228,15 +228,8 @@ fun ExploreScreen(
     val isLoadingMoreHome by viewModel.isLoadingMoreHome.collectAsStateWithLifecycle()
     val searchHistory = uiState.searchHistory
     val homeMoods = uiState.homeMoods
+    val homeCategories = uiState.homeCategories
     val detailStack = uiState.detailStack
-    val searchGenres = remember {
-        listOf(
-            "Pop", "Rock", "Hip-Hop", "R&B", "Electronic",
-            "Indie", "Alternative", "Classical", "Jazz", "Metal",
-            "Country", "Folk", "Latin", "Reggae", "Soul",
-            "Blues", "K-Pop", "J-Pop", "Soundtracks", "Ambient"
-        )
-    }
 
     var isSearchActive by rememberSaveable(isSearchDestination) {
         mutableStateOf(false)
@@ -304,7 +297,8 @@ fun ExploreScreen(
                             os.durationMs,
                             os.thumbnailUrl,
                             os.artistId,
-                            os.albumName
+                            os.albumName,
+                            os.artistRefs
                         ).apply {
                             playbackContextName = playbackContextTitle
                         }
@@ -321,7 +315,8 @@ fun ExploreScreen(
                         durationMs,
                         song.thumbnailUrl,
                         song.artistId,
-                        song.albumName
+                        song.albumName,
+                        song.artistRefs
                     ).apply {
                         playbackContextName = playbackContextTitle
                     }
@@ -889,13 +884,13 @@ fun ExploreScreen(
                                                                 )
                                                             }
                                                         }
-                                                        items(searchGenres.chunked(2), key = { rowGenres -> rowGenres.joinToString("|") }) { rowGenres ->
+                                                        items(homeCategories.chunked(2), key = { rowCategories -> rowCategories.joinToString("|") { it.browseId } }) { rowCategories ->
                                                             Row(
                                                                 modifier = Modifier.fillMaxWidth(),
                                                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                                                             ) {
-                                                                rowGenres.forEach { genre ->
-                                                                    val genreIndex = searchGenres.indexOf(genre)
+                                                                rowCategories.forEach { category ->
+                                                                    val genreIndex = homeCategories.indexOf(category)
                                                                     val tileBackground = when (genreIndex % 3) {
                                                                         0 -> DsmusicTheme.colorScheme.primaryContainer
                                                                         1 -> DsmusicTheme.colorScheme.secondaryContainer
@@ -914,7 +909,11 @@ fun ExploreScreen(
                                                                             .background(tileBackground)
                                                                             .clickable {
                                                                                 showSearchGenreBrowser = false
-                                                                                scope.launch { viewModel.search("$genre music") }
+                                                                                viewModel.loadSectionDetails(
+                                                                                    category.browseId,
+                                                                                    category.params,
+                                                                                    category.title
+                                                                                )
                                                                             }
                                                                             .padding(14.dp)
                                                                     ) {
@@ -928,7 +927,7 @@ fun ExploreScreen(
                                                                                 color = tileForeground.copy(alpha = 0.72f)
                                                                             )
                                                                             Text(
-                                                                                genre,
+                                                                                category.title,
                                                                                 style = DsmusicTheme.typography.titleMedium,
                                                                                 fontWeight = FontWeight.Bold,
                                                                                 color = tileForeground,
@@ -943,7 +942,7 @@ fun ExploreScreen(
                                                                         }
                                                                     }
                                                                 }
-                                                                if (rowGenres.size == 1) Spacer(Modifier.weight(1f))
+                                                                if (rowCategories.size == 1) Spacer(Modifier.weight(1f))
                                                             }
                                                         }
                                                     }
@@ -1065,7 +1064,7 @@ fun ExploreScreen(
                                                             }
                                                         }
 
-                                                        item(key = "search-genres-entry") {
+                                                        if (homeCategories.isNotEmpty()) item(key = "search-genres-entry") {
                                                             Row(
                                                                 modifier = Modifier
                                                                     .fillMaxWidth()
@@ -1101,7 +1100,8 @@ fun ExploreScreen(
                                                                         color = DsmusicTheme.colorScheme.onSurface
                                                                     )
                                                                     Text(
-                                                                        "Pop · Rock · Hip-Hop · R&B · and more",
+                                                                        homeCategories.take(4).joinToString(" · ") { it.title } +
+                                                                            if (homeCategories.size > 4) " · and more" else "",
                                                                         style = DsmusicTheme.typography.bodySmall,
                                                                         color = DsmusicTheme.colorScheme.onSurfaceVariant,
                                                                         maxLines = 2,
@@ -1522,7 +1522,7 @@ fun ExploreScreen(
                                                                                 SongItem.createOnlineSong(
                                                                                     item.song.videoId, item.song.title, item.song.artist, "",
                                                                                     item.song.durationMs, item.song.thumbnailUrl, item.song.artistId,
-                                                                                    item.song.albumName
+                                                                                    item.song.albumName, item.song.artistRefs
                                                                                 )
                                                                             )
                                                                         }
