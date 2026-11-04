@@ -311,7 +311,15 @@ fun BottomSheetScaffoldContent(
                         label = "TabTransition"
                     ) { tab ->
                         if (tab == BottomSheetTab.OPTIONS) {
-                            OptionsContent(song, isFavorite, { isFavorite = it }, actionListener, onAddToPlaylist = { showAddToPlaylistDialog = true }, showAddToQueue = showAddToQueue, onDismiss)
+                            OptionsContent(
+                                song = song,
+                                isFavorite = isFavorite,
+                                onFavoriteChange = { isFavorite = it },
+                                actionListener = actionListener,
+                                onAddToPlaylist = { showAddToPlaylistDialog = true },
+                                showAddToQueue = showAddToQueue,
+                                onDismiss = onDismiss
+                            )
                         } else {
                             InfoContent(song)
                         }
@@ -365,7 +373,15 @@ fun BottomSheetScaffoldContent(
                             label = "TabTransition"
                         ) { tab ->
                             if (tab == BottomSheetTab.OPTIONS) {
-                                OptionsContent(song, isFavorite, { isFavorite = it }, actionListener, onAddToPlaylist = { showAddToPlaylistDialog = true }, showAddToQueue = showAddToQueue, onDismiss)
+                                OptionsContent(
+                                song = song,
+                                isFavorite = isFavorite,
+                                onFavoriteChange = { isFavorite = it },
+                                actionListener = actionListener,
+                                onAddToPlaylist = { showAddToPlaylistDialog = true },
+                                showAddToQueue = showAddToQueue,
+                                onDismiss = onDismiss
+                            )
                             } else {
                                 InfoContent(song)
                             }
