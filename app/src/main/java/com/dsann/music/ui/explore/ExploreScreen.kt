@@ -1085,7 +1085,7 @@ fun ExploreScreen(
                                                                             .fillMaxWidth()
                                                                             .clip(RoundedCornerShape(12.dp))
                                                                             .clickable {
-                                                                                onAccountHistorySongClick(song, recentAccountHistory, index)
+                                                                                viewModel.playOnlineSongWithQueue(song, recentAccountHistory, index)
                                                                             }
                                                                             .padding(vertical = 7.dp, horizontal = 4.dp),
                                                                         verticalAlignment = Alignment.CenterVertically
