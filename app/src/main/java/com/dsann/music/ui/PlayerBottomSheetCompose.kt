@@ -153,6 +153,40 @@ private enum class MiniDismissDragPhase {
 // ==========================================
 // 2. STEP 2: DYNAMIC SHAPE & SQUIRCLE MORPHING
 // ==========================================
+/**
+ * Dynamic clipping outline for the mini-to-full player frame. The player tree keeps
+ * full-window measurement throughout the animation; only this graphics-layer outline
+ * changes, avoiding per-frame remeasurement of controls, lyrics and artwork.
+ */
+private class PlayerSheetAnimatedFrameShape(
+    private val progress: Float,
+    private val miniWidthFraction: Float,
+    private val miniHeightPx: Float,
+    private val miniCornerRadiusPx: Float
+) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Outline {
+        val fraction = progress.coerceIn(0f, 1f)
+        val frameWidth = size.width *
+            (miniWidthFraction + (1f - miniWidthFraction) * fraction)
+        val frameHeight = miniHeightPx + (size.height - miniHeightPx) * fraction
+        val left = (size.width - frameWidth) / 2f
+        val radius = miniCornerRadiusPx * (1f - fraction)
+        return Outline.Rounded(
+            RoundRect(
+                rect = Rect(left, 0f, left + frameWidth, frameHeight),
+                topLeft = CornerRadius(radius, radius),
+                topRight = CornerRadius(radius, radius),
+                bottomRight = CornerRadius(radius, radius),
+                bottomLeft = CornerRadius(radius, radius)
+            )
+        )
+    }
+}
+
 class PlayerSheetDynamicShape(
     private val topRadiusProvider: () -> Dp,
     private val bottomRadiusProvider: () -> Dp,
@@ -332,20 +366,22 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
     onExpand: () -> Unit,
     dragModifier: Modifier,
     miniPlayerHeight: Dp,
-    currentSheetTranslationY: Animatable<Float, AnimationVector1D>,
-    collapsedSheetOffsetY: Float,
     miniPlayerWidthFraction: Float,
     miniPlayerBackgroundColor: Color,
     miniPlayerShape: Shape,
-    miniPlayerElevation: Dp
+    miniPlayerElevation: Dp,
+    miniPlayerCornerRadius: Dp,
+    miniSwipeModifier: Modifier,
+    miniDragHandler: SheetVerticalDragGestureHandler
 ) {
     val currentSong = uiState.currentSong ?: return
     val isPlaying = uiState.isPlaying
     val fullPlayerStateHolder = rememberSaveableStateHolder()
     val isLyricsModeEnabled by viewModel.isLyricsModeEnabled.collectAsStateWithLifecycle()
     val isQueueExpanded by viewModel.isQueueExpanded.collectAsStateWithLifecycle()
+    // Overlays such as Queue are only allowed once the sheet has actually settled open.
     val isFullPlayerVisible by remember(playerContentExpansionFraction) {
-        derivedStateOf { playerContentExpansionFraction.value >= 0.5f }
+        derivedStateOf { playerContentExpansionFraction.value >= 0.995f }
     }
     // Mini-player gesture mappings can open Lyrics or Queue directly. Keep those states
     // functional even when the sheet has not crossed the normal full-player threshold.
@@ -375,16 +411,19 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
         derivedStateOf { if (playerContentExpansionFraction.value >= 0.5f) 1f else 0f }
     }
 
-    // Mini Player Container
+    // Mini content shares the sheet's origin and moves with its interpolated frame.
     Box(
         modifier = Modifier
             .align(Alignment.TopCenter)
             .fillMaxWidth(miniPlayerWidthFraction)
             .height(miniPlayerHeight)
+            .padding(horizontal = 12.dp * miniPlayerWidthFraction)
+            .then(miniSwipeModifier)
+            .playerSheetVerticalDragGesture(
+                enabled = !isSheetExpanded && !isLyricsModeEnabled && !isQueueExpanded,
+                handler = miniDragHandler
+            )
             .graphicsLayer {
-                // Counter the sheet's endpoint snap/drag translation so the mini
-                // layer stays at the dock while the full player fades at screen top.
-                translationY = collapsedSheetOffsetY - currentSheetTranslationY.value
                 alpha = (1f - playerContentExpansionFraction.value).coerceIn(0f, 1f)
             }
             .shadow(miniPlayerElevation, miniPlayerShape)
@@ -424,11 +463,8 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
                     }
                 }
                 .graphicsLayer {
-                    // Keep the expanded player anchored to the top edge. Only opacity
-                    // changes; it does not travel upward with the collapsed sheet.
-                    translationY = -currentSheetTranslationY.value
-                    // Once mounted, the expanded surface is opaque; the mini layer remains above it until mid-transition.
-                    alpha = if (playerContentExpansionFraction.value > 0.015f) 1f else 0f
+                    // The full player follows the same sheet origin as the mini layer.
+                    alpha = playerContentExpansionFraction.value.coerceIn(0f, 1f)
                 }
                 .zIndex(fullPlayerZIndex)
         ) {
@@ -1275,19 +1311,35 @@ fun PlayerBottomSheetCompose(
             }
             val destFraction = if (targetExpanded) 1f else 0f
             val resolvedAnimationSpec = animationSpec
-                ?: tween(durationMillis = 220, easing = LinearEasing)
+                ?: tween(durationMillis = 360, easing = FastOutSlowInEasing)
+            val collapsedDistance = sheetCollapsedTargetYState.value.coerceAtLeast(1f)
+            val fractionInitialVelocity = (-initialVelocity / collapsedDistance)
+                .takeIf { it.isFinite() } ?: 0f
 
             isSheetAnimating = true
             try {
-                // Position and size changes are not animated. Both visual layers are
-                // already anchored to their final positions, so the transition is a
-                // single lightweight alpha fade instead of a moving/resizing morph.
-                currentSheetTranslationY.snapTo(destY)
-                playerContentExpansionFraction.animateTo(
-                    targetValue = destFraction,
-                    animationSpec = resolvedAnimationSpec,
-                    initialVelocity = 0f
-                )
+                // Y position and expansion fraction run on the same animation clock.
+                // This moves and grows the same clipped frame instead of snapping the
+                // sheet to an endpoint and fading two unrelated surfaces.
+                coroutineScope {
+                    val translationJob = launch {
+                        currentSheetTranslationY.animateTo(
+                            targetValue = destY,
+                            animationSpec = resolvedAnimationSpec,
+                            initialVelocity = initialVelocity
+                        )
+                    }
+                    try {
+                        playerContentExpansionFraction.animateTo(
+                            targetValue = destFraction,
+                            animationSpec = resolvedAnimationSpec,
+                            initialVelocity = fractionInitialVelocity
+                        )
+                        translationJob.join()
+                    } finally {
+                        translationJob.cancel()
+                    }
+                }
                 // Persist only the settled state. Publishing every animation frame to the
                 // Activity ViewModel creates unnecessary flow work and UI invalidations.
                 viewModel.setPlayerExpansionFraction(destFraction)
@@ -1346,10 +1398,23 @@ fun PlayerBottomSheetCompose(
             else -> RoundedCornerShape(22.dp)
         }
         val miniPlayerElevation = if (miniPlayerStyle == "Card") 6.dp else 0.dp
+        val miniPlayerCornerRadius = when (miniPlayerStyle) {
+            "Flat" -> 0.dp
+            "Compact" -> 18.dp
+            "Pill" -> miniPlayerHeight / 2f
+            else -> 22.dp
+        }
 
-        // The mini card has its own width. It does not animate horizontally during
-        // the opacity transition.
+        // The mini panel starts inset by 12dp on both sides, then expands to full width.
         val miniPlayerWidthFraction = if (isLandscapeWindow) 0.5f else 1f
+        val miniFrameWidthFraction = remember(containerWidthDp, density, miniPlayerWidthFraction) {
+            with(density) {
+                val fullWidthPx = containerWidthDp.toPx().coerceAtLeast(1f)
+                ((fullWidthPx - 24.dp.toPx()).coerceAtLeast(0f) / fullWidthPx) *
+                    miniPlayerWidthFraction
+            }
+        }
+        val miniPlayerCornerRadiusPx = with(density) { miniPlayerCornerRadius.toPx() }
 
         val velocityTracker = remember { VelocityTracker() }
         
@@ -1388,21 +1453,59 @@ fun PlayerBottomSheetCompose(
             }
         )
 
+        val miniSwipeGestureModifier = Modifier.pointerInput(
+            gestureSettings, isLyricsModeEnabled, isQueueExpanded
+        ) {
+            var dragX = 0f
+            var dragY = 0f
+            detectDragGestures(
+                onDragStart = {
+                    dragX = 0f
+                    dragY = 0f
+                },
+                onDrag = { change, amount ->
+                    dragX += amount.x
+                    dragY += amount.y
+                    change.consume()
+                },
+                onDragEnd = {
+                    if (isLyricsModeEnabled || isQueueExpanded) return@detectDragGestures
+                    if (kotlin.math.max(kotlin.math.abs(dragX), kotlin.math.abs(dragY)) < 24.dp.toPx()) {
+                        return@detectDragGestures
+                    }
+                    when {
+                        kotlin.math.abs(dragX) >= kotlin.math.abs(dragY) && dragX < 0 ->
+                            performPlayerGesture(gestureSettings.miniSwipeLeft)
+                        kotlin.math.abs(dragX) >= kotlin.math.abs(dragY) && dragX > 0 ->
+                            performPlayerGesture(gestureSettings.miniSwipeRight)
+                        dragY < 0 -> performPlayerGesture(gestureSettings.miniSwipeUp)
+                        else -> handleMiniSwipeDown()
+                    }
+                }
+            )
+        }
+
         if (showPlayerContentArea) {
             DsmusicSurface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    // Parent movement is retained for direct drag gestures. During the
-                    // open/close fade the two visual layers counter-translate to stay put.
+                    .fillMaxSize()
                     .graphicsLayer {
+                        val progress = playerContentExpansionFraction.value.coerceIn(0f, 1f)
                         translationY = sheetVisualState.visualSheetTranslationYProvider()
-                    }
-                    .height(containerHeight),
-                // This wrapper stays transparent and full-window sized. The mini card
-                // owns its shape/background; the fullscreen layer owns its own background.
+                        shape = PlayerSheetAnimatedFrameShape(
+                            progress = progress,
+                            miniWidthFraction = miniFrameWidthFraction,
+                            miniHeightPx = with(density) { miniPlayerHeight.toPx() },
+                            miniCornerRadiusPx = miniPlayerCornerRadiusPx
+                        )
+                        clip = true
+                    },
+                // One surface morphs from the dock card into the fullscreen player.
+                // The player tree stays full-window measured; only the graphics-layer
+                // outline changes during animation.
                 shape = androidx.compose.ui.graphics.RectangleShape,
-                color = Color.Transparent,
+                color = dynamicBgColor,
                 showBorder = false
             ) {
                 Box(modifier = Modifier.fillMaxSize().padding(bottom = sheetVisualState.currentBottomPadding.coerceAtLeast(0.dp))) {
@@ -1413,31 +1516,7 @@ fun PlayerBottomSheetCompose(
                     ) {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                // Phase-Optimized Layout measuring (Zero-Recomposition)
-                                .layout { measurable, constraints ->
-                                    // Measure only at the two settled endpoints. The previous
-                                    // fraction-based height/padding interpolation forced a new
-                                    // measure on every transition frame.
-                                    val expanded = currentSheetContentState == PlayerSheetState.EXPANDED
-                                    val targetHeightPx = with(density) {
-                                        (if (expanded) containerHeight else miniPlayerHeight).roundToPx()
-                                    }
-                                    val sidePaddingPx = if (expanded) 0 else with(density) { 12.dp.roundToPx() }
-                                    val innerWidth = (constraints.maxWidth - sidePaddingPx * 2).coerceAtLeast(0)
-
-                                    val placeable = measurable.measure(
-                                        constraints.copy(
-                                            minWidth = innerWidth,
-                                            maxWidth = innerWidth,
-                                            minHeight = targetHeightPx,
-                                            maxHeight = targetHeightPx
-                                        )
-                                    )
-                                    layout(constraints.maxWidth, targetHeightPx) {
-                                        placeable.placeRelative(sidePaddingPx, 0)
-                                    }
-                                }
+                                .fillMaxSize()
                                 .then(
                                     if (currentSheetContentState == PlayerSheetState.COLLAPSED) {
                                         Modifier.pointerInput(gestureSettings, isLyricsModeEnabled, isQueueExpanded) {
@@ -1474,24 +1553,6 @@ fun PlayerBottomSheetCompose(
                                     translationX = offsetAnimatable.value
                                     transformOrigin = TransformOrigin(0.5f, 1f)
                                 }
-                                .playerSheetVerticalDragGesture(
-                                    enabled = currentSheetContentState == PlayerSheetState.COLLAPSED &&
-                                        !isLyricsModeEnabled && !isQueueExpanded,
-                                    handler = sheetVerticalDragGestureHandler
-                                )
-                                .pointerInput(currentSheetContentState, isLyricsModeEnabled) {
-                                    detectTapGestures(
-                                        onTap = {
-                                            if (!isLyricsModeEnabled) {
-                                                currentSheetContentState = if (currentSheetContentState == PlayerSheetState.COLLAPSED) {
-                                                    PlayerSheetState.EXPANDED
-                                                } else {
-                                                    PlayerSheetState.COLLAPSED
-                                                }
-                                            }
-                                        }
-                                    )
-                                }
                         ) {
                             val verticalDragModifier = Modifier.playerSheetVerticalDragGesture(
                                 enabled = currentSheetContentState == PlayerSheetState.EXPANDED && !isLyricsModeEnabled && !isQueueExpanded,
@@ -1518,7 +1579,10 @@ fun PlayerBottomSheetCompose(
                                 miniPlayerWidthFraction = miniPlayerWidthFraction,
                                 miniPlayerBackgroundColor = dynamicBgColor,
                                 miniPlayerShape = miniPlayerShape,
-                                miniPlayerElevation = miniPlayerElevation
+                                miniPlayerElevation = miniPlayerElevation,
+                                miniPlayerCornerRadius = miniPlayerCornerRadius,
+                                miniSwipeModifier = miniSwipeGestureModifier,
+                                miniDragHandler = sheetVerticalDragGestureHandler
                             )
                         }
                     }
