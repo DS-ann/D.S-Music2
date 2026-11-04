@@ -42,6 +42,7 @@ import com.dsann.music.ui.theme.IconButton
 import com.dsann.music.ui.theme.ListItem
 import com.dsann.music.ui.theme.ListItemDefaults
 import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.dsmusicHomeStudioGradientBrush
 import com.dsann.music.ui.theme.ModalBottomSheet
 import com.dsann.music.ui.theme.Text
 import com.dsann.music.ui.theme.TextButton
@@ -197,7 +198,7 @@ internal fun FullScreenLyricsOverlay(
     contentColor: Color,
     contentSecondary: Color,
     dynamicAccentColor: Color,
-    lyricsColorStyle: String = "Dynamic (Gradient)",
+    lyricsColorStyle: String = "Home Studio Gradient",
     onRetryLyrics: () -> Unit,
     onFetchLyrics: () -> Unit,
     onSeekTo: (Int) -> Unit,
@@ -411,8 +412,8 @@ internal fun FullScreenLyricsOverlay(
                             Text(
                                 text = plainLyrics,
                                 style = DsmusicTheme.typography.titleLarge.copy(
-                                    brush = if (lyricsColorStyle == "Dynamic (Gradient)") {
-                                        Brush.horizontalGradient(listOf(dynamicAccentColor, contentColor))
+                                    brush = if (lyricsColorStyle == "Home Studio Gradient") {
+                                        dsmusicHomeStudioGradientBrush()
                                     } else null,
                                     fontSize = DsmusicTheme.typography.titleLarge.fontSize *
                                         if (compactLandscapeLyrics) 0.78f else 1f,
@@ -420,7 +421,7 @@ internal fun FullScreenLyricsOverlay(
                                         if (compactLandscapeLyrics) 0.82f else 1f
                                 ),
                                 color = when (lyricsColorStyle) {
-                                    "Dynamic (Gradient)" -> Color.Unspecified
+                                    "Home Studio Gradient" -> Color.Unspecified
                                     "White" -> Color.White
                                     "UI Matching" -> dynamicAccentColor
                                     else -> contentColor.copy(alpha = 0.9f)
