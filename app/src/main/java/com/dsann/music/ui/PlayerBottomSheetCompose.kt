@@ -1581,13 +1581,19 @@ fun PlayerBottomSheetCompose(
 
                                 val miniSizePx = 48.dp.toPx()
                                 val fullSizePx = albumArtSizeDp.toPx()
-                                val artTransitionProgress = t.coerceIn(0f, 1f)
-                                val normalScale = androidx.compose.ui.util.lerp(
-                                    miniSizePx / fullSizePx, 1f, artTransitionProgress
-                                )
+                                // Switch between the two fixed artwork positions while its
+                                // alpha is zero. No per-frame scale or position interpolation.
+                                val artTransitionProgress = if (t >= 0.5f) 1f else 0f
+                                val normalScale = if (artTransitionProgress == 0f) {
+                                    miniSizePx / fullSizePx
+                                } else {
+                                    1f
+                                }
 
-                                // Account for the horizontal padding applied in the parent layout block
-                                val startPaddingPx = sheetVisualState.currentHorizontalPaddingStartPxProvider()
+                                // Account for the fixed horizontal padding at the collapsed endpoint.
+                                val startPaddingPx = if (
+                                    currentSheetContentState == PlayerSheetState.COLLAPSED
+                                ) 12.dp.toPx() else 0f
 
                                 // Position relative to the Surface top-left
                                 val xStartPx = startPaddingPx +
@@ -1617,9 +1623,15 @@ fun PlayerBottomSheetCompose(
                                 }
                                 val yEndPx = with(density) { topOffsetDp.toPx() }
 
-                                val normalX = androidx.compose.ui.util.lerp(xStartPx, xEndPx, artTransitionProgress)
-                                val normalY = androidx.compose.ui.util.lerp(yStartPx, yEndPx, artTransitionProgress)
-                                val normalShadow = androidx.compose.ui.util.lerp(0f, 16.dp.toPx(), artTransitionProgress)
+                                val normalX = if (artTransitionProgress == 0f) xStartPx else xEndPx
+                                // Artwork is anchored to the dock in mini mode and to its
+                                // final full-player location after the midpoint.
+                                val normalY = if (artTransitionProgress == 0f) {
+                                    sheetCollapsedTargetYState.value + yStartPx
+                                } else {
+                                    yEndPx
+                                }
+                                val normalShadow = if (artTransitionProgress == 0f) 0f else 16.dp.toPx()
 
                                 val appBarThumbSizePx = 44.dp.toPx()
                                 val appBarScale = appBarThumbSizePx / fullSizePx
@@ -1631,7 +1643,8 @@ fun PlayerBottomSheetCompose(
                                 scaleX = androidx.compose.ui.util.lerp(normalScale, appBarScale, lyricsT)
                                 scaleY = androidx.compose.ui.util.lerp(normalScale, appBarScale, lyricsT)
                                 translationX = androidx.compose.ui.util.lerp(normalX, appBarX, lyricsT) + dismissOffsetPx
-                                translationY = androidx.compose.ui.util.lerp(normalY, appBarY, lyricsT)
+                                translationY = androidx.compose.ui.util.lerp(normalY, appBarY, lyricsT) -
+                                    currentSheetTranslationY.value
                                 transformOrigin = TransformOrigin(0f, 0f)
 
                                 // Keep the selected artwork outline on the shared cover;
@@ -1640,7 +1653,12 @@ fun PlayerBottomSheetCompose(
                                 shape = if (isVideoMode) androidx.compose.ui.graphics.RectangleShape else playerArtworkShape
                                 clip = true
                                 shadowElevation = androidx.compose.ui.util.lerp(normalShadow, 6.dp.toPx(), lyricsT)
-                                alpha = artworkAlpha
+                                val artworkFade = if (t < 0.5f) {
+                                    (1f - t * 2f).coerceIn(0f, 1f)
+                                } else {
+                                    ((t - 0.5f) * 2f).coerceIn(0f, 1f)
+                                }
+                                alpha = artworkAlpha * artworkFade
                             }
                             // Put the click target inside the transformed layer. With clickable
                             // outside graphicsLayer, taps on the old 90%-screen layout bounds could
