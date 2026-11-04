@@ -190,7 +190,11 @@ internal fun SyncedLyricsCompose(
     // Interpolate from Media3's live playback position at display-frame cadence. The
     // dedicated clock applies bounded phase correction and re-anchors on seeks, pauses,
     // invalid frame gaps and decoder clock discontinuities.
-    val lyricClock = remember { mutableIntStateOf(currentPositionProvider().coerceAtLeast(0)) }
+    // Keep the displayed clock scoped to the active track so a new queue item cannot
+    // inherit the previous track's final lyric position.
+    val lyricClock = remember(currentSong?.id) {
+        mutableIntStateOf(currentPositionProvider().coerceAtLeast(0))
+    }
     val karaokePlaybackClock = remember(currentSong?.id) { KaraokePlaybackClock() }
     LaunchedEffect(
         isPlaying, currentSong?.id, lyrics, currentPositionProvider, playbackSpeedProvider, isKaraokeMode
@@ -233,18 +237,34 @@ internal fun SyncedLyricsCompose(
     val lyricPositionProvider = remember(lyricClock) { { lyricClock.intValue } }
 
     // derivedStateOf means this parent/list selection changes only when the active lyric line changes.
-    val activeIndex by remember(displayItems, lyricClock) {
+    val activeIndex by remember(displayItems, lyricClock, currentSong?.duration) {
         derivedStateOf {
             val currentPos = lyricClock.intValue
-            if (displayItems.isEmpty()) -1
+            val lastLyric = displayItems.lastOrNull { !it.line.isInterlude }?.line
+            val lastWordEndMs = lastLyric?.words
+                ?.maxOfOrNull { it.absoluteStartTimeMs + it.durationMs }
+                ?.takeIf { it > 0L }
+            val songDurationMs = currentSong?.duration?.takeIf { it > 0L }
+            val hasPassedFinalLyric = when {
+                songDurationMs != null && currentPos.toLong() >= songDurationMs -> true
+                lastWordEndMs != null && currentPos.toLong() > lastWordEndMs + 1000L -> true
+                else -> false
+            }
+
+            if (displayItems.isEmpty() || hasPassedFinalLyric) -1
             else binarySearchActiveIndex(displayItems, currentPos)
         }
     }
 
-    // ── Keep each active lyric line centred. The effect runs on line changes only:
-    // karaoke word frames update lyricClock but leave activeIndex unchanged.
+    // Keep each active lyric line centred. Re-key by song as well as line index:
+    // two tracks can begin on the same lyric index, but must not inherit old scroll.
     val density = LocalDensity.current
-    LaunchedEffect(activeIndex, density) {
+    var lastScrolledSongId by remember { mutableStateOf<Long?>(Long.MIN_VALUE) }
+    LaunchedEffect(currentSong?.id, displayItems, activeIndex, density) {
+        if (lastScrolledSongId != currentSong?.id) {
+            listState.scrollToItem(0)
+            lastScrolledSongId = currentSong?.id
+        }
         if (activeIndex >= 0) {
             performSmoothedScroll(
                 listState,
@@ -252,6 +272,8 @@ internal fun SyncedLyricsCompose(
                 displayItems,
                 with(density) { 36.dp.roundToPx() }
             )
+        } else if (lyricClock.intValue <= (displayItems.firstOrNull()?.line?.startTimeMs ?: 0L)) {
+            listState.scrollToItem(0)
         }
     }
 
