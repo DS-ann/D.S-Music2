@@ -531,6 +531,32 @@ fun ExploreScreen(
             }
         }
 
+    // Swap heavy Explore pages only after the outgoing page reaches zero opacity.
+    // This preserves the requested 100% -> 0% -> 100% motion without composing two
+    // large LazyColumn trees at once on Android 6.
+    var renderedScreen by remember { mutableStateOf(currentScreen) }
+    val screenOpacity = remember { androidx.compose.animation.core.Animatable(1f) }
+    LaunchedEffect(currentScreen) {
+        if (renderedScreen != currentScreen) {
+            screenOpacity.animateTo(
+                targetValue = 0f,
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 140,
+                    easing = androidx.compose.animation.core.LinearEasing
+                )
+            )
+            renderedScreen = currentScreen
+            screenOpacity.snapTo(0f)
+            screenOpacity.animateTo(
+                targetValue = 1f,
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 140,
+                    easing = androidx.compose.animation.core.LinearEasing
+                )
+            )
+        }
+    }
+
     val currentFilter by viewModel.searchFilter.collectAsStateWithLifecycle()
 
     val onSearchHeaderQueryChange = remember(viewModel) {
@@ -583,34 +609,19 @@ fun ExploreScreen(
                     enabled = android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.M
                 ) { sharedTransitionScope ->
                     CompositionLocalProvider(LocalSharedTransitionScope provides sharedTransitionScope) {
-                        // Keep full-page transitions responsive; the previous default motion
-                        // scheme made heavy list/detail swaps feel unnecessarily slow.
-                        val spatialSpec = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(
-                            durationMillis = 190,
-                            easing = androidx.compose.animation.core.FastOutSlowInEasing
-                        )
-                        val effectsSpec = androidx.compose.animation.core.tween<Float>(
-                            durationMillis = 150,
-                            easing = androidx.compose.animation.core.LinearEasing
-                        )
-
                         AnimatedContent(
-                            targetState = currentScreen,
-                            // Keep API 23 on one content identity. It has no shared-element
-                            // transitions, so retaining the outgoing page only adds another
-                            // large list tree during navigation.
-                            contentKey = { screen ->
-                                if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) {
-                                    "android6-single-screen"
-                                } else screen
+                            targetState = renderedScreen,
+                            modifier = Modifier.fillMaxSize().graphicsLayer {
+                                alpha = screenOpacity.value.coerceIn(0f, 1f)
                             },
-                            // Switching between large result/detail lists should not animate two
-                            // complete LazyColumn trees simultaneously on low-memory phones.
+                            // Page content changes only while fully transparent. Keeping the
+                            // content transition itself immediate avoids a second active list
+                            // tree during the opacity swap on lower-memory devices.
                             transitionSpec = {
                                 androidx.compose.animation.EnterTransition.None togetherWith
                                     androidx.compose.animation.ExitTransition.None
                             },
-                            label = "Explore Slide Transitions"
+                            label = "Explore Opacity Transition"
                         ) { screen ->
                             CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                                 when (screen) {
