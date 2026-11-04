@@ -462,7 +462,7 @@ fun QueueListItem(
                 .padding(vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val albumArtModel = remember(song.id) {
+            val albumArtModel = remember(song.id, song.thumbnailUrl, song.albumId, song.path) {
                 song.getAlbumArtUri() ?: R.drawable.default_album_art
             }
             Box(
