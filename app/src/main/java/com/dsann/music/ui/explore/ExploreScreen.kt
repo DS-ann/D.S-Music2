@@ -2705,6 +2705,28 @@ private fun ExploreCustomizerDialog(
                 }
             }
 
+            if (isSearchDestination && currentMood != null && !isSearchActive) {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item(key = "active-search-mood") {
+                        DsmusicFilterChip(
+                            selected = true,
+                            onClick = { onMoodClick(null) },
+                            shape = CircleShape,
+                            label = {
+                                Text(
+                                    "Mood: $currentMood  ×",
+                                    style = DsmusicTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+
             // Category Chips — fetched from YouTube Music (hidden during active search inputs, without animations)
             if (!isSearchDestination && !isSearchActive && searchQuery.isBlank() && searchResults.isEmpty() && homeMoods.isNotEmpty()) {
                 LazyRow(
