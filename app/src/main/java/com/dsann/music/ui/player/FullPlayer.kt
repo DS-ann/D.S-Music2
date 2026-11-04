@@ -828,12 +828,15 @@ fun FullPlayer(
     // landscape player is shown.
     var landscapeShowsQueue by remember { mutableStateOf(false) }
 
-    // Unify BackHandler to collapse the sliding Queue drawer first
-    BackHandler(enabled = isLyricsModeEnabled || isQueueExpanded) {
+    // Back first exits the active overlay/drawer, then returns the landscape pane
+    // from Up next to Lyrics.
+    BackHandler(enabled = isLyricsModeEnabled || isQueueExpanded || landscapeShowsQueue) {
         if (isLyricsModeEnabled) {
             onLyricsModeChanged(false)
         } else if (isQueueExpanded) {
             viewModel.setQueueExpanded(false)
+        } else if (landscapeShowsQueue) {
+            landscapeShowsQueue = false
         }
     }
 
