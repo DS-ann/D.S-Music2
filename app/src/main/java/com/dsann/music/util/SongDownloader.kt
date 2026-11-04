@@ -120,6 +120,11 @@ object SongDownloader {
 
     private val activeDownloads = ConcurrentHashMap<String, DownloadTask>()
 
+    // SongItem.id is the raw String.hashCode() widened to Long and may be negative.
+    // Keep notification and PendingIntent IDs positive without collapsing negatives to 1.
+    private fun notificationIdFor(videoId: String): Int =
+        (videoId.hashCode() and Int.MAX_VALUE).coerceAtLeast(1)
+
     fun isDownloading(videoId: String?): Boolean =
         !videoId.isNullOrBlank() && activeDownloads.containsKey(videoId)
 
@@ -294,7 +299,7 @@ object SongDownloader {
         cancelDownloadInternal(
             context = context.applicationContext,
             videoId = videoId,
-            notificationId = song.id.toInt().coerceAtLeast(1),
+            notificationId = notificationIdFor(videoId),
             title = song.title
         )
     }
@@ -344,7 +349,7 @@ object SongDownloader {
         videoId: String,
         task: DownloadTask
     ) {
-        val notificationId = song.id.toInt().coerceAtLeast(1)
+        val notificationId = notificationIdFor(videoId)
         val cleanTitleStr = cleanTitle(song.title)
         val cleanArtistStr = cleanArtist(song.artist)
         val coroutineContext = currentCoroutineContext()
