@@ -71,7 +71,7 @@ fun DsmusicSurface(
     modifier: Modifier = Modifier,
     shape: Shape = DsmusicTheme.shapes.medium,
     color: Color = DsmusicTheme.colorScheme.surfaceContainer,
-    contentColor: Color = colorScheme.onSurface,
+    contentColor: Color = DsmusicTheme.colorScheme.onSurface,
     tonalElevation: Any? = null,
     shadowElevation: Any? = null,
     border: Any? = null,
@@ -270,7 +270,7 @@ fun DsmusicTextButton(
     interactionSource: Any? = null,
     content: @Composable RowScope.() -> Unit
 ) {
-    val contentColor = if (enabled) colors?.contentColor ?: colorScheme.primary
+    val contentColor = if (enabled) colors?.contentColor ?: DsmusicTheme.colorScheme.primary
         else colors?.disabledContentColor ?: DsmusicTheme.colorScheme.onSurfaceVariant
     Row(
         modifier = modifier.clip(RoundedCornerShape(10.dp))
@@ -425,7 +425,7 @@ fun DsmusicPageHeading(
                 .width(4.dp)
                 .height(if (subtitle == null) 42.dp else 48.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(DsmusicTheme.colorScheme.primary)
+                .background(colorScheme.primary)
         )
         Column(
             modifier = Modifier.padding(start = 12.dp),
@@ -434,7 +434,7 @@ fun DsmusicPageHeading(
             Text(
                 text = kicker.uppercase(),
                 style = DsmusicTheme.typography.labelMedium.copy(
-                    color = DsmusicTheme.colorScheme.primary,
+                    color = colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.7.sp
                 ),
@@ -445,7 +445,7 @@ fun DsmusicPageHeading(
                 style = DsmusicTheme.typography.headlineMedium.copy(
                     fontSize = titleSize,
                     lineHeight = titleLineHeight,
-                    color = DsmusicTheme.colorScheme.onSurface,
+                    color = colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.sp
                 ),
