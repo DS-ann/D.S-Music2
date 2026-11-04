@@ -815,6 +815,12 @@ fun BentoCell(
                 )
             }
         }
+        if (item !is SearchItem.Artist) {
+            ExploreCoverActionButton(
+                onClick = onLongClick,
+                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+            )
+        }
     }
 }
 
