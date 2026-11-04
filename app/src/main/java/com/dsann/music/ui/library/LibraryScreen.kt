@@ -1279,7 +1279,7 @@ fun SongListItem(
     artworkRequestSizePx: Int = 128
 ) {
     val context = LocalContext.current
-    val artModel = remember(song) { song.getAlbumArtUri() ?: R.drawable.ic_music_note }
+    val artModel = remember(song.id, song.thumbnailUrl, song.albumId, song.path) { song.getAlbumArtUri() ?: R.drawable.ic_music_note }
     // The lazy list reuses rows while playback/favourite state changes. Keep the
     // immutable Coil request stable instead of rebuilding it during each row recompose.
     val artworkRequest = remember(context, artModel) {
