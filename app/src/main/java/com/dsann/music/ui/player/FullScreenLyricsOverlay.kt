@@ -181,6 +181,99 @@ internal fun LyricsProviderPickerSheet(
     }
 }
 
+
+/**
+ * Single source of truth for lyrics rendering in the landscape side pane and the
+ * immersive lyrics screen. Provider state, timing, karaoke highlighting and plain
+ * text fallback all flow through the same renderer.
+ */
+@Composable
+internal fun PlayerLyricsContent(
+    currentSong: SongItem?,
+    syncedLyrics: List<LyricLine>?,
+    plainLyrics: String?,
+    isLoading: Boolean,
+    isPlaying: Boolean,
+    lyricsError: Throwable?,
+    currentPositionProvider: () -> Int,
+    playbackSpeedProvider: () -> Float,
+    contentReady: Boolean,
+    contentColor: Color,
+    dynamicAccentColor: Color,
+    lyricsColorStyle: String,
+    onRetryLyrics: () -> Unit,
+    onFetchLyrics: () -> Unit,
+    onSeekTo: (Int) -> Unit,
+    selectedProvider: String?,
+    providerResults: Map<String, LyricsResult>,
+    modifier: Modifier = Modifier
+) {
+    val compactLandscapeLyrics = LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        when {
+            isLoading -> CircularProgressIndicator(color = dynamicAccentColor)
+            !contentReady -> Unit
+            !syncedLyrics.isNullOrEmpty() -> SyncedLyricsCompose(
+                onSeekTo = onSeekTo,
+                lyrics = syncedLyrics,
+                currentPositionProvider = currentPositionProvider,
+                playbackSpeedProvider = playbackSpeedProvider,
+                isPlaying = isPlaying,
+                contentColor = contentColor,
+                dynamicAccentColor = dynamicAccentColor,
+                currentSong = currentSong,
+                selectedProvider = selectedProvider,
+                providerResults = providerResults,
+                lyricsColorStyle = lyricsColorStyle,
+                modifier = Modifier.fillMaxSize()
+            )
+            !plainLyrics.isNullOrBlank() -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 28.dp)
+                ) {
+                    Text(
+                        text = plainLyrics,
+                        style = DsmusicTheme.typography.titleLarge.copy(
+                            brush = if (lyricsColorStyle == "Home Studio Gradient") {
+                                dsmusicHomeStudioGradientBrush()
+                            } else null,
+                            fontSize = DsmusicTheme.typography.titleLarge.fontSize *
+                                if (compactLandscapeLyrics) 0.78f else 1f,
+                            lineHeight = DsmusicTheme.typography.titleLarge.lineHeight *
+                                if (compactLandscapeLyrics) 0.82f else 1f
+                        ),
+                        color = when (lyricsColorStyle) {
+                            "Home Studio Gradient" -> Color.Unspecified
+                            "White" -> Color.White
+                            "UI Matching" -> dynamicAccentColor
+                            else -> contentColor.copy(alpha = 0.9f)
+                        }
+                    )
+                    LyricsMetadataFooter(
+                        currentSong = currentSong,
+                        selectedProvider = selectedProvider,
+                        providerResults = providerResults,
+                        contentColor = contentColor
+                    )
+                }
+            }
+            lyricsError != null -> LyricsErrorState(
+                message = lyricsError.message ?: "Lyrics not found",
+                onRetry = onRetryLyrics
+            )
+            else -> LyricsErrorState(
+                message = "Lyrics are not loaded yet",
+                onRetry = onFetchLyrics
+            )
+        }
+    }
+}
+
 @Composable
 internal fun FullScreenLyricsOverlay(
     currentSong: SongItem?,
@@ -370,87 +463,26 @@ internal fun FullScreenLyricsOverlay(
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                when {
-                    // Keep the loading state visible while an explicitly selected provider fetches.
-                    // The user can still reopen/switch sources without getting a blank lyrics panel.
-                    isLoading -> {
-                        CircularProgressIndicator(color = dynamicAccentColor)
-                    }
-
-                    !contentReady -> Unit
-
-                    !syncedLyrics.isNullOrEmpty() -> {
-                        SyncedLyricsCompose(
-                            onSeekTo = onSeekTo,
-                            lyrics = syncedLyrics,
-                            currentPositionProvider = effectivePositionProvider,
-                            playbackSpeedProvider = playbackSpeedProvider,
-                            isPlaying = isPlaying,
-                            contentColor = contentColor,
-                            dynamicAccentColor = dynamicAccentColor,
-                            currentSong = currentSong,
-                            selectedProvider = selectedProvider,
-                            providerResults = providerResults,
-                            lyricsColorStyle = lyricsColorStyle,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-
-                    !plainLyrics.isNullOrBlank() -> {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                                .padding(horizontal = 16.dp, vertical = 28.dp)
-                        ) {
-                            Text(
-                                text = plainLyrics,
-                                style = DsmusicTheme.typography.titleLarge.copy(
-                                    brush = if (lyricsColorStyle == "Home Studio Gradient") {
-                                        dsmusicHomeStudioGradientBrush()
-                                    } else null,
-                                    fontSize = DsmusicTheme.typography.titleLarge.fontSize *
-                                        if (compactLandscapeLyrics) 0.78f else 1f,
-                                    lineHeight = DsmusicTheme.typography.titleLarge.lineHeight *
-                                        if (compactLandscapeLyrics) 0.82f else 1f
-                                ),
-                                color = when (lyricsColorStyle) {
-                                    "Home Studio Gradient" -> Color.Unspecified
-                                    "White" -> Color.White
-                                    "UI Matching" -> dynamicAccentColor
-                                    else -> contentColor.copy(alpha = 0.9f)
-                                }
-                            )
-                            LyricsMetadataFooter(
-                                currentSong = currentSong,
-                                selectedProvider = selectedProvider,
-                                providerResults = providerResults,
-                                contentColor = contentColor
-                            )
-                        }
-                    }
-
-                    lyricsError != null -> {
-                        LyricsErrorState(
-                            message = lyricsError.message ?: "Lyrics not found",
-                            onRetry = onRetryLyrics
-                        )
-                    }
-
-                    else -> {
-                        LyricsErrorState(
-                            message = "Lyrics are not loaded yet",
-                            onRetry = onFetchLyrics
-                        )
-                    }
-                }
-            }
+            PlayerLyricsContent(
+                currentSong = currentSong,
+                syncedLyrics = syncedLyrics,
+                plainLyrics = plainLyrics,
+                isLoading = isLoading,
+                isPlaying = isPlaying,
+                lyricsError = lyricsError,
+                currentPositionProvider = effectivePositionProvider,
+                playbackSpeedProvider = playbackSpeedProvider,
+                contentReady = contentReady,
+                contentColor = contentColor,
+                dynamicAccentColor = dynamicAccentColor,
+                lyricsColorStyle = lyricsColorStyle,
+                onRetryLyrics = onRetryLyrics,
+                onFetchLyrics = onFetchLyrics,
+                onSeekTo = onSeekTo,
+                selectedProvider = selectedProvider,
+                providerResults = providerResults,
+                modifier = Modifier.fillMaxWidth().weight(1f)
+            )
 
             // Do not tie the source selector to contentReady: provider switching temporarily
             // clears the visible lyrics while a new source is loading.
