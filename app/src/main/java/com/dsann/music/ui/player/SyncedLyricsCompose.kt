@@ -169,13 +169,19 @@ internal fun SyncedLyricsCompose(
 
     // ── Filter out interludes when in karaoke mode ──
     val displayItems = remember(lyrics, isKaraokeMode) {
+        // Some lyric providers return blocks in source order rather than playback order.
+        // The active-line binary search requires monotonic timestamps; explicitly sort
+        // each track so an early playback position can never resolve to the final line.
         lyrics.mapIndexedNotNull { index, line ->
             if (isKaraokeMode && line.isInterlude) null
             else LyricDisplayItem(
                 line = line,
                 originalIndex = index
             )
-        }
+        }.sortedWith(
+            compareBy<LyricDisplayItem> { it.line.startTimeMs }
+                .thenBy { it.originalIndex }
+        )
     }
 
     // Interpolate from Media3's live playback position at display-frame cadence. The
@@ -183,14 +189,21 @@ internal fun SyncedLyricsCompose(
     // invalid frame gaps and decoder clock discontinuities.
     // Keep the displayed clock scoped to the active track so a new queue item cannot
     // inherit the previous track's final lyric position.
-    val lyricClock = remember(currentSong?.id) {
+    // Online SongItem IDs are derived from String.hashCode(). Use the original video ID
+    // as the primary identity so a hash collision or repeated queue entry cannot inherit
+    // another track's final lyric clock.
+    val lyricTrackKey = currentSong?.videoId?.takeIf { it.isNotBlank() }
+        ?: currentSong?.path?.takeIf { it.isNotBlank() }
+        ?: currentSong?.id?.toString()
+    val lyricClock = remember(lyricTrackKey) {
         mutableIntStateOf(currentPositionProvider().coerceAtLeast(0))
     }
-    val karaokePlaybackClock = remember(currentSong?.id) { KaraokePlaybackClock() }
+    val karaokePlaybackClock = remember(lyricTrackKey) { KaraokePlaybackClock() }
     LaunchedEffect(
-        isPlaying, currentSong?.id, lyrics, currentPositionProvider, playbackSpeedProvider, isKaraokeMode
+        isPlaying, lyricTrackKey, lyrics, currentPositionProvider, playbackSpeedProvider, isKaraokeMode
     ) {
         val initialPosition = currentPositionProvider().coerceAtLeast(0)
+        var previousPosition = initialPosition
         karaokePlaybackClock.reset(initialPosition)
         lyricClock.intValue = initialPosition
 
@@ -198,26 +211,52 @@ internal fun SyncedLyricsCompose(
             if (!isPlaying) {
                 // Keep paused seeks responsive without running an idle display-frame loop.
                 val actualMs = currentPositionProvider().coerceAtLeast(0)
+                val rewoundToStart = actualMs < previousPosition - 750 &&
+                    actualMs <= (displayItems.firstOrNull()?.line?.startTimeMs ?: 0L) + 1200L
                 karaokePlaybackClock.reset(actualMs)
+                if (rewoundToStart) listState.scrollToItem(0)
                 if (lyricClock.intValue != actualMs) lyricClock.intValue = actualMs
+                previousPosition = actualMs
                 delay(if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 80L else 60L)
             } else if (!isKaraokeMode) {
                 // Ordinary synced lyrics only need accurate line changes, not word-sweep FPS.
                 val interval = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 84L else 40L
                 delay(interval)
                 val actualMs = currentPositionProvider().coerceAtLeast(0)
+                val rewoundToStart = actualMs < previousPosition - 750 &&
+                    actualMs <= (displayItems.firstOrNull()?.line?.startTimeMs ?: 0L) + 1200L
+                if (rewoundToStart) {
+                    // A replay/restart of the same song does not change currentSong.id.
+                    // Reset the active clock and list offset together, rather than waiting
+                    // for a smooth-scroll animation from the previous song's final line.
+                    karaokePlaybackClock.reset(actualMs)
+                    listState.scrollToItem(0)
+                }
                 if (lyricClock.intValue != actualMs) lyricClock.intValue = actualMs
+                previousPosition = actualMs
             } else {
                 withFrameNanos {
                     val frameNanos = karaokeFrameTimeNanos.value
                     if (frameNanos <= 0L) return@withFrameNanos
 
-                    val framePosition = karaokePlaybackClock.update(
-                        frameTimeNanos = frameNanos,
-                        actualPositionMs = currentPositionProvider(),
-                        playbackSpeed = playbackSpeedProvider(),
-                        isPlaying = true
-                    )
+                    val actualMs = currentPositionProvider().coerceAtLeast(0)
+                    val framePosition = if (
+                        actualMs < previousPosition - 750 &&
+                        actualMs <= (displayItems.firstOrNull()?.line?.startTimeMs ?: 0L) + 1200L
+                    ) {
+                        // Re-anchor word timing when a track restarts from the beginning.
+                        karaokePlaybackClock.reset(actualMs)
+                        listState.scrollToItem(0)
+                        actualMs
+                    } else {
+                        karaokePlaybackClock.update(
+                            frameTimeNanos = frameNanos,
+                            actualPositionMs = actualMs,
+                            playbackSpeed = playbackSpeedProvider(),
+                            isPlaying = true
+                        )
+                    }
+                    previousPosition = actualMs
                     if (lyricClock.intValue != framePosition) {
                         lyricClock.intValue = framePosition
                     }
@@ -250,8 +289,12 @@ internal fun SyncedLyricsCompose(
     // Keep each active lyric line centred. Re-key by song as well as line index:
     // two tracks can begin on the same lyric index, but must not inherit old scroll.
     val density = LocalDensity.current
-    LaunchedEffect(currentSong?.id, displayItems, activeIndex, density) {
-        if (activeIndex >= 0) {
+    LaunchedEffect(lyricTrackKey, displayItems, activeIndex, density) {
+        if (activeIndex == 0) {
+            // The first line is a hard anchor. Do not animate from the previous track's
+            // final-line offset or leave that row visible while the list catches up.
+            listState.scrollToItem(0)
+        } else if (activeIndex > 0) {
             performSmoothedScroll(
                 listState,
                 activeIndex,
