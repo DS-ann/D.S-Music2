@@ -1359,7 +1359,11 @@ fun FullPlayer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                horizontalArrangement = if (roundTransport) Arrangement.Center else Arrangement.spacedBy(12.dp),
+                horizontalArrangement = if (roundTransport) {
+                    Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally)
+                } else {
+                    Arrangement.spacedBy(12.dp)
+                },
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
@@ -1421,15 +1425,9 @@ fun FullPlayer(
                 }
             }
 
-            // Keep the queue opener attached to the bottom edge of the player pane.
-            // Any unused vertical space belongs above the opener, not below it.
-            val isTabletPortrait = screenWidth >= 600.dp && !isLandscapeWindow
-            if (isTabletPortrait) {
-                Spacer(modifier = Modifier.height(10.dp))
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
-            }
-            Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 16.dp))
+            // Keep the queue opener close to the transport controls. A weighted spacer
+            // here expanded to most of the available height on phones and tablets.
+            Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 8.dp))
 
             // Swipe Up / Click Chevron Up Indicator to expand Queue
             Box(
