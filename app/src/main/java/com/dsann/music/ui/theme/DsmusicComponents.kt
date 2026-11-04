@@ -33,12 +33,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /** Flat D.S Launcher-inspired surfaces: no tonal elevation or liquid-glass layers. */
-private val DsmusicPanelShape = RoundedCornerShape(18.dp)
-
 @Composable
 fun DsmusicCard(
     modifier: Modifier = Modifier,
-    shape: Shape = DsmusicPanelShape,
+    shape: Shape = DsmusicTheme.shapes.large,
     colors: DsmusicCardColors? = null,
     elevation: Any? = null,
     border: Any? = null,
@@ -48,12 +46,14 @@ fun DsmusicCard(
     val scheme = DsmusicTheme.colorScheme
     val containerColor = colors?.containerColor ?: scheme.surfaceContainerLow
     val contentColor = colors?.contentColor ?: scheme.onSurface
-    val outline = scheme.outlineVariant.copy(alpha = 0.86f)
+    // A restrained shared treatment keeps card families consistent without expensive visual effects.
+    val defaultBorder = BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = 0.92f))
+    val resolvedBorder = border as? BorderStroke ?: defaultBorder
     Column(
         modifier = modifier
             .clip(shape)
             .background(containerColor)
-            .border(BorderStroke(1.25.dp, outline), shape)
+            .border(resolvedBorder, shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {
         CompositionLocalProvider(LocalDsmusicContentColor provides contentColor) {
@@ -65,7 +65,7 @@ fun DsmusicCard(
 @Composable
 fun DsmusicSurface(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(16.dp),
+    shape: Shape = DsmusicTheme.shapes.medium,
     color: Color = DsmusicTheme.colorScheme.surfaceContainer,
     contentColor: Color = DsmusicTheme.colorScheme.onSurface,
     tonalElevation: Any? = null,
@@ -75,14 +75,13 @@ fun DsmusicSurface(
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
+    val resolvedBorder = border as? BorderStroke ?: BorderStroke(
+        1.dp,
+        DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.9f)
+    )
     Box(
         modifier = modifier.clip(shape).background(color)
-            .then(
-                if (showBorder) Modifier.border(
-                    BorderStroke(1.25.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.88f)),
-                    shape
-                ) else Modifier
-            )
+            .then(if (showBorder) Modifier.border(resolvedBorder, shape) else Modifier)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {
         CompositionLocalProvider(LocalDsmusicContentColor provides contentColor) {
@@ -110,14 +109,14 @@ fun DsmusicListItem(
     content: (@Composable () -> Unit)? = null
 ) {
     val paddingValues = contentPadding ?: PaddingValues(horizontal = 13.dp, vertical = 10.dp)
-    val itemShape = shapes ?: RoundedCornerShape(14.dp)
+    val itemShape = shapes ?: DsmusicTheme.shapes.medium
     val scheme = DsmusicTheme.colorScheme
     val itemBackground = when {
         colors == null -> scheme.surfaceContainerLow
         selected -> colors.selectedContainerColor
         else -> colors.containerColor
     }
-    val itemBorder = scheme.outlineVariant.copy(alpha = 0.82f)
+    val itemBorder = scheme.outlineVariant.copy(alpha = 0.9f)
     Row(
         modifier = modifier.fillMaxWidth().clip(itemShape)
             .background(itemBackground)
