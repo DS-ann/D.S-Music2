@@ -1501,8 +1501,15 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     fun getPinnedSpeedDialSongs(): List<OnlineSong> {
         val json = prefs.getString("speed_dial_songs_json", null) ?: return emptyList()
         return try {
-            val type = object : com.google.gson.reflect.TypeToken<List<OnlineSong>>() {}.type
-            gson.fromJson(json, type) ?: emptyList()
+            val type = object : com.google.gson.reflect.TypeToken<List<OnlineSong?>>() {}.type
+            val restoredSongs: List<OnlineSong?> = gson.fromJson(json, type) ?: emptyList()
+            restoredSongs.mapNotNull { restored ->
+                val song = restored ?: return@mapNotNull null
+                // Gson can bypass Kotlin constructor defaults. Older/corrupt preferences may
+                // therefore restore artistRefs as null even though the model declares a default.
+                val safeArtistRefs = song.artistRefs.orEmpty().filterNotNull()
+                song.copy(artistRefs = safeArtistRefs)
+            }
         } catch (_: Exception) {
             emptyList()
         }
