@@ -109,6 +109,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -227,10 +228,7 @@ fun ExploreScreen(
     val detailStack = uiState.detailStack
 
     var isSearchActive by rememberSaveable(isSearchDestination) {
-        mutableStateOf(isSearchDestination)
-    }
-    LaunchedEffect(isSearchDestination) {
-        if (isSearchDestination) isSearchActive = true
+        mutableStateOf(false)
     }
     var selectedSongForMenu by remember { mutableStateOf<OnlineSong?>(null) }
     var selectedCollectionForMenu by remember { mutableStateOf<SearchItem?>(null) }
@@ -1947,28 +1945,20 @@ private fun ExploreCustomizerDialog(
                     .imePadding()
             ) {
                 Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                DsmusicPageHeading(
-                    title = "Search",
-                    subtitle = "Songs, artists, albums and playlists",
-                    modifier = Modifier.weight(1f)
-                )
-                Box(
                     modifier = Modifier
-                        .size(42.dp)
-                        .clip(RoundedCornerShape(13.dp))
-                        .background(DsmusicTheme.colorScheme.surfaceContainerLow)
-                        .border(
-                            1.dp,
-                            DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-                            RoundedCornerShape(13.dp)
-                        )
-                        .clickable {
+                        .fillMaxWidth()
+                        .padding(start = 20.dp, end = 18.dp, top = 14.dp, bottom = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    DsmusicPageHeading(
+                        title = "Search",
+                        subtitle = "Find your next favourite.",
+                        kicker = "FIND YOUR SOUND",
+                        modifier = Modifier.weight(1f)
+                    )
+                    DsmusicIconButton(
+                        onClick = {
                             keyboardController?.hide()
                             if (isSearchDestination) {
                                 onLeaveSearchDestination()
@@ -1977,109 +1967,97 @@ private fun ExploreCustomizerDialog(
                                 onClearSearch()
                             }
                         },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = "Back",
-                        tint = DsmusicTheme.colorScheme.onSurface
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                BasicTextField(
-                    value = searchQuery,
-                    onValueChange = onQueryChange,
-                    modifier = Modifier
-                        .weight(1f)
-                        .focusRequester(searchFocusRequester)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(DsmusicTheme.colorScheme.surfaceContainerLow)
-                        .border(
-                            1.dp,
-                            DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-                            RoundedCornerShape(14.dp)
-                        )
-                        .padding(horizontal = 14.dp, vertical = 14.dp),
-                    singleLine = true,
-                    textStyle = DsmusicTheme.typography.bodyLarge.copy(
-                        color = DsmusicTheme.colorScheme.onSurface
-                    ),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { submitSearch() }),
-                    decorationBox = { innerTextField ->
-                        Box {
-                            if (searchQuery.isBlank()) {
-                                BasicText(
-                                    text = "Search music, artists, albums...",
-                                    style = DsmusicTheme.typography.bodyLarge.copy(
-                                        color = DsmusicTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    maxLines = 1
-                                )
-                            }
-                            innerTextField()
-                        }
-                    }
-                )
-
-                if (searchQuery.isNotBlank()) {
-                    Box(
-                        Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(DsmusicTheme.colorScheme.surfaceContainerLow)
-                            .clickable { onQueryChange("") },
-                        contentAlignment = Alignment.Center
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(DsmusicTheme.colorScheme.surfaceContainerHigh, CircleShape),
+                        shape = CircleShape
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = "Clear query",
-                            tint = DsmusicTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "Back",
+                            tint = DsmusicTheme.colorScheme.onSurface
                         )
                     }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(13.dp))
-                        .background(
-                            if (searchQuery.isNotBlank()) DsmusicTheme.colorScheme.primary
-                            else DsmusicTheme.colorScheme.surfaceContainerLow
-                        )
-                        .border(
-                            1.dp,
-                            if (searchQuery.isNotBlank()) DsmusicTheme.colorScheme.primary
-                            else DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-                            RoundedCornerShape(13.dp)
-                        )
-                        .clickable(enabled = searchQuery.isNotBlank()) { submitSearch() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Search,
-                        contentDescription = "Search",
-                        tint = if (searchQuery.isNotBlank()) DsmusicTheme.colorScheme.onPrimary
-                        else DsmusicTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-                Spacer(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(1.dp)
-                        .background(DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
-                )
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .height(62.dp)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(DsmusicTheme.colorScheme.surfaceContainerHigh)
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.Search,
+                        contentDescription = null,
+                        tint = DsmusicTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    BasicTextField(
+                        value = searchQuery,
+                        onValueChange = onQueryChange,
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(searchFocusRequester)
+                            .padding(vertical = 10.dp),
+                        singleLine = true,
+                        textStyle = DsmusicTheme.typography.bodyLarge.copy(
+                            color = DsmusicTheme.colorScheme.onSurface
+                        ),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { submitSearch() }),
+                        decorationBox = { innerTextField ->
+                            Box {
+                                if (searchQuery.isBlank()) {
+                                    BasicText(
+                                        text = "Songs, artists, albums, playlists...",
+                                        style = DsmusicTheme.typography.bodyLarge.copy(
+                                            color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                        ),
+                                        maxLines = 1
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        }
+                    )
+                    if (searchQuery.isNotBlank()) {
+                        DsmusicIconButton(
+                            onClick = { onQueryChange("") },
+                            modifier = Modifier.size(34.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.Close,
+                                contentDescription = "Clear query",
+                                tint = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    DsmusicIconButton(
+                        onClick = submitSearch,
+                        enabled = searchQuery.isNotBlank(),
+                        modifier = Modifier
+                            .size(46.dp)
+                            .background(
+                                if (searchQuery.isNotBlank()) DsmusicTheme.colorScheme.primary
+                                else DsmusicTheme.colorScheme.surfaceContainerLow,
+                                CircleShape
+                            ),
+                        shape = CircleShape
+                    ) {
+                        Icon(
+                            Icons.Rounded.Search,
+                            contentDescription = "Search",
+                            tint = if (searchQuery.isNotBlank()) DsmusicTheme.colorScheme.onPrimary
+                                else DsmusicTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
 
                 LazyColumn(
                     modifier = Modifier
@@ -2108,28 +2086,64 @@ private fun ExploreCustomizerDialog(
                                     }
                                 }
                             }
-                            items(searchHistory) { historyItem ->
-                                DsmusicListItem(
-                                    headlineContent = { Text(historyItem) },
-                                    leadingContent = { Icon(Icons.Rounded.History, null) },
-                                    trailingContent = {
+                            itemsIndexed(
+                                searchHistory,
+                                key = { index, item -> "active-history:$index:$item" }
+                            ) { index, historyItem ->
+                                Column {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable { onHistoryItemClick(historyItem) }
+                                            .padding(horizontal = 18.dp, vertical = 9.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(34.dp)
+                                                .clip(CircleShape)
+                                                .background(DsmusicTheme.colorScheme.surfaceContainerHigh),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                Icons.Rounded.History,
+                                                contentDescription = null,
+                                                tint = DsmusicTheme.colorScheme.primary,
+                                                modifier = Modifier.size(17.dp)
+                                            )
+                                        }
+                                        Spacer(Modifier.width(12.dp))
+                                        Text(
+                                            historyItem,
+                                            modifier = Modifier.weight(1f),
+                                            style = DsmusicTheme.typography.bodyMedium,
+                                            color = DsmusicTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                         DsmusicIconButton(
-                                            onClick = { onRemoveFromSearchHistory(historyItem) }
+                                            onClick = { onRemoveFromSearchHistory(historyItem) },
+                                            modifier = Modifier.size(34.dp)
                                         ) {
                                             Icon(
                                                 Icons.Rounded.Close,
                                                 contentDescription = "Remove search",
-                                                modifier = Modifier.size(18.dp)
+                                                tint = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(17.dp)
                                             )
                                         }
-                                    },
-                                    colors = ListItemDefaults.colors(
-                                        containerColor = Color.Transparent
-                                    ),
-                                    modifier = Modifier.clickable {
-                                        onHistoryItemClick(historyItem)
                                     }
-                                )
+                                    if (index < searchHistory.lastIndex) {
+                                        Box(
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = 64.dp, end = 18.dp)
+                                                .height(0.7.dp)
+                                                .background(DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.24f))
+                                        )
+                                    }
+                                }
                             }
                         }
 
@@ -2144,40 +2158,63 @@ private fun ExploreCustomizerDialog(
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                 )
                             }
-                            itemsIndexed(recentAccountHistory) { idx, song ->
-                                DsmusicListItem(
-                                    headlineContent = {
-                                        Text(
-                                            song.title,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    },
-                                    supportingContent = {
-                                        Text(
-                                            song.artist,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    },
-                                    leadingContent = {
+                            itemsIndexed(
+                                recentAccountHistory,
+                                key = { idx, _ -> "active-played:$idx" }
+                            ) { idx, song ->
+                                Column {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                onSearchActiveChange(false)
+                                                onAccountHistorySongClick(song, recentAccountHistory, idx)
+                                            }
+                                            .padding(horizontal = 18.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         AsyncImage(
                                             model = rememberExploreImageRequest(song.thumbnailUrl, 128),
                                             contentDescription = null,
-                                            modifier = Modifier
-                                                .size(40.dp)
-                                                .clip(RoundedCornerShape(6.dp)),
+                                            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(9.dp)),
                                             contentScale = ContentScale.Crop
                                         )
-                                    },
-                                    colors = ListItemDefaults.colors(
-                                        containerColor = Color.Transparent
-                                    ),
-                                    modifier = Modifier.clickable {
-                                        onSearchActiveChange(false)
-                                        onAccountHistorySongClick(song, recentAccountHistory, idx)
+                                        Spacer(Modifier.width(12.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                song.title,
+                                                style = DsmusicTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = DsmusicTheme.colorScheme.onSurface,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                song.artist,
+                                                style = DsmusicTheme.typography.bodySmall,
+                                                color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                        Icon(
+                                            Icons.Rounded.MusicNote,
+                                            contentDescription = "Play",
+                                            tint = DsmusicTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 8.dp).size(18.dp)
+                                        )
                                     }
-                                )
+                                    if (idx < recentAccountHistory.lastIndex) {
+                                        Box(
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = 72.dp, end = 18.dp)
+                                                .height(0.7.dp)
+                                                .background(DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.24f))
+                                        )
+                                    }
+                                }
                             }
                         }
 
