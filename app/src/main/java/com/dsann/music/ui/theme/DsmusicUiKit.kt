@@ -11,6 +11,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -26,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -1078,26 +1081,45 @@ class DsmusicPullToRefreshState {
 
 object PullToRefreshDefaults {
     @Composable fun Indicator(state: DsmusicPullToRefreshState, isRefreshing: Boolean, modifier: Modifier = Modifier) {
-        PullRefreshIndicator(modifier, isRefreshing || state.progress > 0.05f)
+        PullRefreshIndicator(modifier, state, isRefreshing)
     }
     @Composable fun LoadingIndicator(state: DsmusicPullToRefreshState, isRefreshing: Boolean, modifier: Modifier = Modifier) {
-        PullRefreshIndicator(modifier, isRefreshing || state.progress > 0.05f)
+        PullRefreshIndicator(modifier, state, isRefreshing)
     }
 }
 @Composable
-private fun PullRefreshIndicator(modifier: Modifier, active: Boolean) {
+private fun PullRefreshIndicator(
+    modifier: Modifier,
+    state: DsmusicPullToRefreshState,
+    isRefreshing: Boolean
+) {
     val accent = DsmusicTheme.colorScheme.primary
-    if (active) {
+    val isArmed = state.progress >= 1f
+    if (isRefreshing || state.progress > 0.05f) {
         Box(
-            modifier.padding(8.dp).size(24.dp).clip(CircleShape)
+            modifier.padding(8.dp).size(28.dp).clip(CircleShape)
                 .background(accent.copy(alpha = 0.16f)),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(16.dp),
-                color = accent,
-                strokeWidth = 2.dp
-            )
+            if (isRefreshing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(17.dp),
+                    color = accent,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                // The arrow remains visible while pulling. It flips only when the
+                // release threshold is reached, and flips back immediately if the
+                // user reverses the gesture before lifting their finger.
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = if (isArmed) "Release to refresh" else "Pull to refresh",
+                    modifier = Modifier
+                        .size(22.dp)
+                        .graphicsLayer { rotationZ = if (isArmed) 180f else 0f },
+                    tint = accent
+                )
+            }
         }
     }
 }
@@ -1144,7 +1166,10 @@ fun PullToRefreshBox(
             }
 
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                val shouldRefresh = state.progress >= 0.9f && !latestIsRefreshing
+                // This callback runs only after the user's pointer is released. Merely
+                // crossing the threshold never starts a request; pulling back below it
+                // disarms the gesture and the content returns to its resting position.
+                val shouldRefresh = state.progress >= 1f && !latestIsRefreshing
                 state.pullDistancePx = 0f
                 state.progress = 0f
                 if (shouldRefresh) latestOnRefresh()
