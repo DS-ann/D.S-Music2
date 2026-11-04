@@ -671,6 +671,12 @@ object SongDownloader {
                 fromCache = cachedStream != null,
                 artworkBytes = artworkBytes
             )
+            // Never report a successful M4A download if its metadata writer failed.
+            // Previously this format could silently publish the untouched source after a
+            // jaudiotagger failure, leaving the local library with no embedded title/cover.
+            if (outputFile.extension.equals("m4a", ignoreCase = true) && !metadataEmbedded) {
+                throw IOException("Could not embed and verify title, artist and cover metadata in the M4A file")
+            }
             // A failed WebM-to-Ogg remux must never publish WebM bytes with a .opus name.
             if (outputFile.extension.equals("opus", ignoreCase = true) && !metadataEmbedded) {
                 throw IOException("Could not create a valid tagged Ogg Opus file")
@@ -992,8 +998,10 @@ object SongDownloader {
             } else {
                 writtenTag.getFirst(org.jaudiotagger.tag.FieldKey.ARTIST)
             }
-            if (writtenTitle.isNullOrBlank() || writtenArtist.isNullOrBlank()) {
-                throw IOException("Metadata verification failed: title or artist was not persisted")
+            if (writtenTitle.isNullOrBlank() || !writtenTitle.equals(title.trim(), ignoreCase = true) ||
+                writtenArtist.isNullOrBlank() || !writtenArtist.equals(artist.trim(), ignoreCase = true)
+            ) {
+                throw IOException("Metadata verification failed: the exact M4A title or artist was not persisted")
             }
             if (!album.isNullOrBlank()) {
                 val writtenAlbum = if (writtenTag is org.jaudiotagger.tag.mp4.Mp4Tag) {
@@ -1007,6 +1015,15 @@ object SongDownloader {
             }
             if (artworkBytes != null && artworkBytes.isNotEmpty() && writtenTag.artworkList.isNullOrEmpty()) {
                 throw IOException("Metadata verification failed: cover artwork was not persisted")
+            }
+            if (isMp4Container) {
+                verifyMp4MetadataWithPlatform(
+                    file = taggedFile,
+                    title = title,
+                    artist = artist,
+                    album = album,
+                    expectArtwork = artworkBytes != null && artworkBytes.isNotEmpty()
+                )
             }
 
             backupFile = File(outputFile.parentFile, "${outputFile.name}.raw-backup")
@@ -1029,6 +1046,59 @@ object SongDownloader {
                 backupFile.renameTo(outputFile)
             }
             return false
+        }
+    }
+
+    /**
+     * Verify the actual MP4 atoms with Android's native extractor as well as jaudiotagger.
+     * This catches files whose Java tag structure can be reread but whose metadata is not
+     * visible to Android's own music library and artwork decoder.
+     */
+    private fun verifyMp4MetadataWithPlatform(
+        file: File,
+        title: String,
+        artist: String,
+        album: String?,
+        expectArtwork: Boolean
+    ) {
+        val retriever = android.media.MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(file.absolutePath)
+            val nativeTitle = retriever.extractMetadata(
+                android.media.MediaMetadataRetriever.METADATA_KEY_TITLE
+            )?.trim()
+            val nativeArtist = retriever.extractMetadata(
+                android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST
+            )?.trim()
+            val nativeAlbum = retriever.extractMetadata(
+                android.media.MediaMetadataRetriever.METADATA_KEY_ALBUM
+            )?.trim()
+
+            if (!nativeTitle.equals(title.trim(), ignoreCase = true)) {
+                throw IOException("Android could not read the embedded M4A title")
+            }
+            if (!nativeArtist.equals(artist.trim(), ignoreCase = true)) {
+                throw IOException("Android could not read the embedded M4A artist")
+            }
+            if (!album.isNullOrBlank() && !nativeAlbum.equals(album.trim(), ignoreCase = true)) {
+                throw IOException("Android could not read the embedded M4A album")
+            }
+            if (expectArtwork) {
+                val embeddedPicture = retriever.embeddedPicture
+                if (embeddedPicture == null || embeddedPicture.isEmpty()) {
+                    throw IOException("Android could not read the embedded M4A cover artwork")
+                }
+            }
+        } catch (error: IOException) {
+            throw error
+        } catch (error: Exception) {
+            throw IOException("Android could not verify the embedded M4A metadata", error)
+        } finally {
+            try {
+                retriever.release()
+            } catch (_: Exception) {
+                // Verification result is already determined.
+            }
         }
     }
 
