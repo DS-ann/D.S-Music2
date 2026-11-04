@@ -434,7 +434,7 @@ private fun LyricLineItem(
         // A synced line has no per-word sweep, so its active state is expressed as
         // a full-strength line highlight rather than a faint partial word fill.
         .background(
-            color = if (isActive && !isKaraoke) accentColor.copy(alpha = 0.16f)
+            color = if (isActive && !isKaraoke) accentColor.copy(alpha = 0.22f)
                 else Color.Transparent,
             shape = RoundedCornerShape(18.dp)
         )
@@ -471,7 +471,7 @@ private fun LyricLineItem(
     }
     val activeSyncedLineShadow = if (isActive && !isKaraoke) {
         androidx.compose.ui.graphics.Shadow(
-            color = accentColor.copy(alpha = 0.48f),
+            color = accentColor.copy(alpha = 0.64f),
             offset = androidx.compose.ui.geometry.Offset(0f, 0f),
             blurRadius = 10f
         )
