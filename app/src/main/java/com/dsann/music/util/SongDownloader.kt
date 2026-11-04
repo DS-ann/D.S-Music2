@@ -177,7 +177,8 @@ object SongDownloader {
 
         val baseName = "${cleanTitle(title)} - ${cleanArtist(artist)}"
             .replace(Regex("[^a-zA-Z0-9._\\s()\\[\\]-]"), "_")
-        val extensions = listOf("m4a", "mp3", "mka", "webm", "opus", "ogg", "flac", "aac", "wav")
+        // Prefer the new Ogg Opus export while retaining lookup for older Matroska/WebM downloads.
+        val extensions = listOf("m4a", "mp3", "opus", "mka", "webm", "ogg", "flac", "aac", "wav")
         for (extension in extensions) {
             val filename = "$baseName.$extension"
             val found = findDsmusicMediaStoreUri(context, filename)
@@ -508,7 +509,7 @@ object SongDownloader {
                 val extension = when {
                     downloadStream?.mimeType?.startsWith("audio/mp4", ignoreCase = true) == true -> "m4a"
                     downloadStream?.mimeType?.startsWith("audio/mpeg", ignoreCase = true) == true -> "mp3"
-                    downloadStream?.mimeType?.contains("webm", ignoreCase = true) == true -> "mka"
+                    downloadStream?.mimeType?.contains("webm", ignoreCase = true) == true -> "opus"
                     downloadStream?.mimeType?.contains("opus", ignoreCase = true) == true -> "opus"
                     downloadStream?.mimeType?.contains("ogg", ignoreCase = true) == true -> "ogg"
                     downloadStream?.mimeType?.contains("flac", ignoreCase = true) == true -> "flac"
@@ -670,8 +671,11 @@ object SongDownloader {
                 fromCache = cachedStream != null,
                 artworkBytes = artworkBytes
             )
-            // A failed .mka conversion would leave the original WebM bytes under a
-            // Matroska filename. Do not publish a mislabeled file as a successful download.
+            // A failed WebM-to-Ogg remux must never publish WebM bytes with a .opus name.
+            if (outputFile.extension.equals("opus", ignoreCase = true) && !metadataEmbedded) {
+                throw IOException("Could not create a valid tagged Ogg Opus file")
+            }
+            // Retain the safety check for older Matroska download paths.
             if (outputFile.extension.equals("mka", ignoreCase = true) && !metadataEmbedded) {
                 throw IOException("Could not embed metadata into the Opus Matroska file")
             }
@@ -893,6 +897,9 @@ object SongDownloader {
         artworkBytes: ByteArray?
     ): Boolean {
         val extension = outputFile.extension
+        if (extension.equals("opus", ignoreCase = true)) {
+            return embedOggOpusMetadataSafely(outputFile, title, artist, album, videoId, fromCache, artworkBytes)
+        }
         if (extension.equals("mka", ignoreCase = true)) {
             return embedMatroskaMetadataSafely(outputFile, title, artist, album, videoId, fromCache, artworkBytes)
         }
@@ -1018,6 +1025,64 @@ object SongDownloader {
         } catch (error: Exception) {
             Log.w(TAG, "Metadata embedding failed safely for ${outputFile.name}", error)
             taggedFile.delete()
+            if (backupFile?.exists() == true && !outputFile.exists()) {
+                backupFile.renameTo(outputFile)
+            }
+            return false
+        }
+    }
+
+    /**
+     * Publish a standards-compliant Ogg Opus file with Vorbis-comment metadata.
+     * WebM input is demuxed and remuxed without decoding or re-encoding its Opus packets.
+     * Existing Ogg Opus input is retagged while keeping its audio packets intact.
+     */
+    private fun embedOggOpusMetadataSafely(
+        outputFile: File,
+        title: String,
+        artist: String,
+        album: String?,
+        videoId: String,
+        fromCache: Boolean,
+        artworkBytes: ByteArray?
+    ): Boolean {
+        val stagedFile = File(outputFile.parentFile, "${outputFile.nameWithoutExtension}.tagging.opus")
+        var backupFile: File? = null
+        try {
+            if (stagedFile.exists() && !stagedFile.delete()) {
+                throw IOException("Could not clear the Ogg Opus metadata staging file")
+            }
+            val sourceComment = if (fromCache) {
+                "Exported from D.S Music cached audio (video ID: $videoId)"
+            } else {
+                "Downloaded from YouTube Music (video ID: $videoId)"
+            }
+            OggOpusRemuxer.writeTaggedOpus(
+                inputFile = outputFile,
+                outputFile = stagedFile,
+                title = title,
+                artist = artist,
+                album = album,
+                comment = sourceComment,
+                artworkBytes = artworkBytes
+            )
+
+            backupFile = File(outputFile.parentFile, "${outputFile.name}.raw-backup")
+            if (backupFile.exists() && !backupFile.delete()) {
+                throw IOException("Could not clear the original Opus backup file")
+            }
+            if (!outputFile.renameTo(backupFile)) {
+                throw IOException("Could not preserve the original Opus stream before tagging")
+            }
+            if (!stagedFile.renameTo(outputFile)) {
+                backupFile.renameTo(outputFile)
+                throw IOException("Could not install the tagged Ogg Opus file")
+            }
+            backupFile.delete()
+            return true
+        } catch (error: Exception) {
+            Log.w(TAG, "Ogg Opus metadata embedding failed safely for ${outputFile.name}", error)
+            stagedFile.delete()
             if (backupFile?.exists() == true && !outputFile.exists()) {
                 backupFile.renameTo(outputFile)
             }
@@ -1493,7 +1558,7 @@ object SongDownloader {
     private fun extensionForMimeType(mimeType: String?): String = when {
         mimeType?.contains("mp4", ignoreCase = true) == true -> "m4a"
         mimeType?.contains("mpeg", ignoreCase = true) == true -> "mp3"
-        mimeType?.contains("webm", ignoreCase = true) == true -> "mka"
+        mimeType?.contains("webm", ignoreCase = true) == true -> "opus"
         mimeType?.contains("matroska", ignoreCase = true) == true -> "mka"
         mimeType?.contains("opus", ignoreCase = true) == true -> "opus"
         mimeType?.contains("ogg", ignoreCase = true) == true -> "ogg"
