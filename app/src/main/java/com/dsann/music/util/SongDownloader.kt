@@ -120,7 +120,8 @@ object SongDownloader {
         val contentLength: Long,
         val mimeType: String?,
         val cachedBytes: Long,
-        val isComplete: Boolean
+        val isComplete: Boolean,
+        val metadata: com.dsann.music.service.CachedMediaMetadata
     )
 
     private val activeDownloads = ConcurrentHashMap<String, DownloadTask>()
@@ -495,6 +496,7 @@ object SongDownloader {
 
             coroutineContext.ensureActive()
 
+            val cachedMetadata = cachedStream?.metadata
             var artworkBytes: ByteArray? = null
             if (cachedStream != null) {
                 // Reuse artwork captured with cached playback when available.
@@ -506,7 +508,9 @@ object SongDownloader {
 
             // Older cached sessions and some queue entries have no local artwork file or
             // thumbnail attached. Resolve a metadata-only thumbnail as a fallback.
-            val artworkUrl = song.thumbnailUrl?.takeIf { it.isNotBlank() } ?: runCatching {
+            val artworkUrl = song.thumbnailUrl?.takeIf { it.isNotBlank() }
+                ?: cachedMetadata?.thumbnailUrl?.takeIf { it.isNotBlank() }
+                ?: runCatching {
                 com.dsann.music.data.innertube.YouTubeMusic
                     .player(videoId, metadataOnly = true)
                     .getOrNull()
@@ -537,11 +541,22 @@ object SongDownloader {
 
             coroutineContext.ensureActive()
 
-            // Keep the exact source metadata in tags and MediaStore. Filename cleaning is
-            // only for filesystem safety and must not rewrite the displayed song information.
-            val metadataTitle = song.title.trim().ifBlank { cleanTitleStr }
-            val metadataArtist = song.artist.trim().ifBlank { cleanArtistStr }
+            if (!artworkBytes.isNullOrEmpty()) {
+                AudioPlaybackService.storeCachedMediaArtworkBytes(
+                    context.applicationContext,
+                    song.id.toString(),
+                    artworkBytes
+                )
+            }
+
+            // Prefer the current song model, then recover missing fields from the actual cached
+            // stream's saved metadata. This avoids exporting a cached file under generic labels.
+            val metadataTitle = song.title.trim()
+                .ifBlank { cachedMetadata?.title?.trim().orEmpty().ifBlank { cleanTitleStr } }
+            val metadataArtist = song.artist.trim()
+                .ifBlank { cachedMetadata?.artist?.trim().orEmpty().ifBlank { cleanArtistStr } }
             val metadataAlbum = song.albumName?.trim()?.takeIf { it.isNotEmpty() }
+                ?: cachedMetadata?.albumName?.trim()?.takeIf { it.isNotEmpty() }
 
             val metadataEmbedded = embedMetadataSafely(
                 outputFile = outputFile,
@@ -821,6 +836,19 @@ object SongDownloader {
             if (writtenTitle.isNullOrBlank() || writtenArtist.isNullOrBlank()) {
                 throw IOException("Metadata verification failed: title or artist was not persisted")
             }
+            if (!album.isNullOrBlank()) {
+                val writtenAlbum = if (writtenTag is org.jaudiotagger.tag.mp4.Mp4Tag) {
+                    writtenTag.getFirst(org.jaudiotagger.tag.mp4.Mp4FieldKey.ALBUM)
+                } else {
+                    writtenTag.getFirst(org.jaudiotagger.tag.FieldKey.ALBUM)
+                }
+                if (!writtenAlbum.equals(album.trim(), ignoreCase = true)) {
+                    throw IOException("Metadata verification failed: album was not persisted")
+                }
+            }
+            if (!artworkBytes.isNullOrEmpty() && writtenTag.artworkList.isNullOrEmpty()) {
+                throw IOException("Metadata verification failed: cover artwork was not persisted")
+            }
 
             backupFile = File(outputFile.parentFile, "${outputFile.name}.raw-backup")
             if (backupFile.exists() && !backupFile.delete()) {
@@ -1067,7 +1095,8 @@ object SongDownloader {
                 contentLength = contentLength,
                 mimeType = mimeType,
                 cachedBytes = cachedBytes,
-                isComplete = complete
+                isComplete = complete,
+                metadata = metadata
             )
         }
         return candidates.firstOrNull { it.isComplete } ?: candidates.maxByOrNull { it.cachedBytes }

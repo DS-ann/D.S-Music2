@@ -83,7 +83,9 @@ data class CachedMediaMetadata(
     val songId: String,
     val durationMs: Long = 0L,
     val videoId: String = "",
-    val mimeType: String = ""
+    val mimeType: String = "",
+    val albumName: String = "",
+    val thumbnailUrl: String = ""
 )
 
 data class CachedAudioFacts(
@@ -284,7 +286,9 @@ class AudioPlaybackService : MediaSessionService() {
             songId: String = "",
             durationMs: Long = 0L,
             videoId: String = "",
-            mimeType: String = ""
+            mimeType: String = "",
+            albumName: String = "",
+            thumbnailUrl: String = ""
         ) {
             if (cacheKey.isBlank() || title.isBlank()) return
             val digestKey = cacheMetadataEntryKey(cacheKey)
@@ -293,11 +297,13 @@ class AudioPlaybackService : MediaSessionService() {
             val previousMetadata = getCachedMediaMetadata(context, cacheKey)
             val payload = org.json.JSONObject()
                 .put("title", title)
-                .put("artist", artist)
-                .put("songId", songId)
-                .put("durationMs", durationMs)
+                .put("artist", artist.ifBlank { previousMetadata?.artist.orEmpty() })
+                .put("songId", songId.ifBlank { previousMetadata?.songId.orEmpty() })
+                .put("durationMs", durationMs.takeIf { it > 0L } ?: previousMetadata?.durationMs ?: 0L)
                 .put("videoId", videoId.ifBlank { previousMetadata?.videoId.orEmpty() })
                 .put("mimeType", mimeType.ifBlank { previousMetadata?.mimeType.orEmpty() })
+                .put("albumName", albumName.ifBlank { previousMetadata?.albumName.orEmpty() })
+                .put("thumbnailUrl", thumbnailUrl.ifBlank { previousMetadata?.thumbnailUrl.orEmpty() })
                 .toString()
             context.getSharedPreferences(PREF_MEDIA_CACHE_METADATA, Context.MODE_PRIVATE)
                 .edit().putString(digestKey, payload).apply()
@@ -317,7 +323,9 @@ class AudioPlaybackService : MediaSessionService() {
                     songId = json.optString("songId", ""),
                     durationMs = json.optLong("durationMs", 0L),
                     videoId = json.optString("videoId", ""),
-                    mimeType = json.optString("mimeType", "")
+                    mimeType = json.optString("mimeType", ""),
+                    albumName = json.optString("albumName", ""),
+                    thumbnailUrl = json.optString("thumbnailUrl", "")
                 )
             } catch (_: Exception) {
                 null
@@ -333,20 +341,49 @@ class AudioPlaybackService : MediaSessionService() {
         @JvmStatic
         fun storeCachedMediaArtwork(context: Context, songId: String, bitmap: Bitmap): Boolean {
             if (songId.isBlank()) return false
+            return try {
+                val bytes = java.io.ByteArrayOutputStream().use { output ->
+                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output)) return false
+                    output.toByteArray()
+                }
+                storeCachedMediaArtworkBytes(context, songId, bytes)
+            } catch (error: Exception) {
+                Log.w(TAG, "Unable to persist cached artwork", error)
+                false
+            }
+        }
+
+        /** Persist an already encoded JPEG cover, including covers obtained by the downloader. */
+        @JvmStatic
+        fun storeCachedMediaArtworkBytes(context: Context, songId: String, jpegBytes: ByteArray): Boolean {
+            if (songId.isBlank() || jpegBytes.isEmpty()) return false
             val file = getCachedMediaArtworkFile(context, songId)
             val directory = file.parentFile ?: return false
             if (!directory.exists() && !directory.mkdirs()) return false
+            val staged = File(directory, file.name + ".tmp")
             return try {
-                val written = java.io.FileOutputStream(file).use { output ->
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output)
+                java.io.FileOutputStream(staged).use { output ->
+                    output.write(jpegBytes)
+                    output.flush()
+                    output.fd.sync()
                 }
-                if (written && file.isFile && file.length() > 0L) true
-                else {
-                    file.delete()
+                if (!staged.isFile || staged.length() <= 0L) {
+                    staged.delete()
+                    return false
+                }
+                if (file.exists() && !file.delete()) {
+                    staged.delete()
+                    return false
+                }
+                if (!staged.renameTo(file)) {
+                    staged.delete()
                     false
+                } else {
+                    true
                 }
             } catch (error: Exception) {
-                Log.w(TAG, "Unable to persist cached artwork", error)
+                staged.delete()
+                Log.w(TAG, "Unable to persist cached artwork bytes", error)
                 false
             }
         }
@@ -1597,10 +1634,14 @@ class AudioPlaybackService : MediaSessionService() {
     private fun ensureCurrentTrackCacheAssets() {
         val vm = viewModel ?: return
         val song = vm.currentSong.value ?: return
-        if (song.isCachedTrack || song.isDownloadedOffline) return
+        if (song.isDownloadedOffline) return
         if (cacheAssetsSongId == song.id) return
         cacheAssetsSongId = song.id
 
+        val currentUri = if (isPlayerInitialized) player.currentMediaItem?.localConfiguration?.uri else null
+        val cacheMetadata = currentUri?.let {
+            getCachedMediaMetadata(applicationContext, it.toString())
+        }
         val artwork = getCachedMediaArtworkFile(applicationContext, song.id.toString())
         if (artwork.isFile && artwork.length() > 0L) {
             // A cache hit must also hydrate the live MediaSession/notification artwork.
@@ -1608,8 +1649,14 @@ class AudioPlaybackService : MediaSessionService() {
             setSongMetadataFromCache(song.title, artwork, song.id.toString())
         } else {
             when {
-                !song.thumbnailUrl.isNullOrBlank() -> setSongMetadataByUrl(song.title, song.thumbnailUrl)
-                song.albumId > 0L -> setSongMetadataById(song.title, song.albumId)
+                !song.thumbnailUrl.isNullOrBlank() ->
+                    setSongMetadataByUrl(song.title, song.thumbnailUrl)
+                !cacheMetadata?.thumbnailUrl.isNullOrBlank() ->
+                    setSongMetadataByUrl(song.title, cacheMetadata?.thumbnailUrl)
+                !song.videoId.isNullOrBlank() ->
+                    setSongMetadataByUrl(song.title, null)
+                song.albumId > 0L ->
+                    setSongMetadataById(song.title, song.albumId)
             }
         }
 
@@ -1709,7 +1756,9 @@ class AudioPlaybackService : MediaSessionService() {
                     artist,
                     songId,
                     durationMs,
-                    videoId
+                    videoId,
+                    albumName = song?.albumName.orEmpty(),
+                    thumbnailUrl = song?.thumbnailUrl.orEmpty()
                 )
 
                 val existingFacts = getCachedAudioFacts(
@@ -2006,7 +2055,9 @@ class AudioPlaybackService : MediaSessionService() {
                 artist,
                 songId,
                 cachedSong?.duration ?: 0L,
-                cachedSong?.videoId.orEmpty()
+                cachedSong?.videoId.orEmpty(),
+                albumName = cachedSong?.albumName.orEmpty(),
+                thumbnailUrl = cachedSong?.thumbnailUrl.orEmpty()
             )
         }
 
@@ -2045,7 +2096,7 @@ class AudioPlaybackService : MediaSessionService() {
             .firstOrNull { it.sampleMimeType?.startsWith("audio/") == true }
         val mimeType = listOf(audioFormat?.containerMimeType, audioFormat?.sampleMimeType)
             .firstOrNull { candidate ->
-                !candidate.isNullOrBlank() && listOf("webm", "mp4", "mpeg", "ogg", "flac", "wav")
+                !candidate.isNullOrBlank() && listOf("webm", "mp4", "mpeg", "ogg", "opus", "flac", "wav")
                     .any { candidate.contains(it, ignoreCase = true) }
             } ?: audioFormat?.sampleMimeType ?: return
 
@@ -2061,7 +2112,9 @@ class AudioPlaybackService : MediaSessionService() {
             item.mediaId.ifBlank { activeSong?.id?.toString().orEmpty() },
             durationMs,
             activeSong?.videoId.orEmpty(),
-            mimeType
+            mimeType,
+            albumName = activeSong?.albumName.orEmpty(),
+            thumbnailUrl = activeSong?.thumbnailUrl.orEmpty()
         )
     }
 
