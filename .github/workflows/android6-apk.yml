@@ -9,7 +9,7 @@ on:
         type: string
         default: master
   push:
-    branches: [ master, 'fix/download-metadata-cache-playback' ]
+    branches: [ master, 'fix/download-metadata-cache-playback', dsmusic ]
     paths:
       - 'app/**'
       - 'gradle/**'
