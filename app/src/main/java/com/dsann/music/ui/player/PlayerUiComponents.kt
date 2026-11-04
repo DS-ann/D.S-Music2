@@ -206,8 +206,7 @@ internal fun PillChip(
     val progressColor = accentColor.copy(alpha = if (isDark) 0.35f else 0.25f)
     val noBackground = style == "None"
     val chipShape = when (style) {
-        "Round" -> RoundedCornerShape(14.dp)
-        "Pill" -> CircleShape
+        "Round", "Pill" -> CircleShape
         "Square" -> RoundedCornerShape(5.dp)
         else -> RoundedCornerShape(0.dp)
     }
@@ -233,7 +232,7 @@ internal fun PillChip(
                     )
                 }
                 if (style == "Round" || style == "Square") {
-                    val borderRadius = if (style == "Square") 4.dp.toPx() else 12.dp.toPx()
+                    val borderRadius = if (style == "Square") 4.dp.toPx() else size.minDimension / 2f
                     drawRoundRect(
                         color = (if (isSelected) accentColor else contentColor).copy(
                             alpha = if (isSelected) 0.78f else 0.28f
