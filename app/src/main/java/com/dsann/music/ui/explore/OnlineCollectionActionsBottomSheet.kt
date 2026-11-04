@@ -424,30 +424,39 @@ private fun CollectionPrimaryAction(
 }
 
 @Composable
-private fun CollectionActionRow(
+internal fun CollectionActionRow(
     title: String,
     subtitle: String,
     icon: @Composable () -> Unit,
     enabled: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(13.dp))
             .background(DsmusicTheme.colorScheme.surfaceContainerLow)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         icon()
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(9.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = DsmusicTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Text(
+                title,
+                style = DsmusicTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             Text(
                 subtitle,
                 style = DsmusicTheme.typography.bodySmall,
-                color = DsmusicTheme.colorScheme.onSurfaceVariant
+                color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

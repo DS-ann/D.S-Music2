@@ -1810,6 +1810,13 @@ internal fun ExploreActionSheetHeader(
     }
 }
 
+private data class ExploreTrackMenuItem(
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val action: () -> Unit
+)
+
 @Composable
 fun OnlineSongBottomSheet(
     song: OnlineSong,
@@ -1933,14 +1940,6 @@ fun OnlineSongBottomSheet(
 
             HorizontalDivider(color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
-            Text(
-                "QUICK ACTIONS",
-                style = DsmusicTheme.typography.labelSmall.copy(
-                    letterSpacing = 1.1.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = DsmusicTheme.colorScheme.onSurfaceVariant
-            )
             OptionsContent(
                 song = onlineSongItem,
                 isFavorite = isFavorite,
@@ -1971,7 +1970,11 @@ fun OnlineSongBottomSheet(
             val artistMenuItems = safeArtistRefs
                 .distinctBy { it.id ?: it.name.trim().lowercase() }
                 .map { artist ->
-                    Triple("Open ${artist.name}", Icons.Rounded.Person) {
+                    ExploreTrackMenuItem(
+                        title = "Open ${artist.name}",
+                        subtitle = "View artist page",
+                        icon = Icons.Rounded.Person
+                    ) {
                         if (!artist.id.isNullOrBlank()) {
                             exploreViewModel.loadArtist(artist.id)
                         } else {
@@ -1981,7 +1984,11 @@ fun OnlineSongBottomSheet(
                     }
                 }.ifEmpty {
                     listOf(
-                        Triple("Go to artist", Icons.Rounded.Person) {
+                        ExploreTrackMenuItem(
+                            title = "Go to artist",
+                            subtitle = "View artist page",
+                            icon = Icons.Rounded.Person
+                        ) {
                             if (!song.artistId.isNullOrBlank()) {
                                 exploreViewModel.loadArtist(song.artistId)
                             } else {
@@ -1993,12 +2000,20 @@ fun OnlineSongBottomSheet(
                 }
 
             val baseMenuItems = listOf(
-                Triple("Start mix", Icons.Rounded.Radio) {
+                ExploreTrackMenuItem(
+                    title = "Start mix",
+                    subtitle = "Radio based on this track",
+                    icon = Icons.Rounded.Radio
+                ) {
                     exploreViewModel.startRadio(song)
                     com.dsann.music.ui.SnackbarController.showMessage("Starting mix based on ${song.title}")
                     onDismissRequest()
                 },
-                Triple("Go to album", Icons.Rounded.Album) {
+                ExploreTrackMenuItem(
+                    title = "Go to album",
+                    subtitle = "Open album details",
+                    icon = Icons.Rounded.Album
+                ) {
                     val albumId = song.albumId
                     if (!albumId.isNullOrBlank()) {
                         exploreViewModel.loadAlbum(albumId)
@@ -2008,27 +2023,40 @@ fun OnlineSongBottomSheet(
                     }
                 }
             ) + artistMenuItems + listOf(
-                Triple("View song credits", Icons.Rounded.Groups) {
+                ExploreTrackMenuItem(
+                    title = "View song credits",
+                    subtitle = "Writers and contributors",
+                    icon = Icons.Rounded.Groups
+                ) {
                     onViewCreditsClick(song)
                     onDismissRequest()
                 },
-                Triple(
-                    if (isPinned) "Unpin from Speed dial" else "Pin to Speed dial",
-                    Icons.Rounded.PushPin
+                ExploreTrackMenuItem(
+                    title = if (isPinned) "Unpin from Speed dial" else "Pin to Speed dial",
+                    subtitle = if (isPinned) "Remove from quick access" else "Keep this track close",
+                    icon = Icons.Rounded.PushPin
                 ) {
                     exploreViewModel.pinToSpeedDial(song)
                     val msg = if (isPinned) "Song removed from Speed Dial!" else "Song pinned to Speed Dial!"
                     com.dsann.music.ui.SnackbarController.showMessage(msg)
                     onDismissRequest()
                 },
-                Triple("Not interested", Icons.Rounded.Block) {
+                ExploreTrackMenuItem(
+                    title = "Not interested",
+                    subtitle = "See fewer similar tracks",
+                    icon = Icons.Rounded.Block
+                ) {
                     exploreViewModel.setNotInterested(song)
                     com.dsann.music.ui.SnackbarController.showMessage("We will suggest fewer songs like this")
                     onDismissRequest()
                 }
             )
             val menuItems = if (onRemoveFromCache != null) {
-                baseMenuItems + Triple("Remove from cache", Icons.Rounded.DeleteOutline) {
+                baseMenuItems + ExploreTrackMenuItem(
+                    title = "Remove from cache",
+                    subtitle = "Delete the offline copy",
+                    icon = Icons.Rounded.DeleteOutline
+                ) {
                     onRemoveFromCache()
                     onDismissRequest()
                 }
@@ -2036,30 +2064,33 @@ fun OnlineSongBottomSheet(
                 baseMenuItems
             }
 
-            val menuColumns = if (isLandscape) 2 else 1
+            // Keep the compact icon/title/subtitle card structure identical to the
+            // album sheet's MORE OPTIONS rows, but pair the cards in portrait as well.
+            val menuColumns = 2
             val menuChunks = menuItems.chunked(menuColumns)
 
             Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
-                menuChunks.forEachIndexed { chunkIdx, chunk ->
+                menuChunks.forEach { chunk ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
                     ) {
-                        chunk.forEachIndexed { innerIdx, itemTuple ->
-                            val (title, icon, action) = itemTuple
-                            val globalIndex = chunkIdx * menuColumns + innerIdx
-                            Box(modifier = Modifier.weight(1f)) {
-                                CompactMenuItem(
-                                    text = title,
-                                    icon = icon,
-                                    shapes = if (isLandscape) {
-                                        ListItemDefaults.shapes()
-                                    } else {
-                                        ListItemDefaults.segmentedShapes(index = globalIndex, count = menuItems.size)
-                                    },
-                                    onClick = action
-                                )
-                            }
+                        chunk.forEach { item ->
+                            CollectionActionRow(
+                                modifier = Modifier.weight(1f),
+                                title = item.title,
+                                subtitle = item.subtitle,
+                                icon = {
+                                    Icon(
+                                        imageVector = item.icon,
+                                        contentDescription = null,
+                                        tint = DsmusicTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                },
+                                enabled = true,
+                                onClick = item.action
+                            )
                         }
                         if (chunk.size < menuColumns) {
                             Spacer(modifier = Modifier.weight(1f))
