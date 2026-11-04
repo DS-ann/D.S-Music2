@@ -511,12 +511,14 @@ object SongDownloader {
             val artworkUrl = song.thumbnailUrl?.takeIf { it.isNotBlank() }
                 ?: cachedMetadata?.thumbnailUrl?.takeIf { it.isNotBlank() }
                 ?: runCatching {
-                com.dsann.music.data.innertube.YouTubeMusic
-                    .player(videoId, metadataOnly = true)
-                    .getOrNull()
-                    ?.thumbnailUrl
-                    ?.takeIf { it.isNotBlank() }
-            }.getOrNull()
+                    com.dsann.music.data.innertube.YouTubeMusic
+                        .player(videoId, metadataOnly = true)
+                        .getOrNull()
+                        ?.thumbnailUrl
+                        ?.takeIf { it.isNotBlank() }
+                }.getOrNull()
+                ?: videoId.takeIf { it.isNotBlank() }
+                    ?.let { "https://img.youtube.com/vi/$it/hqdefault.jpg" }
 
             if ((artworkBytes == null || artworkBytes.isEmpty()) && !artworkUrl.isNullOrBlank()) {
                 try {

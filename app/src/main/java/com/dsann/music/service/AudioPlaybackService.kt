@@ -2028,13 +2028,24 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     private fun buildMediaItem(uri: Uri, title: String, artist: String, songId: String = ""): MediaItem {
-        val metadataBuilder = androidx.media3.common.MediaMetadata.Builder()
-            .setTitle(title)
-            .setArtist(artist)
         val activeSong = (viewModel?.currentSong?.value ?: widgetRestoredSong)
             ?.takeIf { it.id.toString() == songId }
-        activeSong?.albumName?.takeIf { it.isNotBlank() }?.let { metadataBuilder.setAlbumTitle(it) }
-        activeSong?.thumbnailUrl?.takeIf { it.isNotBlank() }?.let { metadataBuilder.setArtworkUri(it.toUri()) }
+        val cachedMetadata = if (uri.scheme == "http" || uri.scheme == "https") {
+            getCachedMediaMetadata(this, uri.toString())
+        } else {
+            null
+        }
+        val resolvedTitle = title.takeIf { it.isNotBlank() } ?: cachedMetadata?.title.orEmpty()
+        val resolvedArtist = artist.takeIf { it.isNotBlank() } ?: cachedMetadata?.artist.orEmpty()
+        val resolvedAlbum = activeSong?.albumName?.takeIf { it.isNotBlank() }
+            ?: cachedMetadata?.albumName?.takeIf { it.isNotBlank() }
+        val resolvedThumbnail = activeSong?.thumbnailUrl?.takeIf { it.isNotBlank() }
+            ?: cachedMetadata?.thumbnailUrl?.takeIf { it.isNotBlank() }
+        val metadataBuilder = androidx.media3.common.MediaMetadata.Builder()
+            .setTitle(resolvedTitle)
+            .setArtist(resolvedArtist)
+        resolvedAlbum?.let { metadataBuilder.setAlbumTitle(it) }
+        resolvedThumbnail?.let { metadataBuilder.setArtworkUri(it.toUri()) }
 
         // We only compress current cover for the active track to conserve heap space
         if (currentAlbumArtSongId == songId) {
