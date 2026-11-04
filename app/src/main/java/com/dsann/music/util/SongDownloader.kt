@@ -670,6 +670,11 @@ object SongDownloader {
                 fromCache = cachedStream != null,
                 artworkBytes = artworkBytes
             )
+            // A failed .mka conversion would leave the original WebM bytes under a
+            // Matroska filename. Do not publish a mislabeled file as a successful download.
+            if (outputFile.extension.equals("mka", ignoreCase = true) && !metadataEmbedded) {
+                throw IOException("Could not embed metadata into the Opus Matroska file")
+            }
 
             coroutineContext.ensureActive()
             if (!AudioFileManager.scanFile(context, outputFile, metadataTitle, metadataArtist, metadataAlbum)) {
