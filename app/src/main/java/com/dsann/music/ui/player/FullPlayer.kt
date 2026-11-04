@@ -410,6 +410,7 @@ private fun LandscapePlayerDetailsPane(
     onProviderSelected: (String) -> Unit,
     onSeekTo: (Int) -> Unit,
     onFetchLyrics: () -> Unit,
+    onRetryLyrics: () -> Unit,
     onPlayQueueItem: (Int) -> Unit
 ) {
     var showProviderPicker by remember { mutableStateOf(false) }
@@ -477,7 +478,7 @@ private fun LandscapePlayerDetailsPane(
                 contentColor = contentColor,
                 dynamicAccentColor = accentColor,
                 lyricsColorStyle = lyricsColorStyle,
-                onRetryLyrics = onFetchLyrics,
+                onRetryLyrics = onRetryLyrics,
                 onFetchLyrics = onFetchLyrics,
                 onSeekTo = onSeekTo,
                 selectedProvider = selectedProvider,
@@ -542,7 +543,7 @@ private fun LandscapePlayerDetailsPane(
             providerResults = providerResults,
             selectedProvider = selectedProvider,
             onProviderSelected = onProviderSelected,
-            onRefindClick = onFetchLyrics,
+            onRefindClick = onRetryLyrics,
             accentColor = accentColor,
             contentColor = contentColor,
             backgroundBrush = Brush.verticalGradient(
@@ -1523,6 +1524,7 @@ fun FullPlayer(
                         onProviderSelected = onProviderSelected,
                         onSeekTo = onSeekTo,
                         onFetchLyrics = onFetchLyrics,
+                        onRetryLyrics = onRetryLyrics,
                         onPlayQueueItem = { index -> viewModel.playSongAtIndex(index) }
                     )
                 } else {
