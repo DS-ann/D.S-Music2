@@ -567,7 +567,11 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private fun restoreHomeFeedCache(): Boolean {
         val json = prefs.getString(HOME_FEED_CACHE_KEY, null) ?: return false
         return try {
-            val cached = gson.fromJson(json, CachedHomeFeed::class.java) ?: return false
+            // CachedHomeFeed contains nested lists of custom models. Using ::class.java
+            // erases those element types and Gson silently creates LinkedTreeMap entries,
+            // which later crash when Compose iterates them as CachedHomeFeedSection.
+            val cacheType = object : com.google.gson.reflect.TypeToken<CachedHomeFeed>() {}.type
+            val cached: CachedHomeFeed = gson.fromJson(json, cacheType) ?: return false
             val restoredSections = cached.sections.mapNotNull { section ->
                 val restoredItems = section.items.mapNotNull { item ->
                     when (item.type) {
@@ -642,7 +646,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private fun restoreGenresCache(): Boolean {
         val json = prefs.getString(GENRES_CACHE_KEY, null) ?: return false
         return runCatching {
-            val cached = gson.fromJson(json, CachedGenres::class.java) ?: return false
+            // Preserve List<HomeCategory>'s element type. Raw class deserialization
+            // produces List<LinkedTreeMap>, causing a ClassCastException during rendering.
+            val cacheType = object : com.google.gson.reflect.TypeToken<CachedGenres>() {}.type
+            val cached: CachedGenres = gson.fromJson(json, cacheType) ?: return false
             if (cached.categories.isEmpty()) return false
             _uiState.update { it.copy(homeCategories = cached.categories, genresError = null) }
             true
