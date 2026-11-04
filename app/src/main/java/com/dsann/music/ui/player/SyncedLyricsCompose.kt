@@ -7,6 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.dsann.music.ui.theme.Button
 import com.dsann.music.ui.theme.Icon
 import com.dsann.music.ui.theme.DsmusicTheme
@@ -429,6 +431,13 @@ private fun LyricLineItem(
 
     val commonModifier = Modifier
         .fillMaxWidth()
+        // A synced line has no per-word sweep, so its active state is expressed as
+        // a full-strength line highlight rather than a faint partial word fill.
+        .background(
+            color = if (isActive && !isKaraoke) accentColor.copy(alpha = 0.16f)
+                else Color.Transparent,
+            shape = RoundedCornerShape(18.dp)
+        )
         .clickable(
             interactionSource = remember { MutableInteractionSource() },
             indication = null,
@@ -460,8 +469,16 @@ private fun LyricLineItem(
         "Center" -> TextAlign.Center
         else -> if (line.isRightAligned) TextAlign.End else TextAlign.Start
     }
+    val activeSyncedLineShadow = if (isActive && !isKaraoke) {
+        androidx.compose.ui.graphics.Shadow(
+            color = accentColor.copy(alpha = 0.48f),
+            offset = androidx.compose.ui.geometry.Offset(0f, 0f),
+            blurRadius = 10f
+        )
+    } else null
     val mainTextStyle = DsmusicTheme.typography.headlineMedium.copy(
         brush = lyricsBrush,
+        shadow = activeSyncedLineShadow,
         fontFamily = lyricFontFamily,
         fontSize = 38.sp * textScale,
         fontWeight = FontWeight.Bold,
