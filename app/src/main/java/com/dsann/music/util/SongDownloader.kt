@@ -217,7 +217,7 @@ object SongDownloader {
             }
         }.toTypedArray()
 
-        return try {
+        val audioUri = try {
             context.contentResolver.query(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                 projection,
@@ -251,7 +251,48 @@ object SongDownloader {
                 null
             }
         } catch (error: Exception) {
-            Log.w(TAG, "Could not resolve published download $filename", error)
+            Log.w(TAG, "Could not resolve audio-library download $filename", error)
+            null
+        }
+
+        return audioUri ?: findDsmusicDownloadsUri(context, filename)
+    }
+
+    /**
+     * WebM audio is stored through MediaStore.Downloads on Android 10+ because
+     * audio/webm is not consistently registered in Android's MIME-to-extension map.
+     * The generic Downloads collection accepts the real container MIME without relabeling
+     * the WebM bytes as Ogg/MP3 or losing the file when Audio.Media rejects the insert.
+     */
+    private fun findDsmusicDownloadsUri(context: Context, filename: String): Uri? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+
+        return try {
+            val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+            context.contentResolver.query(
+                collection,
+                arrayOf(MediaStore.Downloads._ID, MediaStore.Downloads.RELATIVE_PATH),
+                "${MediaStore.Downloads.DISPLAY_NAME} = ?",
+                arrayOf(filename),
+                "${MediaStore.Downloads.DATE_ADDED} DESC"
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID)
+                val pathColumn = cursor.getColumnIndex(MediaStore.Downloads.RELATIVE_PATH)
+                while (cursor.moveToNext()) {
+                    val path = if (pathColumn >= 0) cursor.getString(pathColumn).orEmpty() else ""
+                    val normalizedPath = path.replace('\\', '/').lowercase()
+                    if (!normalizedPath.contains("d.s music/") &&
+                        !normalizedPath.contains("spatialflow/")
+                    ) continue
+                    return@use ContentUris.withAppendedId(
+                        collection,
+                        cursor.getLong(idColumn)
+                    )
+                }
+                null
+            }
+        } catch (error: Exception) {
+            Log.w(TAG, "Could not resolve generic WebM download $filename", error)
             null
         }
     }
@@ -1007,6 +1048,8 @@ object SongDownloader {
                 ?.takeIf { it.isNotEmpty() }
                 ?.let(::buildWebmCoverAttachment)
             appendWebmMetadataTags(stagedFile, tags, coverAttachment)
+            val appendedElements = if (coverAttachment == null) tags else tags + coverAttachment
+            verifyAppendedWebmMetadata(stagedFile, appendedElements)
 
             backupFile = File(outputFile.parentFile, "${outputFile.name}.raw-backup")
             if (backupFile.exists() && !backupFile.delete()) {
@@ -1095,6 +1138,22 @@ object SongDownloader {
         }
         encoded[0] = (encoded[0].toInt() or (1 shl (8 - width))).toByte()
         return encoded
+    }
+
+    private fun verifyAppendedWebmMetadata(file: File, expectedElements: ByteArray) {
+        if (expectedElements.isEmpty()) throw IOException("No WebM metadata was generated")
+        java.io.RandomAccessFile(file, "r").use { randomFile ->
+            val fileLength = randomFile.length()
+            if (fileLength < expectedElements.size.toLong()) {
+                throw IOException("WebM metadata verification failed: tagged file is too small")
+            }
+            randomFile.seek(fileLength - expectedElements.size.toLong())
+            val actualElements = ByteArray(expectedElements.size)
+            randomFile.readFully(actualElements)
+            if (!actualElements.contentEquals(expectedElements)) {
+                throw IOException("WebM metadata verification failed: tags or cover attachment were not persisted")
+            }
+        }
     }
 
     private fun appendWebmMetadataTags(file: File, tags: ByteArray, coverAttachment: ByteArray?) {

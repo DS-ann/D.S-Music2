@@ -186,11 +186,31 @@ public class AudioFileManager {
         else if (lowerFileName.endsWith(".wav")) mimeType = "audio/wav";
         else mimeType = "application/octet-stream";
         values.put(MediaStore.Audio.Media.MIME_TYPE, mimeType);
-        values.put(MediaStore.Audio.Media.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/D.S Music/");
+
+        // Android's MediaStore.Audio collection does not consistently recognize audio/webm
+        // as an insertable MIME type. Keep WebM/Opus in its real container and publish it
+        // through the generic Downloads collection instead of lying about it as audio/ogg.
+        boolean isWebmAudio = lowerFileName.endsWith(".webm");
+        Uri collectionUri;
+        String relativePath;
+        if (isWebmAudio) {
+            collectionUri = MediaStore.Downloads.EXTERNAL_CONTENT_URI;
+            relativePath = Environment.DIRECTORY_DOWNLOADS + "/D.S Music/";
+        } else {
+            collectionUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
+            relativePath = Environment.DIRECTORY_MUSIC + "/D.S Music/";
+        }
+        values.put(MediaStore.Audio.Media.RELATIVE_PATH, relativePath);
         values.put(MediaStore.Audio.Media.IS_PENDING, 1);
 
         ContentResolver resolver = context.getContentResolver();
-        Uri itemUri = resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values);
+        Uri itemUri;
+        try {
+            itemUri = resolver.insert(collectionUri, values);
+        } catch (Exception insertError) {
+            Log.e(TAG, "Failed to create MediaStore entry for " + sourceFile.getName(), insertError);
+            return false;
+        }
         if (itemUri == null) {
             Log.e(TAG, "Failed to create MediaStore entry for " + sourceFile.getName());
             return false;
@@ -220,7 +240,7 @@ public class AudioFileManager {
             if (resolver.update(itemUri, ready, null, null) <= 0) {
                 throw new IOException("Could not publish the completed audio file");
             }
-            Log.d(TAG, "File copied to MediaStore successfully: Music/D.S Music/" + sourceFile.getName());
+            Log.d(TAG, "File copied to MediaStore successfully: " + relativePath + sourceFile.getName());
             return true;
         } catch (Exception e) {
             try {
