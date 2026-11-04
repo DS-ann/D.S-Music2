@@ -512,9 +512,9 @@ object SongDownloader {
                         videoId = videoId,
                         allowFormatChoice = false,
                         preferredFormatOverride = resolvedDownloadFormat
-                    )
-                    val refreshedUrl = refreshedStream?.url
-                        ?.takeIf { it.startsWith("https://", ignoreCase = true) }
+                    ) ?: throw IOException("The source returned HTTP 403 and did not provide a refreshed stream", downloadError)
+                    val refreshedUrl = refreshedStream.url
+                        .takeIf { it.startsWith("https://", ignoreCase = true) }
                         ?: throw IOException("The source returned HTTP 403 and did not provide a refreshed download URL", downloadError)
                     if (!NewPipeStreamExtractor.matchesAudioFormat(
                             refreshedStream.mimeType,
