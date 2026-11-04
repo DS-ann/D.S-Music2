@@ -400,8 +400,6 @@ private fun LandscapePlayerDetailsPane(
     isLyricsLoading: Boolean,
     lyricsError: Throwable?,
     currentSong: SongItem?,
-    songList: List<SongItem>,
-    currentSongIndex: Int,
     currentPositionProvider: () -> Int,
     playbackSpeedProvider: () -> Float,
     isPlaying: Boolean,
@@ -414,14 +412,9 @@ private fun LandscapePlayerDetailsPane(
     onProviderSelected: (String) -> Unit,
     onSeekTo: (Int) -> Unit,
     onFetchLyrics: () -> Unit,
-    onRetryLyrics: () -> Unit,
-    onReorderQueue: (Int, Int) -> Unit,
-    onSongLongClick: (SongItem) -> Unit,
-    onPlayQueueItem: (Int) -> Unit
+    onRetryLyrics: () -> Unit
 ) {
     var showProviderPicker by remember { mutableStateOf(false) }
-    val queueListState = rememberLazyListState()
-    val queueDragDropState = rememberDragDropState(queueListState, onReorderQueue)
     val panelShape = RoundedCornerShape(24.dp)
 
     Column(
@@ -494,30 +487,22 @@ private fun LandscapePlayerDetailsPane(
                 modifier = Modifier.fillMaxSize()
             )
         } else {
-            if (songList.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("The queue is empty", color = secondaryColor)
-                }
-            } else {
-                LazyColumn(
-                    state = queueListState,
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    itemsIndexed(songList, key = { _, song -> song.id }) { index, song ->
-                        QueueListItem(
-                            song = song,
-                            isPlaying = index == currentSongIndex,
-                            shapes = ListItemDefaults.segmentedShapes(
-                                index = index,
-                                count = songList.size
-                            ),
-                            dragDropState = queueDragDropState,
-                            index = index,
-                            onLongClick = { onSongLongClick(song) },
-                            onClick = { onPlayQueueItem(index) }
-                        )
-                    }
+            // Up Next opens the shared SlidingQueueDrawer. This pane deliberately
+            // does not compose a second, independent copy of the queue.
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Up Next",
+                        color = contentColor,
+                        fontWeight = FontWeight.Bold,
+                        style = DsmusicTheme.typography.titleMedium
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "The main queue is open beside the player.",
+                        color = secondaryColor,
+                        style = DsmusicTheme.typography.bodySmall
+                    )
                 }
             }
         }
@@ -809,20 +794,12 @@ fun FullPlayer(
     val isShuffleEnabled by viewModel.isShuffleEnabled.collectAsStateWithLifecycle()
     val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
     val currentSongIndex by viewModel.currentSongIndex.collectAsStateWithLifecycle()
-    // This is the selected destination for the landscape player's right-side pane.
-    // Lyrics is the default, so its player action is selected as soon as a wide
-    // landscape player is shown.
-    var landscapeShowsQueue by remember { mutableStateOf(false) }
-
-    // Back first exits the active overlay/drawer, then returns the landscape pane
-    // from Up next to Lyrics.
-    BackHandler(enabled = isLyricsModeEnabled || isQueueExpanded || landscapeShowsQueue) {
-        if (isLyricsModeEnabled) {
-            onLyricsModeChanged(false)
-        } else if (isQueueExpanded) {
+    // Back dismisses the one shared queue first, then the fullscreen lyrics overlay.
+    BackHandler(enabled = isLyricsModeEnabled || isQueueExpanded) {
+        if (isQueueExpanded) {
             viewModel.setQueueExpanded(false)
-        } else if (landscapeShowsQueue) {
-            landscapeShowsQueue = false
+        } else {
+            onLyricsModeChanged(false)
         }
     }
 
@@ -880,7 +857,7 @@ fun FullPlayer(
         val queueDockInset = animatedQueueDockInset.coerceAtLeast(0.dp)
         // The fullscreen lyrics overlay and the landscape side pane share this one
         // fetch trigger. A track is requested once when either lyrics surface becomes active.
-        val landscapeLyricsVisible = isPlayerVisible && useWidePlayer && isLandscapeWindow && !landscapeShowsQueue
+        val landscapeLyricsVisible = isPlayerVisible && useWidePlayer && isLandscapeWindow && !isQueueExpanded
         LaunchedEffect(
             isLyricsModeEnabled,
             landscapeLyricsVisible,
@@ -1167,10 +1144,8 @@ fun FullPlayer(
                             icon = painterResource(id = R.drawable.ic_lyrics),
                             label = "Lyrics",
                             isSelected = isLyricsModeEnabled ||
-                                (useWidePlayer && isLandscapeWindow &&
-                                    !landscapeShowsQueue && !isQueueExpanded),
+                                (useWidePlayer && isLandscapeWindow && !isQueueExpanded),
                             onClick = {
-                                landscapeShowsQueue = false
                                 viewModel.setQueueExpanded(false)
                                 onLyricsModeChanged(true)
                             },
@@ -1201,10 +1176,8 @@ fun FullPlayer(
                             style = playerButtonStyle,
                             icon = painterResource(id = R.drawable.ic_keyboard_arrow_down),
                             label = "Up next",
-                            isSelected = isQueueExpanded ||
-                                (useWidePlayer && isLandscapeWindow && landscapeShowsQueue),
+                            isSelected = isQueueExpanded,
                             onClick = {
-                                landscapeShowsQueue = false
                                 onLyricsModeChanged(false)
                                 viewModel.setQueueExpanded(true)
                             },
@@ -1494,10 +1467,13 @@ fun FullPlayer(
                 if (isPlayerVisible) {
                     LandscapePlayerDetailsPane(
                         modifier = Modifier.weight(0.46f).fillMaxHeight(),
-                        showQueue = landscapeShowsQueue,
-                        onShowQueueChange = { landscapeShowsQueue = it },
+                        showQueue = isQueueExpanded,
+                        onShowQueueChange = { showQueue ->
+                            if (showQueue) onLyricsModeChanged(false)
+                            viewModel.setQueueExpanded(showQueue)
+                        },
                         onOpenFullScreenLyrics = {
-                            landscapeShowsQueue = false
+                            viewModel.setQueueExpanded(false)
                             onLyricsModeChanged(true)
                         },
                         syncedLyrics = syncedLyrics,
@@ -1505,8 +1481,6 @@ fun FullPlayer(
                         isLyricsLoading = isLyricsLoading,
                         lyricsError = lyricsError,
                         currentSong = uiState.currentSong,
-                        songList = songList,
-                        currentSongIndex = currentSongIndex,
                         currentPositionProvider = currentPositionProvider,
                         playbackSpeedProvider = playbackSpeedProvider,
                         isPlaying = uiState.isPlaying,
@@ -1519,10 +1493,7 @@ fun FullPlayer(
                         onProviderSelected = onProviderSelected,
                         onSeekTo = onSeekTo,
                         onFetchLyrics = onFetchLyrics,
-                        onRetryLyrics = onRetryLyrics,
-                        onReorderQueue = { from, to -> viewModel.reorderQueue(from, to) },
-                        onSongLongClick = { song -> showQueueSongActions(context, song, viewModel) },
-                        onPlayQueueItem = { index -> viewModel.playSongAtIndex(index) }
+                        onRetryLyrics = onRetryLyrics
                     )
                 } else {
                     Spacer(Modifier.weight(0.46f).fillMaxHeight())
