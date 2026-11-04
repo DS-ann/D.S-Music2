@@ -17,6 +17,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import android.os.Looper;
 
 public class AudioFileManager {
 
@@ -97,34 +101,60 @@ public class AudioFileManager {
             return copyToMediaStore(context, file, title, artist, album);
         }
         try {
+            // The downloader immediately refreshes the local library after publishing a file.
+            // Wait for the scanner callback on background callers so that refresh cannot race
+            // ahead of the MediaStore row creation on Android 6-9.
+            final CountDownLatch scanFinished = new CountDownLatch(1);
+            final AtomicBoolean scanSucceeded = new AtomicBoolean(false);
             MediaScannerConnection.scanFile(
                     context,
                     new String[]{file.getAbsolutePath()},
                     new String[]{mimeTypeForFile(file.getName())},
                     (scannedPath, scannedUri) -> {
-                        if (scannedUri == null) {
-                            Log.w(TAG, "Media scanner did not return a URI for " + scannedPath);
-                            return;
-                        }
-                        ContentValues metadata = new ContentValues();
-                        if (title != null && !title.trim().isEmpty()) {
-                            metadata.put(MediaStore.Audio.Media.TITLE, title.trim());
-                        }
-                        if (artist != null && !artist.trim().isEmpty()) {
-                            metadata.put(MediaStore.Audio.Media.ARTIST, artist.trim());
-                            metadata.put(MediaStore.Audio.Media.ALBUM_ARTIST, artist.trim());
-                        }
-                        if (album != null && !album.trim().isEmpty()) {
-                            metadata.put(MediaStore.Audio.Media.ALBUM, album.trim());
-                        }
                         try {
-                            int updated = context.getContentResolver().update(scannedUri, metadata, null, null);
-                            Log.d(TAG, "Updated legacy MediaStore metadata rows=" + updated);
-                        } catch (Exception metadataError) {
-                            Log.w(TAG, "Could not update legacy MediaStore metadata", metadataError);
+                            if (scannedUri == null) {
+                                Log.w(TAG, "Media scanner did not return a URI for " + scannedPath);
+                                return;
+                            }
+                            ContentValues metadata = new ContentValues();
+                            if (title != null && !title.trim().isEmpty()) {
+                                metadata.put(MediaStore.Audio.Media.TITLE, title.trim());
+                            }
+                            if (artist != null && !artist.trim().isEmpty()) {
+                                metadata.put(MediaStore.Audio.Media.ARTIST, artist.trim());
+                                metadata.put(MediaStore.Audio.Media.ALBUM_ARTIST, artist.trim());
+                            }
+                            if (album != null && !album.trim().isEmpty()) {
+                                metadata.put(MediaStore.Audio.Media.ALBUM, album.trim());
+                            }
+                            try {
+                                int updated = context.getContentResolver().update(scannedUri, metadata, null, null);
+                                Log.d(TAG, "Updated legacy MediaStore metadata rows=" + updated);
+                            } catch (Exception metadataError) {
+                                Log.w(TAG, "Could not update legacy MediaStore metadata", metadataError);
+                            }
+                            scanSucceeded.set(true);
+                        } finally {
+                            scanFinished.countDown();
                         }
                     });
             Log.d(TAG, "Media scan requested: " + file.getAbsolutePath());
+            if (Looper.myLooper() != Looper.getMainLooper()) {
+                try {
+                    if (!scanFinished.await(12L, TimeUnit.SECONDS)) {
+                        Log.e(TAG, "Timed out waiting for MediaStore to index " + file.getName());
+                        return false;
+                    }
+                    if (!scanSucceeded.get()) {
+                        Log.e(TAG, "MediaStore did not index " + file.getName());
+                        return false;
+                    }
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    Log.w(TAG, "Interrupted while waiting for MediaStore to index " + file.getName(), interrupted);
+                    return false;
+                }
+            }
             return true;
         } catch (Exception e) {
             Log.e(TAG, "scanFile failed: " + e.getMessage(), e);
