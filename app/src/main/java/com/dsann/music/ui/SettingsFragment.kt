@@ -718,10 +718,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putString("ui_density", safe) }
     }
 
-    private val _uiFontFamily = MutableStateFlow(prefs.getString("ui_font_family", "System") ?: "System")
+    private val _uiFontFamily = MutableStateFlow(
+        when (prefs.getString("ui_font_family", "Roboto") ?: "Roboto") {
+            "Cursive" -> "Cursive"
+            "Sans", "Google Sans Flex" -> "Sans"
+            "Serif" -> "Serif"
+            // Migrate legacy System/Monospace selections to the requested Roboto default.
+            else -> "Roboto"
+        }
+    )
     val uiFontFamily: StateFlow<String> = _uiFontFamily.asStateFlow()
     fun setUiFontFamily(value: String) {
-        val safe = value.takeIf { it in listOf("System", "Google Sans Flex", "Serif", "Monospace") } ?: "System"
+        val safe = value.takeIf { it in listOf("Cursive", "Roboto", "Sans", "Serif") } ?: "Roboto"
         _uiFontFamily.value = safe
         prefs.edit { putString("ui_font_family", safe) }
     }
@@ -3085,9 +3093,9 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Interface font",
-                        description = "Choose the typeface used across headings, labels, buttons, lists and settings.",
+                        description = "Choose one typeface for the entire app: Cursive, Roboto, Sans or Serif.",
                         selected = uiFontFamily,
-                        options = listOf("System", "Google Sans Flex", "Serif", "Monospace"),
+                        options = listOf("Cursive", "Roboto", "Sans", "Serif"),
                         onSelected = onUiFontFamilyChange
                     )
                 },
