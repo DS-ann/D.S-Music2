@@ -58,6 +58,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.dsann.music.ui.theme.Icon
 import com.dsann.music.ui.theme.IconButton
 import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.dsmusicHomeStudioGradientBrush
 import com.dsann.music.ui.theme.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -401,7 +402,7 @@ private fun LandscapePlayerDetailsPane(
     accentColor: Color,
     selectedProvider: String?,
     providerResults: Map<String, LyricsResult>,
-    lyricsColorStyle: String = "Dynamic (Gradient)",
+    lyricsColorStyle: String = "Home Studio Gradient",
     onProviderSelected: (String) -> Unit,
     onSeekTo: (Int) -> Unit,
     onFetchLyrics: () -> Unit,
@@ -492,14 +493,14 @@ private fun LandscapePlayerDetailsPane(
                             Text(
                                 text = line,
                                 color = when (lyricsColorStyle) {
-                                    "Dynamic (Gradient)" -> Color.Unspecified
+                                    "Home Studio Gradient" -> Color.Unspecified
                                     "White" -> Color.White
                                     "UI Matching" -> accentColor
                                     else -> contentColor.copy(alpha = 0.88f)
                                 },
                                 style = DsmusicTheme.typography.bodyLarge.copy(
-                                    brush = if (lyricsColorStyle == "Dynamic (Gradient)") {
-                                        Brush.horizontalGradient(listOf(accentColor, contentColor))
+                                    brush = if (lyricsColorStyle == "Home Studio Gradient") {
+                                        dsmusicHomeStudioGradientBrush()
                                     } else null
                                 ),
                                 modifier = Modifier.padding(vertical = 5.dp)
@@ -796,7 +797,7 @@ fun FullPlayer(
     visualizerStyle: String = "Off",
     playerBackgroundStyle: String = "Artwork",
     playerButtonStyle: String = "Pill",
-    lyricsColorStyle: String = "Dynamic (Gradient)",
+    lyricsColorStyle: String = "Home Studio Gradient",
     scrubberThickness: Float = 1f,
     scrubberThumbStyle: String = "Auto",
     visualizerColor: String = "Accent",
