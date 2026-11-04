@@ -1105,6 +1105,13 @@ fun PlayerBottomSheetCompose(
             Animatable(restoredExpansionFraction)
         }
 
+        // Mirror only the current draw-phase progress to the dock. This is a
+        // snapshot-state read by graphicsLayer, not a full tab-tree collection.
+        LaunchedEffect(playerContentExpansionFraction) {
+            snapshotFlow { playerContentExpansionFraction.value }
+                .collect { viewModel.setPlayerExpansionProgress(it) }
+        }
+
         // Queue-related layering changes only after the player sheet has completed
         // its mini-to-full morph, preventing the artwork from jumping behind the drawer.
         val isQueuePresentationActive by remember(isQueueExpanded, playerContentExpansionFraction) {
