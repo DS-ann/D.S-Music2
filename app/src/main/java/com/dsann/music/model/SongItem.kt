@@ -209,7 +209,7 @@ data class SongItem(
             thumbnailUrl: String?,
             artistId: String? = null,
             albumName: String? = null,
-            artistRefs: List<OnlineArtistRef> = emptyList()
+            artistRefs: List<OnlineArtistRef>? = null
         ): SongItem {
             val id = videoId?.hashCode()?.toLong() ?: (streamUrl?.hashCode()?.toLong() ?: System.currentTimeMillis())
             val song = SongItem(id, title ?: "Unknown Title", artist ?: "Unknown Artist", -1, streamUrl, durationMs, System.currentTimeMillis())
@@ -217,7 +217,13 @@ data class SongItem(
             song.thumbnailUrl = thumbnailUrl?.let { enhanceThumbnailUrl(it) }
             song.videoId = videoId
             song.artistId = artistId
-            song.artistRefs = ArrayList(artistRefs)
+            song.artistRefs = ArrayList(
+                artistRefs.orEmpty().mapNotNull { ref ->
+                    val name = ref?.name?.trim()?.takeIf { it.isNotEmpty() }
+                        ?: return@mapNotNull null
+                    OnlineArtistRef(name, ref.id?.takeIf { it.isNotBlank() })
+                }
+            )
             song.albumName = albumName?.takeIf { it.isNotBlank() }
             return song
         }
