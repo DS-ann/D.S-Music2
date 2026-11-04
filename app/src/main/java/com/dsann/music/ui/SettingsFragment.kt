@@ -683,12 +683,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     private val _lyricsColorStyle = MutableStateFlow(
-        prefs.getString("lyrics_color_style", "Dynamic (Gradient)") ?: "Dynamic (Gradient)"
+        when (prefs.getString("lyrics_color_style", "Home Studio Gradient")) {
+            "Dynamic (Gradient)" -> "Home Studio Gradient"
+            "UI Matching" -> "UI Matching"
+            "White" -> "White"
+            else -> "Home Studio Gradient"
+        }
     )
     val lyricsColorStyle: StateFlow<String> = _lyricsColorStyle.asStateFlow()
     fun setLyricsColorStyle(value: String) {
-        val safe = value.takeIf { it in listOf("Dynamic (Gradient)", "UI Matching", "White") }
-            ?: "Dynamic (Gradient)"
+        val safe = value.takeIf { it in listOf("Home Studio Gradient", "UI Matching", "White") }
+            ?: "Home Studio Gradient"
         _lyricsColorStyle.value = safe
         prefs.edit { putString("lyrics_color_style", safe) }
     }
@@ -3049,9 +3054,9 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Lyrics colour",
-                        description = "Choose album-art dynamic gradients, interface-matched colours, or white.",
+                        description = "Use the fixed D.S Launcher Home Studio gradient, interface-matched text, or pure white.",
                         selected = lyricsColorStyle,
-                        options = listOf("Dynamic (Gradient)", "UI Matching", "White"),
+                        options = listOf("Home Studio Gradient", "UI Matching", "White"),
                         onSelected = onLyricsColorStyleChange
                     )
                 },
