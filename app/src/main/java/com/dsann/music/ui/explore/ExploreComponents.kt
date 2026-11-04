@@ -122,6 +122,7 @@ import kotlinx.coroutines.withContext
 import com.dsann.music.data.innertube.HomeSection
 import com.dsann.music.data.innertube.OnlineAlbum
 import com.dsann.music.data.innertube.OnlineArtist
+import com.dsann.music.data.innertube.OnlineArtistRef
 import com.dsann.music.data.innertube.OnlinePlaylist
 import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.SearchItem
@@ -1825,6 +1826,15 @@ fun OnlineSongBottomSheet(
     val favoritesManager = remember { FavoritesManager(context) }
     var isFavorite by remember(song.videoId) { mutableStateOf(favoritesManager.isFavorite(song.videoId.hashCode().toLong())) }
 
+    // Legacy Gson records can contain null artistRefs (or null entries) despite
+    // OnlineSong's Kotlin default. Normalize once before building actions/artist rows.
+    val safeArtistRefs = remember(song.artistRefs) {
+        song.artistRefs.orEmpty().mapNotNull { ref ->
+            val name = ref?.name?.trim()?.takeIf { it.isNotEmpty() }
+                ?: return@mapNotNull null
+            OnlineArtistRef(name, ref.id?.takeIf { it.isNotBlank() })
+        }
+    }
     val onlineSongItem = remember(
         song.videoId,
         song.title,
@@ -1833,7 +1843,7 @@ fun OnlineSongBottomSheet(
         song.thumbnailUrl,
         song.albumName,
         song.artistId,
-        song.artistRefs
+        safeArtistRefs
     ) {
         SongItem.createOnlineSong(
             song.videoId,
@@ -1844,7 +1854,7 @@ fun OnlineSongBottomSheet(
             song.thumbnailUrl,
             song.artistId,
             albumName = song.albumName,
-            artistRefs = song.artistRefs
+            artistRefs = safeArtistRefs
         )
     }
     val queueStyleListener = remember(song.videoId) {
@@ -1958,7 +1968,7 @@ fun OnlineSongBottomSheet(
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            val artistMenuItems = song.artistRefs
+            val artistMenuItems = safeArtistRefs
                 .distinctBy { it.id ?: it.name.trim().lowercase() }
                 .map { artist ->
                     Triple("Open ${artist.name}", Icons.Rounded.Person) {
