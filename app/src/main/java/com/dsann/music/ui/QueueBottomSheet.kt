@@ -550,12 +550,8 @@ fun QueueListItem(
                                 val state = dragDropState ?: return@pointerInput
                                 if (index < 0) return@pointerInput
                                 detectDragGesturesAfterLongPress(
-                                    onDragStart = { offset ->
-                                        val item = state.lazyListState.layoutInfo.visibleItemsInfo
-                                            .firstOrNull { it.index == index }
-                                        if (item != null) {
-                                            state.onDragStart(Offset(offset.x, offset.y + item.offset))
-                                        }
+                                    onDragStart = {
+                                        state.onDragStartAtIndex(index)
                                     },
                                     onDragEnd = { state.onDragInterrupted() },
                                     onDragCancel = { state.onDragInterrupted() },
@@ -631,7 +627,6 @@ class DragDropState(
     var currentIndexOfDraggedItem by mutableStateOf<Int?>(null)
     private var autoScrollJob: Job? = null
     private var autoScrollDeltaPx: Float = 0f
-    private var lastTargetIndex: Int? = null
 
     val elementDisplacement: Float?
         get() = currentIndexOfDraggedItem?.let { currentIndex ->
@@ -644,7 +639,9 @@ class DragDropState(
 
     fun onDragStart(offset: Offset) {
         stopAutoScroll()
-        lastTargetIndex = null
+        draggedDistance = 0f
+        initiallyDraggedElement = null
+        currentIndexOfDraggedItem = null
         lazyListState.layoutInfo.visibleItemsInfo
             .firstOrNull { item -> offset.y.toInt() in item.offset..(item.offset + item.size) }
             ?.also {
@@ -653,53 +650,54 @@ class DragDropState(
             }
     }
 
+    /** Start from the exact LazyColumn row that owns the drag handle. */
+    fun onDragStartAtIndex(index: Int) {
+        stopAutoScroll()
+        draggedDistance = 0f
+        val item = lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+        initiallyDraggedElement = item
+        currentIndexOfDraggedItem = item?.index
+    }
+
     fun onDragInterrupted() {
         initiallyDraggedElement = null
         currentIndexOfDraggedItem = null
         draggedDistance = 0f
-        lastTargetIndex = null
         stopAutoScroll()
+    }
+
+    /**
+     * Keep the original grabbed row as the drag anchor for the entire gesture.
+     * Re-anchoring after each move discarded the finger's remaining displacement,
+     * which made long drags stop after roughly one item.
+     */
+    private fun moveDraggedItemToPointer() {
+        val anchor = initiallyDraggedElement ?: return
+        val fromIndex = currentIndexOfDraggedItem ?: return
+        val currentCenter = anchor.offset + draggedDistance + anchor.size / 2f
+        val targetItem = lazyListState.layoutInfo.visibleItemsInfo.minByOrNull { item ->
+            kotlin.math.abs((item.offset + item.size / 2f) - currentCenter)
+        } ?: return
+
+        if (targetItem.index != fromIndex) {
+            onMove(fromIndex, targetItem.index)
+            currentIndexOfDraggedItem = targetItem.index
+        }
     }
 
     fun onDrag(dragAmount: Offset) {
         draggedDistance += dragAmount.y
+        val anchor = initiallyDraggedElement ?: return
+        val currentOffset = anchor.offset + draggedDistance
+        val size = anchor.size
 
-        val initialOffset = initiallyDraggedElement?.offset ?: return
-        val currentOffset = initialOffset + draggedDistance
-        val size = initiallyDraggedElement?.size ?: return
-        
-        val currentCenter = currentOffset + size / 2f
+        moveDraggedItemToPointer()
 
-        val currentIndex = currentIndexOfDraggedItem ?: return
-        val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
-        
-        // Nearest item detection
-        val targetItem = visibleItems.minByOrNull { item ->
-            kotlin.math.abs((item.offset + item.size / 2f) - currentCenter)
-        }
-
-        if (
-            targetItem != null && 
-            targetItem.index != currentIndex && 
-            targetItem.index != lastTargetIndex
-        ) {
-            lastTargetIndex = targetItem.index
-
-            onMove(currentIndex, targetItem.index)
-            currentIndexOfDraggedItem = targetItem.index
-
-            // Re-anchor Dragged Item
-            initiallyDraggedElement = lazyListState.layoutInfo.visibleItemsInfo
-                .firstOrNull { it.index == targetItem.index }
-            draggedDistance = 0f
-        }
-        
-        // Use exact visible window limits to prevent jarring scrolling
+        // Edge auto-scroll uses the finger's real position relative to the original
+        // row anchor, even after the queue has reordered several times.
         val viewportStart = lazyListState.layoutInfo.viewportStartOffset.toFloat()
         val viewportEnd = lazyListState.layoutInfo.viewportEndOffset.toFloat()
         val overscrollThreshold = 80f
-
-        // Smoother delta values
         val scrollDelta = when {
             currentOffset < viewportStart + overscrollThreshold -> -20f
             currentOffset + size > viewportEnd - overscrollThreshold -> 20f
@@ -733,6 +731,9 @@ class DragDropState(
                 lastFrameNanos = frameNanos
                 val frameScale = elapsedNanos.toFloat() / 16_666_667f
                 lazyListState.scrollBy(autoScrollDeltaPx * frameScale)
+                // When the finger stays at an edge, scrolling itself moves new rows
+                // under the drag point. Re-evaluate the target on every auto-scroll frame.
+                moveDraggedItemToPointer()
             }
         }
     }
