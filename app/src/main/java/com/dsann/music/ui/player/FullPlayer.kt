@@ -386,8 +386,6 @@ private fun PlayerVisualizer(
 @Composable
 private fun LandscapePlayerDetailsPane(
     modifier: Modifier = Modifier,
-    showQueue: Boolean,
-    onShowQueueChange: (Boolean) -> Unit,
     onOpenFullScreenLyrics: () -> Unit,
     syncedLyrics: List<LyricLine>?,
     plainLyrics: String?,
@@ -421,36 +419,24 @@ private fun LandscapePlayerDetailsPane(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            listOf("Lyrics", "Up next").forEachIndexed { index, label ->
-                val selected = showQueue == (index == 1)
-                Text(
-                    text = label,
-                    color = if (selected) accentColor else secondaryColor,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    style = DsmusicTheme.typography.labelLarge,
-                    modifier = Modifier
-                        .background(
-                            if (selected) accentColor.copy(alpha = 0.14f) else Color.Transparent,
-                            RoundedCornerShape(18.dp)
-                        )
-                        .clickable { onShowQueueChange(index == 1) }
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
+            Text(
+                text = "LYRICS",
+                color = accentColor,
+                fontWeight = FontWeight.Bold,
+                style = DsmusicTheme.typography.labelLarge
+            )
+            Spacer(Modifier.weight(1f))
+            DsmusicIconButton(onClick = { showProviderPicker = true }) {
+                Icon(Icons.Rounded.MoreVert, contentDescription = "Choose lyrics source")
+            }
+            DsmusicIconButton(onClick = onOpenFullScreenLyrics) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_fullscreen),
+                    contentDescription = "Open fullscreen lyrics"
                 )
             }
-            Spacer(Modifier.weight(1f))
-            if (!showQueue) {
-                DsmusicIconButton(onClick = { showProviderPicker = true }) {
-                    Icon(Icons.Rounded.MoreVert, contentDescription = "Choose lyrics source")
-                }
-                DsmusicIconButton(onClick = onOpenFullScreenLyrics) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_fullscreen),
-                        contentDescription = "Open fullscreen lyrics"
-                    )
-                }
-            }
             Text(
-                text = if (showQueue) "MAIN QUEUE" else currentSong?.artist.orEmpty(),
+                text = currentSong?.artist.orEmpty(),
                 color = secondaryColor,
                 style = DsmusicTheme.typography.labelSmall,
                 maxLines = 1
@@ -459,47 +445,26 @@ private fun LandscapePlayerDetailsPane(
 
         Spacer(Modifier.height(10.dp))
 
-        if (!showQueue) {
-            PlayerLyricsContent(
-                currentSong = currentSong,
-                syncedLyrics = syncedLyrics,
-                plainLyrics = plainLyrics,
-                isLoading = isLyricsLoading,
-                isPlaying = isPlaying,
-                lyricsError = lyricsError,
-                currentPositionProvider = currentPositionProvider,
-                playbackSpeedProvider = playbackSpeedProvider,
-                contentReady = true,
-                contentColor = contentColor,
-                dynamicAccentColor = accentColor,
-                lyricsColorStyle = lyricsColorStyle,
-                onRetryLyrics = onRetryLyrics,
-                onFetchLyrics = onFetchLyrics,
-                onSeekTo = onSeekTo,
-                selectedProvider = selectedProvider,
-                providerResults = providerResults,
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            // Up Next opens the shared SlidingQueueDrawer. This pane deliberately
-            // does not compose a second, independent copy of the queue.
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "Up Next",
-                        color = contentColor,
-                        fontWeight = FontWeight.Bold,
-                        style = DsmusicTheme.typography.titleMedium
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = "The main queue is open beside the player.",
-                        color = secondaryColor,
-                        style = DsmusicTheme.typography.bodySmall
-                    )
-                }
-            }
-        }
+        PlayerLyricsContent(
+            currentSong = currentSong,
+            syncedLyrics = syncedLyrics,
+            plainLyrics = plainLyrics,
+            isLoading = isLyricsLoading,
+            isPlaying = isPlaying,
+            lyricsError = lyricsError,
+            currentPositionProvider = currentPositionProvider,
+            playbackSpeedProvider = playbackSpeedProvider,
+            contentReady = true,
+            contentColor = contentColor,
+            dynamicAccentColor = accentColor,
+            lyricsColorStyle = lyricsColorStyle,
+            onRetryLyrics = onRetryLyrics,
+            onFetchLyrics = onFetchLyrics,
+            onSeekTo = onSeekTo,
+            selectedProvider = selectedProvider,
+            providerResults = providerResults,
+            modifier = Modifier.fillMaxSize()
+        )
     }
 
     if (showProviderPicker) {
@@ -841,6 +806,7 @@ fun FullPlayer(
             targetValue = if (
                 useWidePlayer &&
                 isLandscapeWindow &&
+                isPlayerVisible &&
                 isQueueExpanded
             ) screenWidth * 0.42f else 0.dp,
             animationSpec = spring(dampingRatio = 0.85f, stiffness = 300f),
@@ -851,7 +817,7 @@ fun FullPlayer(
         val queueDockInset = animatedQueueDockInset.coerceAtLeast(0.dp)
         // The fullscreen lyrics overlay and the landscape side pane share this one
         // fetch trigger. A track is requested once when either lyrics surface becomes active.
-        val landscapeLyricsVisible = isPlayerVisible && useWidePlayer && isLandscapeWindow && !isQueueExpanded
+        val landscapeLyricsVisible = isPlayerVisible && useWidePlayer && isLandscapeWindow
         LaunchedEffect(
             isLyricsModeEnabled,
             landscapeLyricsVisible,
@@ -1172,8 +1138,12 @@ fun FullPlayer(
                             label = "Up next",
                             isSelected = isQueueExpanded,
                             onClick = {
-                                onLyricsModeChanged(false)
-                                viewModel.setQueueExpanded(true)
+                                if (isQueueExpanded) {
+                                    viewModel.setQueueExpanded(false)
+                                } else {
+                                    onLyricsModeChanged(false)
+                                    viewModel.setQueueExpanded(true)
+                                }
                             },
                             contentColor = contentColor,
                             accentColor = dynamicAccentColor,
@@ -1424,7 +1394,7 @@ fun FullPlayer(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) {
-                        viewModel.setQueueExpanded(true)
+                        viewModel.setQueueExpanded(!isQueueExpanded)
                     },
                 contentAlignment = Alignment.Center
             ) {
@@ -1461,11 +1431,6 @@ fun FullPlayer(
                 if (isPlayerVisible) {
                     LandscapePlayerDetailsPane(
                         modifier = Modifier.weight(0.46f).fillMaxHeight(),
-                        showQueue = isQueueExpanded,
-                        onShowQueueChange = { showQueue ->
-                            if (showQueue) onLyricsModeChanged(false)
-                            viewModel.setQueueExpanded(showQueue)
-                        },
                         onOpenFullScreenLyrics = {
                             viewModel.setQueueExpanded(false)
                             onLyricsModeChanged(true)
@@ -1536,7 +1501,8 @@ fun FullPlayer(
 
         // --- CUSTOM EMBEDDED SLIDING PLAY QUEUE ---
         SlidingQueueDrawer(
-            isQueueExpanded = isQueueExpanded,
+            // Do not reveal or shift the queue until the player frame has fully settled.
+            isQueueExpanded = isQueueExpanded && isPlayerVisible,
             onQueueExpandedChange = { viewModel.setQueueExpanded(it) },
             songList = songList,
             currentSongIndex = currentSongIndex,
