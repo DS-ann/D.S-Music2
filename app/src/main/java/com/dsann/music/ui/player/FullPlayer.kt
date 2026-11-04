@@ -1165,7 +1165,8 @@ fun FullPlayer(
                             icon = painterResource(id = R.drawable.ic_lyrics),
                             label = "Lyrics",
                             isSelected = isLyricsModeEnabled ||
-                                (useWidePlayer && isLandscapeWindow && !landscapeShowsQueue),
+                                (useWidePlayer && isLandscapeWindow &&
+                                    !landscapeShowsQueue && !isQueueExpanded),
                             onClick = {
                                 landscapeShowsQueue = false
                                 viewModel.setQueueExpanded(false)
