@@ -51,9 +51,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.dsann.music.ui.theme.Icon
@@ -92,10 +89,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dsann.music.MainActivity
 import com.dsann.music.ui.SettingsViewModel
-import com.dsann.music.ui.QueueListItem
-import com.dsann.music.ui.rememberDragDropState
 import com.dsann.music.ui.showQueueSongActions
-import com.dsann.music.ui.theme.ListItemDefaults
 import com.dsann.music.R
 import com.dsann.music.data.lyrics.LyricLine
 import com.dsann.music.data.lyrics.LyricsResult
@@ -456,7 +450,7 @@ private fun LandscapePlayerDetailsPane(
                 }
             }
             Text(
-                text = if (showQueue) "${songList.size} tracks" else currentSong?.artist.orEmpty(),
+                text = if (showQueue) "MAIN QUEUE" else currentSong?.artist.orEmpty(),
                 color = secondaryColor,
                 style = DsmusicTheme.typography.labelSmall,
                 maxLines = 1
