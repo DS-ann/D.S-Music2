@@ -849,7 +849,7 @@ fun ExploreScreen(
 
                                         Box(modifier = Modifier.weight(1f)) {
                                             when {
-                                                isSearchDestination && !isSearchActive && searchQuery.isBlank() -> {
+                                                isSearchDestination && !isSearchActive && searchQuery.isBlank() && currentMood == null -> {
                                                     LazyColumn(
                                                         modifier = Modifier.fillMaxSize(),
                                                         contentPadding = PaddingValues(
@@ -2706,7 +2706,7 @@ private fun ExploreCustomizerDialog(
             }
 
             // Category Chips — fetched from YouTube Music (hidden during active search inputs, without animations)
-            if (!isSearchActive && searchQuery.isBlank() && searchResults.isEmpty() && homeMoods.isNotEmpty()) {
+            if (!isSearchDestination && !isSearchActive && searchQuery.isBlank() && searchResults.isEmpty() && homeMoods.isNotEmpty()) {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
