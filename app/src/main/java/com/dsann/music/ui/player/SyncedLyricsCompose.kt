@@ -1,19 +1,12 @@
 package com.dsann.music.ui.player
 
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.clickable
@@ -35,11 +28,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import com.dsann.music.ui.theme.Button
 import com.dsann.music.ui.theme.Icon
-import com.dsann.music.ui.theme.LinearWavyProgressIndicator
 import com.dsann.music.ui.theme.DsmusicTheme
 import com.dsann.music.ui.theme.dsmusicHomeStudioGradientBrush
 import com.dsann.music.ui.theme.Text
-import com.dsann.music.ui.theme.WavyProgressIndicatorDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -311,42 +302,9 @@ internal fun SyncedLyricsCompose(
                         .fillMaxWidth()
                 ) {
                     if (line.isInterlude) {
-                        AnimatedVisibility(
-                            visible = isActive,
-                            enter = expandVertically(
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                    stiffness = Spring.StiffnessMediumLow
-                                )
-                            ) + slideInVertically(
-                                initialOffsetY = { it / 2 },
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioLowBouncy,
-                                    stiffness = Spring.StiffnessMediumLow
-                                )
-                            ) + fadeIn(animationSpec = tween(300)),
-                            exit = shrinkVertically(
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                    stiffness = Spring.StiffnessMedium
-                                )
-                            ) + slideOutVertically(
-                                targetOffsetY = { -it / 2 },
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                    stiffness = Spring.StiffnessMedium
-                                )
-                            ) + fadeOut(animationSpec = tween(250))
-                        ) {
+                        if (isActive) {
                             InterludeItem(
-                                isActive = true,
-                                currentPositionProvider = lyricPositionProvider,
                                 line = line,
-                                nextLineStartMs = if (item.originalIndex + 1 < lyrics.size) {
-                                    lyrics[item.originalIndex + 1].startTimeMs
-                                } else {
-                                    line.startTimeMs + 5000
-                                },
                                 accentColor = dynamicAccentColor,
                                 contentColor = contentColor
                             )
@@ -415,18 +373,14 @@ private fun LyricLineItem(
     val isKaraoke = line.isWordByWord && line.words.isNotEmpty()
     val scale = 1.0f
 
-    val alpha by animateFloatAsState(
-        targetValue = when {
-            isActive -> 1.0f
-            isPast -> 0.60f
-            else -> 0.38f
-        },
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "LyricAlpha"
-    )
+    // The active synced line must be fully legible on the exact frame its timestamp
+    // becomes active. Animating its alpha from the previous line's dim value made
+    // ordinary line-synced lyrics look like a delayed/loading word highlight.
+    val alpha = when {
+        isActive -> 1f
+        isPast -> 0.60f
+        else -> 0.38f
+    }
 
 
     val bracketMatch = remember(line.content) {
@@ -490,13 +444,13 @@ private fun LyricLineItem(
             scaleY = scale
             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
 
-            val driftProgress = if (isActive) {
+            val driftProgress = if (isActive && isKaraoke) {
                 val pos = currentPositionProvider()
                 val duration = (lineEndMs - lineStartMs).coerceAtLeast(1)
                 ((pos - lineStartMs).toFloat() / duration).coerceIn(0f, 1f)
             } else 0f
 
-            val driftDp = if (isActive) {
+            val driftDp = if (isActive && isKaraoke) {
                 val eased = easeOutCubic(driftProgress)
                 (-2f * eased)
             } else 0f
@@ -785,86 +739,31 @@ private fun calculateWordProgress(word: LyricWord, pos: Long): Float =
 
 @Composable
 private fun InterludeItem(
-    isActive: Boolean,
-    currentPositionProvider: () -> Int,
     line: LyricLine,
-    nextLineStartMs: Long,
     accentColor: Color,
     contentColor: Color
 ) {
-    val duration = (nextLineStartMs - line.startTimeMs).coerceAtLeast(1)
-    val rawProgressState = remember(isActive, line.startTimeMs, nextLineStartMs) {
-        derivedStateOf {
-            if (isActive) {
-                ((currentPositionProvider() - line.startTimeMs).toFloat() / duration).coerceIn(0f, 1f)
-            } else 0f
-        }
-    }
-
-    val animatedProgressState = animateFloatAsState(
-        targetValue = rawProgressState.value,
-        animationSpec = WavyProgressIndicatorDefaults.ProgressAnimationSpec,
-        label = "InterludeProgress"
-    )
-
-    val breathingFrameTimeNanos = rememberAppAnimationFrameTimeNanos(active = isActive)
-
-    val iconAlpha by animateFloatAsState(
-        targetValue = if (isActive) 0.85f else 0.25f,
-        animationSpec = spring(stiffness = Spring.StiffnessLow),
-        label = "InterludeAlpha"
-    )
-
-    val density = LocalDensity.current
-    val thickStroke = remember(density) {
-        androidx.compose.ui.graphics.drawscope.Stroke(
-            width = with(density) { 4.dp.toPx() },
-            cap = androidx.compose.ui.graphics.StrokeCap.Round,
-            join = androidx.compose.ui.graphics.StrokeJoin.Round
-        )
-    }
-
+    // A synced-lyrics gap is not a playback progress widget. Keep it static so
+    // ordinary line-synchronized lyrics never show a fake loading animation.
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 28.dp, end = 24.dp, top = 24.dp, bottom = 24.dp),
+            .padding(start = 28.dp, end = 24.dp, top = 18.dp, bottom = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Icon(
             painter = painterResource(id = R.drawable.ic_music_note),
-            contentDescription = "Interlude",
-            tint = accentColor.copy(alpha = iconAlpha),
-            modifier = Modifier
-                .size(26.dp)
-                .graphicsLayer {
-                    val frameNanos = breathingFrameTimeNanos.value
-                    val phase = if (isActive && frameNanos > 0L) {
-                        (frameNanos % 1_400_000_000L).toDouble() / 1_400_000_000.0
-                    } else 0.25
-                    val breatheScale = if (isActive) {
-                        1f + 0.18f * kotlin.math.sin(
-                            phase * 2.0 * Math.PI - Math.PI / 2.0
-                        ).toFloat()
-                    } else 1f
-                    scaleX = breatheScale
-                    scaleY = breatheScale
-                }
+            contentDescription = null,
+            tint = accentColor.copy(alpha = 0.45f),
+            modifier = Modifier.size(20.dp)
         )
-
-        LinearWavyProgressIndicator(
-            progress = {
-                animatedProgressState.value
-            },
-            modifier = Modifier
-                .weight(1f)
-                .height(11.dp),
-            color = accentColor.copy(alpha = if (isActive) 0.75f else 0.18f),
-            trackColor = contentColor.copy(alpha = 0.06f),
-            stroke = thickStroke,
-            trackStroke = thickStroke,
-            wavelength = WavyProgressIndicatorDefaults.LinearDeterminateWavelength,
-            amplitude = { p -> WavyProgressIndicatorDefaults.indicatorAmplitude(p) * 2.5f }
+        Text(
+            text = line.content.ifBlank { "Instrumental" },
+            color = contentColor.copy(alpha = 0.48f),
+            style = DsmusicTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            maxLines = 2
         )
     }
 }
