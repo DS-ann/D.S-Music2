@@ -49,6 +49,7 @@ fun SlidingQueueDrawer(
     playerBackgroundColor: Int,
     dynamicAccentColor: Color,
     isDark: Boolean,
+    onSongLongClick: (SongItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
@@ -241,7 +242,7 @@ fun SlidingQueueDrawer(
                 ) {
                     itemsIndexed(
                         items = songList,
-                        key = { index, song -> "${song.id}_$index" },
+                        key = { _, song -> song.id },
                         contentType = { _, _ -> "queue-song" }
                     ) { index, song ->
                         val isPlaying = (index == currentSongIndex)
@@ -265,22 +266,10 @@ fun SlidingQueueDrawer(
                                 song = song,
                                 isPlaying = isPlaying,
                                 shapes = shapes,
-                                showReorderControls = true,
                                 dragDropState = if (isQueueExpanded) dragDropState else null,
                                 index = index,
-                                onMoveUp = {
-                                    if (index > 0) {
-                                        onReorderQueue(index, index - 1)
-                                    }
-                                },
-                                onMoveDown = {
-                                    if (index < songList.size - 1) {
-                                        onReorderQueue(index, index + 1)
-                                    }
-                                },
-                                onClick = {
-                                    onPlaySongAtIndex(index)
-                                }
+                                onLongClick = { onSongLongClick(song) },
+                                onClick = { onPlaySongAtIndex(index) }
                             )
                         }
                     }
