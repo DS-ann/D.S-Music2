@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.core.content.edit
 import androidx.core.graphics.ColorUtils
 import androidx.core.net.toUri
@@ -666,8 +667,19 @@ class PlayerSharedViewModel @Inject constructor(
     private val _playerExpansionFraction = MutableStateFlow(0f)
     val playerExpansionFraction: StateFlow<Float> = _playerExpansionFraction.asStateFlow()
 
+    // Read only from graphicsLayer draw lambdas so the navigation dock can follow
+    // player expansion without recomposing the retained tabs on every frame.
+    private val _playerExpansionProgress = mutableFloatStateOf(0f)
+    val playerExpansionProgress: Float
+        get() = _playerExpansionProgress.floatValue
+
+    fun setPlayerExpansionProgress(fraction: Float) {
+        _playerExpansionProgress.floatValue = fraction.coerceIn(0f, 1f)
+    }
+
     fun setPlayerExpansionFraction(fraction: Float) {
         _playerExpansionFraction.value = fraction
+        setPlayerExpansionProgress(fraction)
     }
 
     private val _isPlaybackReady = MutableStateFlow(false)
