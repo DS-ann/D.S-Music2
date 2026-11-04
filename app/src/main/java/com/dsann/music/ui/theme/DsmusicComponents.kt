@@ -22,10 +22,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -393,8 +395,23 @@ fun DsmusicPageHeading(
         title.length >= 15 -> 32.sp
         else -> 37.sp
     }
+    val headingShape = RoundedCornerShape(22.dp)
+    val headingGradient = remember {
+        Brush.horizontalGradient(
+            listOf(
+                Color(0xFF53F6FF).copy(alpha = 0.12f),
+                Color(0xFF699DFF).copy(alpha = 0.12f),
+                Color(0xFFAE7EFF).copy(alpha = 0.12f),
+                Color(0xFFFF70CD).copy(alpha = 0.12f),
+                Color(0xFFFFCF7F).copy(alpha = 0.12f)
+            )
+        )
+    }
     Row(
-        modifier = modifier,
+        modifier = modifier
+            .clip(headingShape)
+            .background(headingGradient, headingShape)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
