@@ -481,17 +481,61 @@ object SongDownloader {
                 )
                 task.outputFile = outputFile
 
-                downloadNetworkStream(
-                    context = context,
-                    title = cleanTitleStr,
-                    streamUrl = streamUrl,
-                    expectedBytes = downloadStream?.contentLength,
-                    outputFile = outputFile,
-                    task = task,
-                    videoId = videoId,
-                    notificationId = notificationId,
-                    coroutineContext = coroutineContext
-                )
+                val resolvedDownloadFormat = when {
+                    NewPipeStreamExtractor.matchesAudioFormat(downloadStream?.mimeType, preferredFormat = "m4a") -> "m4a"
+                    NewPipeStreamExtractor.matchesAudioFormat(downloadStream?.mimeType, preferredFormat = "mp3") -> "mp3"
+                    NewPipeStreamExtractor.matchesAudioFormat(downloadStream?.mimeType, preferredFormat = "opus") -> "opus"
+                    else -> downloadFormat
+                }
+
+                try {
+                    downloadNetworkStream(
+                        context = context,
+                        title = cleanTitleStr,
+                        streamUrl = streamUrl,
+                        expectedBytes = downloadStream?.contentLength,
+                        outputFile = outputFile,
+                        task = task,
+                        videoId = videoId,
+                        notificationId = notificationId,
+                        coroutineContext = coroutineContext
+                    )
+                } catch (downloadError: IOException) {
+                    val wasForbidden = downloadError.message?.contains("HTTP 403", ignoreCase = true) == true
+                    if (!wasForbidden) throw downloadError
+
+                    // googlevideo URLs are signed and can expire. Re-extract once, retaining
+                    // the concrete format returned by the initial picker (including Opus).
+                    Log.w(TAG, "Refreshing expired $resolvedDownloadFormat URL after HTTP 403 for $videoId")
+                    NewPipeStreamExtractor.clearVideoCache(videoId)
+                    val refreshedStream = NewPipeStreamExtractor.getDownloadStreamData(
+                        videoId = videoId,
+                        allowFormatChoice = false,
+                        preferredFormatOverride = resolvedDownloadFormat
+                    )
+                    val refreshedUrl = refreshedStream?.url
+                        ?.takeIf { it.startsWith("https://", ignoreCase = true) }
+                        ?: throw IOException("The source returned HTTP 403 and did not provide a refreshed download URL", downloadError)
+                    if (!NewPipeStreamExtractor.matchesAudioFormat(
+                            refreshedStream.mimeType,
+                            preferredFormat = resolvedDownloadFormat
+                        )
+                    ) {
+                        throw IOException("The refreshed stream does not match the selected $resolvedDownloadFormat format")
+                    }
+
+                    downloadNetworkStream(
+                        context = context,
+                        title = cleanTitleStr,
+                        streamUrl = refreshedUrl,
+                        expectedBytes = refreshedStream.contentLength,
+                        outputFile = outputFile,
+                        task = task,
+                        videoId = videoId,
+                        notificationId = notificationId,
+                        coroutineContext = coroutineContext
+                    )
+                }
             }
 
             coroutineContext.ensureActive()
@@ -502,48 +546,53 @@ object SongDownloader {
                 // Reuse artwork captured with cached playback when available.
                 val cachedArtwork = AudioPlaybackService.getCachedMediaArtworkFile(context, song.id.toString())
                 if (cachedArtwork.isFile && cachedArtwork.length() > 0L) {
-                    artworkBytes = runCatching { cachedArtwork.readBytes() }.getOrNull()
+                    artworkBytes = runCatching { cachedArtwork.readBytes() }
+                        .getOrNull()
+                        ?.takeIf { it.isNotEmpty() }
                 }
             }
 
-            // Older cached sessions and some queue entries have no local artwork file or
-            // thumbnail attached. Resolve a metadata-only thumbnail as a fallback.
-            val artworkUrl = song.thumbnailUrl?.takeIf { it.isNotBlank() }
-                ?: cachedMetadata?.thumbnailUrl?.takeIf { it.isNotBlank() }
-                ?: runCatching {
+            val needsSourceMetadata = !isUsableMetadataText(song.title) ||
+                !isUsableMetadataText(song.artist)
+            val sourceMetadata = if (needsSourceMetadata) {
+                runCatching {
+                    com.dsann.music.data.innertube.YouTubeMusic
+                        .player(videoId, metadataOnly = true)
+                        .getOrNull()
+                }.getOrNull()
+            } else null
+
+            // Try each known artwork URL. A non-empty but stale URL must not prevent trying
+            // the cache thumbnail, InnerTube metadata thumbnail, or the video-ID fallback.
+            val artworkUrls = mutableListOf<String>()
+            song.thumbnailUrl?.takeIf { it.isNotBlank() }?.let(artworkUrls::add)
+            cachedMetadata?.thumbnailUrl?.takeIf { it.isNotBlank() }?.let(artworkUrls::add)
+            sourceMetadata?.thumbnailUrl?.takeIf { it.isNotBlank() }?.let(artworkUrls::add)
+
+            if (artworkBytes.isNullOrEmpty() && artworkUrls.isEmpty()) {
+                val metadataThumbnail = runCatching {
                     com.dsann.music.data.innertube.YouTubeMusic
                         .player(videoId, metadataOnly = true)
                         .getOrNull()
                         ?.thumbnailUrl
                         ?.takeIf { it.isNotBlank() }
                 }.getOrNull()
-                ?: videoId.takeIf { it.isNotBlank() }
-                    ?.let { "https://img.youtube.com/vi/$it/hqdefault.jpg" }
+                metadataThumbnail?.let(artworkUrls::add)
+            }
+            videoId.takeIf { it.isNotBlank() }
+                ?.let { "https://img.youtube.com/vi/$it/hqdefault.jpg" }
+                ?.let(artworkUrls::add)
 
-            if ((artworkBytes == null || artworkBytes.isEmpty()) && !artworkUrl.isNullOrBlank()) {
-                try {
-                    val future = Glide.with(context)
-                        .asBitmap()
-                        .load(artworkUrl)
-                        .submit()
-                    val originalBitmap = future.get()
-                    if (originalBitmap != null) {
-                        val size = originalBitmap.width.coerceAtMost(originalBitmap.height)
-                        val x = (originalBitmap.width - size) / 2
-                        val y = (originalBitmap.height - size) / 2
-                        val croppedBitmap = Bitmap.createBitmap(originalBitmap, x, y, size, size)
-                        val stream = ByteArrayOutputStream()
-                        croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)
-                        artworkBytes = stream.toByteArray()
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to fetch and crop thumbnail", e)
+            if (artworkBytes.isNullOrEmpty()) {
+                for (artworkUrl in artworkUrls.distinct()) {
+                    artworkBytes = fetchArtworkBytes(context, artworkUrl)
+                    if (!artworkBytes.isNullOrEmpty()) break
                 }
             }
 
             coroutineContext.ensureActive()
 
-            if (artworkBytes != null && artworkBytes.isNotEmpty()) {
+            if (!artworkBytes.isNullOrEmpty()) {
                 AudioPlaybackService.storeCachedMediaArtworkBytes(
                     context.applicationContext,
                     song.id.toString(),
@@ -551,14 +600,16 @@ object SongDownloader {
                 )
             }
 
-            // Prefer the current song model, then recover missing fields from the actual cached
-            // stream's saved metadata. This avoids exporting a cached file under generic labels.
-            val metadataTitle = song.title.trim()
-                .ifBlank { cachedMetadata?.title?.trim().orEmpty().ifBlank { cleanTitleStr } }
-            val metadataArtist = song.artist.trim()
-                .ifBlank { cachedMetadata?.artist?.trim().orEmpty().ifBlank { cleanArtistStr } }
-            val metadataAlbum = song.albumName?.trim()?.takeIf { it.isNotEmpty() }
-                ?: cachedMetadata?.albumName?.trim()?.takeIf { it.isNotEmpty() }
+            // Explicit "Unknown" placeholders are missing metadata, not real tag values.
+            val metadataTitle = firstUsableMetadataText(
+                song.title, cachedMetadata?.title, sourceMetadata?.title, cleanTitleStr
+            ) ?: cleanTitleStr
+            val metadataArtist = firstUsableMetadataText(
+                song.artist, cachedMetadata?.artist, sourceMetadata?.artist, cleanArtistStr
+            ) ?: cleanArtistStr
+            val metadataAlbum = firstUsableMetadataText(
+                song.albumName, cachedMetadata?.albumName
+            )
 
             val metadataEmbedded = embedMetadataSafely(
                 outputFile = outputFile,
@@ -727,6 +778,50 @@ object SongDownloader {
             }
         }
         throw IOException("Audio download failed after 3 attempts: ${lastError?.message ?: "unknown network error"}", lastError)
+    }
+
+    private fun isUsableMetadataText(value: String?): Boolean {
+        val normalized = value?.trim().orEmpty()
+        if (normalized.isEmpty()) return false
+        return !normalized.equals("<unknown>", ignoreCase = true) &&
+            !normalized.equals("unknown", ignoreCase = true) &&
+            !normalized.equals("unknown title", ignoreCase = true) &&
+            !normalized.equals("unknown artist", ignoreCase = true) &&
+            !normalized.equals("unknown album", ignoreCase = true)
+    }
+
+    private fun firstUsableMetadataText(vararg values: String?): String? =
+        values.firstOrNull { isUsableMetadataText(it) }?.trim()
+
+    private fun fetchArtworkBytes(context: Context, url: String): ByteArray? {
+        var target: com.bumptech.glide.request.FutureTarget<Bitmap>? = null
+        var sourceBitmap: Bitmap? = null
+        var croppedBitmap: Bitmap? = null
+        try {
+            target = Glide.with(context)
+                .asBitmap()
+                .load(url)
+                .override(768, 768)
+                .submit()
+            sourceBitmap = target.get() ?: return null
+            if (sourceBitmap.width <= 0 || sourceBitmap.height <= 0) return null
+
+            val size = sourceBitmap.width.coerceAtMost(sourceBitmap.height)
+            val x = (sourceBitmap.width - size) / 2
+            val y = (sourceBitmap.height - size) / 2
+            croppedBitmap = Bitmap.createBitmap(sourceBitmap, x, y, size, size)
+            val output = ByteArrayOutputStream()
+            if (!croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, output)) return null
+            return output.toByteArray().takeIf { it.isNotEmpty() }
+        } catch (error: Exception) {
+            Log.w(TAG, "Could not retrieve artwork from $url", error)
+            return null
+        } finally {
+            if (croppedBitmap != null && croppedBitmap !== sourceBitmap && !croppedBitmap.isRecycled) {
+                croppedBitmap.recycle()
+            }
+            target?.let { Glide.with(context).clear(it) }
+        }
     }
 
     /**
