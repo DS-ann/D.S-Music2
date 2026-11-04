@@ -281,20 +281,9 @@ fun QueueBottomSheetContent(
                                         song = song,
                                         isPlaying = isPlaying,
                                         shapes = shapes,
-                                        showReorderControls = true,
                                         dragDropState = dragDropState,
                                         index = index,
                                         onLongClick = { onSongLongClick(song) },
-                                        onMoveUp = {
-                                            if (index > 0) {
-                                                viewModel.reorderQueue(index, index - 1)
-                                            }
-                                        },
-                                        onMoveDown = {
-                                            if (index < displayedSongs.size - 1) {
-                                                viewModel.reorderQueue(index, index + 1)
-                                            }
-                                        },
                                         onClick = {
                                             viewModel.playSongAtIndex(index)
                                         }
@@ -418,20 +407,9 @@ fun QueueBottomSheetContent(
                                             song = song,
                                             isPlaying = isPlaying,
                                             shapes = shapes,
-                                            showReorderControls = true,
                                             dragDropState = dragDropState,
                                             index = index,
                                             onLongClick = { onSongLongClick(song) },
-                                            onMoveUp = {
-                                                if (index > 0) {
-                                                    viewModel.reorderQueue(index, index - 1)
-                                                }
-                                            },
-                                            onMoveDown = {
-                                                if (index < displayedSongs.size - 1) {
-                                                    viewModel.reorderQueue(index, index + 1)
-                                                }
-                                            },
                                             onClick = {
                                                 viewModel.playSongAtIndex(index)
                                             }
@@ -448,20 +426,20 @@ fun QueueBottomSheetContent(
 }
 
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun QueueListItem(
     song: SongItem,
     isPlaying: Boolean,
     shapes: ListItemShapes,
-    showReorderControls: Boolean,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
     dragDropState: DragDropState? = null,
     index: Int = -1,
     onLongClick: () -> Unit = {},
     @SuppressLint("ModifierParameter") modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    // The row may move to another index while this pointerInput remains active.
+    // Keep the latest index without restarting the gesture detector.
     val latestIndex = rememberUpdatedState(index)
 
     Row(
@@ -482,8 +460,9 @@ fun QueueListItem(
                 .padding(vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-        leadingContent = {
-            val albumArtModel = remember(song.id) { song.getAlbumArtUri() ?: R.drawable.default_album_art }
+            val albumArtModel = remember(song.id) {
+                song.getAlbumArtUri() ?: R.drawable.default_album_art
+            }
             Box(
                 modifier = Modifier.size(52.dp),
                 contentAlignment = Alignment.Center
@@ -513,58 +492,62 @@ fun QueueListItem(
                     }
                 }
             }
-        },
-        content = {
-            Text(
-                text = song.title,
-                fontWeight = if (isPlaying) FontWeight.ExtraBold else FontWeight.SemiBold,
-                fontSize = 16.sp,
-                color = if (isPlaying) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        },
-        supportingContent = {
-            Text(
-                text = song.artist,
-                fontSize = 13.sp,
-                color = if (isPlaying) DsmusicTheme.colorScheme.primary.copy(alpha = 0.8f) else DsmusicTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        },
-        }
-        if (showReorderControls) {
-            Spacer(modifier = Modifier.width(4.dp))
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    // Do not key this pointer input by index: the index changes after every
-                    // reorder, and restarting the detector cancels a long drag after one row.
-                    .pointerInput(dragDropState, song.id) {
-                        val state = dragDropState ?: return@pointerInput
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = {
-                                val startIndex = latestIndex.value
-                                if (startIndex >= 0) state.onDragStartAtIndex(startIndex)
-                            },
-                            onDragEnd = { state.onDragInterrupted() },
-                            onDragCancel = { state.onDragInterrupted() },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                state.onDrag(dragAmount)
-                            }
-                        )
-                    },
-                contentAlignment = Alignment.Center
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.Menu,
-                    contentDescription = "Drag to reorder",
-                    tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                    modifier = Modifier.size(25.dp)
+                Text(
+                    text = song.title,
+                    fontWeight = if (isPlaying) FontWeight.ExtraBold else FontWeight.SemiBold,
+                    fontSize = 16.sp,
+                    color = if (isPlaying) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = song.artist,
+                    fontSize = 13.sp,
+                    color = if (isPlaying) DsmusicTheme.colorScheme.primary.copy(alpha = 0.8f)
+                    else DsmusicTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
+        }
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // The only trailing queue control: the three-bar drag handle.
+        // It has its own pointer region, so long-pressing the song body opens the song menu.
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .pointerInput(dragDropState, song.id) {
+                    val state = dragDropState ?: return@pointerInput
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = {
+                            val startIndex = latestIndex.value
+                            if (startIndex >= 0) state.onDragStartAtIndex(startIndex)
+                        },
+                        onDragEnd = { state.onDragInterrupted() },
+                        onDragCancel = { state.onDragInterrupted() },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            state.onDrag(dragAmount)
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Menu,
+                contentDescription = "Drag to reorder",
+                tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                modifier = Modifier.size(25.dp)
+            )
         }
     }
 }
