@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
@@ -198,6 +199,7 @@ fun ExploreScreen(
     val accountVM: AccountViewModel = viewModel()
     val userProfile by accountVM.userProfile.collectAsStateWithLifecycle()
     val accountHistory by accountVM.history.collectAsStateWithLifecycle()
+    val recentAccountHistory = remember(accountHistory) { accountHistory.take(10) }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -951,7 +953,7 @@ fun ExploreScreen(
                                                                         val selected = currentMood == mood
                                                                         DsmusicFilterChip(
                                                                             selected = selected,
-                                                                            onClick = { onMoodClick(if (selected) null else mood) },
+                                                                            onClick = { onSearchHeaderMoodClick(if (selected) null else mood) },
                                                                             shape = CircleShape,
                                                                             label = {
                                                                                 Text(
@@ -985,7 +987,7 @@ fun ExploreScreen(
                                                                             color = DsmusicTheme.colorScheme.onSurfaceVariant
                                                                         )
                                                                     }
-                                                                    DsmusicTextButton(onClick = onClearSearchHistory) {
+                                                                    DsmusicTextButton(onClick = onSearchHeaderClearHistory) {
                                                                         Text("Clear all")
                                                                     }
                                                                 }
@@ -999,7 +1001,13 @@ fun ExploreScreen(
                                                                         modifier = Modifier
                                                                             .fillMaxWidth()
                                                                             .clip(RoundedCornerShape(12.dp))
-                                                                            .clickable { onHistoryItemClick(historyItem) }
+                                                                            .clickable {
+                                                                                scope.launch {
+                                                                                    isSearchActive = false
+                                                                                    delay(50.milliseconds)
+                                                                                    viewModel.search(historyItem)
+                                                                                }
+                                                                            }
                                                                             .padding(horizontal = 4.dp, vertical = 8.dp),
                                                                         verticalAlignment = Alignment.CenterVertically
                                                                     ) {
@@ -1027,7 +1035,7 @@ fun ExploreScreen(
                                                                             overflow = TextOverflow.Ellipsis
                                                                         )
                                                                         DsmusicIconButton(
-                                                                            onClick = { onRemoveFromSearchHistory(historyItem) },
+                                                                            onClick = { onSearchHeaderRemoveHistoryItem(historyItem) },
                                                                             modifier = Modifier.size(36.dp)
                                                                         ) {
                                                                             Icon(
