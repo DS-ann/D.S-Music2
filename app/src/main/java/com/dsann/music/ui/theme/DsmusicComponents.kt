@@ -71,7 +71,7 @@ fun DsmusicSurface(
     modifier: Modifier = Modifier,
     shape: Shape = DsmusicTheme.shapes.medium,
     color: Color = DsmusicTheme.colorScheme.surfaceContainer,
-    contentColor: Color = DsmusicTheme.colorScheme.onSurface,
+    contentColor: Color = colorScheme.onSurface,
     tonalElevation: Any? = null,
     shadowElevation: Any? = null,
     border: Any? = null,
@@ -270,7 +270,7 @@ fun DsmusicTextButton(
     interactionSource: Any? = null,
     content: @Composable RowScope.() -> Unit
 ) {
-    val contentColor = if (enabled) colors?.contentColor ?: DsmusicTheme.colorScheme.primary
+    val contentColor = if (enabled) colors?.contentColor ?: colorScheme.primary
         else colors?.disabledContentColor ?: DsmusicTheme.colorScheme.onSurfaceVariant
     Row(
         modifier = modifier.clip(RoundedCornerShape(10.dp))
@@ -397,67 +397,26 @@ fun DsmusicPageHeading(
         title.length >= 15 -> 32.sp
         else -> 37.sp
     }
+    val colorScheme = DsmusicTheme.colorScheme
     val headingShape = RoundedCornerShape(22.dp)
+    val headingGradient = remember(
+        colorScheme.primary,
+        colorScheme.secondary,
+        colorScheme.tertiary
+    ) {
+        Brush.horizontalGradient(
+            colorStops = arrayOf(
+                0f to colorScheme.primary.copy(alpha = 0.20f),
+                0.36f to colorScheme.secondary.copy(alpha = 0.14f),
+                0.72f to colorScheme.tertiary.copy(alpha = 0.07f),
+                1f to colorScheme.tertiary.copy(alpha = 0f)
+            )
+        )
+    }
     Row(
         modifier = modifier
             .clip(headingShape)
-            .drawWithCache {
-                val glowRadius = maxOf(size.width, size.height) * 0.62f
-                val cyanGlow = Brush.radialGradient(
-                    colors = listOf(
-                        Color(0xFF1ABEFF).copy(alpha = 94f / 255f),
-                        Color(0xFF355FFF).copy(alpha = 35f / 255f),
-                        Color(0x001D2C66)
-                    ),
-                    center = Offset(0f, size.height * 0.22f),
-                    radius = glowRadius
-                )
-                val violetGlow = Brush.radialGradient(
-                    colors = listOf(
-                        Color(0xFFA049FF).copy(alpha = 90f / 255f),
-                        Color(0xFFB137DD).copy(alpha = 35f / 255f),
-                        Color(0x004F177C)
-                    ),
-                    center = Offset(size.width * 0.96f, size.height * 0.38f),
-                    radius = glowRadius * 0.92f
-                )
-                val pinkGlow = Brush.radialGradient(
-                    colors = listOf(
-                        Color(0xFFFF45B1).copy(alpha = 65f / 255f),
-                        Color(0xFFE22DA1).copy(alpha = 16f / 255f),
-                        Color(0x0060144B)
-                    ),
-                    center = Offset(size.width * 0.82f, size.height * 0.96f),
-                    radius = glowRadius * 0.74f
-                )
-                val upperRibbon = Brush.linearGradient(
-                    colors = listOf(
-                        Color(0x0034DBFF),
-                        Color(0xFF46DEFF).copy(alpha = 35f / 255f),
-                        Color(0xFF9B75FF).copy(alpha = 25f / 255f),
-                        Color(0x00FF5CBE)
-                    ),
-                    start = Offset(0f, size.height * 0.18f),
-                    end = Offset(size.width, size.height * 0.47f)
-                )
-                val lowerRibbon = Brush.linearGradient(
-                    colors = listOf(
-                        Color(0x005B7BFF),
-                        Color(0xFF46E1FF).copy(alpha = 20f / 255f),
-                        Color(0xFF9D64FF).copy(alpha = 28f / 255f),
-                        Color(0x00FF5BC1)
-                    ),
-                    start = Offset(0f, size.height * 0.66f),
-                    end = Offset(size.width, size.height * 0.83f)
-                )
-                onDrawBehind {
-                    drawRect(cyanGlow)
-                    drawRect(violetGlow)
-                    drawRect(pinkGlow)
-                    drawRect(upperRibbon)
-                    drawRect(lowerRibbon)
-                }
-            }
+            .background(headingGradient, headingShape)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
