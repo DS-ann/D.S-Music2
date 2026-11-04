@@ -137,9 +137,9 @@ public class AudioFileManager {
         String lowerFileName = fileName.toLowerCase(java.util.Locale.ROOT);
         if (lowerFileName.endsWith(".mp3")) return "audio/mpeg";
         if (lowerFileName.endsWith(".m4a") || lowerFileName.endsWith(".aac")) return "audio/mp4";
+        if (lowerFileName.endsWith(".opus") || lowerFileName.endsWith(".ogg")) return "audio/ogg";
         if (lowerFileName.endsWith(".mka")) return "audio/x-matroska";
         if (lowerFileName.endsWith(".webm")) return "audio/webm";
-        if (lowerFileName.endsWith(".ogg") || lowerFileName.endsWith(".opus")) return "audio/ogg";
         if (lowerFileName.endsWith(".flac")) return "audio/flac";
         if (lowerFileName.endsWith(".wav")) return "audio/wav";
         return "application/octet-stream";
@@ -171,16 +171,17 @@ public class AudioFileManager {
         String lowerFileName = sourceFile.getName().toLowerCase(java.util.Locale.ROOT);
         boolean isWebmAudio = lowerFileName.endsWith(".webm");
         boolean isMatroskaAudio = lowerFileName.endsWith(".mka");
-        // Only legacy WebM needs the generic Downloads collection. Android natively
-        // indexes MKA as audio/x-matroska, so keep it in the normal audio library.
+        boolean isOggOpusAudio = lowerFileName.endsWith(".opus");
+        // New Opus downloads are real Ogg Opus files and belong in the audio library.
+        // Only older, unconverted WebM files need the generic Downloads collection.
         boolean isGenericContainerAudio = isWebmAudio;
 
         ContentValues values = new ContentValues();
         values.put(MediaStore.Audio.Media.DISPLAY_NAME, sourceFile.getName());
 
         // Audio-specific indexed columns are not part of MediaStore.Downloads on
-        // older Android releases. WebM/MKA carries its title/artist/album/cover
-        // in the embedded Matroska metadata written before this publish step.
+        // older Android releases. Ogg Opus/MKA files carry their own embedded tags;
+        // the audio-library columns are still populated for reliable system indexing.
         if (!isGenericContainerAudio) {
             values.put(MediaStore.Audio.Media.TITLE, title);
             values.put(MediaStore.Audio.Media.ARTIST, artist);
@@ -193,17 +194,16 @@ public class AudioFileManager {
         String mimeType;
         if (lowerFileName.endsWith(".mp3")) mimeType = "audio/mpeg";
         else if (lowerFileName.endsWith(".m4a") || lowerFileName.endsWith(".aac")) mimeType = "audio/mp4";
+        else if (isOggOpusAudio || lowerFileName.endsWith(".ogg")) mimeType = "audio/ogg";
         else if (isWebmAudio) mimeType = "audio/webm";
         else if (isMatroskaAudio) mimeType = "audio/x-matroska";
-        else if (lowerFileName.endsWith(".ogg") || lowerFileName.endsWith(".opus")) mimeType = "audio/ogg";
         else if (lowerFileName.endsWith(".flac")) mimeType = "audio/flac";
         else if (lowerFileName.endsWith(".wav")) mimeType = "audio/wav";
         else mimeType = "application/octet-stream";
         values.put(MediaStore.Audio.Media.MIME_TYPE, mimeType);
 
         // Android's MediaStore.Audio collection does not consistently recognize audio/webm.
-        // Legacy WebM files use Downloads; new .mka Opus files use audio/x-matroska here
-        // and stay indexed in Music/D.S Music.
+        // Legacy WebM files use Downloads; .opus is published as audio/ogg in Music/D.S Music.
         Uri collectionUri;
         String relativePath;
         if (isGenericContainerAudio) {
