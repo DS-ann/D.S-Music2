@@ -388,6 +388,9 @@ private fun PlayerVisualizer(
 @Composable
 private fun LandscapePlayerDetailsPane(
     modifier: Modifier = Modifier,
+    showQueue: Boolean,
+    onShowQueueChange: (Boolean) -> Unit,
+    onOpenFullScreenLyrics: () -> Unit,
     syncedLyrics: List<LyricLine>?,
     plainLyrics: String?,
     isLyricsLoading: Boolean,
@@ -409,19 +412,7 @@ private fun LandscapePlayerDetailsPane(
     onFetchLyrics: () -> Unit,
     onPlayQueueItem: (Int) -> Unit
 ) {
-    var showQueue by remember { mutableStateOf(false) }
     var showProviderPicker by remember { mutableStateOf(false) }
-    var lastAutoRequestedLyricsSongId by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(showQueue, currentSong?.id) {
-        val songId = currentSong?.id ?: return@LaunchedEffect
-        if (!showQueue && lastAutoRequestedLyricsSongId != songId &&
-            syncedLyrics.isNullOrEmpty() && plainLyrics.isNullOrBlank() && !isLyricsLoading
-        ) {
-            // Request at most once automatically per track; the visible retry button handles failures.
-            lastAutoRequestedLyricsSongId = songId
-            onFetchLyrics()
-        }
-    }
     val panelShape = RoundedCornerShape(24.dp)
 
     Column(
@@ -446,7 +437,7 @@ private fun LandscapePlayerDetailsPane(
                             if (selected) accentColor.copy(alpha = 0.14f) else Color.Transparent,
                             RoundedCornerShape(18.dp)
                         )
-                        .clickable { showQueue = index == 1 }
+                        .clickable { onShowQueueChange(index == 1) }
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                 )
             }
@@ -455,9 +446,15 @@ private fun LandscapePlayerDetailsPane(
                 DsmusicIconButton(onClick = { showProviderPicker = true }) {
                     Icon(Icons.Rounded.MoreVert, contentDescription = "Choose lyrics source")
                 }
+                DsmusicIconButton(onClick = onOpenFullScreenLyrics) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_fullscreen),
+                        contentDescription = "Open fullscreen lyrics"
+                    )
+                }
             }
             Text(
-                text = if (showQueue) songList.size.toString() + " tracks" else currentSong?.artist.orEmpty(),
+                text = if (showQueue) "${songList.size} tracks" else currentSong?.artist.orEmpty(),
                 color = secondaryColor,
                 style = DsmusicTheme.typography.labelSmall,
                 maxLines = 1
@@ -467,86 +464,26 @@ private fun LandscapePlayerDetailsPane(
         Spacer(Modifier.height(10.dp))
 
         if (!showQueue) {
-            when {
-                !syncedLyrics.isNullOrEmpty() -> SyncedLyricsCompose(
-                    onSeekTo = onSeekTo,
-                    lyrics = syncedLyrics,
-                    currentPositionProvider = currentPositionProvider,
-                    playbackSpeedProvider = playbackSpeedProvider,
-                    isPlaying = isPlaying,
-                    contentColor = contentColor,
-                    dynamicAccentColor = accentColor,
-                    currentSong = currentSong,
-                    selectedProvider = selectedProvider,
-                    providerResults = providerResults,
-                    lyricsColorStyle = lyricsColorStyle,
-                    modifier = Modifier.fillMaxSize()
-                )
-
-                !plainLyrics.isNullOrBlank() -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 8.dp, vertical = 12.dp)
-                    ) {
-                        plainLyrics.lineSequence().filter { it.isNotBlank() }.forEach { line ->
-                            Text(
-                                text = line,
-                                color = when (lyricsColorStyle) {
-                                    "Home Studio Gradient" -> Color.Unspecified
-                                    "White" -> Color.White
-                                    "UI Matching" -> accentColor
-                                    else -> contentColor.copy(alpha = 0.88f)
-                                },
-                                style = DsmusicTheme.typography.bodyLarge.copy(
-                                    brush = if (lyricsColorStyle == "Home Studio Gradient") {
-                                        dsmusicHomeStudioGradientBrush()
-                                    } else null
-                                ),
-                                modifier = Modifier.padding(vertical = 5.dp)
-                            )
-                        }
-                    }
-                }
-
-                else -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize().padding(12.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = if (isLyricsLoading) "Finding lyrics…" else "Lyrics",
-                            color = contentColor,
-                            style = DsmusicTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = when {
-                                isLyricsLoading -> "Looking for a synchronized lyrics source."
-                                lyricsError != null -> "Lyrics could not be loaded."
-                                else -> "Lyrics will appear here when available."
-                            },
-                            color = secondaryColor,
-                            style = DsmusicTheme.typography.bodyMedium
-                        )
-                        if (!isLyricsLoading) {
-                            Spacer(Modifier.height(14.dp))
-                            Text(
-                                text = "Load lyrics",
-                                color = accentColor,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier
-                                    .background(accentColor.copy(alpha = 0.12f), RoundedCornerShape(18.dp))
-                                    .clickable(onClick = onFetchLyrics)
-                                    .padding(horizontal = 18.dp, vertical = 10.dp)
-                            )
-                        }
-                    }
-                }
-            }
+            PlayerLyricsContent(
+                currentSong = currentSong,
+                syncedLyrics = syncedLyrics,
+                plainLyrics = plainLyrics,
+                isLoading = isLyricsLoading,
+                isPlaying = isPlaying,
+                lyricsError = lyricsError,
+                currentPositionProvider = currentPositionProvider,
+                playbackSpeedProvider = playbackSpeedProvider,
+                contentReady = true,
+                contentColor = contentColor,
+                dynamicAccentColor = accentColor,
+                lyricsColorStyle = lyricsColorStyle,
+                onRetryLyrics = onFetchLyrics,
+                onFetchLyrics = onFetchLyrics,
+                onSeekTo = onSeekTo,
+                selectedProvider = selectedProvider,
+                providerResults = providerResults,
+                modifier = Modifier.fillMaxSize()
+            )
         } else {
             if (songList.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -557,7 +494,7 @@ private fun LandscapePlayerDetailsPane(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    itemsIndexed(songList) { index, song ->
+                    itemsIndexed(songList, key = { _, song -> song.id }) { index, song ->
                         val isCurrent = index == currentSongIndex
                         Row(
                             modifier = Modifier
