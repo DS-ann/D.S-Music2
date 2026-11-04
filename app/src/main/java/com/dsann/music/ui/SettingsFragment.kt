@@ -121,6 +121,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -1505,8 +1506,8 @@ fun SettingsScreenContent(
         enterTransition = {
             androidx.compose.animation.fadeIn(
                 androidx.compose.animation.core.tween(
-                    durationMillis = 140,
-                    delayMillis = 140,
+                    durationMillis = 48,
+                    delayMillis = 48,
                     easing = androidx.compose.animation.core.LinearEasing
                 )
             )
@@ -1514,7 +1515,7 @@ fun SettingsScreenContent(
         exitTransition = {
             androidx.compose.animation.fadeOut(
                 androidx.compose.animation.core.tween(
-                    durationMillis = 140,
+                    durationMillis = 48,
                     easing = androidx.compose.animation.core.LinearEasing
                 )
             )
@@ -1522,8 +1523,8 @@ fun SettingsScreenContent(
         popEnterTransition = {
             androidx.compose.animation.fadeIn(
                 androidx.compose.animation.core.tween(
-                    durationMillis = 140,
-                    delayMillis = 140,
+                    durationMillis = 48,
+                    delayMillis = 48,
                     easing = androidx.compose.animation.core.LinearEasing
                 )
             )
@@ -1531,7 +1532,7 @@ fun SettingsScreenContent(
         popExitTransition = {
             androidx.compose.animation.fadeOut(
                 androidx.compose.animation.core.tween(
-                    durationMillis = 140,
+                    durationMillis = 48,
                     easing = androidx.compose.animation.core.LinearEasing
                 )
             )
@@ -2063,86 +2064,236 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
             .statusBarsPadding()
             .nestedScroll(nestedScrollConnection)
             .verticalScroll(scrollState)
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = 18.dp)
             .padding(bottom = 120.dp)
     ) {
         DsmusicPageHeading(
             title = "Settings",
+            subtitle = "Shape the way D.S Music sounds and feels.",
+            kicker = "YOUR LISTENING SPACE",
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 18.dp, bottom = 26.dp)
+                .padding(top = 18.dp, bottom = 20.dp)
         )
 
-        SettingsGroupCard(
-            items = listOf(
-                {
-                    SettingsCategoryItem(
-                        title = "Account & Sync",
-                        subtitle = "YouTube Music login, history sync",
-                        iconResId = R.drawable.ic_settings_account,
-                        onClick = { navController.navigate(SettingsRoute.Account.route) }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(26.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            DsmusicTheme.colorScheme.primaryContainer.copy(alpha = 0.92f),
+                            DsmusicTheme.colorScheme.surfaceContainerHigh,
+                            DsmusicTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
+                        )
                     )
-                },
-                {
-                    SettingsCategoryItem(
-                        title = "Playback",
-                        subtitle = "Audio behavior, crossfade, audio focus",
-                        iconResId = R.drawable.ic_settings_playback,
-                        onClick = { navController.navigate(SettingsRoute.Playback.route) }
+                )
+                .clickable { navController.navigate(SettingsRoute.Appearance.route) }
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                Text(
+                    "MAKE IT YOURS",
+                    style = DsmusicTheme.typography.labelSmall.copy(
+                        letterSpacing = 1.3.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = DsmusicTheme.colorScheme.primary
+                )
+                Text(
+                    "Your sound.\nYour style.",
+                    style = DsmusicTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
+                    color = DsmusicTheme.colorScheme.onSurface
+                )
+                Text(
+                    "Themes, player design, lyrics, fonts and navigation.",
+                    style = DsmusicTheme.typography.bodySmall,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Open customisation",
+                        style = DsmusicTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = DsmusicTheme.colorScheme.primary
                     )
-                },
-                {
-                    SettingsCategoryItem(
-                        title = "Controls & Gestures",
-                        subtitle = "Player swipes, double tap, long press and mini-player actions",
-                        iconResId = R.drawable.ic_settings_gestures,
-                        onClick = { navController.navigate(SettingsRoute.Controls.route) }
-                    )
-                },
-                {
-                    SettingsCategoryItem(
-                        title = "Music Management",
-                        subtitle = "Manage folders, refresh library, storage",
-                        iconResId = R.drawable.ic_settings_library,
-                        onClick = { navController.navigate(SettingsRoute.MusicManagement.route) }
-                    )
-                },
-                {
-                    SettingsCategoryItem(
-                        title = "Customize",
-                        subtitle = "Theme, colors, icons, player, lyrics, typography and navigation",
-                        iconResId = R.drawable.ic_settings_customize,
-                        onClick = { navController.navigate(SettingsRoute.Appearance.route) }
-                    )
-                },
-                {
-                    SettingsCategoryItem(
-                        title = "Backup & Restore",
-                        subtitle = "Export and import your library and settings",
-                        iconResId = R.drawable.ic_settings_backup,
-                        onClick = { navController.navigate(SettingsRoute.BackupRestore.route) }
-                    )
-                },
-                {
-                    SettingsCategoryItem(
-                        title = "Feedback & Bug Reports",
-                        subtitle = "Report issues, request features, export logs",
-                        iconResId = R.drawable.ic_settings_feedback,
-                        onClick = { navController.navigate(SettingsRoute.Feedback.route) }
-                    )
-                },
-                {
-                    SettingsCategoryItem(
-                        title = "About",
-                        subtitle = "App version, credits, updates",
-                        iconResId = R.drawable.ic_settings_info,
-                        onClick = { navController.navigate(SettingsRoute.About.route) }
+                    Icon(
+                        Icons.Rounded.ChevronRight,
+                        contentDescription = null,
+                        tint = DsmusicTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
-            )
+            }
+            Box(
+                modifier = Modifier
+                    .size(58.dp)
+                    .clip(CircleShape)
+                    .background(DsmusicTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_settings_customize),
+                    contentDescription = null,
+                    tint = DsmusicTheme.colorScheme.primary,
+                    modifier = Modifier.size(30.dp)
+                )
+            }
+        }
+
+        Text(
+            "LISTENING & CONTROL",
+            style = DsmusicTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold),
+            color = DsmusicTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 2.dp, top = 24.dp, bottom = 10.dp)
         )
-        
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            SettingsDashboardTile(
+                title = "Playback",
+                subtitle = "Quality, autoplay and crossfade",
+                iconResId = R.drawable.ic_settings_playback,
+                modifier = Modifier.weight(1f),
+                onClick = { navController.navigate(SettingsRoute.Playback.route) }
+            )
+            SettingsDashboardTile(
+                title = "Controls",
+                subtitle = "Gestures and player actions",
+                iconResId = R.drawable.ic_settings_gestures,
+                modifier = Modifier.weight(1f),
+                onClick = { navController.navigate(SettingsRoute.Controls.route) }
+            )
+        }
+
+        Text(
+            "LIBRARY & ACCOUNT",
+            style = DsmusicTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold),
+            color = DsmusicTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 2.dp, top = 20.dp, bottom = 10.dp)
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            SettingsDashboardTile(
+                title = "Account & Sync",
+                subtitle = "YouTube Music and history",
+                iconResId = R.drawable.ic_settings_account,
+                modifier = Modifier.weight(1f),
+                onClick = { navController.navigate(SettingsRoute.Account.route) }
+            )
+            SettingsDashboardTile(
+                title = "Music Management",
+                subtitle = "Folders, downloads and cache",
+                iconResId = R.drawable.ic_settings_library,
+                modifier = Modifier.weight(1f),
+                onClick = { navController.navigate(SettingsRoute.MusicManagement.route) }
+            )
+        }
+
+        Text(
+            "BACKUP & SUPPORT",
+            style = DsmusicTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold),
+            color = DsmusicTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 2.dp, top = 20.dp, bottom = 10.dp)
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            SettingsDashboardTile(
+                title = "Backup & Restore",
+                subtitle = "Move your settings and library",
+                iconResId = R.drawable.ic_settings_backup,
+                modifier = Modifier.weight(1f),
+                onClick = { navController.navigate(SettingsRoute.BackupRestore.route) }
+            )
+            SettingsDashboardTile(
+                title = "Feedback",
+                subtitle = "Report bugs and request features",
+                iconResId = R.drawable.ic_settings_feedback,
+                modifier = Modifier.weight(1f),
+                onClick = { navController.navigate(SettingsRoute.Feedback.route) }
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            SettingsDashboardTile(
+                title = "About D.S Music",
+                subtitle = "Version, updates and credits",
+                iconResId = R.drawable.ic_settings_info,
+                modifier = Modifier.weight(1f),
+                onClick = { navController.navigate(SettingsRoute.About.route) }
+            )
+            Spacer(Modifier.weight(1f))
+        }
+
         AppLogoSection(isLandscape = isLandscape)
+    }
+}
+
+@Composable
+private fun SettingsDashboardTile(
+    title: String,
+    subtitle: String,
+    iconResId: Int,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(142.dp)
+            .clip(RoundedCornerShape(21.dp))
+            .background(DsmusicTheme.colorScheme.surfaceContainerLow)
+            .border(
+                1.dp,
+                DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.20f),
+                RoundedCornerShape(21.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(DsmusicTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(iconResId),
+                    contentDescription = null,
+                    tint = DsmusicTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            Icon(
+                Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        Text(
+            title,
+            style = DsmusicTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = DsmusicTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            subtitle,
+            style = DsmusicTheme.typography.bodySmall,
+            color = DsmusicTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

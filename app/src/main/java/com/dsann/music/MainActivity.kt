@@ -385,7 +385,7 @@ class MainActivity : AppCompatActivity() {
                                 rootTabOpacity.animateTo(
                                     targetValue = 0f,
                                     animationSpec = androidx.compose.animation.core.tween(
-                                        durationMillis = 140,
+                                        durationMillis = 48,
                                         easing = androidx.compose.animation.core.LinearEasing
                                     )
                                 )
@@ -406,7 +406,7 @@ class MainActivity : AppCompatActivity() {
                             rootTabOpacity.animateTo(
                                 targetValue = 1f,
                                 animationSpec = androidx.compose.animation.core.tween(
-                                    durationMillis = 140,
+                                    durationMillis = 48,
                                     easing = androidx.compose.animation.core.LinearEasing
                                 )
                             )
@@ -601,8 +601,8 @@ class MainActivity : AppCompatActivity() {
                                 enterTransition = {
                                     androidx.compose.animation.fadeIn(
                                         animationSpec = androidx.compose.animation.core.tween(
-                                            durationMillis = 140,
-                                            delayMillis = 140,
+                                            durationMillis = 48,
+                                            delayMillis = 48,
                                             easing = androidx.compose.animation.core.LinearEasing
                                         )
                                     )
@@ -610,7 +610,7 @@ class MainActivity : AppCompatActivity() {
                                 exitTransition = {
                                     androidx.compose.animation.fadeOut(
                                         animationSpec = androidx.compose.animation.core.tween(
-                                            durationMillis = 140,
+                                            durationMillis = 48,
                                             easing = androidx.compose.animation.core.LinearEasing
                                         )
                                     )
@@ -618,8 +618,8 @@ class MainActivity : AppCompatActivity() {
                                 popEnterTransition = {
                                     androidx.compose.animation.fadeIn(
                                         animationSpec = androidx.compose.animation.core.tween(
-                                            durationMillis = 140,
-                                            delayMillis = 140,
+                                            durationMillis = 48,
+                                            delayMillis = 48,
                                             easing = androidx.compose.animation.core.LinearEasing
                                         )
                                     )
@@ -627,7 +627,7 @@ class MainActivity : AppCompatActivity() {
                                 popExitTransition = {
                                     androidx.compose.animation.fadeOut(
                                         animationSpec = androidx.compose.animation.core.tween(
-                                            durationMillis = 140,
+                                            durationMillis = 48,
                                             easing = androidx.compose.animation.core.LinearEasing
                                         )
                                     )

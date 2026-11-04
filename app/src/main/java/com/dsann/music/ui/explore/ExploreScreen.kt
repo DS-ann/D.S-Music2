@@ -65,6 +65,7 @@ import com.dsann.music.ui.CreateLocalPlaylistDialog
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material.icons.rounded.History
@@ -228,10 +229,19 @@ fun ExploreScreen(
     val searchHistory = uiState.searchHistory
     val homeMoods = uiState.homeMoods
     val detailStack = uiState.detailStack
+    val searchGenres = remember {
+        listOf(
+            "Pop", "Rock", "Hip-Hop", "R&B", "Electronic",
+            "Indie", "Alternative", "Classical", "Jazz", "Metal",
+            "Country", "Folk", "Latin", "Reggae", "Soul",
+            "Blues", "K-Pop", "J-Pop", "Soundtracks", "Ambient"
+        )
+    }
 
     var isSearchActive by rememberSaveable(isSearchDestination) {
         mutableStateOf(false)
     }
+    var showSearchGenreBrowser by rememberSaveable { mutableStateOf(false) }
     var selectedSongForMenu by remember { mutableStateOf<OnlineSong?>(null) }
     var selectedCollectionForMenu by remember { mutableStateOf<SearchItem?>(null) }
     var selectedCollectionMenuSongs by remember { mutableStateOf<List<OnlineSong>?>(null) }
@@ -471,9 +481,14 @@ fun ExploreScreen(
 
     androidx.activity.compose.BackHandler(
         enabled = isSearchDestination && !isSearchActive &&
-            searchQuery.isBlank() && !detailScreenActive && !isPlayerExpanded
+            (showSearchGenreBrowser || (searchQuery.isBlank() && !detailScreenActive)) &&
+            !isPlayerExpanded
     ) {
-        onLeaveSearchDestination()
+        if (showSearchGenreBrowser) {
+            showSearchGenreBrowser = false
+        } else {
+            onLeaveSearchDestination()
+        }
     }
 
     androidx.activity.compose.BackHandler(enabled = isAccountVisible && !isPlayerExpanded) {
@@ -846,11 +861,93 @@ fun ExploreScreen(
                                             currentFilter = currentFilter,
                                             onFilterClick = onSearchHeaderFilterClick,
                                             isLandscape = isLandscape,
-                                            onClearSearch = onSearchHeaderClearSearch
+                                            onClearSearch = onSearchHeaderClearSearch,
+                                            showGenreBrowser = showSearchGenreBrowser,
+                                            onGenreBrowserBack = { showSearchGenreBrowser = false }
                                         )
 
                                         Box(modifier = Modifier.weight(1f)) {
                                             when {
+                                                isSearchDestination && showSearchGenreBrowser && !isSearchActive && searchQuery.isBlank() -> {
+                                                    LazyColumn(
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 124.dp),
+                                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                                    ) {
+                                                        item(key = "search-genre-intro") {
+                                                            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                                                Text(
+                                                                    "Every sound has a place.",
+                                                                    style = DsmusicTheme.typography.titleLarge,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = DsmusicTheme.colorScheme.onSurface
+                                                                )
+                                                                Text(
+                                                                    "Choose a genre to explore its music.",
+                                                                    style = DsmusicTheme.typography.bodySmall,
+                                                                    color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                                                )
+                                                            }
+                                                        }
+                                                        items(searchGenres.chunked(2), key = { rowGenres -> rowGenres.joinToString("|") }) { rowGenres ->
+                                                            Row(
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                            ) {
+                                                                rowGenres.forEach { genre ->
+                                                                    val genreIndex = searchGenres.indexOf(genre)
+                                                                    val tileBackground = when (genreIndex % 3) {
+                                                                        0 -> DsmusicTheme.colorScheme.primaryContainer
+                                                                        1 -> DsmusicTheme.colorScheme.secondaryContainer
+                                                                        else -> DsmusicTheme.colorScheme.surfaceContainerHigh
+                                                                    }
+                                                                    val tileForeground = when (genreIndex % 3) {
+                                                                        0 -> DsmusicTheme.colorScheme.onPrimaryContainer
+                                                                        1 -> DsmusicTheme.colorScheme.onSecondaryContainer
+                                                                        else -> DsmusicTheme.colorScheme.onSurface
+                                                                    }
+                                                                    Box(
+                                                                        modifier = Modifier
+                                                                            .weight(1f)
+                                                                            .height(104.dp)
+                                                                            .clip(RoundedCornerShape(20.dp))
+                                                                            .background(tileBackground)
+                                                                            .clickable {
+                                                                                showSearchGenreBrowser = false
+                                                                                scope.launch { viewModel.search("$genre music") }
+                                                                            }
+                                                                            .padding(14.dp)
+                                                                    ) {
+                                                                        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                                                            Text(
+                                                                                "GENRE",
+                                                                                style = DsmusicTheme.typography.labelSmall.copy(
+                                                                                    letterSpacing = 1.1.sp,
+                                                                                    fontWeight = FontWeight.Bold
+                                                                                ),
+                                                                                color = tileForeground.copy(alpha = 0.72f)
+                                                                            )
+                                                                            Text(
+                                                                                genre,
+                                                                                style = DsmusicTheme.typography.titleMedium,
+                                                                                fontWeight = FontWeight.Bold,
+                                                                                color = tileForeground,
+                                                                                maxLines = 1,
+                                                                                overflow = TextOverflow.Ellipsis
+                                                                            )
+                                                                            Text(
+                                                                                "Explore music",
+                                                                                style = DsmusicTheme.typography.bodySmall,
+                                                                                color = tileForeground.copy(alpha = 0.78f)
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                }
+                                                                if (rowGenres.size == 1) Spacer(Modifier.weight(1f))
+                                                            }
+                                                        }
+                                                    }
+                                                }
                                                 isSearchDestination && !isSearchActive && searchQuery.isBlank() && currentMood == null -> {
                                                     LazyColumn(
                                                         modifier = Modifier.fillMaxSize(),
@@ -965,6 +1062,58 @@ fun ExploreScreen(
                                                                         )
                                                                     }
                                                                 }
+                                                            }
+                                                        }
+
+                                                        item(key = "search-genres-entry") {
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .clip(RoundedCornerShape(22.dp))
+                                                                    .background(DsmusicTheme.colorScheme.surfaceContainerHigh)
+                                                                    .clickable { showSearchGenreBrowser = true }
+                                                                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.spacedBy(13.dp)
+                                                            ) {
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .size(46.dp)
+                                                                        .clip(RoundedCornerShape(15.dp))
+                                                                        .background(DsmusicTheme.colorScheme.primaryContainer),
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    Icon(
+                                                                        Icons.Rounded.MusicNote,
+                                                                        contentDescription = null,
+                                                                        tint = DsmusicTheme.colorScheme.onPrimaryContainer,
+                                                                        modifier = Modifier.size(23.dp)
+                                                                    )
+                                                                }
+                                                                Column(
+                                                                    modifier = Modifier.weight(1f),
+                                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                                ) {
+                                                                    Text(
+                                                                        "Genres",
+                                                                        style = DsmusicTheme.typography.titleMedium,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        color = DsmusicTheme.colorScheme.onSurface
+                                                                    )
+                                                                    Text(
+                                                                        "Pop · Rock · Hip-Hop · R&B · and more",
+                                                                        style = DsmusicTheme.typography.bodySmall,
+                                                                        color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                                                        maxLines = 2,
+                                                                        overflow = TextOverflow.Ellipsis
+                                                                    )
+                                                                }
+                                                                Icon(
+                                                                    Icons.Rounded.ChevronRight,
+                                                                    contentDescription = "Browse genres",
+                                                                    tint = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                                                    modifier = Modifier.size(20.dp)
+                                                                )
                                                             }
                                                         }
 
@@ -2233,7 +2382,9 @@ private fun ExploreCustomizerDialog(
         currentFilter: SearchFilter?,
         onFilterClick: (SearchFilter?) -> Unit,
         isLandscape: Boolean,
-        onClearSearch: () -> Unit
+        onClearSearch: () -> Unit,
+        showGenreBrowser: Boolean,
+        onGenreBrowserBack: () -> Unit
     ) {
         val recentAccountHistory = remember(accountHistory) { accountHistory.take(10) }
         // Avoid Material3 SearchBar's expanded full-window implementation here. On
@@ -2623,12 +2774,36 @@ private fun ExploreCustomizerDialog(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                DsmusicPageHeading(
-                    title = if (isSearchDestination) "Search" else "Explore",
-                    subtitle = if (isSearchDestination) "Find your next favourite." else null,
-                    kicker = if (isSearchDestination) "FIND YOUR SOUND" else "D.S MUSIC",
-                    modifier = Modifier.weight(1f)
-                )
+                if (isSearchDestination && showGenreBrowser) {
+                    DsmusicIconButton(
+                        onClick = onGenreBrowserBack,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .background(DsmusicTheme.colorScheme.surfaceContainerLow, CircleShape),
+                        shape = CircleShape
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "Back to Search",
+                            tint = DsmusicTheme.colorScheme.onSurface
+                        )
+                    }
+                    DsmusicPageHeading(
+                        title = "Genres",
+                        subtitle = "Browse by sound.",
+                        kicker = "DISCOVER",
+                        modifier = Modifier.weight(1f)
+                    )
+                } else if (!(isSearchDestination && searchQuery.isNotBlank())) {
+                    DsmusicPageHeading(
+                        title = if (isSearchDestination) "Search" else "Explore",
+                        subtitle = if (isSearchDestination) "Find your next favourite." else null,
+                        kicker = if (isSearchDestination) "FIND YOUR SOUND" else "D.S MUSIC",
+                        modifier = Modifier.weight(1f)
+                    )
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
                 if (!isSearchDestination) {
                     DsmusicIconButton(
                         onClick = onCustomizeExplore,
@@ -2669,7 +2844,7 @@ private fun ExploreCustomizerDialog(
                     }
                 }
             }
-            if (showSearchEntry) {
+            if (showSearchEntry && !showGenreBrowser) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
