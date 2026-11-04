@@ -924,16 +924,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     )
     val audioQuality: StateFlow<String> = _audioQuality.asStateFlow()
 
-    private val _playbackAudioFormat = MutableStateFlow(
-        com.dsann.music.data.innertube.NewPipeStreamExtractor.normalizeAudioFormat(
-            prefs.getString(KEY_PLAYBACK_FORMAT, "auto")
-        )
-    )
-    val playbackAudioFormat: StateFlow<String> = _playbackAudioFormat.asStateFlow()
-
     private val _downloadAudioFormat = MutableStateFlow(
-        com.dsann.music.data.innertube.NewPipeStreamExtractor.normalizeAudioFormat(
-            prefs.getString(KEY_DOWNLOAD_FORMAT, "auto")
+        com.dsann.music.data.innertube.NewPipeStreamExtractor.normalizeDownloadAudioFormat(
+            prefs.getString(KEY_DOWNLOAD_FORMAT, "m4a")
         )
     )
     val downloadAudioFormat: StateFlow<String> = _downloadAudioFormat.asStateFlow()
@@ -957,15 +950,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         com.dsann.music.data.innertube.YouTubeMusic.invalidateAllStreamUrls()
     }
 
-    fun setPlaybackAudioFormat(format: String) {
-        val normalized = com.dsann.music.data.innertube.NewPipeStreamExtractor.normalizeAudioFormat(format)
-        _playbackAudioFormat.value = normalized
-        prefs.edit { putString(KEY_PLAYBACK_FORMAT, normalized) }
-        com.dsann.music.data.innertube.YouTubeMusic.invalidateAllStreamUrls()
-    }
-
     fun setDownloadAudioFormat(format: String) {
-        val normalized = com.dsann.music.data.innertube.NewPipeStreamExtractor.normalizeAudioFormat(format)
+        val normalized = com.dsann.music.data.innertube.NewPipeStreamExtractor.normalizeDownloadAudioFormat(format)
         _downloadAudioFormat.value = normalized
         prefs.edit { putString(KEY_DOWNLOAD_FORMAT, normalized) }
         com.dsann.music.data.innertube.NewPipeStreamExtractor.clearCache()
@@ -1170,12 +1156,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     _audioQuality.value =
                         com.dsann.music.data.innertube.NewPipeStreamExtractor
                             .normalizeAudioQuality(prefs.getString(KEY_AUDIO_QUALITY, "256 kbps"))
-                    _playbackAudioFormat.value =
-                        com.dsann.music.data.innertube.NewPipeStreamExtractor
-                            .normalizeAudioFormat(prefs.getString(KEY_PLAYBACK_FORMAT, "auto"))
                     _downloadAudioFormat.value =
                         com.dsann.music.data.innertube.NewPipeStreamExtractor
-                            .normalizeAudioFormat(prefs.getString(KEY_DOWNLOAD_FORMAT, "auto"))
+                            .normalizeDownloadAudioFormat(prefs.getString(KEY_DOWNLOAD_FORMAT, "m4a"))
                     _downloadBitrate.value =
                         com.dsann.music.data.innertube.NewPipeStreamExtractor
                             .normalizeAudioQuality(prefs.getString(KEY_DOWNLOAD_BITRATE, "256 kbps"))
@@ -1318,7 +1301,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         const val KEY_IGNORE_SHORT_AUDIO_DURATION = "ignore_short_audio_duration"
         const val KEY_DATA_SAVER = "data_saver"
         const val KEY_AUDIO_QUALITY = "audio_quality"
-        const val KEY_PLAYBACK_FORMAT = "audio_format"
         const val KEY_DOWNLOAD_FORMAT = "download_audio_format"
         const val KEY_DOWNLOAD_BITRATE = "download_bitrate"
         const val KEY_SYNC_FREQUENCY = "sync_frequency"
@@ -1432,7 +1414,6 @@ fun SettingsScreenContent(
 
     val dataSaver by viewModel.dataSaver.collectAsStateWithLifecycle()
     val audioQuality by viewModel.audioQuality.collectAsStateWithLifecycle()
-    val playbackAudioFormat by viewModel.playbackAudioFormat.collectAsStateWithLifecycle()
     val downloadAudioFormat by viewModel.downloadAudioFormat.collectAsStateWithLifecycle()
     val downloadBitrate by viewModel.downloadBitrate.collectAsStateWithLifecycle()
     val playerFrameRate by viewModel.playerFrameRate.collectAsStateWithLifecycle()
@@ -1750,8 +1731,6 @@ fun SettingsScreenContent(
                 },
                 audioQuality = audioQuality,
                 onAudioQualityChange = { viewModel.setAudioQuality(it) },
-                playbackAudioFormat = playbackAudioFormat,
-                onPlaybackAudioFormatChange = { viewModel.setPlaybackAudioFormat(it) },
                 downloadAudioFormat = downloadAudioFormat,
                 onDownloadAudioFormatChange = { viewModel.setDownloadAudioFormat(it) },
                 downloadBitrate = downloadBitrate,
@@ -4160,8 +4139,6 @@ private fun PlaybackScreen(
     onSetEndOfSong: (Boolean) -> Unit,
     audioQuality: String,
     onAudioQualityChange: (String) -> Unit,
-    playbackAudioFormat: String,
-    onPlaybackAudioFormatChange: (String) -> Unit,
     downloadAudioFormat: String,
     onDownloadAudioFormatChange: (String) -> Unit,
     downloadBitrate: String,
@@ -4210,11 +4187,6 @@ private fun PlaybackScreen(
                     }
                 )
             })
-
-            SettingsHeader("Playback Format")
-            SettingsGroupCard(listOf(
-                { AudioFormatRow("Playback Format", playbackAudioFormat, onPlaybackAudioFormatChange) }
-            ))
 
             SettingsHeader("Playback Bitrate")
             SettingsGroupCard(listOf(
@@ -4320,22 +4292,19 @@ private fun AudioFormatRow(
     onFormatChange: (String) -> Unit
 ) {
     val options = listOf(
-        "auto" to "Auto",
-        "m4a" to "M4A / AAC",
-        "webm" to "WebM",
-        "opus" to "Opus",
+        "m4a" to "M4A",
         "mp3" to "MP3",
-        "ogg" to "Ogg"
+        "opus" to "Opus"
     )
     val selectedFormat = com.dsann.music.data.innertube.NewPipeStreamExtractor
-        .normalizeAudioFormat(currentFormat)
+        .normalizeDownloadAudioFormat(currentFormat)
 
     DsmusicListItem(
         headlineContent = {
             Column {
                 Text(text = title, style = DsmusicTheme.typography.bodyLarge)
                 Text(
-                    text = "Requests this source format without transcoding. If a track has no matching stream, D.S Music asks you to choose from formats that track actually offers.",
+                    text = "Requests this source format without transcoding. If unavailable for a track, choose from the other available M4A, MP3 or Opus streams.",
                     style = DsmusicTheme.typography.bodyMedium,
                     color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )

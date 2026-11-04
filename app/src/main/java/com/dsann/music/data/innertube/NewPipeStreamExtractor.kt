@@ -65,7 +65,6 @@ object NewPipeStreamExtractor {
     private data class PreferenceSnapshot(
         val audioQuality: String,
         val dataSaver: Boolean,
-        val playbackFormat: String,
         val downloadFormat: String,
         val downloadBitrate: String,
         val timestamp: Long
@@ -98,6 +97,13 @@ object NewPipeStreamExtractor {
         else -> "auto"
     }
 
+    /** Download settings deliberately expose only M4A, MP3 and Opus. */
+    fun normalizeDownloadAudioFormat(format: String?): String =
+        when (normalizeAudioFormat(format)) {
+            "m4a", "mp3", "opus" -> normalizeAudioFormat(format)
+            else -> "m4a"
+        }
+
     private fun getPreferenceSnapshot(): PreferenceSnapshot {
         val now = System.currentTimeMillis()
         val cached = cachedPrefs
@@ -111,8 +117,7 @@ object NewPipeStreamExtractor {
         val snapshot = PreferenceSnapshot(
             audioQuality = normalizeAudioQuality(prefs?.getString("audio_quality", "256 kbps")),
             dataSaver = prefs?.getBoolean("data_saver", false) ?: false,
-            playbackFormat = normalizeAudioFormat(prefs?.getString("audio_format", "auto")),
-            downloadFormat = normalizeAudioFormat(prefs?.getString("download_audio_format", "auto")),
+            downloadFormat = normalizeDownloadAudioFormat(prefs?.getString("download_audio_format", "m4a")),
             downloadBitrate = normalizeAudioQuality(prefs?.getString("download_bitrate", "256 kbps")),
             timestamp = now
         )
@@ -125,7 +130,8 @@ object NewPipeStreamExtractor {
         return snapshot.audioQuality to snapshot.dataSaver
     }
 
-    fun getPlaybackAudioFormat(): String = getPreferenceSnapshot().playbackFormat
+    /** Playback is fixed to Opus; the stream selector falls back to M4A per track. */
+    fun getPlaybackAudioFormat(): String = "opus"
 
     fun getDownloadAudioFormat(): String = getPreferenceSnapshot().downloadFormat
 
@@ -158,6 +164,13 @@ object NewPipeStreamExtractor {
             "ogg" -> mime.contains("audio/ogg") || mime.contains("ogg") || codecName.contains("vorbis")
             else -> true
         }
+    }
+
+    fun downloadAudioFormatLabel(mimeType: String?, codec: String? = null): String = when {
+        matchesAudioFormat(mimeType, codec, "m4a") -> "M4A"
+        matchesAudioFormat(mimeType, codec, "mp3") -> "MP3"
+        matchesAudioFormat(mimeType, codec, "opus") -> "Opus"
+        else -> audioFormatDisplayLabel(mimeType.orEmpty(), codec)
     }
 
     private fun isM4aAudio(stream: AudioStream): Boolean {
@@ -286,7 +299,7 @@ object NewPipeStreamExtractor {
             codec = stream.codec,
             bitrateKbps = bitrateKbps,
             contentLength = stream.itagItem?.contentLength?.takeIf { it > 0L },
-            formatLabel = audioFormatDisplayLabel(mimeType, stream.codec)
+            formatLabel = downloadAudioFormatLabel(stream.format?.mimeType, stream.codec)
         )
     }
 
@@ -300,8 +313,21 @@ object NewPipeStreamExtractor {
         allowFormatChoice: Boolean
     ): AudioStream? {
         val requestedFormat = normalizeAudioFormat(preferredFormat)
-        val candidates = candidatesForFormat(audioStreams, requestedFormat)
-            .filter { it.content.startsWith("https://", ignoreCase = true) }
+        val requestedCandidates = candidatesForFormat(audioStreams, requestedFormat)
+        // Playback is fixed to Opus, with M4A as the only automatic fallback.
+        // Downloads retain their explicit format selection and never silently switch formats.
+        val selectedCandidates = if (
+            purpose == AudioFormatPurpose.PLAYBACK &&
+            requestedFormat == "opus" &&
+            requestedCandidates.isEmpty()
+        ) {
+            candidatesForFormat(audioStreams, "m4a")
+        } else {
+            requestedCandidates
+        }
+        val candidates = selectedCandidates.filter {
+            it.content.startsWith("https://", ignoreCase = true)
+        }
         if (candidates.isNotEmpty()) {
             return candidates.minByOrNull { stream ->
                 val bitrate = streamBitrateKbps(stream)
@@ -309,12 +335,17 @@ object NewPipeStreamExtractor {
             }
         }
         if (requestedFormat == "auto") return null
-        if (!allowFormatChoice) throw RequestedAudioFormatUnavailableException(requestedFormat)
+        // Playback must never ask for arbitrary formats: only Opus, then M4A fallback.
+        if (!allowFormatChoice || purpose == AudioFormatPurpose.PLAYBACK) {
+            throw RequestedAudioFormatUnavailableException(requestedFormat)
+        }
 
-        // A missing requested format is a user-choice case, not a silent fallback.
-        // Only display formats for which extraction returned a usable stream URL.
-        val availableStreams = audioStreams.filter {
-            it.content.startsWith("https://", ignoreCase = true)
+        // A missing download format is a user-choice case limited to M4A, MP3 and Opus.
+        val availableStreams = audioStreams.filter { stream ->
+            stream.content.startsWith("https://", ignoreCase = true) &&
+                listOf("m4a", "mp3", "opus").any { format ->
+                    matchesAudioFormat(stream.format?.mimeType, stream.codec, format)
+                }
         }
         if (availableStreams.isEmpty()) {
             throw RequestedAudioFormatUnavailableException(requestedFormat)
@@ -322,7 +353,7 @@ object NewPipeStreamExtractor {
         Log.w(
             TAG,
             "Requested $purpose format '$requestedFormat' unavailable for $videoId; " +
-                "asking the user to choose from ${availableStreams.size} available streams"
+                "asking the user to choose from ${availableStreams.size} supported streams"
         )
         val optionPairs = availableStreams.mapIndexed { index, stream -> stream to choiceOption(stream, index) }
             .sortedWith(compareByDescending<Pair<AudioStream, AvailableAudioFormat>> { it.second.bitrateKbps }
@@ -592,7 +623,13 @@ object NewPipeStreamExtractor {
                 targetBitrateKbpsOverride = targetKbps
             )
         }.getOrNull() ?: return null
-        val streams = parsed.streams.filter { it.mimeType.contains("audio", ignoreCase = true) && it.url.isNotBlank() }
+        val streams = parsed.streams.filter { stream ->
+            stream.mimeType.contains("audio", ignoreCase = true) &&
+                stream.url.isNotBlank() &&
+                listOf("m4a", "mp3", "opus").any { format ->
+                    matchesAudioFormat(stream.mimeType, preferredFormat = format)
+                }
+        }
         if (streams.isEmpty()) return null
 
         val matching = streams.filter {
@@ -621,7 +658,7 @@ object NewPipeStreamExtractor {
                     codec = null,
                     bitrateKbps = kbps,
                     contentLength = stream.contentLength,
-                    formatLabel = audioFormatDisplayLabel(stream.mimeType)
+                    formatLabel = downloadAudioFormatLabel(stream.mimeType)
                 )
             }.sortedWith(
                 compareByDescending<Pair<StreamData, AvailableAudioFormat>> { it.second.bitrateKbps }

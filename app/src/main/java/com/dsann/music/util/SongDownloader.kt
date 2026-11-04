@@ -400,11 +400,8 @@ object SongDownloader {
             // format and bitrate selectors are actually applied (cached spans have no MIME
             // metadata, so they cannot safely satisfy a different format choice).
             val settings = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
-            val playbackFormat = NewPipeStreamExtractor.normalizeAudioFormat(
-                settings.getString("audio_format", "auto")
-            )
-            val downloadFormat = NewPipeStreamExtractor.normalizeAudioFormat(
-                settings.getString("download_audio_format", "auto")
+            val downloadFormat = NewPipeStreamExtractor.normalizeDownloadAudioFormat(
+                settings.getString("download_audio_format", "m4a")
             )
             val playbackBitrate = NewPipeStreamExtractor.normalizeAudioQuality(
                 settings.getString("audio_quality", "256 kbps")
@@ -412,14 +409,19 @@ object SongDownloader {
             val downloadBitrate = NewPipeStreamExtractor.normalizeAudioQuality(
                 settings.getString("download_bitrate", "256 kbps")
             )
-            val cacheMatchesDownloadSelection =
-                playbackFormat == "auto" &&
-                downloadFormat == "auto" &&
-                playbackBitrate == downloadBitrate
-            val cachedStream = if (cacheMatchesDownloadSelection) {
+            // Cache entries may contain Opus or the per-track M4A playback fallback.
+            // Reuse one only when its actual MIME type matches the chosen download format
+            // and the target bitrate is unchanged.
+            val cachedCandidate = if (playbackBitrate == downloadBitrate) {
                 findCachedStream(context, song.id.toString())
             } else {
                 null
+            }
+            val cachedStream = cachedCandidate?.takeIf {
+                NewPipeStreamExtractor.matchesAudioFormat(
+                    it.mimeType,
+                    preferredFormat = downloadFormat
+                )
             }
             coroutineContext.ensureActive()
 

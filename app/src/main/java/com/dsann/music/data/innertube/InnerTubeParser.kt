@@ -729,12 +729,29 @@ object InnerTubeParser {
                     preferredFormat = preferredAudioFormat
                 )
             }
+            // Playback (no explicit override) is Opus-first and falls back only to M4A.
+            // Download parsing passes an override and retains the actual source list so the
+            // download chooser can offer only its supported formats.
+            val playbackM4aFallback = if (
+                preferredAudioFormatOverride == null &&
+                preferredAudioFormat == "opus" &&
+                matchingStreams.isEmpty()
+            ) {
+                availableAudioStreams.filter {
+                    NewPipeStreamExtractor.matchesAudioFormat(it.mimeType, preferredFormat = "m4a")
+                }
+            } else {
+                emptyList()
+            }
             val formatCandidates = when {
                 preferredAudioFormat == "auto" -> {
                     availableAudioStreams.filter { it.mimeType.contains("audio/mp4", ignoreCase = true) }
                         .ifEmpty { availableAudioStreams }
                 }
                 matchingStreams.isNotEmpty() -> matchingStreams
+                preferredAudioFormatOverride == null && preferredAudioFormat == "opus" ->
+                    playbackM4aFallback
+                preferredAudioFormatOverride == null -> emptyList()
                 else -> availableAudioStreams
             }
             val streams = formatCandidates.sortedWith(

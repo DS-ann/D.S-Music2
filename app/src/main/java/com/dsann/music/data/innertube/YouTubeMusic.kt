@@ -323,10 +323,14 @@ object YouTubeMusic {
                     var bestUrl: String? = try {
                         NewPipeStreamExtractor.getStreamUrl(id, allowFormatChoice = promptForFormatChoice)
                     } catch (extractorEx: Exception) {
-                        if (extractorEx is AudioFormatSelectionCancelledException ||
-                            extractorEx is RequestedAudioFormatUnavailableException
-                        ) throw extractorEx
-                        Log.e(TAG, "NewPipe extraction failed for $id; trying InnerTube fallback", extractorEx)
+                        if (extractorEx is AudioFormatSelectionCancelledException) throw extractorEx
+                        // A missing Opus/M4A NewPipe result should still try the native InnerTube
+                        // client, which may expose the M4A fallback even when NewPipe does not.
+                        if (extractorEx is RequestedAudioFormatUnavailableException) {
+                            Log.w(TAG, "NewPipe has no Opus/M4A playback stream for $id; checking InnerTube")
+                        } else {
+                            Log.e(TAG, "NewPipe extraction failed for $id; trying InnerTube fallback", extractorEx)
+                        }
                         null
                     }
 
@@ -335,11 +339,7 @@ object YouTubeMusic {
                         try {
                             val playerJson = InnerTubeClient.player(id)
                             val parsed = InnerTubeParser.parsePlayerResponse(playerJson)
-                            bestUrl = chooseInnerTubeStream(
-                                parsed = parsed,
-                                videoId = id,
-                                promptForFormatChoice = promptForFormatChoice
-                            )
+                            bestUrl = chooseInnerTubeStream(parsed)
                             if (!bestUrl.isNullOrEmpty()) {
                                 Log.d(TAG, "Successfully resolved fallback stream via InnerTube player for $id")
                             }
@@ -383,11 +383,7 @@ object YouTubeMusic {
     }
 
 
-    private suspend fun chooseInnerTubeStream(
-        parsed: PlayerResult?,
-        videoId: String,
-        promptForFormatChoice: Boolean
-    ): String? {
+    private fun chooseInnerTubeStream(parsed: PlayerResult?): String? {
         val audio = parsed?.streams.orEmpty()
             .filter { it.mimeType.contains("audio", ignoreCase = true) && it.url.isNotBlank() }
         if (audio.isEmpty()) return null
@@ -405,39 +401,19 @@ object YouTubeMusic {
                 it.mimeType.contains("audio/mp4", ignoreCase = true)
             }.ifEmpty { audio }
             matching.isNotEmpty() -> matching
+            requestedFormat == "opus" -> audio.filter {
+                NewPipeStreamExtractor.matchesAudioFormat(it.mimeType, preferredFormat = "m4a")
+            }
             else -> emptyList()
         }
 
-        if (candidates.isNotEmpty()) {
-            return candidates.minByOrNull { stream ->
-                val kbps = if (stream.bitrate > 1000) stream.bitrate / 1000 else stream.bitrate
-                if (kbps > 0) kotlin.math.abs(kbps - targetKbps) else Int.MAX_VALUE
-            }?.url
-        }
-
-        if (requestedFormat == "auto") return null
-        if (!promptForFormatChoice) throw RequestedAudioFormatUnavailableException(requestedFormat)
-
-        val options = audio.mapIndexed { index, stream ->
-            val bitrateKbps = if (stream.bitrate > 1000) (stream.bitrate + 500) / 1000 else stream.bitrate
-            AvailableAudioFormat(
-                id = "innertube:$videoId:$index",
-                url = stream.url,
-                mimeType = stream.mimeType.substringBefore(';').trim(),
-                codec = null,
-                bitrateKbps = bitrateKbps,
-                contentLength = stream.contentLength,
-                formatLabel = audioFormatDisplayLabel(stream.mimeType)
-            )
-        }.sortedWith(compareByDescending<AvailableAudioFormat> { it.bitrateKbps }.thenBy { it.formatLabel })
-
-        return AudioFormatSelectionCoordinator.choose(
-            songTitle = parsed?.title ?: videoId,
-            purpose = AudioFormatPurpose.PLAYBACK,
-            requestedFormat = requestedFormat,
-            targetBitrateKbps = targetKbps,
-            options = options
-        ).url
+        // There is no interactive playback-format selector: Opus is preferred and M4A is
+        // the only fallback. If neither is available, let stream resolution fail cleanly.
+        if (candidates.isEmpty()) return null
+        return candidates.minByOrNull { stream ->
+            val kbps = if (stream.bitrate > 1000) stream.bitrate / 1000 else stream.bitrate
+            if (kbps > 0) kotlin.math.abs(kbps - targetKbps) else Int.MAX_VALUE
+        }?.url
     }
 
     /**
