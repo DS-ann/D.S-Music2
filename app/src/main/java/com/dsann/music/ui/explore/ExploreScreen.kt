@@ -231,7 +231,11 @@ fun ExploreScreen(
     val homeMoods = uiState.homeMoods
     val homeCategories = uiState.homeCategories
     val sortedHomeCategories = remember(homeCategories) {
-        homeCategories.sortedBy { it.title.trim().lowercase() }
+        // Do not let malformed or legacy cache entries reach the typed comparator.
+        homeCategories
+            .filterIsInstance<com.dsann.music.data.innertube.HomeCategory>()
+            .distinctBy { it.browseId + "|" + it.params.orEmpty() }
+            .sortedBy { it.title.trim().lowercase() }
     }
     val isLoadingGenres = uiState.isLoadingGenres
     val genresError = uiState.genresError
@@ -954,7 +958,7 @@ fun ExploreScreen(
                                                                 )
                                                             }
                                                         }
-                                                        if (homeCategories.isEmpty()) {
+                                                        if (sortedHomeCategories.isEmpty()) {
                                                             item(key = "search-genre-load-state") {
                                                                 Column(
                                                                     modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp),

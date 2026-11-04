@@ -10,6 +10,7 @@ import com.dsann.music.data.innertube.AlbumPage
 import com.dsann.music.data.innertube.ArtistPage
 import com.dsann.music.data.innertube.HomeSection
 import com.dsann.music.data.innertube.HomeCategory
+import com.dsann.music.data.innertube.HomeCategoryCacheParser
 import com.dsann.music.data.innertube.InnerTubeClient
 import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.OnlineAlbum
@@ -646,12 +647,11 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private fun restoreGenresCache(): Boolean {
         val json = prefs.getString(GENRES_CACHE_KEY, null) ?: return false
         return runCatching {
-            // Preserve List<HomeCategory>'s element type. Raw class deserialization
-            // produces List<LinkedTreeMap>, causing a ClassCastException during rendering.
-            val cacheType = object : com.google.gson.reflect.TypeToken<CachedGenres>() {}.type
-            val cached: CachedGenres = gson.fromJson(json, cacheType) ?: return false
-            if (cached.categories.isEmpty()) return false
-            _uiState.update { it.copy(homeCategories = cached.categories, genresError = null) }
+            // Validate and rebuild every entry explicitly. This repairs old caches containing
+            // Gson LinkedTreeMap values and does not depend on release generic Signature data.
+            val categories = HomeCategoryCacheParser.parse(json)
+            if (categories.isEmpty()) return false
+            _uiState.update { it.copy(homeCategories = categories, genresError = null) }
             true
         }.getOrElse { error ->
             Log.w(TAG, "Ignoring invalid moods-and-genres cache", error)

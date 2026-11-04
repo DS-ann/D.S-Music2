@@ -126,6 +126,40 @@ data class HomeCategory(
     val params: String? = null
 )
 
+
+/**
+ * Decodes the persisted genre catalogue without relying on Gson's reflective generic metadata.
+ * Both the current {"categories":[...]} wrapper and a legacy raw-array cache are accepted.
+ */
+object HomeCategoryCacheParser {
+    fun parse(json: String): List<HomeCategory> {
+        val root = com.google.gson.JsonParser().parse(json)
+        val categoryArray = when {
+            root.isJsonArray -> root.asJsonArray
+            root.isJsonObject -> root.asJsonObject.get("categories")
+                ?.takeIf { it.isJsonArray }
+                ?.asJsonArray
+            else -> null
+        } ?: return emptyList()
+
+        return categoryArray.mapNotNull { element ->
+            if (!element.isJsonObject) return@mapNotNull null
+            val category = element.asJsonObject
+
+            fun stringValue(name: String): String? =
+                category.get(name)
+                    ?.takeIf { !it.isJsonNull && it.isJsonPrimitive }
+                    ?.asString
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+
+            val title = stringValue("title") ?: return@mapNotNull null
+            val browseId = stringValue("browseId") ?: return@mapNotNull null
+            HomeCategory(title, browseId, stringValue("params"))
+        }.distinctBy { it.browseId + "|" + it.params.orEmpty() }
+    }
+}
+
 /** Home page data */
 data class HomePage(
     val sections: List<HomeSection>,
