@@ -538,10 +538,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
         // Standard Feed Scenario: Launch Parallel background queries
         val homeTask = if (InnerTubeClient.cookie != null) {
-            async { YouTubeMusic.home().getOrNull() }
+            async { YouTubeMusic.home() }
         } else null
-        
-        val exploreTask = async { YouTubeMusic.explore().getOrNull() }
+
+        val exploreTask = async { YouTubeMusic.explore() }
 
         // Fetch the online feed first so local personalization cannot delay first content.
 
