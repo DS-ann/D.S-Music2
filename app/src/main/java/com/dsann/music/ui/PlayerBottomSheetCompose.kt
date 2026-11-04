@@ -1044,16 +1044,6 @@ fun PlayerBottomSheetCompose(
         // List is separate from quick state changes
         val songList by viewModel.songList.collectAsStateWithLifecycle()
         val isQueueExpanded by viewModel.isQueueExpanded.collectAsStateWithLifecycle()
-        val isQueuePresentationActive by remember(isQueueExpanded, playerContentExpansionFraction) {
-            derivedStateOf {
-                isQueueExpanded && playerContentExpansionFraction.value >= 0.995f
-            }
-        }
-        val artworkAlpha by animateFloatAsState(
-            targetValue = if (isQueuePresentationActive) 0f else 1f,
-            animationSpec = spring(dampingRatio = 0.85f, stiffness = 300f),
-            label = "ArtworkAlpha"
-        )
 
         // Sliding Layout States
         val containerHeight = with(density) { maxHeight.toPx().toDp() }
@@ -1114,6 +1104,19 @@ fun PlayerBottomSheetCompose(
         val playerContentExpansionFraction = remember(viewModel) {
             Animatable(restoredExpansionFraction)
         }
+
+        // Queue-related layering changes only after the player sheet has completed
+        // its mini-to-full morph, preventing the artwork from jumping behind the drawer.
+        val isQueuePresentationActive by remember(isQueueExpanded, playerContentExpansionFraction) {
+            derivedStateOf {
+                isQueueExpanded && playerContentExpansionFraction.value >= 0.995f
+            }
+        }
+        val artworkAlpha by animateFloatAsState(
+            targetValue = if (isQueuePresentationActive) 0f else 1f,
+            animationSpec = spring(dampingRatio = 0.85f, stiffness = 300f),
+            label = "ArtworkAlpha"
+        )
         // Delay the first opening animation until the expanded player tree has actually
         // completed layout. A single withFrameNanos wait could still start while the
         // heavyweight lyrics/artwork/controls subtree was measuring.
