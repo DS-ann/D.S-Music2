@@ -822,15 +822,16 @@ fun Scaffold(
         Column(Modifier.fillMaxSize()) {
             topBar()
             Box(Modifier.weight(1f).fillMaxWidth()) {
-                CompositionLocalProvider(LocalDsmusicContentColor provides contentColor) {
-                    content(PaddingValues())
-                }
                 if (bottomBarOverlay) {
-                    // Place the dock inside the full-height content layer. It keeps a normal,
-                    // clickable layout size while drawing above the player sheet.
+                    // Keep the dock at its normal position but draw it behind the content layer.
+                    // The collapsed mini-player leaves the dock visible; the opaque expanded player
+                    // is then able to cover the dock in both portrait and landscape.
                     Box(Modifier.align(Alignment.BottomCenter)) {
                         bottomBar()
                     }
+                }
+                CompositionLocalProvider(LocalDsmusicContentColor provides contentColor) {
+                    content(PaddingValues())
                 }
             }
             if (!bottomBarOverlay) {
