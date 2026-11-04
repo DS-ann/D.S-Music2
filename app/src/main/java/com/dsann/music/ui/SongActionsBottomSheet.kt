@@ -63,6 +63,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Download
@@ -429,7 +430,7 @@ private fun SongActionTile(
 ) {
     Column(
         modifier = modifier
-            .height(78.dp)
+            .height(68.dp)
             .clip(RoundedCornerShape(17.dp))
             .background(containerColor)
             .clickable(enabled = enabled, onClick = onClick)
@@ -468,7 +469,7 @@ private fun SongActionWideTile(
 ) {
     Row(
         modifier = modifier
-            .height(58.dp)
+            .height(52.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(containerColor)
             .clickable(enabled = enabled, onClick = onClick)
@@ -507,7 +508,7 @@ fun OptionsContent(
     onDismiss: () -> Unit,
     showDelete: Boolean = true
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             "QUICK ACTIONS",
             style = DsmusicTheme.typography.labelSmall.copy(
@@ -899,6 +900,8 @@ fun ActionButtonRow2(
 ) {
     val context = LocalContext.current
     val isOnline = song?.videoId != null
+    val activeDownloadIds by com.dsann.music.util.SongDownloader.activeDownloadIds.collectAsStateWithLifecycle()
+    val isDownloading = song?.videoId?.let { it in activeDownloadIds } == true
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -941,19 +944,45 @@ fun ActionButtonRow2(
         }
         SongActionTile(
             modifier = Modifier.weight(1f),
-            label = if (isOnline) "Download" else "Offline",
-            containerColor = if (isOnline) DsmusicTheme.colorScheme.primaryContainer else DsmusicTheme.colorScheme.surfaceVariant,
-            contentColor = if (isOnline) DsmusicTheme.colorScheme.onPrimaryContainer else DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+            label = when {
+                !isOnline -> "Offline"
+                isDownloading -> "Cancel"
+                else -> "Download"
+            },
+            containerColor = when {
+                !isOnline -> DsmusicTheme.colorScheme.surfaceVariant
+                isDownloading -> DsmusicTheme.colorScheme.errorContainer
+                else -> DsmusicTheme.colorScheme.primaryContainer
+            },
+            contentColor = when {
+                !isOnline -> DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                isDownloading -> DsmusicTheme.colorScheme.onErrorContainer
+                else -> DsmusicTheme.colorScheme.onPrimaryContainer
+            },
             enabled = isOnline,
             onClick = {
-                song?.let { com.dsann.music.util.SongDownloader.downloadSong(context, it) }
+                song?.let {
+                    if (isDownloading) {
+                        com.dsann.music.util.SongDownloader.cancelDownload(context, it)
+                    } else {
+                        com.dsann.music.util.SongDownloader.downloadSong(context, it)
+                    }
+                }
                 onDismiss()
             }
         ) {
             Icon(
-                imageVector = if (isOnline) Icons.Rounded.Download else Icons.Rounded.Check,
-                contentDescription = null,
-                tint = if (isOnline) DsmusicTheme.colorScheme.onPrimaryContainer else DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                imageVector = when {
+                    !isOnline -> Icons.Rounded.Check
+                    isDownloading -> Icons.Rounded.Close
+                    else -> Icons.Rounded.Download
+                },
+                contentDescription = if (isDownloading) "Cancel download" else "Download",
+                tint = when {
+                    !isOnline -> DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                    isDownloading -> DsmusicTheme.colorScheme.onErrorContainer
+                    else -> DsmusicTheme.colorScheme.onPrimaryContainer
+                },
                 modifier = Modifier.size(23.dp)
             )
         }
@@ -974,7 +1003,7 @@ fun ExpressiveTabSwitcher(selectedTab: BottomSheetTab, onTabSelected: (BottomShe
             .width(320.dp)
             .height(56.dp)
             .clip(RoundedCornerShape(28.dp))
-            .background(DsmusicTheme.colorScheme.surfaceVariant)
+            .background(DsmusicTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
         Box(
             modifier = Modifier

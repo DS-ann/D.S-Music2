@@ -99,7 +99,7 @@ fun DsmusicNavigationBar(
                             .size(width = 52.dp, height = iconSlotHeight)
                             .clip(RoundedCornerShape(12.dp))
                             .background(
-                                if (selected && barStyle != "Minimal") selectedColor.copy(alpha = 0.16f)
+                                if (selected && barStyle != "Minimal") selectedColor.copy(alpha = 0.5f)
                                 else Color.Transparent
                             ),
                         contentAlignment = Alignment.Center

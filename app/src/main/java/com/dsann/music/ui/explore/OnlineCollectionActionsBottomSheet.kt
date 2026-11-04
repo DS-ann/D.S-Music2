@@ -28,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -78,6 +79,9 @@ fun OnlineCollectionActionsBottomSheet(
         mutableStateOf(initialSongs?.takeIf { it.isNotEmpty() })
     }
     var isWorking by remember(collection) { mutableStateOf(false) }
+    val activeDownloadIds by SongDownloader.activeDownloadIds.collectAsStateWithLifecycle()
+    val activeCollectionSongs = cachedSongs.orEmpty().filter { it.videoId in activeDownloadIds }
+    val activeCollectionDownloadCount = activeCollectionSongs.size
 
     val title = when (collection) {
         is SearchItem.Album -> collection.album.title
@@ -193,8 +197,8 @@ fun OnlineCollectionActionsBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             ExploreActionSheetHeader(
                 thumbnailUrl = thumbnail,
@@ -277,15 +281,36 @@ fun OnlineCollectionActionsBottomSheet(
             )
 
             CollectionActionRow(
-                title = "Download",
-                subtitle = "Download every track for offline playback",
-                icon = { Icon(Icons.Default.Download, null) },
+                title = if (activeCollectionDownloadCount > 0) "Cancel downloads" else "Download",
+                subtitle = if (activeCollectionDownloadCount > 0) {
+                    "Cancel $activeCollectionDownloadCount active downloads"
+                } else {
+                    "Download every track for offline playback"
+                },
+                icon = {
+                    if (activeCollectionDownloadCount > 0) {
+                        Icon(Icons.Rounded.Close, null)
+                    } else {
+                        Icon(Icons.Default.Download, null)
+                    }
+                },
                 enabled = !isWorking
             ) {
-                runTrackAction { songs ->
-                    songs.forEach { SongDownloader.downloadSong(context, toSongItem(it)) }
-                    com.dsann.music.ui.SnackbarController.showMessage("Started downloads for ${songs.size} tracks")
-                    onDismissRequest()
+                if (activeCollectionSongs.isNotEmpty()) {
+                    activeCollectionSongs.forEach {
+                        SongDownloader.cancelDownload(context, toSongItem(it))
+                    }
+                    com.dsann.music.ui.SnackbarController.showMessage(
+                        "Cancelling $activeCollectionDownloadCount downloads"
+                    )
+                } else {
+                    runTrackAction { songs ->
+                        cachedSongs = songs
+                        songs.forEach { SongDownloader.downloadSong(context, toSongItem(it)) }
+                        com.dsann.music.ui.SnackbarController.showMessage(
+                            "Started downloads for ${songs.size} tracks"
+                        )
+                    }
                 }
             }
 
@@ -328,7 +353,7 @@ private fun CollectionPrimaryAction(
 ) {
     Column(
         modifier = modifier
-            .height(78.dp)
+            .height(66.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(DsmusicTheme.colorScheme.primaryContainer)
             .clickable(enabled = enabled, onClick = onClick)
@@ -365,7 +390,7 @@ private fun CollectionActionRow(
             .clip(RoundedCornerShape(13.dp))
             .background(DsmusicTheme.colorScheme.surfaceContainerLow)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         icon()

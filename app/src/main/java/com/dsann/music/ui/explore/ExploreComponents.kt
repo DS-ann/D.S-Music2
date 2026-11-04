@@ -1763,9 +1763,7 @@ internal fun ExploreActionSheetHeader(
     modifier: Modifier = Modifier,
     trailingContent: (@Composable () -> Unit)? = null
 ) {
-    // Match the queue song-action card: 84dp cover, 16dp breathing room and a
-    // high-emphasis title/subtitle pair. Keep the identity row consistent for
-    // songs, albums and playlists so the action sheets read as one system.
+    // Compact identity header shared by song, album and playlist action sheets.
     DsmusicSurface(
         modifier = modifier.fillMaxWidth(),
         shape = DsmusicTheme.shapes.large,
@@ -1773,26 +1771,26 @@ internal fun ExploreActionSheetHeader(
         tonalElevation = 1.dp
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(9.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(84.dp)
+                modifier = Modifier.size(68.dp)
                     .clip(DsmusicTheme.shapes.large)
                     .background(DsmusicTheme.colorScheme.surfaceVariant)
             ) {
                 AsyncImage(
-                    model = rememberExploreImageRequest(thumbnailUrl, 192),
+                    model = rememberExploreImageRequest(thumbnailUrl, 144),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
             }
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    style = DsmusicTheme.typography.headlineSmall,
+                    style = DsmusicTheme.typography.titleMedium,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1800,7 +1798,7 @@ internal fun ExploreActionSheetHeader(
                 )
                 Text(
                     text = subtitle,
-                    style = DsmusicTheme.typography.bodyMedium,
+                    style = DsmusicTheme.typography.bodySmall,
                     color = DsmusicTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -1892,9 +1890,9 @@ fun OnlineSongBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 24.dp, start = 16.dp, end = 16.dp, top = 8.dp)
+                .padding(bottom = 16.dp, start = 14.dp, end = 14.dp, top = 4.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             ExploreActionSheetHeader(
                 thumbnailUrl = song.thumbnailUrl,

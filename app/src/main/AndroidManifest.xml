@@ -101,6 +101,11 @@
 
 
         <receiver
+            android:name=".util.SongDownloadCancelReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <receiver
             android:name=".update.UpdateReceiver"
             android:exported="true">
             <intent-filter>

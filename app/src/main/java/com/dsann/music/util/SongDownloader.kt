@@ -2,7 +2,9 @@ package com.dsann.music.util
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.content.ContentUris
 import android.net.Uri
 import android.graphics.Bitmap
@@ -51,6 +53,9 @@ object SongDownloader {
 
     private val _downloadProgress = MutableStateFlow<Map<String, Int>>(emptyMap())
     val downloadProgress: StateFlow<Map<String, Int>> = _downloadProgress.asStateFlow()
+
+    private val _activeDownloadIds = MutableStateFlow<Set<String>>(emptySet())
+    val activeDownloadIds: StateFlow<Set<String>> = _activeDownloadIds.asStateFlow()
 
     fun cleanTitle(title: String): String {
         var clean = title
@@ -273,10 +278,12 @@ object SongDownloader {
             return
         }
 
+        _activeDownloadIds.value = activeDownloads.keys.toSet()
         _downloadProgress.value += (videoId to 0)
         job.invokeOnCompletion {
             if (task.cancelled) task.outputFile?.delete()
             activeDownloads.remove(videoId, task)
+            _activeDownloadIds.value = activeDownloads.keys.toSet()
             _downloadProgress.value -= videoId
         }
         job.start()
@@ -284,14 +291,38 @@ object SongDownloader {
 
     fun cancelDownload(context: Context, song: SongItem) {
         val videoId = song.videoId ?: return
-        val task = activeDownloads[videoId] ?: return
+        cancelDownloadInternal(
+            context = context.applicationContext,
+            videoId = videoId,
+            notificationId = song.id.toInt().coerceAtLeast(1),
+            title = song.title
+        )
+    }
+
+    fun cancelDownloadFromNotification(context: Context, videoId: String, notificationId: Int) {
+        cancelDownloadInternal(
+            context = context.applicationContext,
+            videoId = videoId,
+            notificationId = notificationId,
+            title = null
+        )
+    }
+
+    private fun cancelDownloadInternal(
+        context: Context,
+        videoId: String,
+        notificationId: Int,
+        title: String?
+    ) {
+        val task = activeDownloads[videoId]
+        if (task == null) {
+            cancelNotification(context, notificationId)
+            return
+        }
         if (task.cancelled) return
         task.cancelled = true
-        // HttpURLConnection.disconnect() can perform TLS socket shutdown synchronously.
-        // On Android 6 this throws NetworkOnMainThreadException when cancellation is
-        // triggered from a UI click, so always disconnect from an IO coroutine.
-        // Both disconnect and Job.cancel can run synchronous HTTP/TLS cancellation handlers.
-        // Schedule both off the UI thread so Android 6 StrictMode cannot crash the app.
+        // Socket teardown and Job.cancel may execute synchronous TLS callbacks.
+        // Always schedule both on the IO scope to keep Android 6's main thread clear.
         scope.launch(Dispatchers.IO) {
             runCatching { task.connection?.disconnect() }
             runCatching { task.call?.cancel() }
@@ -299,8 +330,12 @@ object SongDownloader {
         scope.launch(Dispatchers.IO) {
             task.job?.cancel(CancellationException("Download cancelled by user"))
         }
-        cancelNotification(context.applicationContext, song.id.toInt().coerceAtLeast(1))
-        com.dsann.music.ui.SnackbarController.showMessage("Download cancelled: ${cleanTitle(song.title)}")
+        cancelNotification(context, notificationId)
+        if (!title.isNullOrBlank()) {
+            com.dsann.music.ui.SnackbarController.showMessage(
+                "Download cancelled: ${cleanTitle(title)}"
+            )
+        }
     }
 
     private suspend fun performDownload(
@@ -328,7 +363,7 @@ object SongDownloader {
                 return
             }
 
-            updateNotification(context, cleanTitleStr, 0, notificationId)
+            updateNotification(context, cleanTitleStr, 0, notificationId, videoId)
 
             // Reuse playback cache only when playback and download are both in Auto mode
             // with the same target bitrate. Otherwise resolve a fresh stream so the download
@@ -384,7 +419,7 @@ object SongDownloader {
                 task.outputFile = outputFile
                 copyCachedStream(cachedStream, outputFile, coroutineContext)
                 _downloadProgress.value += (videoId to 90)
-                updateNotification(context, cleanTitleStr, 90, notificationId)
+                updateNotification(context, cleanTitleStr, 90, notificationId, videoId)
             } else {
                 // No cache entry for this track: use the standard online download path.
                 val downloadStream = NewPipeStreamExtractor.getDownloadStreamData(
@@ -588,7 +623,7 @@ object SongDownloader {
                                 val now = System.currentTimeMillis()
                                 if (now - lastProgressUpdate > 400L) {
                                     lastProgressUpdate = now
-                                    updateNotification(context, title, progress, notificationId)
+                                    updateNotification(context, title, progress, notificationId, videoId)
                                 }
                             }
                         }
@@ -1068,7 +1103,36 @@ object SongDownloader {
         }
     }
 
-    private fun updateNotification(context: Context, title: String, progress: Int, notificationId: Int) {
+    private fun createCancelDownloadPendingIntent(
+        context: Context,
+        videoId: String,
+        notificationId: Int
+    ): PendingIntent {
+        val intent = Intent(context, SongDownloadCancelReceiver::class.java).apply {
+            action = SongDownloadCancelReceiver.ACTION_CANCEL
+            putExtra(SongDownloadCancelReceiver.EXTRA_VIDEO_ID, videoId)
+            putExtra(SongDownloadCancelReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+        }
+        val immutableFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_IMMUTABLE
+        } else {
+            0
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            notificationId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag
+        )
+    }
+
+    private fun updateNotification(
+        context: Context,
+        title: String,
+        progress: Int,
+        notificationId: Int,
+        videoId: String
+    ) {
         createNotificationChannel(context)
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(com.dsann.music.R.drawable.ic_music_note)
@@ -1078,6 +1142,11 @@ object SongDownloader {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setProgress(100, progress, false)
+            .addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                "Cancel",
+                createCancelDownloadPendingIntent(context, videoId, notificationId)
+            )
 
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.notify(notificationId, builder.build())
