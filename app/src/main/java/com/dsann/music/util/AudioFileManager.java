@@ -56,7 +56,7 @@ public class AudioFileManager {
     public static File createOutputFile(Context context, String fileName) {
         String lowerName = fileName.toLowerCase(java.util.Locale.ROOT);
         if (!(lowerName.endsWith(".m4a") || lowerName.endsWith(".mp3") ||
-                lowerName.endsWith(".webm") || lowerName.endsWith(".ogg") ||
+                lowerName.endsWith(".webm") || lowerName.endsWith(".mka") || lowerName.endsWith(".ogg") ||
                 lowerName.endsWith(".opus") || lowerName.endsWith(".aac") ||
                 lowerName.endsWith(".flac") || lowerName.endsWith(".wav"))) {
             fileName = fileName + ".m4a";
@@ -137,6 +137,7 @@ public class AudioFileManager {
         String lowerFileName = fileName.toLowerCase(java.util.Locale.ROOT);
         if (lowerFileName.endsWith(".mp3")) return "audio/mpeg";
         if (lowerFileName.endsWith(".m4a") || lowerFileName.endsWith(".aac")) return "audio/mp4";
+        if (lowerFileName.endsWith(".mka")) return "audio/x-matroska";
         if (lowerFileName.endsWith(".webm")) return "audio/webm";
         if (lowerFileName.endsWith(".ogg") || lowerFileName.endsWith(".opus")) return "audio/ogg";
         if (lowerFileName.endsWith(".flac")) return "audio/flac";
@@ -169,6 +170,8 @@ public class AudioFileManager {
 
         String lowerFileName = sourceFile.getName().toLowerCase(java.util.Locale.ROOT);
         boolean isWebmAudio = lowerFileName.endsWith(".webm");
+        boolean isMatroskaAudio = lowerFileName.endsWith(".mka");
+        boolean isGenericContainerAudio = isWebmAudio || isMatroskaAudio;
 
         ContentValues values = new ContentValues();
         values.put(MediaStore.Audio.Media.DISPLAY_NAME, sourceFile.getName());
@@ -176,7 +179,7 @@ public class AudioFileManager {
         // Audio-specific indexed columns are not part of MediaStore.Downloads on
         // older Android releases. WebM already carries its title/artist/album/cover
         // in the embedded Matroska metadata written before this publish step.
-        if (!isWebmAudio) {
+        if (!isGenericContainerAudio) {
             values.put(MediaStore.Audio.Media.TITLE, title);
             values.put(MediaStore.Audio.Media.ARTIST, artist);
             values.put(MediaStore.Audio.Media.ALBUM_ARTIST, artist);
@@ -189,6 +192,7 @@ public class AudioFileManager {
         if (lowerFileName.endsWith(".mp3")) mimeType = "audio/mpeg";
         else if (lowerFileName.endsWith(".m4a") || lowerFileName.endsWith(".aac")) mimeType = "audio/mp4";
         else if (isWebmAudio) mimeType = "audio/webm";
+        else if (isMatroskaAudio) mimeType = "audio/matroska";
         else if (lowerFileName.endsWith(".ogg") || lowerFileName.endsWith(".opus")) mimeType = "audio/ogg";
         else if (lowerFileName.endsWith(".flac")) mimeType = "audio/flac";
         else if (lowerFileName.endsWith(".wav")) mimeType = "audio/wav";
@@ -200,7 +204,7 @@ public class AudioFileManager {
         // through the generic Downloads collection instead of lying about it as audio/ogg.
         Uri collectionUri;
         String relativePath;
-        if (isWebmAudio) {
+        if (isGenericContainerAudio) {
             collectionUri = MediaStore.Downloads.EXTERNAL_CONTENT_URI;
             relativePath = Environment.DIRECTORY_DOWNLOADS + "/D.S Music/";
         } else {

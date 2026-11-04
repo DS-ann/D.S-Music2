@@ -177,7 +177,7 @@ object SongDownloader {
 
         val baseName = "${cleanTitle(title)} - ${cleanArtist(artist)}"
             .replace(Regex("[^a-zA-Z0-9._\\s()\\[\\]-]"), "_")
-        val extensions = listOf("m4a", "mp3", "webm", "opus", "ogg", "flac", "aac", "wav")
+        val extensions = listOf("m4a", "mp3", "mka", "webm", "opus", "ogg", "flac", "aac", "wav")
         for (extension in extensions) {
             val filename = "$baseName.$extension"
             val found = findDsmusicMediaStoreUri(context, filename)
@@ -508,7 +508,7 @@ object SongDownloader {
                 val extension = when {
                     downloadStream?.mimeType?.startsWith("audio/mp4", ignoreCase = true) == true -> "m4a"
                     downloadStream?.mimeType?.startsWith("audio/mpeg", ignoreCase = true) == true -> "mp3"
-                    downloadStream?.mimeType?.contains("webm", ignoreCase = true) == true -> "webm"
+                    downloadStream?.mimeType?.contains("webm", ignoreCase = true) == true -> "mka"
                     downloadStream?.mimeType?.contains("opus", ignoreCase = true) == true -> "opus"
                     downloadStream?.mimeType?.contains("ogg", ignoreCase = true) == true -> "ogg"
                     downloadStream?.mimeType?.contains("flac", ignoreCase = true) == true -> "flac"
@@ -885,8 +885,8 @@ object SongDownloader {
         artworkBytes: ByteArray?
     ): Boolean {
         val extension = outputFile.extension
-        if (extension.equals("webm", ignoreCase = true)) {
-            return embedWebmMetadataSafely(outputFile, title, artist, album, videoId, fromCache, artworkBytes)
+        if (extension.equals("mka", ignoreCase = true)) {
+            return embedMatroskaMetadataSafely(outputFile, title, artist, album, videoId, fromCache, artworkBytes)
         }
         val taggedFile = File(outputFile.parentFile, "${outputFile.nameWithoutExtension}.tagging.$extension")
         var backupFile: File? = null
@@ -1018,11 +1018,11 @@ object SongDownloader {
     }
 
     /**
-     * WebM/Opus is not handled by the usual audio-tag writer. Write standard Matroska
-     * SimpleTag elements into a WebM Segment so that tags are embedded in the media file,
-     * rather than relying only on MediaStore's display fields.
+     * YouTube supplies Opus inside WebM. Matroska attachments are not part of the WebM profile.
+     * convert the staged DocType to Matroska, then write tags and the embedded cover into the media file,
+     * rather than relying only on MediaStore display fields.
      */
-    private fun embedWebmMetadataSafely(
+    private fun embedMatroskaMetadataSafely(
         outputFile: File,
         title: String,
         artist: String,
@@ -1031,25 +1031,26 @@ object SongDownloader {
         fromCache: Boolean,
         artworkBytes: ByteArray?
     ): Boolean {
-        val stagedFile = File(outputFile.parentFile, "${outputFile.nameWithoutExtension}.tagging.webm")
+        val stagedFile = File(outputFile.parentFile, "${outputFile.nameWithoutExtension}.tagging.mka")
         var backupFile: File? = null
         try {
             if (stagedFile.exists() && !stagedFile.delete()) {
                 throw IOException("Could not clear the WebM metadata staging file")
             }
             outputFile.copyTo(stagedFile, overwrite = true)
+            convertWebmHeaderToMatroska(stagedFile)
             val sourceComment = if (fromCache) {
                 "Exported from D.S Music cached audio (video ID: $videoId)"
             } else {
                 "Downloaded from YouTube Music (video ID: $videoId)"
             }
-            val tags = buildWebmMetadataTags(title, artist, album, sourceComment)
+            val tags = buildMatroskaMetadataTags(title, artist, album, sourceComment)
             val coverAttachment = artworkBytes
                 ?.takeIf { it.isNotEmpty() }
-                ?.let(::buildWebmCoverAttachment)
-            appendWebmMetadataTags(stagedFile, tags, coverAttachment)
+                ?.let(::buildMatroskaCoverAttachment)
+            appendMatroskaMetadataTags(stagedFile, tags, coverAttachment)
             val appendedElements = if (coverAttachment == null) tags else tags + coverAttachment
-            verifyAppendedWebmMetadata(stagedFile, appendedElements)
+            verifyAppendedMatroskaMetadata(stagedFile, appendedElements)
 
             backupFile = File(outputFile.parentFile, "${outputFile.name}.raw-backup")
             if (backupFile.exists() && !backupFile.delete()) {
@@ -1074,7 +1075,7 @@ object SongDownloader {
         }
     }
 
-    private fun buildWebmMetadataTags(
+    private fun buildMatroskaMetadataTags(
         title: String,
         artist: String,
         album: String?,
@@ -1084,45 +1085,44 @@ object SongDownloader {
 
         fun addTag(name: String, value: String?) {
             if (value.isNullOrBlank()) return
-            val nameElement = webmElement(byteArrayOf(0x45, 0xA3.toByte()), name.toByteArray(Charsets.UTF_8))
-            val valueElement = webmElement(byteArrayOf(0x44, 0x87.toByte()), value.toByteArray(Charsets.UTF_8))
-            val simpleTag = webmElement(byteArrayOf(0x67, 0xC8.toByte()), nameElement + valueElement)
-            // TargetTypeValue 50 is the default track-level tag target; omitting a TrackUID
-            // makes the descriptive tags apply to the audio track.
-            val targets = webmElement(
+            val nameElement = matroskaElement(byteArrayOf(0x45, 0xA3.toByte()), name.toByteArray(Charsets.UTF_8))
+            val valueElement = matroskaElement(byteArrayOf(0x44, 0x87.toByte()), value.toByteArray(Charsets.UTF_8))
+            val simpleTag = matroskaElement(byteArrayOf(0x67, 0xC8.toByte()), nameElement + valueElement)
+            // TargetTypeValue 20 identifies a track/song tag and applies to audio tracks.
+            val targets = matroskaElement(
                 byteArrayOf(0x63, 0xC0.toByte()),
-                webmElement(byteArrayOf(0x68, 0xCA.toByte()), byteArrayOf(50))
+                matroskaElement(byteArrayOf(0x68, 0xCA.toByte()), byteArrayOf(20))
             )
-            entries.add(webmElement(byteArrayOf(0x73, 0x73.toByte()), targets + simpleTag))
+            entries.add(matroskaElement(byteArrayOf(0x73, 0x73.toByte()), targets + simpleTag))
         }
 
         addTag("TITLE", title)
         addTag("ARTIST", artist)
         addTag("ALBUM", album)
         addTag("COMMENT", comment)
-        return webmElement(
+        return matroskaElement(
             byteArrayOf(0x12, 0x54, 0xC3.toByte(), 0x67),
             entries.fold(ByteArray(0)) { output, entry -> output + entry }
         )
     }
 
-    private fun webmElement(id: ByteArray, payload: ByteArray): ByteArray =
-        id + encodeWebmSize(payload.size.toLong()) + payload
+    private fun matroskaElement(id: ByteArray, payload: ByteArray): ByteArray =
+        id + encodeEbmlSize(payload.size.toLong()) + payload
     /** Matroska cover art is stored as an AttachedFile child inside the Segment. */
-    private fun buildWebmCoverAttachment(artworkBytes: ByteArray): ByteArray {
-        val description = webmElement(byteArrayOf(0x46, 0x7E), "Front cover".toByteArray(Charsets.UTF_8))
-        val fileName = webmElement(byteArrayOf(0x46, 0x6E), "cover.jpg".toByteArray(Charsets.UTF_8))
-        val mimeType = webmElement(byteArrayOf(0x46, 0x60), "image/jpeg".toByteArray(Charsets.UTF_8))
-        val fileData = webmElement(byteArrayOf(0x46, 0x5C), artworkBytes)
-        val fileUid = webmElement(byteArrayOf(0x46, 0xAE.toByte()), byteArrayOf(1))
-        val attachedFile = webmElement(
+    private fun buildMatroskaCoverAttachment(artworkBytes: ByteArray): ByteArray {
+        val description = matroskaElement(byteArrayOf(0x46, 0x7E), "Front cover".toByteArray(Charsets.UTF_8))
+        val fileName = matroskaElement(byteArrayOf(0x46, 0x6E), "cover.jpg".toByteArray(Charsets.UTF_8))
+        val mimeType = matroskaElement(byteArrayOf(0x46, 0x60), "image/jpeg".toByteArray(Charsets.UTF_8))
+        val fileData = matroskaElement(byteArrayOf(0x46, 0x5C), artworkBytes)
+        val fileUid = matroskaElement(byteArrayOf(0x46, 0xAE.toByte()), byteArrayOf(1))
+        val attachedFile = matroskaElement(
             byteArrayOf(0x61, 0xA7.toByte()),
             description + fileName + mimeType + fileData + fileUid
         )
-        return webmElement(byteArrayOf(0x19, 0x41, 0xA4.toByte(), 0x69), attachedFile)
+        return matroskaElement(byteArrayOf(0x19, 0x41, 0xA4.toByte(), 0x69), attachedFile)
     }
 
-    private fun encodeWebmSize(value: Long, fixedWidth: Int? = null): ByteArray {
+    private fun encodeEbmlSize(value: Long, fixedWidth: Int? = null): ByteArray {
         if (value < 0L) throw IOException("Invalid EBML element size")
         val width = fixedWidth ?: (1..8).firstOrNull { candidate ->
             value <= (1L shl (7 * candidate)) - 2L
@@ -1140,7 +1140,156 @@ object SongDownloader {
         return encoded
     }
 
-    private fun verifyAppendedWebmMetadata(file: File, expectedElements: ByteArray) {
+    /**
+     * Convert the small EBML header to the Matroska DocType before writing an AttachedFile.
+     * The Segment is copied byte-for-byte, preserving all Opus packets and timestamps.
+     */
+    private fun convertWebmHeaderToMatroska(file: File) {
+        val convertedFile = File(file.parentFile, file.name + ".matroska-header")
+        var backupFile: File? = null
+        try {
+            java.io.RandomAccessFile(file, "r").use { input ->
+                if (input.length() < 8L ||
+                    input.readUnsignedByte() != 0x1A ||
+                    input.readUnsignedByte() != 0x45 ||
+                    input.readUnsignedByte() != 0xDF ||
+                    input.readUnsignedByte() != 0xA3
+                ) {
+                    throw IOException("The downloaded audio does not start with an EBML header")
+                }
+
+                val firstSizeByte = input.readUnsignedByte()
+                var sizeWidth = 1
+                var sizeMarker = 0x80
+                while (sizeWidth <= 8 && (firstSizeByte and sizeMarker) == 0) {
+                    sizeWidth++
+                    sizeMarker = sizeMarker ushr 1
+                }
+                if (sizeWidth > 8) throw IOException("Invalid EBML header size")
+
+                var headerPayloadSize = (firstSizeByte and (sizeMarker - 1)).toLong()
+                repeat(sizeWidth - 1) {
+                    headerPayloadSize = (headerPayloadSize shl 8) or input.readUnsignedByte().toLong()
+                }
+                if (headerPayloadSize <= 0L || headerPayloadSize > 64L * 1024L) {
+                    throw IOException("Unexpected EBML header size: $headerPayloadSize")
+                }
+
+                val headerPayload = ByteArray(headerPayloadSize.toInt())
+                input.readFully(headerPayload)
+                val segmentStart = input.filePointer
+                val rewrittenPayload = ByteArrayOutputStream(headerPayload.size + 16)
+                var cursor = 0
+                var docTypeFound = false
+
+                while (cursor < headerPayload.size) {
+                    val elementStart = cursor
+                    val firstIdByte = headerPayload[cursor].toInt() and 0xFF
+                    var idWidth = 1
+                    var idMarker = 0x80
+                    while (idWidth <= 4 && (firstIdByte and idMarker) == 0) {
+                        idWidth++
+                        idMarker = idMarker ushr 1
+                    }
+                    if (idWidth > 4 || cursor + idWidth >= headerPayload.size) {
+                        throw IOException("Invalid EBML header element ID")
+                    }
+
+                    val elementId = headerPayload.copyOfRange(cursor, cursor + idWidth)
+                    cursor += idWidth
+                    val (elementSize, elementSizeWidth) = decodeEbmlSize(headerPayload, cursor)
+                    cursor += elementSizeWidth
+                    if (elementSize < 0L || elementSize > (headerPayload.size - cursor).toLong()) {
+                        throw IOException("EBML header element extends beyond the header")
+                    }
+                    val elementEnd = cursor + elementSize.toInt()
+                    val isDocType = elementId.contentEquals(byteArrayOf(0x42, 0x82.toByte()))
+                    val isCrc32 = elementId.contentEquals(byteArrayOf(0xBF.toByte()))
+
+                    if (isDocType) {
+                        if (docTypeFound) throw IOException("EBML header contains more than one DocType")
+                        docTypeFound = true
+                        val oldDocType = String(headerPayload, cursor, elementSize.toInt(), Charsets.UTF_8)
+                        if (oldDocType != "webm" && oldDocType != "matroska") {
+                            throw IOException("Unsupported EBML DocType: $oldDocType")
+                        }
+                        val newDocType = "matroska".toByteArray(Charsets.UTF_8)
+                        rewrittenPayload.write(elementId)
+                        rewrittenPayload.write(encodeEbmlSize(newDocType.size.toLong()))
+                        rewrittenPayload.write(newDocType)
+                    } else if (!isCrc32) {
+                        rewrittenPayload.write(headerPayload, elementStart, elementEnd - elementStart)
+                    }
+                    cursor = elementEnd
+                }
+
+                if (!docTypeFound) throw IOException("EBML header has no DocType element")
+                val newHeaderPayload = rewrittenPayload.toByteArray()
+
+                FileOutputStream(convertedFile).use { output ->
+                    output.write(byteArrayOf(0x1A, 0x45, 0xDF.toByte(), 0xA3.toByte()))
+                    output.write(encodeEbmlSize(newHeaderPayload.size.toLong()))
+                    output.write(newHeaderPayload)
+
+                    input.seek(segmentStart)
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        val bytesRead = input.read(buffer)
+                        if (bytesRead < 0) break
+                        if (bytesRead > 0) output.write(buffer, 0, bytesRead)
+                    }
+                    output.flush()
+                }
+            }
+
+            if (!convertedFile.isFile || convertedFile.length() <= 0L) {
+                throw IOException("Matroska header conversion produced an empty file")
+            }
+            backupFile = File(file.parentFile, file.name + ".webm-backup")
+            if (backupFile.exists() && !backupFile.delete()) {
+                throw IOException("Could not clear the pre-conversion staging backup")
+            }
+            if (!file.renameTo(backupFile)) {
+                throw IOException("Could not preserve the original WebM staging file")
+            }
+            if (!convertedFile.renameTo(file)) {
+                backupFile.renameTo(file)
+                throw IOException("Could not install the Matroska header")
+            }
+            backupFile.delete()
+        } catch (error: Exception) {
+            convertedFile.delete()
+            if (backupFile?.exists() == true && !file.exists()) {
+                backupFile.renameTo(file)
+            }
+            throw error
+        }
+    }
+
+    private fun decodeEbmlSize(bytes: ByteArray, offset: Int): Pair<Long, Int> {
+        if (offset !in bytes.indices) throw IOException("Missing EBML element size")
+        val first = bytes[offset].toInt() and 0xFF
+        var width = 1
+        var marker = 0x80
+        while (width <= 8 && (first and marker) == 0) {
+            width++
+            marker = marker ushr 1
+        }
+        if (width > 8 || offset + width > bytes.size) {
+            throw IOException("Invalid EBML element size")
+        }
+
+        var value = (first and (marker - 1)).toLong()
+        for (index in 1 until width) {
+            value = (value shl 8) or (bytes[offset + index].toInt() and 0xFF).toLong()
+        }
+        if (value == (1L shl (7 * width)) - 1L) {
+            throw IOException("Unknown-size elements are not valid inside the EBML header")
+        }
+        return value to width
+    }
+
+    private fun verifyAppendedMatroskaMetadata(file: File, expectedElements: ByteArray) {
         if (expectedElements.isEmpty()) throw IOException("No WebM metadata was generated")
         java.io.RandomAccessFile(file, "r").use { randomFile ->
             val fileLength = randomFile.length()
@@ -1156,7 +1305,7 @@ object SongDownloader {
         }
     }
 
-    private fun appendWebmMetadataTags(file: File, tags: ByteArray, coverAttachment: ByteArray?) {
+    private fun appendMatroskaMetadataTags(file: File, tags: ByteArray, coverAttachment: ByteArray?) {
         val segmentChildren = if (coverAttachment == null || coverAttachment.isEmpty()) tags else tags + coverAttachment
         java.io.RandomAccessFile(file, "rw").use { randomFile ->
             val fileLength = randomFile.length()
@@ -1209,7 +1358,7 @@ object SongDownloader {
             if (expectedEnd != fileLength) {
                 throw IOException("Unexpected trailing bytes after the WebM Segment")
             }
-            val newSize = encodeWebmSize(segmentSize + segmentChildren.size.toLong(), width)
+            val newSize = encodeEbmlSize(segmentSize + segmentChildren.size.toLong(), width)
             randomFile.seek(sizeOffset)
             randomFile.write(newSize)
             randomFile.seek(fileLength)
@@ -1336,7 +1485,8 @@ object SongDownloader {
     private fun extensionForMimeType(mimeType: String?): String = when {
         mimeType?.contains("mp4", ignoreCase = true) == true -> "m4a"
         mimeType?.contains("mpeg", ignoreCase = true) == true -> "mp3"
-        mimeType?.contains("webm", ignoreCase = true) == true -> "webm"
+        mimeType?.contains("webm", ignoreCase = true) == true -> "mka"
+        mimeType?.contains("matroska", ignoreCase = true) == true -> "mka"
         mimeType?.contains("opus", ignoreCase = true) == true -> "opus"
         mimeType?.contains("ogg", ignoreCase = true) == true -> "ogg"
         mimeType?.contains("flac", ignoreCase = true) == true -> "flac"
