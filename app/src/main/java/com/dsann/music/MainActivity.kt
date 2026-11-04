@@ -868,8 +868,7 @@ class MainActivity : AppCompatActivity() {
             if (cameFromOutside) {
                 exploreViewModel.cameFromLibrary = true
             }
-            exploreViewModel.setSearchFilter(com.dsann.music.data.innertube.SearchFilter.ARTISTS)
-            exploreViewModel.search(artistName)
+            exploreViewModel.loadArtistByName(artistName)
         }
     }
 

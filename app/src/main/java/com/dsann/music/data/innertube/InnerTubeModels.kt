@@ -20,7 +20,8 @@ data class OnlineSong(
     val isVideo: Boolean = false,
     val isEpisode: Boolean = false,
     val isLive: Boolean = false,
-    val podcastId: String? = null
+    val podcastId: String? = null,
+    val artistRefs: List<OnlineArtistRef> = emptyList()
 )
 
 /** Represents an online album */
@@ -49,7 +50,7 @@ data class OnlineArtist(
 data class OnlineArtistRef(
     val name: String,
     val id: String? = null
-)
+) : java.io.Serializable
 
 /** Represents an online playlist */
 data class OnlinePlaylist(
@@ -118,11 +119,19 @@ data class HomeSection(
     val params: String? = null
 )
 
+/** A YouTube Music Explore chip with its original browse destination. */
+data class HomeCategory(
+    val title: String,
+    val browseId: String,
+    val params: String? = null
+)
+
 /** Home page data */
 data class HomePage(
     val sections: List<HomeSection>,
     val continuation: String? = null,
-    val moods: List<String> = emptyList()
+    val moods: List<String> = emptyList(),
+    val categories: List<HomeCategory> = emptyList()
 )
 
 /** Album page data */

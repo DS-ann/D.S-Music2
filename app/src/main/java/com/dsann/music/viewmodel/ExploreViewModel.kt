@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.dsann.music.data.innertube.AlbumPage
 import com.dsann.music.data.innertube.ArtistPage
 import com.dsann.music.data.innertube.HomeSection
+import com.dsann.music.data.innertube.HomeCategory
 import com.dsann.music.data.innertube.InnerTubeClient
 import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.PlaylistPage
@@ -186,6 +187,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private var homeContinuationJob: Job? = null
     private var searchContinuationJob: Job? = null
     private var detailLoadJob: Job? = null
+    private var artistResolveJob: Job? = null
 
     /**
      * Stop page content requests when Explore is hidden but preserve its already-loaded state.
@@ -567,8 +569,13 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         if (allMoods.isEmpty()) {
             explorePage?.moods?.let { allMoods.addAll(it) }
         }
-        if (allMoods.isNotEmpty()) {
-            _uiState.update { it.copy(homeMoods = allMoods.distinct()) }
+        val categories = (explorePage?.categories.orEmpty() + homePage?.categories.orEmpty())
+            .distinctBy { it.browseId + "|" + it.params.orEmpty() }
+        _uiState.update { state ->
+            state.copy(
+                homeMoods = allMoods.distinct().ifEmpty { state.homeMoods },
+                homeCategories = categories.ifEmpty { state.homeCategories }
+            )
         }
 
         // 3. Merge Results safely in explicit priority order
@@ -883,7 +890,39 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun loadArtistByName(name: String, fallbackThumbnailUrl: String? = null) {
+        val cleanName = name.trim()
+        if (cleanName.isBlank() || cleanName.equals("Unknown Artist", ignoreCase = true)) return
+        artistResolveJob?.cancel()
+        artistResolveJob = viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingDetail = true, error = null) }
+            try {
+                val result = YouTubeMusic.search(cleanName, SearchFilter.ARTISTS)
+                val artists = result.getOrNull()?.items?.filterIsInstance<SearchItem.Artist>().orEmpty()
+                val match = artists.firstOrNull {
+                    it.artist.title.trim().equals(cleanName, ignoreCase = true)
+                } ?: artists.firstOrNull()
+                artistResolveJob = null
+                if (match != null) {
+                    _uiState.update { it.copy(isLoadingDetail = false) }
+                    loadArtist(match.artist.browseId, match.artist.thumbnailUrl ?: fallbackThumbnailUrl)
+                } else {
+                    _uiState.update {
+                        it.copy(isLoadingDetail = false, error = "Could not find an artist page for $cleanName")
+                    }
+                }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                _uiState.update {
+                    it.copy(isLoadingDetail = false, error = error.message ?: "Could not open artist page")
+                }
+            }
+        }
+    }
+
     fun loadArtist(browseId: String, fallbackThumbnailUrl: String? = null) {
+        artistResolveJob?.cancel()
+        artistResolveJob = null
         _uiState.update { it.copy(isLoadingDetail = true) }
         detailLoadJob?.cancel()
         detailLoadJob = viewModelScope.launch {
@@ -1341,6 +1380,7 @@ data class ExploreUiState(
     val isRefreshing: Boolean = false,
     val searchHistory: List<String> = emptyList(),
     val homeMoods: List<String> = emptyList(),
+    val homeCategories: List<HomeCategory> = emptyList(),
     val searchFilter: SearchFilter? = null,
     val streamUrl: String? = null,
     val streamError: String? = null,

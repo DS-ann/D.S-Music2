@@ -436,6 +436,7 @@ object InnerTubeParser {
                     val subtitleRuns = flexColumns.getOrNull(1)?.asJsonObject
                         ?.path("musicResponsiveListItemFlexColumnRenderer.text.runs")?.asJsonArray
                     
+                    val parsedArtistRefs = parseArtistRefs(subtitleRuns)
                     var parsedArtist = ""
                     var parsedArtistId: String? = null
                     var parsedAlbumName: String? = null
@@ -498,8 +499,10 @@ object InnerTubeParser {
                     SearchItem.Song(OnlineSong(
                         videoId = videoId,
                         title = title,
-                        artist = parsedArtist.trim(),
-                        artistId = parsedArtistId,
+                        artist = parsedArtistRefs.takeIf { it.isNotEmpty() }?.joinToString(", ") { it.name }
+                            ?: parsedArtist.trim(),
+                        artistId = parsedArtistRefs.firstOrNull()?.id ?: parsedArtistId,
+                        artistRefs = parsedArtistRefs,
                         albumName = parsedAlbumName,
                         albumId = parsedAlbumId,
                         duration = durationText.trim().takeIf { it.isNotEmpty() },
@@ -818,16 +821,32 @@ object InnerTubeParser {
                 }
             val continuation = continuationCandidates.firstOrNull { it.isNotBlank() }
 
-            // Header chips can appear in either single- or two-column browse responses.
+            // Keep actual browseEndpoint values with the category labels.
             val moods = mutableListOf<String>()
+            val categories = mutableListOf<HomeCategory>()
             findFirstObject(json, "chipCloudRenderer")?.getAsJsonArray("chips")?.forEach { chip ->
-                val renderer = chip.takeIf { it.isJsonObject }?.asJsonObject ?: return@forEach
-                val text = renderer.path("chipCloudChipRenderer.text.runs.0.text")?.asString
-                    ?: renderer.path("chipCloudChipRenderer.text.simpleText")?.asString
-                if (!text.isNullOrBlank()) moods.add(text)
+                val wrapper = chip.takeIf { it.isJsonObject }?.asJsonObject ?: return@forEach
+                val renderer = wrapper.getAsJsonObject("chipCloudChipRenderer") ?: wrapper
+                val title = renderer.path("text.runs.0.text")?.asString
+                    ?: renderer.path("text.simpleText")?.asString
+                if (title.isNullOrBlank()) return@forEach
+                moods.add(title)
+                val browse = renderer.path("navigationEndpoint.browseEndpoint")?.asJsonObject
+                    ?: renderer.path("onSelectCommand.browseEndpoint")?.asJsonObject
+                    ?: renderer.path("navigationEndpoint.commandExecutorCommand.commands.0.browseEndpoint")?.asJsonObject
+                val browseId = browse?.get("browseId")?.asString?.takeIf { it.isNotBlank() }
+                if (browseId != null) {
+                    categories.add(
+                        HomeCategory(title, browseId, browse.get("params")?.asString?.takeIf { it.isNotBlank() })
+                    )
+                }
             }
-
-            return HomePage(sections, continuation, moods.distinct())
+            return HomePage(
+                sections = sections,
+                continuation = continuation,
+                moods = moods.distinct(),
+                categories = categories.distinctBy { it.browseId + "|" + it.params.orEmpty() }
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing home page", e)
         }
@@ -912,6 +931,22 @@ object InnerTubeParser {
         )
     }
 
+    private fun parseArtistRefs(runs: com.google.gson.JsonArray?): List<OnlineArtistRef> {
+        if (runs == null) return emptyList()
+        return runs.mapNotNull { run ->
+            val item = run.takeIf { it.isJsonObject }?.asJsonObject ?: return@mapNotNull null
+            val pageType = item.path(
+                "navigationEndpoint.browseEndpoint.browseEndpointContextSupportedConfigs.browseEndpointContextMusicConfig.pageType"
+            )?.asString
+            if (pageType != "MUSIC_PAGE_TYPE_ARTIST" && pageType != "MUSIC_PAGE_TYPE_USER_CHANNEL") {
+                return@mapNotNull null
+            }
+            val name = item.get("text")?.asString?.trim().orEmpty()
+            if (name.isBlank()) return@mapNotNull null
+            OnlineArtistRef(name, item.path("navigationEndpoint.browseEndpoint.browseId")?.asString)
+        }.distinctBy { it.id?.takeIf(String::isNotBlank) ?: it.name.trim().lowercase() }
+    }
+
     private fun parseTwoRowItem(renderer: JsonObject): SearchItem? {
         try {
             val title = renderer.path("title.runs.0.text")?.asString ?: return null
@@ -929,13 +964,14 @@ object InnerTubeParser {
             return when {
                 watchEndpoint != null -> {
                     val videoId = watchEndpoint.get("videoId")?.asString ?: return null
-                    val artistId = renderer.path("subtitle.runs.0.navigationEndpoint.browseEndpoint.browseId")?.asString
+                    val refs = parseArtistRefs(renderer.path("subtitle.runs")?.asJsonArray)
                     SearchItem.Song(OnlineSong(
                         videoId = videoId,
                         title = title,
-                        artist = getCleanArtist(subtitle),
-                        artistId = artistId,
-                        thumbnailUrl = thumbnail
+                        artist = refs.takeIf { it.isNotEmpty() }?.joinToString(", ") { it.name } ?: getCleanArtist(subtitle),
+                        artistId = refs.firstOrNull()?.id,
+                        thumbnailUrl = thumbnail,
+                        artistRefs = refs
                     ))
                 }
                 browseEndpoint != null -> {
