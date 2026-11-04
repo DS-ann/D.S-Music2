@@ -1611,6 +1611,15 @@ fun PlayerBottomSheetCompose(
                         }
                     ) * artworkScaleFactor
                     val statusBarTopPx = WindowInsets.statusBars.getTop(density).toFloat()
+                    // Keep the shared cover aligned with the player pane while the
+                    // landscape queue animates into its dedicated 42% side panel.
+                    val sharedArtworkQueueInset = androidx.compose.animation.core.animateDpAsState(
+                        targetValue = if (
+                            isLandscapeWindow && useWidePlayer && isQueuePresentationActive
+                        ) containerWidthDp * 0.42f else 0.dp,
+                        animationSpec = spring(dampingRatio = 0.85f, stiffness = 300f),
+                        label = "SharedArtworkQueueInset"
+                    )
 
                     if (!isLegacyCompactArtwork) {
                     Box(
@@ -1642,7 +1651,14 @@ fun PlayerBottomSheetCompose(
                                     }
                                 val xEndPx = if (useWidePlayer) {
                                     with(density) {
-                                        (20.dp + (containerWidthDp - 60.dp) * 0.54f / 2f - albumArtSizeDp / 2f).toPx()
+                                        val queueInset = sharedArtworkQueueInset.value.coerceAtLeast(0.dp)
+                                        val remainingPlayerWidth = (containerWidthDp - queueInset - 60.dp)
+                                            .coerceAtLeast(0.dp)
+                                        (
+                                            20.dp + queueInset +
+                                                remainingPlayerWidth * 0.54f / 2f -
+                                                albumArtSizeDp / 2f
+                                            ).toPx()
                                     }
                                 } else {
                                     (with(density) { containerWidthDp.toPx() } - fullSizePx) / 2f
@@ -1778,7 +1794,18 @@ fun PlayerBottomSheetCompose(
                                     }
                                 )
                             }
-                            .zIndex(if (isQueuePresentationActive) 1f else if (isLyricsModeEnabled || lyricsArtworkProgress > 0f) 6f else 3f)
+                            .zIndex(
+                                if (isQueuePresentationActive) {
+                                    // The queue is confined to the left dock in wide
+                                    // landscape mode; keep the shifted artwork above the
+                                    // player content so it is not hidden by the full-screen layer.
+                                    if (isLandscapeWindow && useWidePlayer) 6f else 1f
+                                } else if (isLyricsModeEnabled || lyricsArtworkProgress > 0f) {
+                                    6f
+                                } else {
+                                    3f
+                                }
+                            )
                     ) {
                         if (
                             isVideoMode &&
