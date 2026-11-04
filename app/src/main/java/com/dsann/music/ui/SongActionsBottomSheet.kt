@@ -739,8 +739,6 @@ fun HeaderSection(
                 overflow = TextOverflow.Ellipsis
             )
         }
-        }
-
     }
 }
 
