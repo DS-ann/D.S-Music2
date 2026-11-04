@@ -64,6 +64,7 @@ import com.dsann.music.ui.CreateLocalPlaylistDialog
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.MusicNote
@@ -208,6 +209,7 @@ fun ExploreScreen(
     val isSearching = uiState.isSearching
     val homeSections = uiState.homeSections
     val isLoadingHome = uiState.isLoadingHome
+    val homeFeedError = uiState.homeFeedError
     val isLoadingStream = uiState.isLoadingStream
     val currentMood = uiState.currentMood
     val currentOnlineSong = uiState.currentOnlineSong
@@ -1114,11 +1116,18 @@ fun ExploreScreen(
                                                         state = pullToRefreshState,
                                                         modifier = Modifier.fillMaxSize(),
                                                         indicator = {
-                                                            PullToRefreshDefaults.LoadingIndicator(
-                                                                state = pullToRefreshState,
-                                                                isRefreshing = isRefreshing,
-                                                                modifier = Modifier.align(Alignment.TopCenter)
-                                                            )
+                                                            // During a pull, show the reversible pull indicator.
+                                                            // Once refresh begins on release, the centered loading state below
+                                                            // takes over when there is no existing feed to keep on screen.
+                                                            if (homeSections.isNotEmpty() ||
+                                                                (!isRefreshing && pullToRefreshState.progress > 0.05f)
+                                                            ) {
+                                                                PullToRefreshDefaults.LoadingIndicator(
+                                                                    state = pullToRefreshState,
+                                                                    isRefreshing = isRefreshing,
+                                                                    modifier = Modifier.align(Alignment.TopCenter)
+                                                                )
+                                                            }
                                                         }
                                                     ) {
                                                         when {
@@ -1246,44 +1255,84 @@ fun ExploreScreen(
                                                                 }
                                                             }
 
-                                                            isLoadingHome -> HomeFeedSkeleton()
+                                                            isLoadingHome || (isRefreshing && homeSections.isEmpty()) -> {
+                                                                Box(
+                                                                    modifier = Modifier.fillMaxSize(),
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    Column(
+                                                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                                                    ) {
+                                                                        LoadingIndicator(modifier = Modifier.size(36.dp))
+                                                                        Text(
+                                                                            "Loading Explore",
+                                                                            style = DsmusicTheme.typography.bodyMedium,
+                                                                            color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            homeFeedError != null && homeSections.isEmpty() -> {
+                                                                Box(
+                                                                    modifier = Modifier.fillMaxSize()
+                                                                        .verticalScroll(rememberScrollState()),
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    Column(
+                                                                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                                                    ) {
+                                                                        Icon(
+                                                                            imageVector = Icons.Rounded.CloudOff,
+                                                                            contentDescription = null,
+                                                                            modifier = Modifier.size(56.dp),
+                                                                            tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f)
+                                                                        )
+                                                                        Text(
+                                                                            "Network not available",
+                                                                            style = DsmusicTheme.typography.titleMedium,
+                                                                            color = DsmusicTheme.colorScheme.onSurface
+                                                                        )
+                                                                        Text(
+                                                                            "Check your internet connection and try again.",
+                                                                            style = DsmusicTheme.typography.bodyMedium,
+                                                                            color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                                                            textAlign = TextAlign.Center
+                                                                        )
+                                                                        DsmusicOutlinedButton(onClick = { viewModel.refreshHomeFeed() }) {
+                                                                            Text("Refresh")
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
 
                                                             else -> {
                                                                 Box(
                                                                     modifier = Modifier.fillMaxSize()
-                                                                        .verticalScroll(
-                                                                            rememberScrollState()
-                                                                        ),
+                                                                        .verticalScroll(rememberScrollState()),
                                                                     contentAlignment = Alignment.Center
                                                                 ) {
-                                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                                    Column(
+                                                                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                                                    ) {
                                                                         Icon(
-                                                                            Icons.Rounded.MusicNote,
-                                                                            null,
-                                                                            modifier = Modifier.size(
-                                                                                64.dp
-                                                                            ),
-                                                                            tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(
-                                                                                alpha = 0.5f
-                                                                            )
-                                                                        )
-                                                                        Spacer(
-                                                                            modifier = Modifier.height(
-                                                                                16.dp
-                                                                            )
+                                                                            imageVector = Icons.Rounded.MusicNote,
+                                                                            contentDescription = null,
+                                                                            modifier = Modifier.size(56.dp),
+                                                                            tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                                                         )
                                                                         Text(
-                                                                            "Search for music",
+                                                                            "Nothing to show right now",
                                                                             style = DsmusicTheme.typography.titleMedium,
                                                                             color = DsmusicTheme.colorScheme.onSurfaceVariant
                                                                         )
-                                                                        Spacer(
-                                                                            modifier = Modifier.height(
-                                                                                8.dp
-                                                                            )
-                                                                        )
                                                                         DsmusicOutlinedButton(onClick = { viewModel.refreshHomeFeed() }) {
-                                                                            Text("Load Home Feed")
+                                                                            Text("Refresh")
                                                                         }
                                                                     }
                                                                 }
