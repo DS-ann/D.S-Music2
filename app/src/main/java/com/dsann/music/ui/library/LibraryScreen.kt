@@ -3474,37 +3474,70 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
                     val nameSeparator = baseName.lastIndexOf(" - ")
                     val fallbackTitle = if (nameSeparator > 0) baseName.substring(0, nameSeparator).trim() else baseName
                     val fallbackArtist = if (nameSeparator > 0) baseName.substring(nameSeparator + 3).trim() else ""
+                    val mediaId = c.getLong(idCol)
+                    val mediaUri = android.content.ContentUris.withAppendedId(
+                        android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                        mediaId
+                    )
+
+                    // MediaStore's M4A album-art index is inconsistent after direct file
+                    // insertion, especially when the source row has no generated ALBUM_ID.
+                    // Read the actual embedded MP4 atoms on IO and give Coil a cached image URI.
+                    val embeddedMetadata = if (
+                        isDownloadedFile && displayName.endsWith(".m4a", ignoreCase = true)
+                    ) {
+                        com.dsann.music.util.DownloadedAudioMetadataReader.read(
+                            context = context,
+                            filePath = path,
+                            mediaUri = mediaUri,
+                            cacheKey = "media-$mediaId"
+                        )
+                    } else null
+
                     val storedTitle = c.getString(titleCol).orEmpty()
                     val storedArtist = c.getString(artistCol).orEmpty()
-                    val title = if (
-                        isDownloadedFile && (
-                            storedTitle.isBlank() ||
-                                storedTitle.equals("<unknown>", ignoreCase = true) ||
-                                storedTitle.equals(baseName, ignoreCase = true)
-                        )
-                    ) fallbackTitle else storedTitle.ifBlank { fallbackTitle }
-                    val artist = if (
-                        isDownloadedFile &&
-                            (storedArtist.isBlank() ||
-                                storedArtist.equals("<unknown>", ignoreCase = true) ||
-                                storedArtist.equals("unknown artist", ignoreCase = true)) &&
-                            fallbackArtist.isNotBlank()
-                    ) fallbackArtist else storedArtist.ifBlank { "Unknown Artist" }
+                    val storedTitleIsUseful = storedTitle.isNotBlank() &&
+                        !storedTitle.equals("<unknown>", ignoreCase = true) &&
+                        !storedTitle.equals("unknown title", ignoreCase = true) &&
+                        !storedTitle.equals(baseName, ignoreCase = true)
+                    val title = when {
+                        storedTitleIsUseful -> storedTitle
+                        !embeddedMetadata?.title.isNullOrBlank() -> embeddedMetadata!!.title!!
+                        storedTitle.isNotBlank() && !storedTitle.equals("<unknown>", ignoreCase = true) -> storedTitle
+                        fallbackTitle.isNotBlank() -> fallbackTitle
+                        else -> "Unknown Title"
+                    }
+
+                    val storedArtistIsUseful = storedArtist.isNotBlank() &&
+                        !storedArtist.equals("<unknown>", ignoreCase = true) &&
+                        !storedArtist.equals("unknown artist", ignoreCase = true)
+                    val artist = when {
+                        storedArtistIsUseful -> storedArtist
+                        !embeddedMetadata?.artist.isNullOrBlank() -> embeddedMetadata!!.artist!!
+                        fallbackArtist.isNotBlank() -> fallbackArtist
+                        storedArtist.isNotBlank() -> storedArtist
+                        else -> "Unknown Artist"
+                    }
+                    val mediaStoreAlbum = c.getString(albumNameCol)?.takeIf {
+                        it.isNotBlank() && !it.equals("<unknown>", ignoreCase = true)
+                    }
+                    val albumName = mediaStoreAlbum ?: embeddedMetadata?.album
 
                     songs.add(
                         SongItem(
-                            c.getLong(idCol),
+                            mediaId,
                             title,
                             artist,
                             c.getLong(albumCol),
-                            c.getString(dataCol),
+                            path,
                             duration,
                             c.getLong(dateCol)
                         ).apply {
                             mediaStoreRelativePath = relativePath
-                            albumName = c.getString(albumNameCol)?.takeIf {
-                                it.isNotBlank() && !it.equals("<unknown>", ignoreCase = true)
-                            }
+                            this.albumName = albumName
+                            // Prefer the embedded cover from the M4A file to a missing/stale
+                            // MediaStore album-art row. This is a normal file URI, not the M4A URI.
+                            thumbnailUrl = embeddedMetadata?.artworkUri
                         }
                     )
                 }
