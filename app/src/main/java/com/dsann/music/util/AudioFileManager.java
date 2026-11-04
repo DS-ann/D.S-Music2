@@ -171,7 +171,9 @@ public class AudioFileManager {
         String lowerFileName = sourceFile.getName().toLowerCase(java.util.Locale.ROOT);
         boolean isWebmAudio = lowerFileName.endsWith(".webm");
         boolean isMatroskaAudio = lowerFileName.endsWith(".mka");
-        boolean isGenericContainerAudio = isWebmAudio || isMatroskaAudio;
+        // Only legacy WebM needs the generic Downloads collection. Android natively
+        // indexes MKA as audio/x-matroska, so keep it in the normal audio library.
+        boolean isGenericContainerAudio = isWebmAudio;
 
         ContentValues values = new ContentValues();
         values.put(MediaStore.Audio.Media.DISPLAY_NAME, sourceFile.getName());
@@ -192,16 +194,16 @@ public class AudioFileManager {
         if (lowerFileName.endsWith(".mp3")) mimeType = "audio/mpeg";
         else if (lowerFileName.endsWith(".m4a") || lowerFileName.endsWith(".aac")) mimeType = "audio/mp4";
         else if (isWebmAudio) mimeType = "audio/webm";
-        else if (isMatroskaAudio) mimeType = "audio/matroska";
+        else if (isMatroskaAudio) mimeType = "audio/x-matroska";
         else if (lowerFileName.endsWith(".ogg") || lowerFileName.endsWith(".opus")) mimeType = "audio/ogg";
         else if (lowerFileName.endsWith(".flac")) mimeType = "audio/flac";
         else if (lowerFileName.endsWith(".wav")) mimeType = "audio/wav";
         else mimeType = "application/octet-stream";
         values.put(MediaStore.Audio.Media.MIME_TYPE, mimeType);
 
-        // Android's MediaStore.Audio collection does not consistently recognize audio/webm
-        // as an insertable MIME type. Keep WebM/Opus in its real container and publish it
-        // through the generic Downloads collection instead of lying about it as audio/ogg.
+        // Android's MediaStore.Audio collection does not consistently recognize audio/webm.
+        // Legacy WebM files use Downloads; new .mka Opus files use audio/x-matroska here
+        // and stay indexed in Music/D.S Music.
         Uri collectionUri;
         String relativePath;
         if (isGenericContainerAudio) {
