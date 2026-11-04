@@ -359,7 +359,9 @@ class MainActivity : AppCompatActivity() {
                         exploreViewModel.setExplorePageActive(currentDestination?.route == "explore")
                         searchViewModel.setExplorePageActive(currentDestination?.route == "search")
                     }
-                    val showBottomBar = !isPlayerExpanded && currentDestination?.route in listOf("explore", "search", "library", "local_music", "settings")
+                    // Keep the tab viewport and navigation dock at their normal dimensions while the player expands.
+                    // PlayerBottomSheetCompose is drawn later in this Box and overlays both surfaces.
+                    val showBottomBar = currentDestination?.route in listOf("explore", "search", "library", "local_music", "settings")
                     // Keep the rail persistent in wide layouts; scroll-driven bottom-bar hiding is phone-only.
                     val showNavigationRail = useNavigationRail && showBottomBar
                     val layoutDirection = LocalLayoutDirection.current
