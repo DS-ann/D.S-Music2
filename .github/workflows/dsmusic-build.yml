@@ -11,6 +11,7 @@ on:
       - "settings.gradle"
       - "gradle.properties"
       - ".github/workflows/dsmusic-build.yml"
+      # Includes M4A tag verification, embedded-cover extraction and Ogg Opus remux tests/builds.
   workflow_dispatch:
 
 permissions:
