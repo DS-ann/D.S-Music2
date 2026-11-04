@@ -850,8 +850,8 @@ fun ExploreScreen(
                                             onAccountVisibleChange = onSearchHeaderAccountVisibleChange,
                                             onCustomizeExplore = { showExploreCustomizer = true },
                                             userProfile = userProfile,
-                                            homeMoods = if (showExploreMoodChips) homeMoods else emptyList(),
-                                            currentMood = currentMood,
+                                            homeMoods = if (!isSearchDestination && showExploreMoodChips) homeMoods else emptyList(),
+                                            currentMood = if (isSearchDestination) null else currentMood,
                                             onMoodClick = onSearchHeaderMoodClick,
                                             currentFilter = currentFilter,
                                             onFilterClick = onSearchHeaderFilterClick,
@@ -988,7 +988,7 @@ fun ExploreScreen(
                                                         }
                                                     }
                                                 }
-                                                isSearchDestination && !isSearchActive && searchQuery.isBlank() && currentMood == null -> {
+                                                isSearchDestination && !isSearchActive && searchQuery.isBlank() -> {
                                                     LazyColumn(
                                                         modifier = Modifier.fillMaxSize(),
                                                         contentPadding = PaddingValues(
@@ -999,200 +999,147 @@ fun ExploreScreen(
                                                         ),
                                                         verticalArrangement = Arrangement.spacedBy(22.dp)
                                                     ) {
-                                                        item(key = "search-landing-hero") {
-                                                            Box(
-                                                                modifier = Modifier
-                                                                    .fillMaxWidth()
-                                                                    .clip(RoundedCornerShape(26.dp))
-                                                                    .background(
-                                                                        Brush.linearGradient(
-                                                                            listOf(
-                                                                                DsmusicTheme.colorScheme.primaryContainer.copy(alpha = 0.78f),
-                                                                                DsmusicTheme.colorScheme.surfaceContainerHigh,
-                                                                                DsmusicTheme.colorScheme.surfaceContainerLow
+                                                        item(key = "search-discovery-cards") {
+                                                            Row(
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                                                verticalAlignment = Alignment.Top
+                                                            ) {
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .weight(1f)
+                                                                        .height(190.dp)
+                                                                        .clip(RoundedCornerShape(24.dp))
+                                                                        .background(
+                                                                            Brush.linearGradient(
+                                                                                listOf(
+                                                                                    DsmusicTheme.colorScheme.primaryContainer.copy(alpha = 0.90f),
+                                                                                    DsmusicTheme.colorScheme.surfaceContainerHigh,
+                                                                                    DsmusicTheme.colorScheme.surfaceContainerLow
+                                                                                )
                                                                             )
                                                                         )
-                                                                    )
-                                                                    .padding(22.dp)
-                                                            ) {
-                                                                Row(
-                                                                    modifier = Modifier.fillMaxWidth(),
-                                                                    verticalAlignment = Alignment.CenterVertically,
-                                                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                                                        .padding(14.dp)
                                                                 ) {
+                                                                    Icon(
+                                                                        Icons.Rounded.Search,
+                                                                        contentDescription = null,
+                                                                        tint = DsmusicTheme.colorScheme.primary.copy(alpha = 0.68f),
+                                                                        modifier = Modifier
+                                                                            .align(Alignment.TopEnd)
+                                                                            .size(25.dp)
+                                                                    )
                                                                     Column(
-                                                                        modifier = Modifier.weight(1f),
-                                                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                                                        modifier = Modifier.fillMaxSize(),
+                                                                        verticalArrangement = Arrangement.spacedBy(7.dp)
                                                                     ) {
                                                                         Text(
-                                                                            "YOUR NEXT FAVOURITE STARTS HERE",
+                                                                            "YOUR NEXT FAVOURITE",
                                                                             style = DsmusicTheme.typography.labelSmall.copy(
-                                                                                letterSpacing = 1.35.sp,
+                                                                                letterSpacing = 1.0.sp,
                                                                                 fontWeight = FontWeight.Bold
                                                                             ),
                                                                             color = DsmusicTheme.colorScheme.primary
                                                                         )
+                                                                        Spacer(Modifier.weight(1f))
                                                                         Text(
                                                                             "Find your\nnext repeat.",
-                                                                            style = DsmusicTheme.typography.headlineLarge.copy(
-                                                                                fontSize = 29.sp,
-                                                                                lineHeight = 33.sp,
+                                                                            style = DsmusicTheme.typography.titleLarge.copy(
+                                                                                fontSize = 22.sp,
+                                                                                lineHeight = 25.sp,
                                                                                 fontWeight = FontWeight.ExtraBold
                                                                             ),
-                                                                            color = DsmusicTheme.colorScheme.onSurface
+                                                                            color = DsmusicTheme.colorScheme.onSurface,
+                                                                            maxLines = 2,
+                                                                            overflow = TextOverflow.Ellipsis
                                                                         )
                                                                         Text(
-                                                                            "Songs, artists, albums and playlists — all in one place.",
+                                                                            "Songs, artists, albums and playlists.",
                                                                             style = DsmusicTheme.typography.bodySmall,
-                                                                            color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                                                            color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                                                            maxLines = 2,
+                                                                            overflow = TextOverflow.Ellipsis
                                                                         )
                                                                     }
+                                                                }
+
+                                                                if (homeCategories.isNotEmpty()) {
                                                                     Box(
                                                                         modifier = Modifier
-                                                                            .size(68.dp)
-                                                                            .clip(CircleShape)
-                                                                            .background(DsmusicTheme.colorScheme.primary.copy(alpha = 0.13f)),
-                                                                        contentAlignment = Alignment.Center
+                                                                            .weight(1f)
+                                                                            .height(190.dp)
+                                                                            .clip(RoundedCornerShape(24.dp))
+                                                                            .background(
+                                                                                Brush.linearGradient(
+                                                                                    listOf(
+                                                                                        DsmusicTheme.colorScheme.secondaryContainer.copy(alpha = 0.96f),
+                                                                                        DsmusicTheme.colorScheme.primaryContainer.copy(alpha = 0.82f),
+                                                                                        DsmusicTheme.colorScheme.surfaceContainerHigh
+                                                                                    )
+                                                                                )
+                                                                            )
+                                                                            .clickable { showSearchGenreBrowser = true }
+                                                                            .padding(14.dp)
                                                                     ) {
                                                                         Icon(
-                                                                            Icons.Rounded.Search,
+                                                                            Icons.Rounded.MusicNote,
                                                                             contentDescription = null,
-                                                                            tint = DsmusicTheme.colorScheme.primary,
-                                                                            modifier = Modifier.size(34.dp)
+                                                                            tint = DsmusicTheme.colorScheme.secondary.copy(alpha = 0.85f),
+                                                                            modifier = Modifier
+                                                                                .align(Alignment.TopEnd)
+                                                                                .size(28.dp)
                                                                         )
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-
-                                                        if (homeMoods.isNotEmpty()) {
-                                                            item(key = "search-moods-heading") {
-                                                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                                    Text(
-                                                                        "Explore by mood",
-                                                                        style = DsmusicTheme.typography.titleMedium,
-                                                                        fontWeight = FontWeight.Bold,
-                                                                        color = DsmusicTheme.colorScheme.onSurface
-                                                                    )
-                                                                    Text(
-                                                                        "Pick a feeling and find its soundtrack.",
-                                                                        style = DsmusicTheme.typography.bodySmall,
-                                                                        color = DsmusicTheme.colorScheme.onSurfaceVariant
-                                                                    )
-                                                                }
-                                                            }
-                                                            item(key = "search-moods") {
-                                                                LazyRow(
-                                                                    horizontalArrangement = Arrangement.spacedBy(9.dp),
-                                                                    contentPadding = PaddingValues(end = 4.dp)
-                                                                ) {
-                                                                    items(homeMoods, key = { "search-mood:$it" }) { mood ->
-                                                                        val selected = currentMood == mood
-                                                                        DsmusicFilterChip(
-                                                                            selected = selected,
-                                                                            onClick = { onSearchHeaderMoodClick(if (selected) null else mood) },
-                                                                            shape = CircleShape,
-                                                                            label = {
+                                                                        Column(
+                                                                            modifier = Modifier.fillMaxSize(),
+                                                                            verticalArrangement = Arrangement.spacedBy(7.dp)
+                                                                        ) {
+                                                                            Text(
+                                                                                "DISCOVER BY SOUND",
+                                                                                style = DsmusicTheme.typography.labelSmall.copy(
+                                                                                    letterSpacing = 1.0.sp,
+                                                                                    fontWeight = FontWeight.Bold
+                                                                                ),
+                                                                                color = DsmusicTheme.colorScheme.primary
+                                                                            )
+                                                                            Spacer(Modifier.weight(1f))
+                                                                            Text(
+                                                                                "Explore genres",
+                                                                                style = DsmusicTheme.typography.titleLarge.copy(
+                                                                                    fontSize = 22.sp,
+                                                                                    lineHeight = 25.sp,
+                                                                                    fontWeight = FontWeight.ExtraBold
+                                                                                ),
+                                                                                color = DsmusicTheme.colorScheme.onSurface,
+                                                                                maxLines = 2,
+                                                                                overflow = TextOverflow.Ellipsis
+                                                                            )
+                                                                            Text(
+                                                                                homeCategories.take(2).joinToString(" · ") { it.title } +
+                                                                                    if (homeCategories.size > 2) " · more" else "",
+                                                                                style = DsmusicTheme.typography.bodySmall,
+                                                                                color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                                                                maxLines = 2,
+                                                                                overflow = TextOverflow.Ellipsis
+                                                                            )
+                                                                            Row(
+                                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                                                            ) {
                                                                                 Text(
-                                                                                    mood,
-                                                                                    style = DsmusicTheme.typography.labelMedium,
-                                                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                                                                    "Browse",
+                                                                                    style = DsmusicTheme.typography.labelLarge,
+                                                                                    fontWeight = FontWeight.Bold,
+                                                                                    color = DsmusicTheme.colorScheme.primary
+                                                                                )
+                                                                                Icon(
+                                                                                    Icons.Rounded.ChevronRight,
+                                                                                    contentDescription = null,
+                                                                                    tint = DsmusicTheme.colorScheme.primary,
+                                                                                    modifier = Modifier.size(17.dp)
                                                                                 )
                                                                             }
-                                                                        )
+                                                                        }
                                                                     }
-                                                                }
-                                                            }
-                                                        }
-
-                                                        if (homeCategories.isNotEmpty()) item(key = "search-genres-entry") {
-                                                            Row(
-                                                                modifier = Modifier
-                                                                    .fillMaxWidth()
-                                                                    .height(164.dp)
-                                                                    .clip(RoundedCornerShape(26.dp))
-                                                                    .background(
-                                                                        Brush.linearGradient(
-                                                                            listOf(
-                                                                                DsmusicTheme.colorScheme.primaryContainer.copy(alpha = 0.96f),
-                                                                                DsmusicTheme.colorScheme.secondaryContainer.copy(alpha = 0.88f),
-                                                                                DsmusicTheme.colorScheme.surfaceContainerHigh
-                                                                            )
-                                                                        )
-                                                                    )
-                                                                    .clickable { showSearchGenreBrowser = true }
-                                                                    .padding(19.dp),
-                                                                verticalAlignment = Alignment.CenterVertically,
-                                                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                                            ) {
-                                                                Column(
-                                                                    modifier = Modifier.weight(1f),
-                                                                    verticalArrangement = Arrangement.spacedBy(7.dp)
-                                                                ) {
-                                                                    Text(
-                                                                        "DISCOVER BY SOUND",
-                                                                        style = DsmusicTheme.typography.labelSmall.copy(
-                                                                            letterSpacing = 1.25.sp,
-                                                                            fontWeight = FontWeight.Bold
-                                                                        ),
-                                                                        color = DsmusicTheme.colorScheme.primary
-                                                                    )
-                                                                    Text(
-                                                                        "Explore genres",
-                                                                        style = DsmusicTheme.typography.headlineMedium,
-                                                                        fontWeight = FontWeight.ExtraBold,
-                                                                        color = DsmusicTheme.colorScheme.onSurface
-                                                                    )
-                                                                    Text(
-                                                                        homeCategories.take(3).joinToString(" · ") { it.title } +
-                                                                            if (homeCategories.size > 3) " · and more" else "",
-                                                                        style = DsmusicTheme.typography.bodySmall,
-                                                                        color = DsmusicTheme.colorScheme.onSurfaceVariant,
-                                                                        maxLines = 2,
-                                                                        overflow = TextOverflow.Ellipsis
-                                                                    )
-                                                                    Row(
-                                                                        verticalAlignment = Alignment.CenterVertically,
-                                                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                                                    ) {
-                                                                        Text(
-                                                                            "Browse categories",
-                                                                            style = DsmusicTheme.typography.labelLarge,
-                                                                            fontWeight = FontWeight.Bold,
-                                                                            color = DsmusicTheme.colorScheme.primary
-                                                                        )
-                                                                        Icon(
-                                                                            Icons.Rounded.ChevronRight,
-                                                                            contentDescription = null,
-                                                                            tint = DsmusicTheme.colorScheme.primary,
-                                                                            modifier = Modifier.size(18.dp)
-                                                                        )
-                                                                    }
-                                                                }
-                                                                Box(
-                                                                    modifier = Modifier.size(104.dp),
-                                                                    contentAlignment = Alignment.Center
-                                                                ) {
-                                                                    Box(
-                                                                        modifier = Modifier
-                                                                            .align(Alignment.TopStart)
-                                                                            .size(62.dp)
-                                                                            .clip(RoundedCornerShape(19.dp))
-                                                                            .background(DsmusicTheme.colorScheme.primary.copy(alpha = 0.16f))
-                                                                    )
-                                                                    Box(
-                                                                        modifier = Modifier
-                                                                            .align(Alignment.BottomEnd)
-                                                                            .size(68.dp)
-                                                                            .clip(RoundedCornerShape(22.dp))
-                                                                            .background(DsmusicTheme.colorScheme.secondary.copy(alpha = 0.14f))
-                                                                    )
-                                                                    Icon(
-                                                                        Icons.Rounded.MusicNote,
-                                                                        contentDescription = null,
-                                                                        tint = DsmusicTheme.colorScheme.primary,
-                                                                        modifier = Modifier.size(49.dp)
-                                                                    )
                                                                 }
                                                             }
                                                         }

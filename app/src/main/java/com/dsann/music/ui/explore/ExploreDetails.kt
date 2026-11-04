@@ -127,6 +127,7 @@ fun AlbumDetailView(
         sharedElementKey = albumPage.album.browseId,
         onBack = onBack,
         landscapeHeaderOnLeft = true,
+        compactCoverHeader = true,
         headerActions = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -459,6 +460,8 @@ fun ArtistDetailView(
         isCircular = true,
         sharedElementKey = artistPage.artist.browseId,
         onBack = onBack,
+        landscapeHeaderOnLeft = true,
+        compactCoverHeader = true,
         headerActions = {
             // Follow/Subscribe Button
             if (onSubscribeClick != null) {
@@ -635,6 +638,7 @@ fun AdaptiveDetailContainer(
     headerActions: @Composable (RowScope.() -> Unit)?,
     onBack: () -> Unit,
     landscapeHeaderOnLeft: Boolean = false,
+    compactCoverHeader: Boolean = false,
     content: LazyListScope.() -> Unit
 ) {
     val lazyListState = rememberLazyListState()
@@ -852,6 +856,103 @@ fun AdaptiveDetailContainer(
                 }
             }
         }
+        }
+    } else if (compactCoverHeader) {
+        // Keep cover art, title, metadata and page actions in one compact header.
+        // This is lighter than the full-width parallax artwork on older devices
+        // and prevents Subscribe / Details actions from becoming a detached section.
+        LazyColumn(
+            state = lazyListState,
+            modifier = Modifier.fillMaxSize().background(DsmusicTheme.colorScheme.background),
+            contentPadding = PaddingValues(top = 56.dp, bottom = 120.dp)
+        ) {
+            item(key = "detail-cover-header") {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .clip(RoundedCornerShape(26.dp))
+                        .background(DsmusicTheme.colorScheme.surfaceContainerLow)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val coverModifier = Modifier
+                            .size(116.dp)
+                            .clip(if (isCircular) CircleShape else RoundedCornerShape(18.dp))
+                        AsyncImage(
+                            model = rememberExploreImageRequest(thumbnailUrl, 384),
+                            contentDescription = null,
+                            modifier = if (sharedElementKey != null) {
+                                coverModifier.sharedElementIfAvailable("image-$sharedElementKey")
+                            } else coverModifier,
+                            contentScale = ContentScale.Crop
+                        )
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(7.dp)
+                        ) {
+                            Text(
+                                text = title,
+                                style = DsmusicTheme.typography.titleLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = DsmusicTheme.colorScheme.onSurface,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = if (sharedElementKey != null) {
+                                    Modifier.sharedElementIfAvailable("title-$sharedElementKey")
+                                } else Modifier
+                            )
+                            if (subtitle.isNotBlank()) {
+                                Text(
+                                    text = subtitle,
+                                    style = DsmusicTheme.typography.bodyMedium,
+                                    color = DsmusicTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                    if (headerActions != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            headerActions()
+                        }
+                    }
+                }
+            }
+            content()
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            DsmusicIconButton(
+                onClick = onBack,
+                modifier = Modifier.background(
+                    DsmusicTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f),
+                    CircleShape
+                ),
+                shape = IconButtonDefaults.filledShape
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = "Back",
+                    tint = DsmusicTheme.colorScheme.onSurface
+                )
+            }
         }
     } else {
         // --- PORTRAIT: PARALLAX ---

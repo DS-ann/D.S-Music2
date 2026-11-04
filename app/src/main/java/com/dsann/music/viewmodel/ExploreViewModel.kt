@@ -12,12 +12,16 @@ import com.dsann.music.data.innertube.HomeSection
 import com.dsann.music.data.innertube.HomeCategory
 import com.dsann.music.data.innertube.InnerTubeClient
 import com.dsann.music.data.innertube.OnlineSong
+import com.dsann.music.data.innertube.OnlineAlbum
+import com.dsann.music.data.innertube.OnlineArtist
+import com.dsann.music.data.innertube.OnlinePlaylist
 import com.dsann.music.data.innertube.PlaylistPage
 import com.dsann.music.data.innertube.SearchFilter
 import com.dsann.music.data.innertube.SearchItem
 import com.dsann.music.data.innertube.YouTubeMusic
 import com.dsann.music.ui.explore.buildExploreImageRequest
 import coil.imageLoader
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -111,6 +115,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     private val prefs = application.getSharedPreferences("explore_prefs", 0)
     private val SEARCH_HISTORY_KEY = "search_history"
+    private val HOME_FEED_CACHE_KEY = "home_feed_cache_v1"
+    private val gson = com.google.gson.Gson()
     private val MAX_HISTORY = 20
 
     init {
@@ -123,6 +129,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 notInterestedIds = notInterested
             )
         }
+        homeLoaded = restoreHomeFeedCache()
     }
 
     private fun loadSearchHistory() {
@@ -188,6 +195,31 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private var searchContinuationJob: Job? = null
     private var detailLoadJob: Job? = null
     private var artistResolveJob: Job? = null
+    private var homeCacheSaveJob: Job? = null
+
+    private data class CachedHomeFeed(
+        val sections: List<CachedHomeFeedSection> = emptyList(),
+        val moods: List<String> = emptyList(),
+        val categories: List<HomeCategory> = emptyList(),
+        val currentMood: String? = null,
+        val homeContinuation: String? = null,
+        val exploreContinuation: String? = null
+    )
+
+    private data class CachedHomeFeedSection(
+        val title: String,
+        val items: List<CachedHomeFeedItem>,
+        val browseEndpoint: String? = null,
+        val params: String? = null
+    )
+
+    private data class CachedHomeFeedItem(
+        val type: String,
+        val song: OnlineSong? = null,
+        val album: OnlineAlbum? = null,
+        val artist: OnlineArtist? = null,
+        val playlist: OnlinePlaylist? = null
+    )
 
     /**
      * Stop page content requests when Explore is hidden but preserve its already-loaded state.
@@ -207,10 +239,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         suggestJob = null
         personalizationJob?.cancel()
         personalizationJob = null
-        homeFeedJob?.cancel()
-        homeFeedJob = null
-        homeRefreshJob?.cancel()
-        homeRefreshJob = null
+        // A first load or an explicit refresh must finish even when the user
+        // switches tabs. Its result is cached, so returning to Explore is instant.
         homeContinuationJob?.cancel()
         homeContinuationJob = null
         searchContinuationJob?.cancel()
@@ -220,8 +250,6 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         _uiState.update {
             it.copy(
                 isSearching = false,
-                isLoadingHome = false,
-                isRefreshing = false,
                 isLoadingMoreHome = false,
                 isLoadingDetail = false
             )
@@ -492,6 +520,79 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         InnerTubeClient.cookie = cookie
     }
 
+    private fun restoreHomeFeedCache(): Boolean {
+        val json = prefs.getString(HOME_FEED_CACHE_KEY, null) ?: return false
+        return try {
+            val cached = gson.fromJson(json, CachedHomeFeed::class.java) ?: return false
+            val restoredSections = cached.sections.mapNotNull { section ->
+                val restoredItems = section.items.mapNotNull { item ->
+                    when (item.type) {
+                        "song" -> item.song?.let { SearchItem.Song(it) }
+                        "album" -> item.album?.let { SearchItem.Album(it) }
+                        "artist" -> item.artist?.let { SearchItem.Artist(it) }
+                        "playlist" -> item.playlist?.let { SearchItem.Playlist(it) }
+                        else -> null
+                    }
+                }
+                if (restoredItems.isEmpty()) null else HomeSection(
+                    title = section.title,
+                    items = restoredItems,
+                    browseEndpoint = section.browseEndpoint,
+                    params = section.params
+                )
+            }
+            if (restoredSections.isEmpty()) return false
+            homeContinuationToken = cached.homeContinuation
+            exploreContinuationToken = cached.exploreContinuation
+            _uiState.update { state ->
+                state.copy(
+                    homeSections = restoredSections,
+                    homeMoods = cached.moods,
+                    homeCategories = cached.categories,
+                    currentMood = cached.currentMood,
+                    isLoadingHome = false,
+                    homeFeedError = null
+                )
+            }
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "Ignoring invalid cached Explore feed", e)
+            false
+        }
+    }
+
+    private fun persistHomeFeedCache() {
+        val state = _uiState.value
+        if (state.homeSections.isEmpty()) return
+        val cached = CachedHomeFeed(
+            sections = state.homeSections.map { section ->
+                CachedHomeFeedSection(
+                    title = section.title,
+                    browseEndpoint = section.browseEndpoint,
+                    params = section.params,
+                    items = section.items.mapNotNull { item ->
+                        when (item) {
+                            is SearchItem.Song -> CachedHomeFeedItem("song", song = item.song)
+                            is SearchItem.Album -> CachedHomeFeedItem("album", album = item.album)
+                            is SearchItem.Artist -> CachedHomeFeedItem("artist", artist = item.artist)
+                            is SearchItem.Playlist -> CachedHomeFeedItem("playlist", playlist = item.playlist)
+                        }
+                    }
+                )
+            },
+            moods = state.homeMoods,
+            categories = state.homeCategories,
+            currentMood = state.currentMood,
+            homeContinuation = homeContinuationToken,
+            exploreContinuation = exploreContinuationToken
+        )
+        val json = runCatching { gson.toJson(cached) }.getOrNull() ?: return
+        homeCacheSaveJob?.cancel()
+        homeCacheSaveJob = viewModelScope.launch(Dispatchers.IO) {
+            prefs.edit().putString(HOME_FEED_CACHE_KEY, json).commit()
+        }
+    }
+
     fun forceReloadHomeFeed() {
         syncCookieFromDisk()
         homeLoaded = false
@@ -650,6 +751,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                             }
                         }
                     }
+                    persistHomeFeedCache()
                     prefetchThumbnails(localStats.take(2).flatMap { it.items.take(3) })
                 }
             } catch (e: Exception) {
@@ -682,12 +784,13 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     )
                 }
                 homeLoaded = true
+                persistHomeFeedCache()
                 prefetchThumbnails(mergedSections.take(3).flatMap { it.items.take(3) })
                 loadPersonalizedSectionsInBackground()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "Home feed error", e)
-                homeLoaded = false
+                homeLoaded = _uiState.value.homeSections.isNotEmpty()
                 _uiState.update {
                     it.copy(
                         homeFeedError = "Network not available. Check your connection and try again."
@@ -721,12 +824,13 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     )
                 }
                 homeLoaded = true
+                persistHomeFeedCache()
                 prefetchThumbnails(mergedSections.take(3).flatMap { it.items.take(3) })
                 loadPersonalizedSectionsInBackground()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "Refresh error", e)
-                homeLoaded = false
+                homeLoaded = _uiState.value.homeSections.isNotEmpty()
                 _uiState.update {
                     it.copy(
                         homeFeedError = "Network not available. Check your connection and try again."
@@ -759,6 +863,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                         }
                     }
                     _uiState.update { it.copy(homeSections = current) }
+                    persistHomeFeedCache()
                     val nextToken = page.continuation?.takeIf { it != token }
                     if (loadingHomeContinuation) {
                         homeContinuationToken = nextToken
@@ -1221,8 +1326,6 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     // ========== Speed Dial & Not Interested ==========
 
-    private val gson = com.google.gson.Gson()
-
     fun getPinnedSpeedDialSongs(): List<OnlineSong> {
         val json = prefs.getString("speed_dial_songs_json", null) ?: return emptyList()
         return try {
@@ -1265,6 +1368,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val mergedSections = fetchMergedHomeFeed()
             _uiState.update { it.copy(homeSections = mergedSections) }
+            persistHomeFeedCache()
         }
     }
 
@@ -1284,6 +1388,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
             
             val mergedSections = fetchMergedHomeFeed()
             _uiState.update { it.copy(homeSections = mergedSections) }
+            persistHomeFeedCache()
         }
 
         val filteredSearchResults = _uiState.value.searchResults.filterNot { item ->
