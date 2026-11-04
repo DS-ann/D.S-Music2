@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.painter.Painter
@@ -66,6 +67,20 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+/**
+ * The fixed D.S Launcher Home Studio text gradient.
+ * Keep these stops in sync with BlankActivity.FixedGradientTextView in D.S-Apps.
+ */
+fun dsmusicHomeStudioGradientBrush(): Brush = Brush.horizontalGradient(
+    colors = listOf(
+        Color(0xFF53F6FF),
+        Color(0xFF699DFF),
+        Color(0xFFAE7EFF),
+        Color(0xFFFF70CD),
+        Color(0xFFFFCF7F)
+    )
+)
 
 @Immutable
 data class DsmusicColorScheme(
