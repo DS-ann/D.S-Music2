@@ -41,6 +41,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -291,7 +292,8 @@ fun BottomSheetScaffoldContent(
         modifier = Modifier.fillMaxWidth(),
         shape = DsmusicTheme.shapes.extraLarge, // Expressive corner radius
         color = DsmusicTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 6.dp
+        tonalElevation = 6.dp,
+        showBorder = false
     ) {
         Column(
             modifier = Modifier
@@ -358,7 +360,7 @@ fun BottomSheetScaffoldContent(
                 // LANDSCAPE: Side-by-Side Split View
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(32.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalAlignment = Alignment.Top
                 ) {
                     // Left Pane (Fixed identity & Switcher)
@@ -1004,24 +1006,31 @@ fun ActionButtonRow2(
 }
 @SuppressLint("UseOfNonLambdaOffsetOverload")
 @Composable
-fun ExpressiveTabSwitcher(selectedTab: BottomSheetTab, onTabSelected: (BottomSheetTab) -> Unit) {
-    val offset by animateDpAsState(
-        targetValue = if (selectedTab == BottomSheetTab.OPTIONS) 0.dp else 160.dp,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
-        label = "TabOffset"
-    )
-
-    Box(
-        modifier = Modifier
-            .width(320.dp)
+fun ExpressiveTabSwitcher(
+    selectedTab: BottomSheetTab,
+    onTabSelected: (BottomSheetTab) -> Unit,
+    modifier: Modifier = Modifier.fillMaxWidth()
+) {
+    BoxWithConstraints(
+        modifier = modifier
             .height(56.dp)
             .clip(RoundedCornerShape(28.dp))
             .background(DsmusicTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
+        // The landscape left pane can be substantially narrower than 320 dp.
+        // Derive both the selected pill width and its offset from the measured
+        // container so Options and Info never draw outside their own hit regions.
+        val tabWidth = maxWidth / 2
+        val offset by animateDpAsState(
+            targetValue = if (selectedTab == BottomSheetTab.OPTIONS) 0.dp else tabWidth,
+            animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
+            label = "TabOffset"
+        )
+
         Box(
             modifier = Modifier
                 .offset(x = offset)
-                .width(160.dp)
+                .width(tabWidth)
                 .fillMaxHeight()
                 .padding(4.dp)
                 .clip(RoundedCornerShape(24.dp))
@@ -1036,20 +1045,25 @@ fun ExpressiveTabSwitcher(selectedTab: BottomSheetTab, onTabSelected: (BottomShe
                     .clickable { onTabSelected(BottomSheetTab.OPTIONS) },
                 contentAlignment = Alignment.Center
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     Icon(
                         imageVector = Icons.Rounded.Menu,
                         contentDescription = null,
                         tint = if (selectedTab == BottomSheetTab.OPTIONS) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "OPTIONS",
                         color = if (selectedTab == BottomSheetTab.OPTIONS) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 14.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = GoogleSansFlex
+                        fontFamily = GoogleSansFlex,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip
                     )
                 }
             }
@@ -1061,20 +1075,25 @@ fun ExpressiveTabSwitcher(selectedTab: BottomSheetTab, onTabSelected: (BottomShe
                     .clickable { onTabSelected(BottomSheetTab.INFO) },
                 contentAlignment = Alignment.Center
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     Icon(
                         imageVector = Icons.Rounded.Info,
                         contentDescription = null,
                         tint = if (selectedTab == BottomSheetTab.INFO) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "INFO",
                         color = if (selectedTab == BottomSheetTab.INFO) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 14.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = GoogleSansFlex
+                        fontFamily = GoogleSansFlex,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip
                     )
                 }
             }

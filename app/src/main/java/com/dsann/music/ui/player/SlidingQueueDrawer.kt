@@ -139,7 +139,7 @@ fun SlidingQueueDrawer(
         }
     }
 
-    Surface(
+    DsmusicSurface(
         modifier = modifier.then(
             if (isLandscape) {
                 Modifier
@@ -158,7 +158,8 @@ fun SlidingQueueDrawer(
         } else {
             RoundedCornerShape(topStart = safeCornerRadius, topEnd = safeCornerRadius)
         },
-        color = queueBgColor
+        color = queueBgColor,
+        showBorder = false
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             val boxScope = this

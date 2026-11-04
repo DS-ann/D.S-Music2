@@ -169,7 +169,8 @@ fun QueueBottomSheetContent(
             .then(if (isLandscape) Modifier.fillMaxHeight(0.9f) else Modifier.wrapContentHeight()),
         shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
         color = DsmusicTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 6.dp
+        tonalElevation = 6.dp,
+        showBorder = false
     ) {
         Column(
             modifier = Modifier
