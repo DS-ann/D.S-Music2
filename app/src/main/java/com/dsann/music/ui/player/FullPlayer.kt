@@ -894,7 +894,7 @@ fun FullPlayer(
         val queueDockInset = animatedQueueDockInset.coerceAtLeast(0.dp)
         // The fullscreen lyrics overlay and the landscape side pane share this one
         // fetch trigger. A track is requested once when either lyrics surface becomes active.
-        val landscapeLyricsVisible = useWidePlayer && isLandscapeWindow && !landscapeShowsQueue
+        val landscapeLyricsVisible = isPlayerVisible && useWidePlayer && isLandscapeWindow && !landscapeShowsQueue
         LaunchedEffect(
             isLyricsModeEnabled,
             landscapeLyricsVisible,
