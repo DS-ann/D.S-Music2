@@ -239,7 +239,7 @@ class MainActivity : AppCompatActivity() {
 
                 val isPlayerExpanded by playerViewModel.isPlayerExpanded.collectAsStateWithLifecycle()
                 val playerExpansionFraction by playerViewModel.playerExpansionFraction.collectAsStateWithLifecycle()
-                val isPlayerBackActive = isPlayerExpanded || playerExpansionFraction >= 0.5f
+                val isPlayerBackActive = isPlayerExpanded || playerExpansionFraction > 0.01f
 
                 var editingSong by remember { mutableStateOf<SongItem?>(null) }
                 val configuration = androidx.compose.ui.platform.LocalConfiguration.current
@@ -810,17 +810,15 @@ class MainActivity : AppCompatActivity() {
                             }.fillMaxSize()
                         )
                         AudioFormatChoiceDialogHost()
-
-                        // This handler is deliberately composed after the retained root tabs,
-                        // both NavHosts and the player sheet. It therefore takes Back before a
-                        // nested Settings page (such as Appearance/Customize) can pop its route.
-                        // The actual animation remains owned by PlayerBottomSheetCompose.
-                        androidx.activity.compose.BackHandler(
-                            enabled = isPlayerBackActive
-                        ) {
-                            playerViewModel.requestPlayerCollapseFromBack()
-                        }
                     }
+                }
+
+                // Register above the complete Scaffold tree. This keeps player dismissal
+                // higher priority than BackHandlers in every root tab and nested destination.
+                androidx.activity.compose.BackHandler(
+                    enabled = isPlayerBackActive
+                ) {
+                    playerViewModel.requestPlayerCollapseFromBack()
                 }
             }
         }

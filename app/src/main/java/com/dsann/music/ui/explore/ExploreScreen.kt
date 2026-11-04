@@ -2,6 +2,7 @@ package com.dsann.music.ui.explore
 
 import com.dsann.music.ui.theme.DsmusicPageHeading
 import com.dsann.music.ui.LocalRootTabActive
+import com.dsann.music.ui.common.rememberReversiblePullToRefreshCallback
 import com.dsann.music.ui.theme.DsmusicCard
 import com.dsann.music.ui.theme.DsmusicSurface
 import com.dsann.music.ui.theme.DsmusicListItem
@@ -1724,9 +1725,13 @@ fun ExploreScreen(
                                                 else -> {
                                                     val pullToRefreshState =
                                                         rememberPullToRefreshState()
+                                                    val refreshAfterRelease =
+                                                        rememberReversiblePullToRefreshCallback(pullToRefreshState) {
+                                                            viewModel.refreshHomeFeed()
+                                                        }
                                                     PullToRefreshBox(
                                                         isRefreshing = isRefreshing,
-                                                        onRefresh = { viewModel.refreshHomeFeed() },
+                                                        onRefresh = refreshAfterRelease,
                                                         state = pullToRefreshState,
                                                         modifier = Modifier.fillMaxSize(),
                                                         indicator = {
