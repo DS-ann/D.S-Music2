@@ -513,7 +513,7 @@ object SongDownloader {
                     ?.takeIf { it.isNotBlank() }
             }.getOrNull()
 
-            if (artworkBytes.isNullOrEmpty() && !artworkUrl.isNullOrBlank()) {
+            if ((artworkBytes == null || artworkBytes.isEmpty()) && !artworkUrl.isNullOrBlank()) {
                 try {
                     val future = Glide.with(context)
                         .asBitmap()
@@ -966,7 +966,7 @@ object SongDownloader {
     }
 
     private fun appendWebmMetadataTags(file: File, tags: ByteArray, coverAttachment: ByteArray?) {
-        val segmentChildren = if (coverAttachment.isNullOrEmpty()) tags else tags + coverAttachment
+        val segmentChildren = if (coverAttachment == null || coverAttachment.isEmpty()) tags else tags + coverAttachment
         java.io.RandomAccessFile(file, "rw").use { randomFile ->
             val fileLength = randomFile.length()
             if (fileLength < 8L) throw IOException("Downloaded WebM file is too small to tag")
