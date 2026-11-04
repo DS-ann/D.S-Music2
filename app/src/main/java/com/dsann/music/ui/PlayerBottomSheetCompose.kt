@@ -370,7 +370,6 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
     miniPlayerBackgroundColor: Color,
     miniPlayerShape: Shape,
     miniPlayerElevation: Dp,
-    miniPlayerCornerRadius: Dp,
     miniSwipeModifier: Modifier,
     miniDragHandler: SheetVerticalDragGestureHandler
 ) {
@@ -1389,8 +1388,7 @@ fun PlayerBottomSheetCompose(
             miniPlayerHeight = miniPlayerHeight
         )
 
-        // The mini card keeps its own shape while the full player supplies its
-        // own fullscreen background. Neither background needs a moving morph layer.
+        // The mini shape values are also used by the shared frame outline below.
         val miniPlayerShape: Shape = when (miniPlayerStyle) {
             "Flat" -> RoundedCornerShape(0.dp)
             "Compact" -> RoundedCornerShape(18.dp)
@@ -1517,38 +1515,6 @@ fun PlayerBottomSheetCompose(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .then(
-                                    if (currentSheetContentState == PlayerSheetState.COLLAPSED) {
-                                        Modifier.pointerInput(gestureSettings, isLyricsModeEnabled, isQueueExpanded) {
-                                            var dragX = 0f
-                                            var dragY = 0f
-                                            detectDragGestures(
-                                                onDragStart = {
-                                                    dragX = 0f
-                                                    dragY = 0f
-                                                },
-                                                onDrag = { change, amount ->
-                                                    dragX += amount.x
-                                                    dragY += amount.y
-                                                    change.consume()
-                                                },
-                                                onDragEnd = {
-                                                    if (isLyricsModeEnabled || isQueueExpanded) return@detectDragGestures
-                                                    if (kotlin.math.max(kotlin.math.abs(dragX), kotlin.math.abs(dragY)) < 24.dp.toPx()) return@detectDragGestures
-                                                    when {
-                                                        kotlin.math.abs(dragX) >= kotlin.math.abs(dragY) && dragX < 0 ->
-                                                            performPlayerGesture(gestureSettings.miniSwipeLeft)
-                                                        kotlin.math.abs(dragX) >= kotlin.math.abs(dragY) && dragX > 0 ->
-                                                            performPlayerGesture(gestureSettings.miniSwipeRight)
-                                                        dragY < 0 ->
-                                                            performPlayerGesture(gestureSettings.miniSwipeUp)
-                                                        else -> handleMiniSwipeDown()
-                                                    }
-                                                }
-                                            )
-                                        }
-                                    } else Modifier
-                                )
                                 .graphicsLayer {
                                     translationX = offsetAnimatable.value
                                     transformOrigin = TransformOrigin(0.5f, 1f)
@@ -1580,7 +1546,6 @@ fun PlayerBottomSheetCompose(
                                 miniPlayerBackgroundColor = dynamicBgColor,
                                 miniPlayerShape = miniPlayerShape,
                                 miniPlayerElevation = miniPlayerElevation,
-                                miniPlayerCornerRadius = miniPlayerCornerRadius,
                                 miniSwipeModifier = miniSwipeGestureModifier,
                                 miniDragHandler = sheetVerticalDragGestureHandler
                             )
