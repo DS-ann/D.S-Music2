@@ -543,7 +543,7 @@ object SongDownloader {
 
             coroutineContext.ensureActive()
 
-            if (!artworkBytes.isNullOrEmpty()) {
+            if (artworkBytes != null && artworkBytes.isNotEmpty()) {
                 AudioPlaybackService.storeCachedMediaArtworkBytes(
                     context.applicationContext,
                     song.id.toString(),
@@ -848,7 +848,7 @@ object SongDownloader {
                     throw IOException("Metadata verification failed: album was not persisted")
                 }
             }
-            if (!artworkBytes.isNullOrEmpty() && writtenTag.artworkList.isNullOrEmpty()) {
+            if (artworkBytes != null && artworkBytes.isNotEmpty() && writtenTag.artworkList.isNullOrEmpty()) {
                 throw IOException("Metadata verification failed: cover artwork was not persisted")
             }
 
