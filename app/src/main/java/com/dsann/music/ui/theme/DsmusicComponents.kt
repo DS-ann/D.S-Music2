@@ -26,8 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
@@ -399,17 +397,15 @@ fun DsmusicPageHeading(
     }
     val colorScheme = DsmusicTheme.colorScheme
     val headingShape = RoundedCornerShape(22.dp)
-    val headingGradient = remember(
-        colorScheme.primary,
-        colorScheme.secondary,
-        colorScheme.tertiary
-    ) {
+    val headingGradient = remember(colorScheme.primary) {
+        // Use the selected settings accent at every stop; only opacity changes
+        // across the heading, fading smoothly from left to transparent right.
         Brush.horizontalGradient(
             colorStops = arrayOf(
                 0f to colorScheme.primary.copy(alpha = 0.20f),
-                0.36f to colorScheme.secondary.copy(alpha = 0.14f),
-                0.72f to colorScheme.tertiary.copy(alpha = 0.07f),
-                1f to colorScheme.tertiary.copy(alpha = 0f)
+                0.36f to colorScheme.primary.copy(alpha = 0.14f),
+                0.72f to colorScheme.primary.copy(alpha = 0.07f),
+                1f to colorScheme.primary.copy(alpha = 0f)
             )
         )
     }
