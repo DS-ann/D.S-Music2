@@ -1145,6 +1145,42 @@ fun ExploreScreen(
                                                                     )
                                                                 ) {
 
+                                                                    if (homeFeedError != null) {
+                                                                        item(key = "home-network-retry") {
+                                                                            Row(
+                                                                                modifier = Modifier
+                                                                                    .fillMaxWidth()
+                                                                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                                                            ) {
+                                                                                Icon(
+                                                                                    imageVector = Icons.Rounded.CloudOff,
+                                                                                    contentDescription = null,
+                                                                                    modifier = Modifier.size(22.dp),
+                                                                                    tint = DsmusicTheme.colorScheme.onSurfaceVariant
+                                                                                )
+                                                                                Column(modifier = Modifier.weight(1f)) {
+                                                                                    Text(
+                                                                                        "Network not available",
+                                                                                        style = DsmusicTheme.typography.titleSmall,
+                                                                                        color = DsmusicTheme.colorScheme.onSurface
+                                                                                    )
+                                                                                    Text(
+                                                                                        "Showing the feed already loaded. Connect and refresh to get new content.",
+                                                                                        style = DsmusicTheme.typography.bodySmall,
+                                                                                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                                                                    )
+                                                                                }
+                                                                                DsmusicOutlinedButton(
+                                                                                    onClick = { viewModel.refreshHomeFeed() }
+                                                                                ) {
+                                                                                    Text("Refresh")
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+
                                                                     item {
                                                                         Box(
                                                                             modifier = Modifier.fillMaxWidth(),
