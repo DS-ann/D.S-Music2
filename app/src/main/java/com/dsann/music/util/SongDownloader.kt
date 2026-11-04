@@ -1035,7 +1035,7 @@ object SongDownloader {
         var backupFile: File? = null
         try {
             if (stagedFile.exists() && !stagedFile.delete()) {
-                throw IOException("Could not clear the WebM metadata staging file")
+                throw IOException("Could not clear the Matroska metadata staging file")
             }
             outputFile.copyTo(stagedFile, overwrite = true)
             convertWebmHeaderToMatroska(stagedFile)
@@ -1054,19 +1054,19 @@ object SongDownloader {
 
             backupFile = File(outputFile.parentFile, "${outputFile.name}.raw-backup")
             if (backupFile.exists() && !backupFile.delete()) {
-                throw IOException("Could not clear the WebM audio backup file")
+                throw IOException("Could not clear the Matroska audio backup file")
             }
             if (!outputFile.renameTo(backupFile)) {
-                throw IOException("Could not preserve original WebM audio before metadata writing")
+                throw IOException("Could not preserve original Matroska audio before metadata writing")
             }
             if (!stagedFile.renameTo(outputFile)) {
                 backupFile.renameTo(outputFile)
-                throw IOException("Could not install the tagged WebM audio file")
+                throw IOException("Could not install the tagged Matroska audio file")
             }
             backupFile.delete()
             return true
         } catch (error: Exception) {
-            Log.w(TAG, "WebM metadata embedding failed safely for ${outputFile.name}", error)
+            Log.w(TAG, "Matroska metadata embedding failed safely for ${outputFile.name}", error)
             stagedFile.delete()
             if (backupFile?.exists() == true && !outputFile.exists()) {
                 backupFile.renameTo(outputFile)
@@ -1088,10 +1088,10 @@ object SongDownloader {
             val nameElement = matroskaElement(byteArrayOf(0x45, 0xA3.toByte()), name.toByteArray(Charsets.UTF_8))
             val valueElement = matroskaElement(byteArrayOf(0x44, 0x87.toByte()), value.toByteArray(Charsets.UTF_8))
             val simpleTag = matroskaElement(byteArrayOf(0x67, 0xC8.toByte()), nameElement + valueElement)
-            // TargetTypeValue 20 identifies a track/song tag and applies to audio tracks.
+            // TargetTypeValue 50 identifies a track/song tag and applies to the audio track.
             val targets = matroskaElement(
                 byteArrayOf(0x63, 0xC0.toByte()),
-                matroskaElement(byteArrayOf(0x68, 0xCA.toByte()), byteArrayOf(20))
+                matroskaElement(byteArrayOf(0x68, 0xCA.toByte()), byteArrayOf(50))
             )
             entries.add(matroskaElement(byteArrayOf(0x73, 0x73.toByte()), targets + simpleTag))
         }
@@ -1290,11 +1290,11 @@ object SongDownloader {
     }
 
     private fun verifyAppendedMatroskaMetadata(file: File, expectedElements: ByteArray) {
-        if (expectedElements.isEmpty()) throw IOException("No WebM metadata was generated")
+        if (expectedElements.isEmpty()) throw IOException("No Matroska metadata was generated")
         java.io.RandomAccessFile(file, "r").use { randomFile ->
             val fileLength = randomFile.length()
             if (fileLength < expectedElements.size.toLong()) {
-                throw IOException("WebM metadata verification failed: tagged file is too small")
+                throw IOException("Matroska metadata verification failed: tagged file is too small")
             }
             randomFile.seek(fileLength - expectedElements.size.toLong())
             val actualElements = ByteArray(expectedElements.size)
@@ -1309,9 +1309,9 @@ object SongDownloader {
         val segmentChildren = if (coverAttachment == null || coverAttachment.isEmpty()) tags else tags + coverAttachment
         java.io.RandomAccessFile(file, "rw").use { randomFile ->
             val fileLength = randomFile.length()
-            if (fileLength < 8L) throw IOException("Downloaded WebM file is too small to tag")
+            if (fileLength < 8L) throw IOException("Downloaded Matroska file is too small to tag")
 
-            // The Segment header occurs near the beginning of a WebM file. Do not scan the
+            // The EBML Segment header occurs near the beginning of the file. Do not scan the
             // audio clusters indefinitely or risk matching arbitrary payload bytes later on.
             val scanLimit = minOf(fileLength - 4L, 1024L * 1024L)
             var segmentOffset = -1L
@@ -1328,7 +1328,7 @@ object SongDownloader {
                 }
                 offset++
             }
-            if (segmentOffset < 0L) throw IOException("WebM Segment header was not found")
+            if (segmentOffset < 0L) throw IOException("Matroska Segment header was not found")
 
             val sizeOffset = segmentOffset + 4L
             randomFile.seek(sizeOffset)
@@ -1339,7 +1339,7 @@ object SongDownloader {
                 width++
                 marker = marker ushr 1
             }
-            if (width > 8) throw IOException("Invalid WebM Segment size")
+            if (width > 8) throw IOException("Invalid Matroska Segment size")
 
             var segmentSize = (first and (marker - 1)).toLong()
             repeat(width - 1) {

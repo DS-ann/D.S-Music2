@@ -177,7 +177,7 @@ public class AudioFileManager {
         values.put(MediaStore.Audio.Media.DISPLAY_NAME, sourceFile.getName());
 
         // Audio-specific indexed columns are not part of MediaStore.Downloads on
-        // older Android releases. WebM already carries its title/artist/album/cover
+        // older Android releases. WebM/MKA carries its title/artist/album/cover
         // in the embedded Matroska metadata written before this publish step.
         if (!isGenericContainerAudio) {
             values.put(MediaStore.Audio.Media.TITLE, title);
