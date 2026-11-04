@@ -196,6 +196,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private var detailLoadJob: Job? = null
     private var artistResolveJob: Job? = null
     private var homeCacheSaveJob: Job? = null
+    @Volatile private var homeCacheSaveVersion = 0L
 
     private data class CachedHomeFeed(
         val sections: List<CachedHomeFeedSection> = emptyList(),
@@ -586,10 +587,15 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
             homeContinuation = homeContinuationToken,
             exploreContinuation = exploreContinuationToken
         )
-        val json = runCatching { gson.toJson(cached) }.getOrNull() ?: return
+        val saveVersion = ++homeCacheSaveVersion
         homeCacheSaveJob?.cancel()
         homeCacheSaveJob = viewModelScope.launch(Dispatchers.IO) {
-            prefs.edit().putString(HOME_FEED_CACHE_KEY, json).commit()
+            val json = runCatching { gson.toJson(cached) }.getOrNull() ?: return@launch
+            // A newer feed update supersedes this write, avoiding an older snapshot
+            // overwriting the newest cache when updates happen close together.
+            if (saveVersion == homeCacheSaveVersion) {
+                prefs.edit().putString(HOME_FEED_CACHE_KEY, json).commit()
+            }
         }
     }
 
@@ -863,13 +869,13 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                         }
                     }
                     _uiState.update { it.copy(homeSections = current) }
-                    persistHomeFeedCache()
                     val nextToken = page.continuation?.takeIf { it != token }
                     if (loadingHomeContinuation) {
                         homeContinuationToken = nextToken
                     } else {
                         exploreContinuationToken = nextToken
                     }
+                    persistHomeFeedCache()
                     prefetchThumbnails(page.sections.take(3).flatMap { it.items.take(4) })
                 }
             } catch (e: Exception) {
