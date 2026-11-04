@@ -1044,8 +1044,13 @@ fun PlayerBottomSheetCompose(
         // List is separate from quick state changes
         val songList by viewModel.songList.collectAsStateWithLifecycle()
         val isQueueExpanded by viewModel.isQueueExpanded.collectAsStateWithLifecycle()
+        val isQueuePresentationActive by remember(isQueueExpanded, playerContentExpansionFraction) {
+            derivedStateOf {
+                isQueueExpanded && playerContentExpansionFraction.value >= 0.995f
+            }
+        }
         val artworkAlpha by animateFloatAsState(
-            targetValue = if (isQueueExpanded) 0f else 1f,
+            targetValue = if (isQueuePresentationActive) 0f else 1f,
             animationSpec = spring(dampingRatio = 0.85f, stiffness = 300f),
             label = "ArtworkAlpha"
         )
@@ -1146,7 +1151,12 @@ fun PlayerBottomSheetCompose(
                     if (isPlaying) viewModel.pauseAudio() else viewModel.playAudio()
                 }
                 PlayerGestureAction.LIKE -> viewModel.toggleFavorite()
-                PlayerGestureAction.QUEUE -> viewModel.setQueueExpanded(true)
+                PlayerGestureAction.QUEUE -> {
+                    // A queue gesture from the mini player first expands the sheet;
+                    // the drawer itself is revealed only after the shared frame settles.
+                    currentSheetContentState = PlayerSheetState.EXPANDED
+                    viewModel.setQueueExpanded(true)
+                }
                 PlayerGestureAction.LYRICS -> viewModel.setLyricsModeEnabled(true)
                 PlayerGestureAction.VIDEO -> audioService?.setVideoMode(!isVideoMode)
                 PlayerGestureAction.STOP -> viewModel.dismissPlayer()
@@ -1162,7 +1172,7 @@ fun PlayerBottomSheetCompose(
                     playerContentExpansionFraction.value < 0.95f -> {
                     currentSheetContentState = PlayerSheetState.EXPANDED
                 }
-                playerContentExpansionFraction.value >= 0.98f && !isQueueExpanded -> {
+                playerContentExpansionFraction.value >= 0.98f && !isQueuePresentationActive -> {
                     viewModel.setLyricsModeEnabled(true)
                 }
             }
@@ -1510,7 +1520,7 @@ fun PlayerBottomSheetCompose(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .zIndex(if (isQueueExpanded) 5f else 2f)
+                            .zIndex(if (isQueuePresentationActive) 5f else 2f)
                     ) {
                         Box(
                             modifier = Modifier
@@ -1755,14 +1765,14 @@ fun PlayerBottomSheetCompose(
                                     }
                                 )
                             }
-                            .zIndex(if (isQueueExpanded) 1f else if (isLyricsModeEnabled || lyricsArtworkProgress > 0f) 6f else 3f)
+                            .zIndex(if (isQueuePresentationActive) 1f else if (isLyricsModeEnabled || lyricsArtworkProgress > 0f) 6f else 3f)
                     ) {
                         if (
                             isVideoMode &&
                             audioService != null &&
                             isPlayerFullyExpanded &&
                             !isLyricsModeEnabled &&
-                            !isQueueExpanded
+                            !isQueuePresentationActive
                         ) {
                             Box(Modifier.fillMaxSize()) {
                                 if (!isVideoFullscreen) {
@@ -1915,7 +1925,7 @@ fun PlayerBottomSheetCompose(
                                 songList = songList,
                                 currentSongIndex = uiState.currentSongIndex,
                                 context = context,
-                                userScrollEnabled = isPlayerFullyExpanded && !isLyricsModeEnabled && !isQueueExpanded,
+                                userScrollEnabled = isPlayerFullyExpanded && !isLyricsModeEnabled && !isQueuePresentationActive,
                                 modifier = Modifier.fillMaxSize()
                             )
                             MiniPlayerArtworkProgressOverlay(
