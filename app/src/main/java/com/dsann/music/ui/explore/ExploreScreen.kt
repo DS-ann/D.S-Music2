@@ -884,7 +884,17 @@ fun ExploreScreen(
                                                                 )
                                                             }
                                                         }
-                                                        items(homeCategories.chunked(2), key = { rowCategories -> rowCategories.joinToString("|") { it.browseId } }) { rowCategories ->
+                                                        itemsIndexed(
+                                                            items = homeCategories.chunked(2),
+                                                            key = { rowIndex, rowCategories ->
+                                                                // Category browse IDs can repeat (for example FEmusic_home)
+                                                                // while their params differ. Include the full destination and
+                                                                // row position so every LazyColumn row has a unique identity.
+                                                                "genre-row:$rowIndex:" + rowCategories.joinToString("|") {
+                                                                    "${it.browseId}:${it.params.orEmpty()}:${it.title}"
+                                                                }
+                                                            }
+                                                        ) { _, rowCategories ->
                                                             Row(
                                                                 modifier = Modifier.fillMaxWidth(),
                                                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
