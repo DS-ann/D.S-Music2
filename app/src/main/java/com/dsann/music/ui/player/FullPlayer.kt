@@ -1386,11 +1386,17 @@ fun FullPlayer(
             Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 16.dp))
 
             val noTransportBackground = playerButtonStyle == "None"
+            val roundTransport = playerButtonStyle == "Round"
+            val transportSize = if (compactLandscape) 60.dp else 76.dp
             val transportShape = when (playerButtonStyle) {
-                "Round" -> RoundedCornerShape(14.dp)
-                "Pill" -> CircleShape
+                "Round", "Pill" -> CircleShape
                 "Square" -> RoundedCornerShape(5.dp)
                 else -> RoundedCornerShape(0.dp)
+            }
+            val transportSizeModifier = if (roundTransport) {
+                Modifier.size(transportSize)
+            } else {
+                Modifier.height(transportSize)
             }
             val sideControlColor = if (noTransportBackground) Color.Transparent
                 else contentColor.copy(alpha = if (isDark) 0.08f else 0.06f)
@@ -1405,13 +1411,12 @@ fun FullPlayer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = if (roundTransport) Arrangement.Center else Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .height(if (compactLandscape) 60.dp else 76.dp)
+                        .then(if (roundTransport) transportSizeModifier else Modifier.weight(1f).then(transportSizeModifier))
                         .clip(transportShape)
                         .background(sideControlColor)
                         .clickable(onClick = onPreviousClick),
@@ -1427,8 +1432,7 @@ fun FullPlayer(
 
                 Box(
                     modifier = Modifier
-                        .weight(1.2f)
-                        .height(if (compactLandscape) 60.dp else 76.dp)
+                        .then(if (roundTransport) transportSizeModifier else Modifier.weight(1.2f).then(transportSizeModifier))
                         .clip(transportShape)
                         .background(centerControlColor)
                         .clickable(enabled = !uiState.isLoading) { onPlayPauseClick() },
@@ -1454,8 +1458,7 @@ fun FullPlayer(
 
                 Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .height(if (compactLandscape) 60.dp else 76.dp)
+                        .then(if (roundTransport) transportSizeModifier else Modifier.weight(1f).then(transportSizeModifier))
                         .clip(transportShape)
                         .background(sideControlColor)
                         .clickable(onClick = onNextClick),
