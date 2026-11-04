@@ -158,10 +158,15 @@ fun customizedTypography(
     spacingChoice: String
 ): DsmusicTypography {
     val family = when (familyChoice) {
-        "Google Sans Flex" -> GoogleSansFlex
+        "Cursive" -> FontFamily.Cursive
+        // Android's default sans face is Roboto on supported Android versions.
+        "Roboto", "System" -> FontFamily.Default
+        "Sans" -> FontFamily.SansSerif
         "Serif" -> FontFamily.Serif
+        // Keep compatibility with appearance Looks created by earlier builds.
+        "Google Sans Flex" -> GoogleSansFlex
         "Monospace" -> FontFamily.Monospace
-        else -> FontFamily.SansSerif
+        else -> FontFamily.Default
     }
     val scale = scaleChoice.takeIf { it.isFinite() }?.coerceIn(0.85f, 1.30f) ?: 1f
     val spacingAdjustment = when (spacingChoice) {
