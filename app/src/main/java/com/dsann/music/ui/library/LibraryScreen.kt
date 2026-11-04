@@ -3480,12 +3480,14 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
                         mediaId
                     )
 
-                    // MediaStore's M4A album-art index is inconsistent after direct file
-                    // insertion, especially when the source row has no generated ALBUM_ID.
-                    // Read the actual embedded MP4 atoms on IO and give Coil a cached image URI.
-                    val embeddedMetadata = if (
-                        isDownloadedFile && displayName.endsWith(".m4a", ignoreCase = true)
-                    ) {
+                    // MediaStore does not consistently index M4A cover atoms, and Android
+                    // 6 does not reliably expose OpusTags through MediaMetadataRetriever.
+                    // Read container-native tags on IO and hand the UI a cached cover URI.
+                    val hasEmbeddedContainerTags =
+                        displayName.endsWith(".m4a", ignoreCase = true) ||
+                            displayName.endsWith(".opus", ignoreCase = true) ||
+                            displayName.endsWith(".ogg", ignoreCase = true)
+                    val embeddedMetadata = if (isDownloadedFile && hasEmbeddedContainerTags) {
                         com.dsann.music.util.DownloadedAudioMetadataReader.read(
                             context = context,
                             filePath = path,

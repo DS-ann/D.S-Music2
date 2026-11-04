@@ -1013,17 +1013,30 @@ object SongDownloader {
                     throw IOException("Metadata verification failed: album was not persisted")
                 }
             }
-            if (artworkBytes != null && artworkBytes.isNotEmpty() && writtenTag.artworkList.isNullOrEmpty()) {
-                throw IOException("Metadata verification failed: cover artwork was not persisted")
+            if (artworkBytes != null && artworkBytes.isNotEmpty()) {
+                val writtenArtwork = writtenTag.artworkList.firstOrNull()?.binaryData
+                if (writtenArtwork == null || writtenArtwork.isEmpty() ||
+                    !writtenArtwork.contentEquals(artworkBytes)
+                ) {
+                    throw IOException("Metadata verification failed: the exact cover artwork was not persisted")
+                }
             }
             if (isMp4Container) {
-                verifyMp4MetadataWithPlatform(
-                    file = taggedFile,
-                    title = title,
-                    artist = artist,
-                    album = album,
-                    expectArtwork = artworkBytes != null && artworkBytes.isNotEmpty()
-                )
+                // This is a diagnostic probe only. Some Android 6/older vendor extractors
+                // fail to expose valid MP4 covr/ilst atoms even though jaudiotagger has
+                // successfully written and reread them. Do not reject a valid tagged file
+                // based on a framework metadata-extraction limitation.
+                runCatching {
+                    verifyMp4MetadataWithPlatform(
+                        file = taggedFile,
+                        title = title,
+                        artist = artist,
+                        album = album,
+                        expectArtwork = artworkBytes != null && artworkBytes.isNotEmpty()
+                    )
+                }.onFailure {
+                    Log.w(TAG, "Android framework could not independently expose M4A tags; MP4 atom verification passed", it)
+                }
             }
 
             backupFile = File(outputFile.parentFile, "${outputFile.name}.raw-backup")
