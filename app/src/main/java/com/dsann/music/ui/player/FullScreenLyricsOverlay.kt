@@ -302,8 +302,6 @@ internal fun FullScreenLyricsOverlay(
     modifier: Modifier = Modifier
 ) {
     val consumeClicks = remember { MutableInteractionSource() }
-    val compactLandscapeLyrics = LocalConfiguration.current.orientation ==
-        android.content.res.Configuration.ORIENTATION_LANDSCAPE
     var showProvidersSheet by remember { mutableStateOf(false) }
     var syncOffsetMs by remember(currentSong?.id) { mutableStateOf(0L) }
     var showSyncControls by remember { mutableStateOf(false) }
