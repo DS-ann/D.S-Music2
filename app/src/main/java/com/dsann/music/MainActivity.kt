@@ -252,7 +252,7 @@ class MainActivity : AppCompatActivity() {
                         val navBackStackEntry by currentNavController.currentBackStackEntryAsState()
                         val currentDestination = navBackStackEntry?.destination
 
-                        val showBottomBar = !isPlayerExpanded && currentDestination?.route in listOf("explore", "search", "library", "local_music", "settings")
+                        val showBottomBar = currentDestination?.route in listOf("explore", "search", "library", "local_music", "settings")
 
                         val density = LocalDensity.current
                         val navigationBarsHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
@@ -417,7 +417,7 @@ class MainActivity : AppCompatActivity() {
                     // Root tabs must measure their scroll viewport above the collapsed mini-player.
                     // Otherwise the last rows can scroll underneath the overlay and become unreachable.
                     val miniPlayerScrollReserve = if (
-                        currentSong != null && !isPlayerExpanded &&
+                        currentSong != null &&
                             currentRoute != null && currentRoute in rootTabRoutes
                     ) {
                         miniPlayerHeight + if (useNavigationRail) 8.dp + systemBottomInset else 4.dp
