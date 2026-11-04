@@ -4,6 +4,7 @@ import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
+import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -96,15 +97,51 @@ public class AudioFileManager {
             return copyToMediaStore(context, file, title, artist, album);
         }
         try {
-            context.sendBroadcast(
-                    new android.content.Intent(android.content.Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
-                            Uri.fromFile(file)));
+            MediaScannerConnection.scanFile(
+                    context,
+                    new String[]{file.getAbsolutePath()},
+                    new String[]{mimeTypeForFile(file.getName())},
+                    (scannedPath, scannedUri) -> {
+                        if (scannedUri == null) {
+                            Log.w(TAG, "Media scanner did not return a URI for " + scannedPath);
+                            return;
+                        }
+                        ContentValues metadata = new ContentValues();
+                        if (title != null && !title.trim().isEmpty()) {
+                            metadata.put(MediaStore.Audio.Media.TITLE, title.trim());
+                        }
+                        if (artist != null && !artist.trim().isEmpty()) {
+                            metadata.put(MediaStore.Audio.Media.ARTIST, artist.trim());
+                            metadata.put(MediaStore.Audio.Media.ALBUM_ARTIST, artist.trim());
+                        }
+                        if (album != null && !album.trim().isEmpty()) {
+                            metadata.put(MediaStore.Audio.Media.ALBUM, album.trim());
+                        }
+                        try {
+                            int updated = context.getContentResolver().update(scannedUri, metadata, null, null);
+                            Log.d(TAG, "Updated legacy MediaStore metadata rows=" + updated);
+                        } catch (Exception metadataError) {
+                            Log.w(TAG, "Could not update legacy MediaStore metadata", metadataError);
+                        }
+                    });
             Log.d(TAG, "Media scan requested: " + file.getAbsolutePath());
             return true;
         } catch (Exception e) {
             Log.e(TAG, "scanFile failed: " + e.getMessage(), e);
             return false;
         }
+    }
+
+
+    private static String mimeTypeForFile(String fileName) {
+        String lowerFileName = fileName.toLowerCase(java.util.Locale.ROOT);
+        if (lowerFileName.endsWith(".mp3")) return "audio/mpeg";
+        if (lowerFileName.endsWith(".m4a") || lowerFileName.endsWith(".aac")) return "audio/mp4";
+        if (lowerFileName.endsWith(".webm")) return "audio/webm";
+        if (lowerFileName.endsWith(".ogg") || lowerFileName.endsWith(".opus")) return "audio/ogg";
+        if (lowerFileName.endsWith(".flac")) return "audio/flac";
+        if (lowerFileName.endsWith(".wav")) return "audio/wav";
+        return "application/octet-stream";
     }
 
     private static boolean copyToMediaStore(Context context, File sourceFile, String suppliedTitle, String suppliedArtist, String suppliedAlbum) {

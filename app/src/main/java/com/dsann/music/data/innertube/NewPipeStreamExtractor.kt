@@ -612,9 +612,10 @@ object NewPipeStreamExtractor {
     private suspend fun selectInnerTubeDownloadStream(
         videoId: String,
         title: String,
-        allowFormatChoice: Boolean
+        allowFormatChoice: Boolean,
+        preferredFormatOverride: String? = null
     ): StreamData? {
-        val requestedFormat = getDownloadAudioFormat()
+        val requestedFormat = normalizeDownloadAudioFormat(preferredFormatOverride ?: getDownloadAudioFormat())
         val targetKbps = getDownloadTargetBitrateKbps()
         val parsed = runCatching {
             InnerTubeParser.parsePlayerResponse(
@@ -691,19 +692,24 @@ object NewPipeStreamExtractor {
      * which can be stored as M4A and tagged with jaudiotagger on Android 6+.
      * If unavailable, keep the selected source stream's reported container.
      */
-    suspend fun getDownloadStreamData(videoId: String?, allowFormatChoice: Boolean = true): StreamData? = coroutineScope {
+    suspend fun getDownloadStreamData(
+        videoId: String?,
+        allowFormatChoice: Boolean = true,
+        preferredFormatOverride: String? = null
+    ): StreamData? = coroutineScope {
         if (videoId.isNullOrBlank()) return@coroutineScope null
         val info = fetchStreamInfo(videoId)
         if (info == null || info.audioStreams.isEmpty()) {
             return@coroutineScope selectInnerTubeDownloadStream(
                 videoId = videoId,
                 title = videoId,
-                allowFormatChoice = allowFormatChoice
+                allowFormatChoice = allowFormatChoice,
+                preferredFormatOverride = preferredFormatOverride
             )
         }
         val audioStreams = info.audioStreams
 
-        val downloadFormat = getDownloadAudioFormat()
+        val downloadFormat = normalizeDownloadAudioFormat(preferredFormatOverride ?: getDownloadAudioFormat())
         val targetKbps = getDownloadTargetBitrateKbps()
         val selected = selectStreamForOperation(
             videoId = videoId,
@@ -717,11 +723,15 @@ object NewPipeStreamExtractor {
 
         val reportedMime = selected.format?.mimeType?.substringBefore(';')?.trim().orEmpty()
         val mime = when {
+            selected.codec?.contains("opus", ignoreCase = true) == true ->
+                reportedMime.ifBlank { "audio/webm" } + "; codecs=\"opus\""
+            selected.codec?.contains("mp4a", ignoreCase = true) == true ->
+                reportedMime.ifBlank { "audio/mp4" } + "; codecs=\"mp4a.40.2\""
+            selected.codec?.contains("mp3", ignoreCase = true) == true ->
+                reportedMime.ifBlank { "audio/mpeg" } + "; codecs=\"mp3\""
+            selected.codec?.contains("vorbis", ignoreCase = true) == true ->
+                reportedMime.ifBlank { "audio/ogg" } + "; codecs=\"vorbis\""
             reportedMime.isNotBlank() -> reportedMime
-            selected.codec?.contains("mp4a", ignoreCase = true) == true -> "audio/mp4"
-            selected.codec?.contains("opus", ignoreCase = true) == true -> "audio/webm"
-            selected.codec?.contains("vorbis", ignoreCase = true) == true -> "audio/ogg"
-            selected.codec?.contains("mp3", ignoreCase = true) == true -> "audio/mpeg"
             else -> "application/octet-stream"
         }
         val bitrateKbps = streamBitrateKbps(selected)

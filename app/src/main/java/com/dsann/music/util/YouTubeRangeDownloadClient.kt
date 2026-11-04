@@ -68,6 +68,8 @@ internal object YouTubeRangeDownloadClient {
     private fun streamRequest(base: Request, from: Long, to: Long?, ranged: Boolean): Request {
         val url = base.url
         val builderUrl = url.newBuilder()
+            .removeAllQueryParameters("range")
+            .removeAllQueryParameters("rn")
             .setQueryParameter("rn", requestNumber.incrementAndGet().toString())
         if (ranged) builderUrl.setQueryParameter("range", "$from-" + (to?.toString() ?: ""))
         val fullUrl = url.toString()
@@ -88,6 +90,30 @@ internal object YouTubeRangeDownloadClient {
         return builder.build()
     }
 
+
+    /** Convert a rejected POST range request into a conventional GET with an HTTP Range header. */
+    private fun directGetFallback(request: Request): Request {
+        val rangeQuery = request.url.queryParameter("range")
+        val cleanUrl = request.url.newBuilder()
+            .removeAllQueryParameters("range")
+            .removeAllQueryParameters("rn")
+            .build()
+        val builder = request.newBuilder()
+            .url(cleanUrl)
+            .get()
+            .removeHeader("Range")
+            .removeHeader("Content-Length")
+            .removeHeader("Content-Type")
+            .removeHeader("Transfer-Encoding")
+        if (!rangeQuery.isNullOrBlank()) {
+            builder.header("Range", "bytes=$rangeQuery")
+        }
+        return builder.build()
+    }
+
+    private fun directGetRangeRequest(base: Request, from: Long, to: Long): Request =
+        directGetFallback(streamRequest(base, from, to, ranged = true))
+
     private fun withRetry(request: Request, send: (Request) -> Response): Response {
         val first = send(request)
         if (first.code != 403) return first
@@ -101,7 +127,18 @@ internal object YouTubeRangeDownloadClient {
         val retryUrl = request.url.newBuilder()
             .setQueryParameter("rn", requestNumber.incrementAndGet().toString())
             .build()
-        return send(request.newBuilder().url(retryUrl).build())
+        val retry = send(request.newBuilder().url(retryUrl).build())
+        if (retry.code != 403) return retry
+        retry.close()
+
+        // A signed Opus URL can reject the POST transport while accepting GET on the same URL.
+        val direct = send(directGetFallback(request))
+        if (direct.isSuccessful) {
+            Log.i(TAG, "Direct GET fallback accepted after POST range returned 403")
+        } else {
+            Log.w(TAG, "Direct GET fallback was rejected: HTTP " + direct.code)
+        }
+        return direct
     }
 
     private class YouTubeStreamInterceptor(
@@ -246,7 +283,15 @@ internal object YouTubeRangeDownloadClient {
                                 val retry = chunkClient.newCall(
                                     YouTubeRangeDownloadClient.streamRequest(base, from, to, true)
                                 ).execute()
-                                pending.complete(retry)
+                                if (retry.code == 403) {
+                                    retry.close()
+                                    val direct = chunkClient.newCall(
+                                        YouTubeRangeDownloadClient.directGetRangeRequest(base, from, to)
+                                    ).execute()
+                                    pending.complete(direct)
+                                } else {
+                                    pending.complete(retry)
+                                }
                             } catch (error: IOException) {
                                 pending.fail(error)
                             }
