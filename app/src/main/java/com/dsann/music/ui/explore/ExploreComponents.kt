@@ -700,12 +700,20 @@ fun SearchBrowseCard(
             onLongClick = { onLongClick?.invoke() }
         ).padding(4.dp)
     ) {
-        AsyncImage(
-            model = rememberExploreImageRequest(thumbnail, 260),
-            contentDescription = null,
-            modifier = Modifier.size(124.dp).clip(if (isArtist) CircleShape else RoundedCornerShape(12.dp)),
-            contentScale = ContentScale.Crop
-        )
+        Box(modifier = Modifier.size(124.dp)) {
+            AsyncImage(
+                model = rememberExploreImageRequest(thumbnail, 260),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().clip(if (isArtist) CircleShape else RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop
+            )
+            if (!isArtist && onLongClick != null) {
+                ExploreCoverActionButton(
+                    onClick = onLongClick,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
+                )
+            }
+        }
         Spacer(Modifier.height(7.dp))
         Text(title, style = DsmusicTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -1567,6 +1575,18 @@ fun HomeCarouselItem(
                     }
                 }
             }
+            val onMenuClick: (() -> Unit)? = when (item) {
+                is SearchItem.Song -> onSongMenuClick?.let { callback -> { callback(item.song) } }
+                is SearchItem.Album, is SearchItem.Playlist ->
+                    onCollectionMenuClick?.let { callback -> { callback(item) } }
+                is SearchItem.Artist -> null
+            }
+            if (onMenuClick != null) {
+                ExploreCoverActionButton(
+                    onClick = onMenuClick,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(7.dp)
+                )
+            }
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
@@ -1706,6 +1726,84 @@ fun CompactMenuItem(
 
 
 @Composable
+private fun ExploreCoverActionButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    DsmusicIconButton(
+        onClick = onClick,
+        modifier = modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(DsmusicTheme.colorScheme.scrim.copy(alpha = 0.58f)),
+        shape = CircleShape
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.MoreVert,
+            contentDescription = "More options",
+            tint = Color.White,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@Composable
+internal fun ExploreActionSheetHeader(
+    thumbnailUrl: String?,
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    trailingContent: (@Composable () -> Unit)? = null
+) {
+    // Match the queue song-action card: 84dp cover, 16dp breathing room and a
+    // high-emphasis title/subtitle pair. Keep the identity row consistent for
+    // songs, albums and playlists so the action sheets read as one system.
+    DsmusicSurface(
+        modifier = modifier.fillMaxWidth(),
+        shape = DsmusicTheme.shapes.large,
+        color = DsmusicTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(84.dp)
+                    .clip(DsmusicTheme.shapes.large)
+                    .background(DsmusicTheme.colorScheme.surfaceVariant)
+            ) {
+                AsyncImage(
+                    model = rememberExploreImageRequest(thumbnailUrl, 192),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = DsmusicTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = DsmusicTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = subtitle,
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            trailingContent?.invoke()
+        }
+    }
+}
+
+@Composable
 fun OnlineSongBottomSheet(
     song: OnlineSong,
     isPinned: Boolean,
@@ -1773,54 +1871,39 @@ fun OnlineSongBottomSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header Row: Title/Artist + Like + Close
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = song.title,
-                        style = DsmusicTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = song.artist,
-                        style = DsmusicTheme.typography.bodySmall,
-                        color = DsmusicTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                DsmusicIconButton(
-                    onClick = {
-                        val target = !isFavorite
-                        favoritesManager.setFavorite(song.videoId.hashCode().toLong(), target)
-                        isFavorite = target
-                        com.dsann.music.ui.SnackbarController.showMessage(
-                            if (target) "Added to library" else "Removed from library"
-                        )
+            ExploreActionSheetHeader(
+                thumbnailUrl = song.thumbnailUrl,
+                title = song.title,
+                subtitle = song.artist,
+                trailingContent = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        DsmusicIconButton(
+                            onClick = {
+                                val target = !isFavorite
+                                favoritesManager.setFavorite(song.videoId.hashCode().toLong(), target)
+                                isFavorite = target
+                                com.dsann.music.ui.SnackbarController.showMessage(
+                                    if (target) "Added to library" else "Removed from library"
+                                )
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (isFavorite) Icons.Rounded.ThumbUp else Icons.Rounded.ThumbUpOffAlt,
+                                contentDescription = "Like",
+                                tint = if (isFavorite) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        DsmusicIconButton(onClick = onDismissRequest) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = "Close",
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
-                ) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Rounded.ThumbUp else Icons.Rounded.ThumbUpOffAlt,
-                        contentDescription = "Like",
-                        tint = if (isFavorite) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(22.dp)
-                    )
                 }
-
-                DsmusicIconButton(onClick = onDismissRequest) {
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = "Close",
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
+            )
 
             HorizontalDivider(color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
