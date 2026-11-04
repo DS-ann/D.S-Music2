@@ -1499,12 +1499,43 @@ fun SettingsScreenContent(
     val canPop = currentBackStackEntry?.destination?.route != SettingsRoute.Main.route
 
     NavHost(
-        navController = navController, 
+        navController = navController,
         startDestination = SettingsRoute.Main.route,
-        enterTransition = { slideInHorizontally(initialOffsetX = { it }) },
-        exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) },
-        popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) },
-        popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) }
+        // Use the app-wide sequential opacity hand-off for nested Settings pages.
+        enterTransition = {
+            androidx.compose.animation.fadeIn(
+                androidx.compose.animation.core.tween(
+                    durationMillis = 140,
+                    delayMillis = 140,
+                    easing = androidx.compose.animation.core.LinearEasing
+                )
+            )
+        },
+        exitTransition = {
+            androidx.compose.animation.fadeOut(
+                androidx.compose.animation.core.tween(
+                    durationMillis = 140,
+                    easing = androidx.compose.animation.core.LinearEasing
+                )
+            )
+        },
+        popEnterTransition = {
+            androidx.compose.animation.fadeIn(
+                androidx.compose.animation.core.tween(
+                    durationMillis = 140,
+                    delayMillis = 140,
+                    easing = androidx.compose.animation.core.LinearEasing
+                )
+            )
+        },
+        popExitTransition = {
+            androidx.compose.animation.fadeOut(
+                androidx.compose.animation.core.tween(
+                    durationMillis = 140,
+                    easing = androidx.compose.animation.core.LinearEasing
+                )
+            )
+        }
     ) {
         composable(SettingsRoute.Main.route) {
             SettingsMainScreen(navController = navController)
