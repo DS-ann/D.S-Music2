@@ -124,7 +124,7 @@ fun DsmusicAppTheme(
     val customAccentHex by prefs.observeKey("custom_accent_color", "#7C9CFF")
     val uiDensity by prefs.observeKey("ui_density", "Comfortable")
     val uiCornerStyle by prefs.observeKey("ui_corner_style", "Soft")
-    val uiFontFamily by prefs.observeKey("ui_font_family", "System")
+    val uiFontFamily by prefs.observeKey("ui_font_family", "Roboto")
     val uiFontScale by prefs.observeKey("ui_font_scale", 1f)
     val uiFontWeight by prefs.observeKey("ui_font_weight", "Default")
     val uiLetterSpacing by prefs.observeKey("ui_letter_spacing", "Normal")
