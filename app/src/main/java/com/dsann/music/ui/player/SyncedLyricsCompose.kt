@@ -37,6 +37,7 @@ import com.dsann.music.ui.theme.Button
 import com.dsann.music.ui.theme.Icon
 import com.dsann.music.ui.theme.LinearWavyProgressIndicator
 import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.dsmusicHomeStudioGradientBrush
 import com.dsann.music.ui.theme.Text
 import com.dsann.music.ui.theme.WavyProgressIndicatorDefaults
 import androidx.compose.runtime.Composable
@@ -137,7 +138,7 @@ internal fun SyncedLyricsCompose(
     currentSong: SongItem? = null,
     selectedProvider: String? = null,
     providerResults: Map<String, LyricsResult> = emptyMap(),
-    lyricsColorStyle: String = "Dynamic (Gradient)",
+    lyricsColorStyle: String = "Home Studio Gradient",
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -443,8 +444,8 @@ private fun LyricLineItem(
         "Mono" -> FontFamily.Monospace
         else -> GoogleSansFlexNonRounded
     }
-    val lyricsBrush = if (lyricsColorStyle == "Dynamic (Gradient)") {
-        Brush.horizontalGradient(listOf(accentColor, contentColor))
+    val lyricsBrush = if (lyricsColorStyle == "Home Studio Gradient") {
+        dsmusicHomeStudioGradientBrush()
     } else null
     val renderedColor = when (lyricsColorStyle) {
         "White" -> Color.White
