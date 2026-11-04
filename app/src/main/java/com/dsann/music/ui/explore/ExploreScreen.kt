@@ -80,6 +80,7 @@ import com.dsann.music.ui.theme.IconButton
 import com.dsann.music.ui.theme.ListItem
 import com.dsann.music.ui.theme.ListItemDefaults
 import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.observeKey
 import com.dsann.music.ui.theme.OutlinedButton
 import com.dsann.music.ui.theme.Snackbar
 import com.dsann.music.ui.theme.Surface
@@ -229,6 +230,9 @@ fun ExploreScreen(
     val searchHistory = uiState.searchHistory
     val homeMoods = uiState.homeMoods
     val homeCategories = uiState.homeCategories
+    val sortedHomeCategories = remember(homeCategories) {
+        homeCategories.sortedBy { it.title.trim().lowercase() }
+    }
     val isLoadingGenres = uiState.isLoadingGenres
     val genresError = uiState.genresError
     val detailStack = uiState.detailStack
@@ -369,6 +373,59 @@ fun ExploreScreen(
     }
 
     val appPrefs = remember { context.getSharedPreferences("AppSettings", 0) }
+    val genreGradientStyle by appPrefs.observeKey("genre_card_gradient_style", "Theme")
+    val genreGradientPalette = remember(
+        genreGradientStyle,
+        DsmusicTheme.colorScheme.primary,
+        DsmusicTheme.colorScheme.secondary,
+        DsmusicTheme.colorScheme.tertiary
+    ) {
+        val primary = DsmusicTheme.colorScheme.primary
+        val secondary = DsmusicTheme.colorScheme.secondary
+        val tertiary = DsmusicTheme.colorScheme.tertiary
+        fun blend(start: Color, end: Color, amount: Float): Color {
+            val t = amount.coerceIn(0f, 1f)
+            return Color(
+                red = start.red + (end.red - start.red) * t,
+                green = start.green + (end.green - start.green) * t,
+                blue = start.blue + (end.blue - start.blue) * t,
+                alpha = 1f
+            )
+        }
+        when (genreGradientStyle) {
+            "Aurora" -> listOf(
+                Color(0xFF2C9B91), Color(0xFF6579D8), Color(0xFF9B66C8),
+                Color(0xFF35AFC0), Color(0xFF7560B9), Color(0xFF5DAD83)
+            )
+            "Ocean" -> listOf(
+                Color(0xFF2879C7), Color(0xFF269DA8), Color(0xFF5867C9),
+                Color(0xFF3C9BCC), Color(0xFF346FAD), Color(0xFF58B5B1)
+            )
+            "Sunset" -> listOf(
+                Color(0xFFE36D62), Color(0xFFF0A64D), Color(0xFFC95D91),
+                Color(0xFFE98252), Color(0xFFDB6A78), Color(0xFFF1B15F)
+            )
+            "Forest" -> listOf(
+                Color(0xFF38865D), Color(0xFF8AA64F), Color(0xFF368D88),
+                Color(0xFF4F9A70), Color(0xFF739B58), Color(0xFF368C69)
+            )
+            "Berry" -> listOf(
+                Color(0xFFA65BC8), Color(0xFFD56D9C), Color(0xFF6265CD),
+                Color(0xFFB55CB4), Color(0xFF8D62CB), Color(0xFFD278B5)
+            )
+            else -> listOf(
+                primary,
+                secondary,
+                tertiary,
+                blend(primary, secondary, 0.5f),
+                blend(secondary, tertiary, 0.5f),
+                blend(tertiary, primary, 0.5f),
+                blend(primary, secondary, 0.25f),
+                blend(secondary, tertiary, 0.25f),
+                blend(tertiary, primary, 0.25f)
+            )
+        }
+    }
     DisposableEffect(context) {
         val listener =
             android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -934,28 +991,37 @@ fun ExploreScreen(
                                                             }
                                                         }
                                                         itemsIndexed(
-                                                            items = homeCategories.chunked(2),
+                                                            items = sortedHomeCategories.chunked(2),
                                                             key = { rowIndex, rowCategories ->
-                                                                // Category browse IDs can repeat (for example FEmusic_home)
-                                                                // while their params differ. Include the full destination and
-                                                                // row position so every LazyColumn row has a unique identity.
+                                                                // Include the full browse destination and row position so
+                                                                // repeated browse IDs still have stable, unique keys.
                                                                 "genre-row:$rowIndex:" + rowCategories.joinToString("|") {
                                                                     "${it.browseId}:${it.params.orEmpty()}:${it.title}"
                                                                 }
                                                             }
-                                                        ) { _, rowCategories ->
+                                                        ) { rowIndex, rowCategories ->
                                                             Row(
                                                                 modifier = Modifier.fillMaxWidth(),
-                                                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                                                             ) {
-                                                                rowCategories.forEach { category ->
-                                                                    val tileBackground = DsmusicTheme.colorScheme.surfaceContainerHigh
-                                                                    val tileForeground = DsmusicTheme.colorScheme.onSurface
+                                                                rowCategories.forEachIndexed { columnIndex, category ->
+                                                                    val genreIndex = rowIndex * 2 + columnIndex
+                                                                    val firstColor = genreGradientPalette[genreIndex % genreGradientPalette.size]
+                                                                    val secondColor = genreGradientPalette[
+                                                                        (genreIndex + 1) % genreGradientPalette.size
+                                                                    ]
+                                                                    val tileBackground = Brush.linearGradient(
+                                                                        listOf(
+                                                                            firstColor.copy(alpha = 0.34f),
+                                                                            secondColor.copy(alpha = 0.27f),
+                                                                            DsmusicTheme.colorScheme.surfaceContainerHigh
+                                                                        )
+                                                                    )
                                                                     Box(
                                                                         modifier = Modifier
                                                                             .weight(1f)
-                                                                            .height(148.dp)
-                                                                            .clip(RoundedCornerShape(23.dp))
+                                                                            .height(112.dp)
+                                                                            .clip(RoundedCornerShape(20.dp))
                                                                             .background(tileBackground)
                                                                             .clickable {
                                                                                 showSearchGenreBrowser = false
@@ -965,61 +1031,41 @@ fun ExploreScreen(
                                                                                     category.title
                                                                                 )
                                                                             }
-                                                                            .padding(15.dp)
+                                                                            .padding(12.dp)
                                                                     ) {
                                                                         Box(
                                                                             modifier = Modifier
                                                                                 .align(Alignment.TopEnd)
-                                                                                .size(58.dp)
+                                                                                .size(40.dp)
                                                                                 .clip(CircleShape)
-                                                                                .background(tileForeground.copy(alpha = 0.09f)),
+                                                                                .background(firstColor.copy(alpha = 0.16f)),
                                                                             contentAlignment = Alignment.Center
                                                                         ) {
                                                                             Icon(
                                                                                 Icons.Rounded.MusicNote,
                                                                                 contentDescription = null,
-                                                                                tint = DsmusicTheme.colorScheme.primary,
-                                                                                modifier = Modifier.size(29.dp)
+                                                                                tint = firstColor,
+                                                                                modifier = Modifier.size(22.dp)
                                                                             )
                                                                         }
                                                                         Column(
                                                                             modifier = Modifier.fillMaxSize(),
-                                                                            verticalArrangement = Arrangement.spacedBy(5.dp)
+                                                                            verticalArrangement = Arrangement.Bottom
                                                                         ) {
                                                                             Text(
-                                                                                "CATEGORY",
-                                                                                style = DsmusicTheme.typography.labelSmall.copy(
-                                                                                    letterSpacing = 1.15.sp,
-                                                                                    fontWeight = FontWeight.Bold
-                                                                                ),
-                                                                                color = tileForeground.copy(alpha = 0.70f)
-                                                                            )
-                                                                            Spacer(Modifier.weight(1f))
-                                                                            Text(
                                                                                 category.title,
-                                                                                style = DsmusicTheme.typography.titleLarge,
-                                                                                fontWeight = FontWeight.ExtraBold,
-                                                                                color = tileForeground,
+                                                                                style = DsmusicTheme.typography.titleMedium,
+                                                                                fontWeight = FontWeight.Bold,
+                                                                                color = DsmusicTheme.colorScheme.onSurface,
                                                                                 maxLines = 2,
                                                                                 overflow = TextOverflow.Ellipsis
                                                                             )
-                                                                            Row(
-                                                                                verticalAlignment = Alignment.CenterVertically,
-                                                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                                                            ) {
-                                                                                Text(
-                                                                                    "Explore music",
-                                                                                    style = DsmusicTheme.typography.bodySmall,
-                                                                                    fontWeight = FontWeight.Medium,
-                                                                                    color = tileForeground.copy(alpha = 0.80f)
-                                                                                )
-                                                                                Icon(
-                                                                                    Icons.Rounded.ChevronRight,
-                                                                                    contentDescription = null,
-                                                                                    tint = tileForeground.copy(alpha = 0.80f),
-                                                                                    modifier = Modifier.size(16.dp)
-                                                                                )
-                                                                            }
+                                                                            Text(
+                                                                                "Explore music",
+                                                                                style = DsmusicTheme.typography.labelSmall,
+                                                                                color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                                                                maxLines = 1
+                                                                            )
                                                                         }
                                                                     }
                                                                 }
@@ -1109,7 +1155,15 @@ fun ExploreScreen(
                                                                             .weight(1f)
                                                                             .height(190.dp)
                                                                             .clip(RoundedCornerShape(24.dp))
-                                                                            .background(DsmusicTheme.colorScheme.surfaceContainerHigh)
+                                                                            .background(
+                                                                                Brush.linearGradient(
+                                                                                    listOf(
+                                                                                        genreGradientPalette[0].copy(alpha = 0.30f),
+                                                                                        genreGradientPalette[1].copy(alpha = 0.22f),
+                                                                                        DsmusicTheme.colorScheme.surfaceContainerHigh
+                                                                                    )
+                                                                                )
+                                                                            )
                                                                             .clickable {
                                                                                 viewModel.loadMoodsAndGenres()
                                                                                 showSearchGenreBrowser = true
@@ -1119,7 +1173,7 @@ fun ExploreScreen(
                                                                         Icon(
                                                                             Icons.Rounded.MusicNote,
                                                                             contentDescription = null,
-                                                                            tint = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                                                            tint = genreGradientPalette[0],
                                                                             modifier = Modifier
                                                                                 .align(Alignment.TopEnd)
                                                                                 .size(28.dp)
@@ -1149,9 +1203,9 @@ fun ExploreScreen(
                                                                                 overflow = TextOverflow.Ellipsis
                                                                             )
                                                                             Text(
-                                                                                if (homeCategories.isNotEmpty()) {
-                                                                                    homeCategories.take(2).joinToString(" · ") { it.title } +
-                                                                                        if (homeCategories.size > 2) " · more" else ""
+                                                                                if (sortedHomeCategories.isNotEmpty()) {
+                                                                                    sortedHomeCategories.take(2).joinToString(" · ") { it.title } +
+                                                                                        if (sortedHomeCategories.size > 2) " · more" else ""
                                                                                 } else {
                                                                                     "Moods, genres and curated sounds."
                                                                                 },

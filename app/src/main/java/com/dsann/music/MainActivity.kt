@@ -808,6 +808,16 @@ class MainActivity : AppCompatActivity() {
                             }.fillMaxSize()
                         )
                         AudioFormatChoiceDialogHost()
+
+                        // This handler is deliberately composed after the retained root tabs,
+                        // both NavHosts and the player sheet. It therefore takes Back before a
+                        // nested Settings page (such as Appearance/Customize) can pop its route.
+                        // The actual animation remains owned by PlayerBottomSheetCompose.
+                        androidx.activity.compose.BackHandler(
+                            enabled = isPlayerExpanded
+                        ) {
+                            playerViewModel.requestPlayerCollapseFromBack()
+                        }
                     }
                 }
             }

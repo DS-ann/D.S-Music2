@@ -48,6 +48,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -659,6 +661,15 @@ class PlayerSharedViewModel @Inject constructor(
 
     private val _isPlayerExpanded = MutableStateFlow(false)
     val isPlayerExpanded: StateFlow<Boolean> = _isPlayerExpanded.asStateFlow()
+
+    // The Activity-level BackHandler has priority over nested Settings NavHosts.
+    // It sends a one-shot request here so the sheet itself can run its normal collapse animation.
+    private val _playerBackCollapseRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val playerBackCollapseRequests = _playerBackCollapseRequests.asSharedFlow()
+
+    fun requestPlayerCollapseFromBack() {
+        _playerBackCollapseRequests.tryEmit(Unit)
+    }
 
     fun setPlayerExpanded(expanded: Boolean) {
         _isPlayerExpanded.value = expanded

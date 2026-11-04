@@ -1228,6 +1228,21 @@ fun PlayerBottomSheetCompose(
             currentSheetContentState = PlayerSheetState.COLLAPSED
         }
 
+        LaunchedEffect(viewModel) {
+            viewModel.playerBackCollapseRequests.collect {
+                // A second Back while the player is already closing is consumed by
+                // the Activity-level handler but must not restart its animation.
+                if (pendingSheetAnimation?.targetExpanded != false) {
+                    if (
+                        currentSheetContentState == PlayerSheetState.EXPANDED ||
+                        playerContentExpansionFraction.value > 0.01f
+                    ) {
+                        collapsePlayerFully()
+                    }
+                }
+            }
+        }
+
         // A rotation changes the sheet's coordinate space. Recalculate its Y position using
         // the new height while retaining the previously saved expansion fraction.
         LaunchedEffect(screenHeightPx, containerWidthDp, useNavigationRail, miniPlayerBottomInsetPx) {

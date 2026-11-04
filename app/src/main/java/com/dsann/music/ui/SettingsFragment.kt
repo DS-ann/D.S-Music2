@@ -410,6 +410,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         setAppearancePreset("Custom")
     }
 
+    private val _genreGradientStyle = MutableStateFlow(
+        prefs.getString("genre_card_gradient_style", "Theme")
+            ?.takeIf { it in listOf("Theme", "Aurora", "Ocean", "Sunset", "Forest", "Berry") }
+            ?: "Theme"
+    )
+    val genreGradientStyle: StateFlow<String> = _genreGradientStyle.asStateFlow()
+    fun setGenreGradientStyle(value: String) {
+        val safe = value.takeIf {
+            it in listOf("Theme", "Aurora", "Ocean", "Sunset", "Forest", "Berry")
+        } ?: "Theme"
+        _genreGradientStyle.value = safe
+        prefs.edit { putString("genre_card_gradient_style", safe) }
+    }
+
     private val _uiCornerStyle = MutableStateFlow(
         prefs.getString("ui_corner_style", "Soft")?.takeIf { it in listOf("Tight", "Soft", "Round") } ?: "Soft"
     )
@@ -764,7 +778,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     // account and library settings are deliberately excluded.
     private val appearanceLookKeys = listOf(
         "theme_mode", KEY_AMOLED_BLACK, KEY_DYNAMIC_ALBUM_THEME, KEY_APPEARANCE_PRESET,
-        "custom_accent_color", "ui_corner_style", KEY_PLAYER_ARTWORK_SHAPE, "player_background_style", "mini_player_style",
+        "custom_accent_color", "genre_card_gradient_style", "ui_corner_style", KEY_PLAYER_ARTWORK_SHAPE, "player_background_style", "mini_player_style",
         "mini_player_control_shape", "mini_player_control_icons", "mini_player_progress",
         "player_layout", "player_artwork_scale", "player_buttons_pill", "player_buttons", "session_buttons", "player_title_align", "player_title_size",
         "player_title_weight", "player_title_scroll", "player_times", "scrubber_style",
@@ -812,6 +826,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         setAmoledBlack(look.optBoolean(KEY_AMOLED_BLACK, _amoledBlack.value))
         setDynamicAlbumTheme(look.optBoolean(KEY_DYNAMIC_ALBUM_THEME, _dynamicAlbumTheme.value))
         setAppearancePreset(look.optString(KEY_APPEARANCE_PRESET, _appearancePreset.value))
+        setGenreGradientStyle(look.optString("genre_card_gradient_style", _genreGradientStyle.value))
         val savedCustomAccent = look.optString("custom_accent_color", _customAccentColor.value)
             .trim().uppercase().let { if (it.startsWith("#")) it else "#$it" }
         if (savedCustomAccent.matches(Regex("#[0-9A-F]{6}"))
@@ -1363,6 +1378,7 @@ fun SettingsScreenContent(
     val savedAppearanceLooks by viewModel.savedAppearanceLooks.collectAsStateWithLifecycle()
     val appearancePreset by viewModel.appearancePreset.collectAsStateWithLifecycle()
     val customAccentColor by viewModel.customAccentColor.collectAsStateWithLifecycle()
+    val genreGradientStyle by viewModel.genreGradientStyle.collectAsStateWithLifecycle()
     val uiCornerStyle by viewModel.uiCornerStyle.collectAsStateWithLifecycle()
     val playerArtworkShape by viewModel.playerArtworkShape.collectAsStateWithLifecycle()
     val playerArtworkScale by viewModel.playerArtworkScale.collectAsStateWithLifecycle()
@@ -1618,6 +1634,8 @@ fun SettingsScreenContent(
                 onAppearancePresetChange = { viewModel.setAppearancePreset(it) },
                 customAccentColor = customAccentColor,
                 onCustomAccentColorChange = { viewModel.setCustomAccentColor(it) },
+                genreGradientStyle = genreGradientStyle,
+                onGenreGradientStyleChange = { viewModel.setGenreGradientStyle(it) },
                 uiCornerStyle = uiCornerStyle,
                 onUiCornerStyleChange = { viewModel.setUiCornerStyle(it) },
                 playerArtworkShape = playerArtworkShape,
@@ -2857,6 +2875,8 @@ private fun AppearanceScreen(
     onAppearancePresetChange: (String) -> Unit,
     customAccentColor: String,
     onCustomAccentColorChange: (String) -> Unit,
+    genreGradientStyle: String,
+    onGenreGradientStyleChange: (String) -> Unit,
     uiCornerStyle: String,
     onUiCornerStyleChange: (String) -> Unit,
     playerArtworkShape: String,
@@ -2997,6 +3017,15 @@ private fun AppearanceScreen(
                         onApply = onCustomAccentColorChange
                     )
                 }
+            })
+            SettingsGroupCard(listOf {
+                SettingsChoiceRow(
+                    title = "Genre card gradients",
+                    description = "Give each genre a different, coordinated gradient. Theme follows your selected app colours; the other palettes offer alternate colour families.",
+                    selected = genreGradientStyle,
+                    options = listOf("Theme", "Aurora", "Ocean", "Sunset", "Forest", "Berry"),
+                    onSelected = onGenreGradientStyleChange
+                )
             })
 
             SettingsHeader("Player layout")
