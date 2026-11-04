@@ -1295,6 +1295,9 @@ fun PlayerBottomSheetCompose(
                         )
                     }
                 }
+                // Persist only the settled state. Publishing every animation frame to the
+                // Activity ViewModel creates unnecessary flow work and UI invalidations.
+                viewModel.setPlayerExpansionFraction(destFraction)
             } finally {
                 isSheetAnimating = false
             }
@@ -1323,11 +1326,6 @@ fun PlayerBottomSheetCompose(
                 animatePlayerSheet(targetExpanded = targetExpanded)
             }
             if (!targetExpanded) fullPlayerLayoutReady = false
-        }
-
-        LaunchedEffect(playerContentExpansionFraction) {
-            snapshotFlow { playerContentExpansionFraction.value }
-                .collect { viewModel.setPlayerExpansionFraction(it) }
         }
 
         val sheetVisualState = rememberSheetVisualState(
