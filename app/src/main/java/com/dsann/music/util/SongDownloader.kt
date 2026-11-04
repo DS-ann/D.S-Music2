@@ -610,15 +610,18 @@ object SongDownloader {
             cachedMetadata?.thumbnailUrl?.takeIf { it.isNotBlank() }?.let(artworkUrls::add)
             sourceMetadata?.thumbnailUrl?.takeIf { it.isNotBlank() }?.let(artworkUrls::add)
 
-            if (artworkBytes.isNullOrEmpty()) {
+            if (artworkBytes == null || artworkBytes.isEmpty()) {
                 for (artworkUrl in artworkUrls.distinct()) {
-                    artworkBytes = fetchArtworkBytes(context, artworkUrl)
-                    if (!artworkBytes.isNullOrEmpty()) break
+                    val fetchedArtwork = fetchArtworkBytes(context, artworkUrl)
+                    if (fetchedArtwork != null && fetchedArtwork.isNotEmpty()) {
+                        artworkBytes = fetchedArtwork
+                        break
+                    }
                 }
             }
 
             // Only request source metadata after all already-known image URLs have failed.
-            if (artworkBytes.isNullOrEmpty()) {
+            if (artworkBytes == null || artworkBytes.isEmpty()) {
                 val metadataThumbnail = runCatching {
                     com.dsann.music.data.innertube.YouTubeMusic
                         .player(videoId, metadataOnly = true)
@@ -630,7 +633,7 @@ object SongDownloader {
                     artworkBytes = fetchArtworkBytes(context, metadataThumbnail)
                 }
             }
-            if (artworkBytes.isNullOrEmpty() && !videoId.isBlank()) {
+            if ((artworkBytes == null || artworkBytes.isEmpty()) && videoId.isNotBlank()) {
                 artworkBytes = fetchArtworkBytes(
                     context,
                     "https://img.youtube.com/vi/$videoId/hqdefault.jpg"
@@ -639,11 +642,11 @@ object SongDownloader {
 
             coroutineContext.ensureActive()
 
-            if (!artworkBytes.isNullOrEmpty()) {
+            artworkBytes?.takeIf { it.isNotEmpty() }?.let { artwork ->
                 AudioPlaybackService.storeCachedMediaArtworkBytes(
                     context.applicationContext,
                     song.id.toString(),
-                    artworkBytes
+                    artwork
                 )
             }
 
