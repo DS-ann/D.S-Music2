@@ -271,10 +271,11 @@ fun QueueBottomSheetContent(
                                         .zIndex(if (isDragging) 1f else 0f)
                                         .graphicsLayer {
                                             translationY = displacement
-                                            if (isDragging) {
-                                                scaleX = 1.03f
-                                                scaleY = 1.03f
-                                            }
+                                            val liftScale = if (isDragging) 1.05f else 1f
+                                            scaleX = liftScale
+                                            scaleY = liftScale
+                                            shadowElevation = if (isDragging) 14.dp.toPx() else 0f
+                                            shape = RoundedCornerShape(18.dp)
                                         }
                                 ) {
                                     QueueListItem(
@@ -397,10 +398,11 @@ fun QueueBottomSheetContent(
                                             .zIndex(if (isDragging) 1f else 0f)
                                             .graphicsLayer {
                                                 translationY = displacement
-                                                if (isDragging) {
-                                                    scaleX = 1.03f
-                                                    scaleY = 1.03f
-                                                }
+                                                val liftScale = if (isDragging) 1.05f else 1f
+                                                scaleX = liftScale
+                                                scaleY = liftScale
+                                                shadowElevation = if (isDragging) 14.dp.toPx() else 0f
+                                                shape = RoundedCornerShape(18.dp)
                                             }
                                     ) {
                                         QueueListItem(
@@ -527,7 +529,7 @@ fun QueueListItem(
                 .size(48.dp)
                 .pointerInput(dragDropState, song.id) {
                     val state = dragDropState ?: return@pointerInput
-                    detectDragGestures(
+                    detectDragGesturesAfterLongPress(
                         onDragStart = {
                             val startIndex = latestIndex.value
                             if (startIndex >= 0) state.onDragStartAtIndex(startIndex)
