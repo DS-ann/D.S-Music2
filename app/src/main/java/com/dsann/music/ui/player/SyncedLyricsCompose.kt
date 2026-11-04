@@ -475,24 +475,12 @@ private fun LyricLineItem(
     val commonModifier = Modifier
         .fillMaxWidth()
         .drawBehind {
+            // Keep only the slim leading indicator. The lyric row itself stays
+            // completely transparent so the player artwork/background remains visible.
             if (isActive && !isKaraoke) {
-                val corner = 18.dp.toPx()
-                val accent = accentColor
-                // Draw the active row's tint and outline behind its text.
-                drawRoundRect(
-                    color = accent.copy(alpha = 0.20f),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner, corner)
-                )
-                drawRoundRect(
-                    color = accent.copy(alpha = 0.72f),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner, corner),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.25.dp.toPx())
-                )
-                // A strong leading rail makes the active line unmistakable
-                // without tinting or painting over the lyric glyphs.
                 val railHeight = (size.height - 20.dp.toPx()).coerceAtLeast(0f)
                 drawRoundRect(
-                    color = accent.copy(alpha = 0.98f),
+                    color = accentColor.copy(alpha = 0.98f),
                     topLeft = androidx.compose.ui.geometry.Offset(5.dp.toPx(), 10.dp.toPx()),
                     size = androidx.compose.ui.geometry.Size(3.dp.toPx(), railHeight),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(

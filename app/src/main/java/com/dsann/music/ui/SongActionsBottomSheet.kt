@@ -317,9 +317,14 @@ fun BottomSheetScaffoldContent(
                     onDismiss()
                 })
 
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
-                Box(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
                     AnimatedContent(
                         targetState = selectedTab,
                         transitionSpec = {
@@ -345,7 +350,7 @@ fun BottomSheetScaffoldContent(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 ExpressiveTabSwitcher(selectedTab) { selectedTab = it }
             } else {
@@ -413,6 +418,85 @@ fun BottomSheetScaffoldContent(
 }
 
 @Composable
+private fun SongActionTile(
+    modifier: Modifier,
+    label: String,
+    containerColor: Color,
+    contentColor: Color,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .height(78.dp)
+            .clip(RoundedCornerShape(17.dp))
+            .background(containerColor)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 9.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(25.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            icon()
+        }
+        Text(
+            text = label,
+            style = DsmusicTheme.typography.labelMedium,
+            fontFamily = GoogleSansFlex,
+            fontWeight = FontWeight.SemiBold,
+            color = contentColor,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun SongActionWideTile(
+    modifier: Modifier,
+    label: String,
+    containerColor: Color,
+    contentColor: Color,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit
+) {
+    Row(
+        modifier = modifier
+            .height(58.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(containerColor)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier.size(22.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            icon()
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = label,
+            style = DsmusicTheme.typography.labelLarge,
+            fontFamily = GoogleSansFlex,
+            fontWeight = FontWeight.SemiBold,
+            color = contentColor,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
 fun OptionsContent(
     song: SongItem?,
     isFavorite: Boolean,
@@ -423,14 +507,17 @@ fun OptionsContent(
     onDismiss: () -> Unit,
     showDelete: Boolean = true
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // Main Actions (Play, Fav, Share)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            "QUICK ACTIONS",
+            style = DsmusicTheme.typography.labelSmall.copy(
+                letterSpacing = 1.15.sp,
+                fontWeight = FontWeight.Bold
+            ),
+            color = DsmusicTheme.colorScheme.onSurfaceVariant
+        )
         ActionButtonRow1(song, isFavorite, onFavoriteChange, actionListener, onDismiss)
-        
-        // Secondary Actions (Queue, Next)
         ActionButtonRow2(song, actionListener, onDismiss, showAddToQueue = showAddToQueue)
-        
-        // Danger Zone / Playlist
         DestructiveActionRow(song, actionListener, onAddToPlaylist, onDismiss, showDelete = showDelete)
     }
 }
@@ -444,50 +531,42 @@ fun DestructiveActionRow(
     onDismiss: () -> Unit,
     showDelete: Boolean = true
 ) {
-    val deleteInteraction = remember { MutableInteractionSource() }
-    val dPressed by deleteInteraction.collectIsPressedAsState()
-
-    val addInteraction = remember { MutableInteractionSource() }
-    val aPressed by addInteraction.collectIsPressedAsState()
-
-    Row(modifier = Modifier.fillMaxWidth().height(72.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        // Add to Playlist Button
-        ToggleButton(
-            checked = aPressed,
-            onCheckedChange = { 
-                onAddToPlaylist()
-            },
-            interactionSource = addInteraction,
-            modifier = Modifier.weight(1f).fillMaxHeight(),
-            colors = ToggleButtonDefaults.toggleButtonColors(
-                containerColor = DsmusicTheme.colorScheme.secondaryContainer,
-                contentColor = DsmusicTheme.colorScheme.onSecondaryContainer
-            )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        SongActionWideTile(
+            modifier = Modifier.weight(if (showDelete) 1f else 2f),
+            label = "Add to playlist",
+            containerColor = DsmusicTheme.colorScheme.secondaryContainer,
+            contentColor = DsmusicTheme.colorScheme.onSecondaryContainer,
+            onClick = onAddToPlaylist
         ) {
-            Icon(Icons.Rounded.PlaylistAdd, null, tint = DsmusicTheme.colorScheme.onSecondaryContainer)
-            Spacer(Modifier.width(8.dp))
-            Text("Add to Playlist", style = DsmusicTheme.typography.labelLarge, fontFamily = GoogleSansFlex, color = DsmusicTheme.colorScheme.onSecondaryContainer)
+            Icon(
+                Icons.Rounded.PlaylistAdd,
+                contentDescription = null,
+                tint = DsmusicTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(21.dp)
+            )
         }
-
         if (showDelete) {
-        // Delete Button
-        ToggleButton(
-            checked = dPressed,
-            onCheckedChange = { 
-                song?.let { actionListener?.onDelete(it) }
-                onDismiss()
-            },
-            interactionSource = deleteInteraction,
-            modifier = Modifier.weight(1f).fillMaxHeight(),
-            colors = ToggleButtonDefaults.toggleButtonColors(
+            SongActionWideTile(
+                modifier = Modifier.weight(1f),
+                label = "Delete",
                 containerColor = DsmusicTheme.colorScheme.errorContainer,
-                contentColor = DsmusicTheme.colorScheme.onErrorContainer
-            )
-        ) {
-            Icon(Icons.Rounded.DeleteOutline, null, tint = DsmusicTheme.colorScheme.onErrorContainer)
-            Spacer(Modifier.width(8.dp))
-            Text("Delete", style = DsmusicTheme.typography.labelLarge, fontFamily = GoogleSansFlex, color = DsmusicTheme.colorScheme.onErrorContainer)
-        }
+                contentColor = DsmusicTheme.colorScheme.onErrorContainer,
+                onClick = {
+                    song?.let { actionListener?.onDelete(it) }
+                    onDismiss()
+                }
+            ) {
+                Icon(
+                    Icons.Rounded.DeleteOutline,
+                    contentDescription = null,
+                    tint = DsmusicTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.size(21.dp)
+                )
+            }
         }
     }
 }
@@ -667,7 +746,9 @@ fun HeaderSection(
                     song?.artist ?: "Unknown Artist",
                     style = DsmusicTheme.typography.bodyMedium,
                     fontFamily = GoogleSansFlex,
-                    color = DsmusicTheme.colorScheme.onSurfaceVariant
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
@@ -751,104 +832,63 @@ fun ActionButtonRow1(
     actionListener: SongActionsBottomSheet.ActionListener?,
     onDismiss: () -> Unit
 ) {
-    var favLocal by remember { mutableStateOf(isFavorite) }
-
-    val playInteraction = remember { MutableInteractionSource() }
-    val favInteraction = remember { MutableInteractionSource() }
-    val shareInteraction = remember { MutableInteractionSource() }
-
-    val playPressed by playInteraction.collectIsPressedAsState()
-    val favPressed by favInteraction.collectIsPressedAsState()
-    val sharePressed by shareInteraction.collectIsPressedAsState()
-
-    val playWeight by animateFloatAsState(
-        targetValue = if (playPressed) 1.5f else 1f,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 380f), label = "playWeight"
-    )
-    val favWeight by animateFloatAsState(
-        targetValue = if (favPressed) 1.5f else 1f, 
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 380f), label = "favWeight"
-    )
-    val shareWeight by animateFloatAsState(
-        targetValue = if (sharePressed) 1.5f else 1f,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 380f), label = "shareWeight"
-    )
+    var favorite by remember(song?.id, isFavorite) { mutableStateOf(isFavorite) }
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(96.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        ToggleButton(
-            checked = playPressed,
-            onCheckedChange = {
+        SongActionTile(
+            modifier = Modifier.weight(1f),
+            label = "Play",
+            containerColor = DsmusicTheme.colorScheme.primaryContainer,
+            contentColor = DsmusicTheme.colorScheme.onPrimaryContainer,
+            onClick = {
                 song?.let { actionListener?.onPlay(it) }
                 onDismiss()
-            },
-            interactionSource = playInteraction,
-            modifier = Modifier
-                .weight(playWeight)
-                .fillMaxHeight()
-                .zIndex(if (playPressed) 1f else 0f),
-            shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-            colors = ToggleButtonDefaults.toggleButtonColors(
-                containerColor = DsmusicTheme.colorScheme.primaryContainer,
-                contentColor = DsmusicTheme.colorScheme.onPrimaryContainer
-            )
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.PlayArrow, null, modifier = Modifier.size(28.dp), tint = DsmusicTheme.colorScheme.onPrimaryContainer)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Play", color = DsmusicTheme.colorScheme.onPrimaryContainer, fontSize = 20.sp, fontWeight = FontWeight.Medium, fontFamily = GoogleSansFlex)
             }
-        }
-
-        ToggleButton(
-            checked = favLocal,
-            onCheckedChange = {
-                favLocal = it
-                onFavoriteChange(it)
-                song?.let { actionListener?.onFavorite(it, favLocal) }
-            },
-            interactionSource = favInteraction,
-            modifier = Modifier
-                .weight(favWeight)
-                .fillMaxHeight()
-                .zIndex(if (favPressed) 1f else 0f),
-            shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
-            colors = ToggleButtonDefaults.toggleButtonColors(
-                containerColor = DsmusicTheme.colorScheme.secondaryContainer,
-                checkedContentColor = Color(0xFFE91E63)
-            )
         ) {
             Icon(
-                imageVector = if (favLocal) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                Icons.Rounded.PlayArrow,
                 contentDescription = null,
-                tint = if (favLocal) Color(0xFFE91E63) else DsmusicTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.size(32.dp)
+                tint = DsmusicTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(24.dp)
             )
         }
-
-        ToggleButton(
-            checked = sharePressed,
-            onCheckedChange = { song?.let { actionListener?.onShare(it) } },
-            interactionSource = shareInteraction,
-            modifier = Modifier
-                .weight(shareWeight)
-                .fillMaxHeight()
-                .zIndex(if (sharePressed) 1f else 0f),
-            shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-            colors = ToggleButtonDefaults.toggleButtonColors(
-                containerColor = DsmusicTheme.colorScheme.tertiaryContainer,
-                contentColor = DsmusicTheme.colorScheme.onTertiaryContainer
-            )
+        SongActionTile(
+            modifier = Modifier.weight(1f),
+            label = if (favorite) "Liked" else "Like",
+            containerColor = DsmusicTheme.colorScheme.secondaryContainer,
+            contentColor = if (favorite) Color(0xFFE91E63) else DsmusicTheme.colorScheme.onSecondaryContainer,
+            onClick = {
+                favorite = !favorite
+                onFavoriteChange(favorite)
+                song?.let { actionListener?.onFavorite(it, favorite) }
+            }
         ) {
-            Icon(Icons.Rounded.Share, null, modifier = Modifier.size(32.dp), tint = DsmusicTheme.colorScheme.onTertiaryContainer)
+            Icon(
+                imageVector = if (favorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                contentDescription = null,
+                tint = if (favorite) Color(0xFFE91E63) else DsmusicTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(23.dp)
+            )
+        }
+        SongActionTile(
+            modifier = Modifier.weight(1f),
+            label = "Share",
+            containerColor = DsmusicTheme.colorScheme.tertiaryContainer,
+            contentColor = DsmusicTheme.colorScheme.onTertiaryContainer,
+            onClick = { song?.let { actionListener?.onShare(it) } }
+        ) {
+            Icon(
+                Icons.Rounded.Share,
+                contentDescription = null,
+                tint = DsmusicTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.size(23.dp)
+            )
         }
     }
 }
-
 
 @Composable
 fun ActionButtonRow2(
@@ -858,158 +898,64 @@ fun ActionButtonRow2(
     showAddToQueue: Boolean = true
 ) {
     val context = LocalContext.current
+    val isOnline = song?.videoId != null
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         if (showAddToQueue) {
-            val queueInteraction = remember { MutableInteractionSource() }
-            val queuePressed by queueInteraction.collectIsPressedAsState()
-            val queueWeight by animateFloatAsState(
-                targetValue = if (queuePressed) 1.4f else 1f,
-                animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f)
-            )
-            ToggleButton(
-                checked = queuePressed,
-                onCheckedChange = {
+            SongActionTile(
+                modifier = Modifier.weight(1f),
+                label = "Queue",
+                containerColor = DsmusicTheme.colorScheme.secondaryContainer,
+                contentColor = DsmusicTheme.colorScheme.onSecondaryContainer,
+                onClick = {
                     song?.let { actionListener?.onAddToQueue(it) }
                     onDismiss()
-                },
-                interactionSource = queueInteraction,
-                modifier = Modifier
-                    .weight(queueWeight)
-                    .height(72.dp)
-                    .zIndex(if (queuePressed) 1f else 0f),
-                shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-                colors = ToggleButtonDefaults.toggleButtonColors(
-                    containerColor = DsmusicTheme.colorScheme.secondaryContainer,
-                    contentColor = DsmusicTheme.colorScheme.onSecondaryContainer,
-                    checkedContainerColor = DsmusicTheme.colorScheme.secondary,
-                    checkedContentColor = DsmusicTheme.colorScheme.onSecondary
-                ),
-                contentPadding = PaddingValues(0.dp)
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_queue_music),
-                        contentDescription = null,
-                        tint = DsmusicTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Queue",
-                        color = DsmusicTheme.colorScheme.onSecondaryContainer,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        fontFamily = GoogleSansFlex
-                    )
                 }
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_queue_music),
+                    contentDescription = null,
+                    tint = DsmusicTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(23.dp)
+                )
             }
         }
-
-        val nextInteraction = remember { MutableInteractionSource() }
-        val nextPressed by nextInteraction.collectIsPressedAsState()
-        val nextWeight by animateFloatAsState(
-            targetValue = if (nextPressed) 1.4f else 1f,
-            animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f)
-        )
-        ToggleButton(
-            checked = nextPressed,
-            onCheckedChange = {
+        SongActionTile(
+            modifier = Modifier.weight(1f),
+            label = "Next",
+            containerColor = DsmusicTheme.colorScheme.tertiaryContainer,
+            contentColor = DsmusicTheme.colorScheme.onTertiaryContainer,
+            onClick = {
                 song?.let { actionListener?.onPlayNext(it) }
                 onDismiss()
-            },
-            interactionSource = nextInteraction,
-            modifier = Modifier
-                .weight(nextWeight)
-                .height(72.dp)
-                .zIndex(if (nextPressed) 1f else 0f),
-            shapes = if (showAddToQueue) {
-                ButtonGroupDefaults.connectedMiddleButtonShapes()
-            } else {
-                ButtonGroupDefaults.connectedLeadingButtonShapes()
-            },
-            colors = ToggleButtonDefaults.toggleButtonColors(
-                containerColor = DsmusicTheme.colorScheme.tertiaryContainer,
-                contentColor = DsmusicTheme.colorScheme.onTertiaryContainer,
-                checkedContainerColor = DsmusicTheme.colorScheme.tertiary,
-                checkedContentColor = DsmusicTheme.colorScheme.onTertiary
-            ),
-            contentPadding = PaddingValues(0.dp)
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_skip_next),
-                    contentDescription = null,
-                    tint = DsmusicTheme.colorScheme.onTertiaryContainer,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Next",
-                    color = DsmusicTheme.colorScheme.onTertiaryContainer,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = GoogleSansFlex
-                )
             }
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_skip_next),
+                contentDescription = null,
+                tint = DsmusicTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.size(23.dp)
+            )
         }
-
-        val downloadInteraction = remember { MutableInteractionSource() }
-        val downloadPressed by downloadInteraction.collectIsPressedAsState()
-        val downloadWeight by animateFloatAsState(
-            targetValue = if (downloadPressed) 1.4f else 1f,
-            animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f)
-        )
-        val isOnline = song?.videoId != null
-
-        ToggleButton(
-            checked = downloadPressed,
-            onCheckedChange = {
-                if (isOnline) {
-                    com.dsann.music.util.SongDownloader.downloadSong(context, song)
-                    onDismiss()
-                }
-            },
+        SongActionTile(
+            modifier = Modifier.weight(1f),
+            label = if (isOnline) "Download" else "Offline",
+            containerColor = if (isOnline) DsmusicTheme.colorScheme.primaryContainer else DsmusicTheme.colorScheme.surfaceVariant,
+            contentColor = if (isOnline) DsmusicTheme.colorScheme.onPrimaryContainer else DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
             enabled = isOnline,
-            interactionSource = downloadInteraction,
-            modifier = Modifier
-                .weight(downloadWeight)
-                .height(72.dp)
-                .zIndex(if (downloadPressed) 1f else 0f),
-            shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-            colors = ToggleButtonDefaults.toggleButtonColors(
-                containerColor = if (isOnline) DsmusicTheme.colorScheme.primaryContainer else DsmusicTheme.colorScheme.surfaceVariant,
-                contentColor = if (isOnline) DsmusicTheme.colorScheme.onPrimaryContainer else DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                checkedContainerColor = DsmusicTheme.colorScheme.primary,
-                checkedContentColor = DsmusicTheme.colorScheme.onPrimary
-            ),
-            contentPadding = PaddingValues(0.dp)
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = if (isOnline) Icons.Rounded.Download else Icons.Rounded.Check,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = if (isOnline) "Download" else "Offline",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = GoogleSansFlex
-                )
+            onClick = {
+                song?.let { com.dsann.music.util.SongDownloader.downloadSong(context, it) }
+                onDismiss()
             }
+        ) {
+            Icon(
+                imageVector = if (isOnline) Icons.Rounded.Download else Icons.Rounded.Check,
+                contentDescription = null,
+                tint = if (isOnline) DsmusicTheme.colorScheme.onPrimaryContainer else DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                modifier = Modifier.size(23.dp)
+            )
         }
     }
 }

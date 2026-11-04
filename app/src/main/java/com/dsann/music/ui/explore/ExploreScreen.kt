@@ -904,8 +904,8 @@ fun ExploreScreen(
                                                                     Box(
                                                                         modifier = Modifier
                                                                             .weight(1f)
-                                                                            .height(104.dp)
-                                                                            .clip(RoundedCornerShape(20.dp))
+                                                                            .height(148.dp)
+                                                                            .clip(RoundedCornerShape(23.dp))
                                                                             .background(tileBackground)
                                                                             .clickable {
                                                                                 showSearchGenreBrowser = false
@@ -915,30 +915,61 @@ fun ExploreScreen(
                                                                                     category.title
                                                                                 )
                                                                             }
-                                                                            .padding(14.dp)
+                                                                            .padding(15.dp)
                                                                     ) {
-                                                                        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                                                        Box(
+                                                                            modifier = Modifier
+                                                                                .align(Alignment.TopEnd)
+                                                                                .size(58.dp)
+                                                                                .clip(CircleShape)
+                                                                                .background(tileForeground.copy(alpha = 0.09f)),
+                                                                            contentAlignment = Alignment.Center
+                                                                        ) {
+                                                                            Icon(
+                                                                                Icons.Rounded.MusicNote,
+                                                                                contentDescription = null,
+                                                                                tint = tileForeground.copy(alpha = 0.76f),
+                                                                                modifier = Modifier.size(29.dp)
+                                                                            )
+                                                                        }
+                                                                        Column(
+                                                                            modifier = Modifier.fillMaxSize(),
+                                                                            verticalArrangement = Arrangement.spacedBy(5.dp)
+                                                                        ) {
                                                                             Text(
-                                                                                "GENRE",
+                                                                                "CATEGORY",
                                                                                 style = DsmusicTheme.typography.labelSmall.copy(
-                                                                                    letterSpacing = 1.1.sp,
+                                                                                    letterSpacing = 1.15.sp,
                                                                                     fontWeight = FontWeight.Bold
                                                                                 ),
-                                                                                color = tileForeground.copy(alpha = 0.72f)
+                                                                                color = tileForeground.copy(alpha = 0.70f)
                                                                             )
+                                                                            Spacer(Modifier.weight(1f))
                                                                             Text(
                                                                                 category.title,
-                                                                                style = DsmusicTheme.typography.titleMedium,
-                                                                                fontWeight = FontWeight.Bold,
+                                                                                style = DsmusicTheme.typography.titleLarge,
+                                                                                fontWeight = FontWeight.ExtraBold,
                                                                                 color = tileForeground,
-                                                                                maxLines = 1,
+                                                                                maxLines = 2,
                                                                                 overflow = TextOverflow.Ellipsis
                                                                             )
-                                                                            Text(
-                                                                                "Explore music",
-                                                                                style = DsmusicTheme.typography.bodySmall,
-                                                                                color = tileForeground.copy(alpha = 0.78f)
-                                                                            )
+                                                                            Row(
+                                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                                            ) {
+                                                                                Text(
+                                                                                    "Explore music",
+                                                                                    style = DsmusicTheme.typography.bodySmall,
+                                                                                    fontWeight = FontWeight.Medium,
+                                                                                    color = tileForeground.copy(alpha = 0.80f)
+                                                                                )
+                                                                                Icon(
+                                                                                    Icons.Rounded.ChevronRight,
+                                                                                    contentDescription = null,
+                                                                                    tint = tileForeground.copy(alpha = 0.80f),
+                                                                                    modifier = Modifier.size(16.dp)
+                                                                                )
+                                                                            }
                                                                         }
                                                                     }
                                                                 }
@@ -1068,52 +1099,91 @@ fun ExploreScreen(
                                                             Row(
                                                                 modifier = Modifier
                                                                     .fillMaxWidth()
-                                                                    .clip(RoundedCornerShape(22.dp))
-                                                                    .background(DsmusicTheme.colorScheme.surfaceContainerHigh)
-                                                                    .clickable { showSearchGenreBrowser = true }
-                                                                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                                                                verticalAlignment = Alignment.CenterVertically,
-                                                                horizontalArrangement = Arrangement.spacedBy(13.dp)
-                                                            ) {
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .size(46.dp)
-                                                                        .clip(RoundedCornerShape(15.dp))
-                                                                        .background(DsmusicTheme.colorScheme.primaryContainer),
-                                                                    contentAlignment = Alignment.Center
-                                                                ) {
-                                                                    Icon(
-                                                                        Icons.Rounded.MusicNote,
-                                                                        contentDescription = null,
-                                                                        tint = DsmusicTheme.colorScheme.onPrimaryContainer,
-                                                                        modifier = Modifier.size(23.dp)
+                                                                    .height(164.dp)
+                                                                    .clip(RoundedCornerShape(26.dp))
+                                                                    .background(
+                                                                        Brush.linearGradient(
+                                                                            listOf(
+                                                                                DsmusicTheme.colorScheme.primaryContainer.copy(alpha = 0.96f),
+                                                                                DsmusicTheme.colorScheme.secondaryContainer.copy(alpha = 0.88f),
+                                                                                DsmusicTheme.colorScheme.surfaceContainerHigh
+                                                                            )
+                                                                        )
                                                                     )
-                                                                }
+                                                                    .clickable { showSearchGenreBrowser = true }
+                                                                    .padding(19.dp),
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                            ) {
                                                                 Column(
                                                                     modifier = Modifier.weight(1f),
-                                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                                    verticalArrangement = Arrangement.spacedBy(7.dp)
                                                                 ) {
                                                                     Text(
-                                                                        "Genres",
-                                                                        style = DsmusicTheme.typography.titleMedium,
-                                                                        fontWeight = FontWeight.Bold,
+                                                                        "DISCOVER BY SOUND",
+                                                                        style = DsmusicTheme.typography.labelSmall.copy(
+                                                                            letterSpacing = 1.25.sp,
+                                                                            fontWeight = FontWeight.Bold
+                                                                        ),
+                                                                        color = DsmusicTheme.colorScheme.primary
+                                                                    )
+                                                                    Text(
+                                                                        "Explore genres",
+                                                                        style = DsmusicTheme.typography.headlineMedium,
+                                                                        fontWeight = FontWeight.ExtraBold,
                                                                         color = DsmusicTheme.colorScheme.onSurface
                                                                     )
                                                                     Text(
-                                                                        homeCategories.take(4).joinToString(" · ") { it.title } +
-                                                                            if (homeCategories.size > 4) " · and more" else "",
+                                                                        homeCategories.take(3).joinToString(" · ") { it.title } +
+                                                                            if (homeCategories.size > 3) " · and more" else "",
                                                                         style = DsmusicTheme.typography.bodySmall,
                                                                         color = DsmusicTheme.colorScheme.onSurfaceVariant,
                                                                         maxLines = 2,
                                                                         overflow = TextOverflow.Ellipsis
                                                                     )
+                                                                    Row(
+                                                                        verticalAlignment = Alignment.CenterVertically,
+                                                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                                                    ) {
+                                                                        Text(
+                                                                            "Browse categories",
+                                                                            style = DsmusicTheme.typography.labelLarge,
+                                                                            fontWeight = FontWeight.Bold,
+                                                                            color = DsmusicTheme.colorScheme.primary
+                                                                        )
+                                                                        Icon(
+                                                                            Icons.Rounded.ChevronRight,
+                                                                            contentDescription = null,
+                                                                            tint = DsmusicTheme.colorScheme.primary,
+                                                                            modifier = Modifier.size(18.dp)
+                                                                        )
+                                                                    }
                                                                 }
-                                                                Icon(
-                                                                    Icons.Rounded.ChevronRight,
-                                                                    contentDescription = "Browse genres",
-                                                                    tint = DsmusicTheme.colorScheme.onSurfaceVariant,
-                                                                    modifier = Modifier.size(20.dp)
-                                                                )
+                                                                Box(
+                                                                    modifier = Modifier.size(104.dp),
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    Box(
+                                                                        modifier = Modifier
+                                                                            .align(Alignment.TopStart)
+                                                                            .size(62.dp)
+                                                                            .clip(RoundedCornerShape(19.dp))
+                                                                            .background(DsmusicTheme.colorScheme.primary.copy(alpha = 0.16f))
+                                                                    )
+                                                                    Box(
+                                                                        modifier = Modifier
+                                                                            .align(Alignment.BottomEnd)
+                                                                            .size(68.dp)
+                                                                            .clip(RoundedCornerShape(22.dp))
+                                                                            .background(DsmusicTheme.colorScheme.secondary.copy(alpha = 0.14f))
+                                                                    )
+                                                                    Icon(
+                                                                        Icons.Rounded.MusicNote,
+                                                                        contentDescription = null,
+                                                                        tint = DsmusicTheme.colorScheme.primary,
+                                                                        modifier = Modifier.size(49.dp)
+                                                                    )
+                                                                }
                                                             }
                                                         }
 
