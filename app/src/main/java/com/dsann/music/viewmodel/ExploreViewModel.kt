@@ -512,7 +512,14 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
                 // Wait for all simultaneously
                 val responses = awaitAll(playTask, songTask, albumTask)
-                
+                if (responses.none { it.isSuccess }) {
+                    val cause = responses.mapNotNull { it.exceptionOrNull() }.firstOrNull()
+                    throw java.io.IOException(
+                        "Network unavailable. Check your connection and try again.",
+                        cause
+                    )
+                }
+
                 responses[0].onSuccess { res ->
                     if (res.items.isNotEmpty()) sections.add(HomeSection("$mood Curations", res.items.shuffled().take(12)))
                 }
@@ -539,8 +546,17 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         // Fetch the online feed first so local personalization cannot delay first content.
 
         // 2. Await Network streams
-        val homePage = homeTask?.await()
-        val explorePage = exploreTask.await()
+        val homeResult = homeTask?.await()
+        val exploreResult = exploreTask.await()
+        if ((homeResult == null || homeResult.isFailure) && exploreResult.isFailure) {
+            val cause = exploreResult.exceptionOrNull() ?: homeResult?.exceptionOrNull()
+            throw java.io.IOException(
+                "Network unavailable. Check your connection and try again.",
+                cause
+            )
+        }
+        val homePage = homeResult?.getOrNull()
+        val explorePage = exploreResult.getOrNull()
         homeContinuationToken = homePage?.continuation
         exploreContinuationToken = explorePage?.continuation
             ?.takeIf { it != homeContinuationToken }
@@ -640,20 +656,36 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         if (!explorePageActive || homeLoaded || _uiState.value.isLoadingHome) return
 
         syncCookieFromDisk()
-        _uiState.update { it.copy(isLoadingHome = true) }
+        _uiState.update {
+            it.copy(
+                isLoadingHome = true,
+                homeFeedError = null
+            )
+        }
         homeFeedJob?.cancel()
         homeFeedJob = viewModelScope.launch {
             try {
                 val mergedSections = fetchMergedHomeFeed()
                 // Publish the main feed immediately; personalization is optional and loaded afterwards.
-                _uiState.update { it.copy(homeSections = mergedSections, isLoadingHome = false) }
+                _uiState.update {
+                    it.copy(
+                        homeSections = mergedSections,
+                        isLoadingHome = false,
+                        homeFeedError = null
+                    )
+                }
                 homeLoaded = true
                 prefetchThumbnails(mergedSections.take(3).flatMap { it.items.take(3) })
                 loadPersonalizedSectionsInBackground()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "Home feed error", e)
-                _uiState.update { it.copy(error = e.message) }
+                homeLoaded = false
+                _uiState.update {
+                    it.copy(
+                        homeFeedError = "Network not available. Check your connection and try again."
+                    )
+                }
             } finally {
                 _uiState.update { if (it.isLoadingHome) it.copy(isLoadingHome = false) else it }
             }
@@ -664,20 +696,35 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         if (!explorePageActive) return
         syncCookieFromDisk()
         homeLoaded = false
-        _uiState.update { it.copy(isRefreshing = true) }
+        _uiState.update {
+            it.copy(
+                isRefreshing = true,
+                homeFeedError = null
+            )
+        }
         homeFeedJob?.cancel()
         homeRefreshJob?.cancel()
         homeRefreshJob = viewModelScope.launch {
             try {
                 val mergedSections = fetchMergedHomeFeed()
-                _uiState.update { it.copy(homeSections = mergedSections) }
+                _uiState.update {
+                    it.copy(
+                        homeSections = mergedSections,
+                        homeFeedError = null
+                    )
+                }
                 homeLoaded = true
                 prefetchThumbnails(mergedSections.take(3).flatMap { it.items.take(3) })
                 loadPersonalizedSectionsInBackground()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "Refresh error", e)
-                _uiState.update { it.copy(error = e.message) }
+                homeLoaded = false
+                _uiState.update {
+                    it.copy(
+                        homeFeedError = "Network not available. Check your connection and try again."
+                    )
+                }
             } finally {
                 _uiState.update { it.copy(isRefreshing = false) }
             }
@@ -1281,6 +1328,7 @@ data class ExploreUiState(
     val isSearching: Boolean = false,
     val homeSections: List<HomeSection> = emptyList(),
     val isLoadingHome: Boolean = false,
+    val homeFeedError: String? = null,
     val isLoadingStream: Boolean = false,
     val currentMood: String? = null,
     val currentOnlineSong: OnlineSong? = null,
