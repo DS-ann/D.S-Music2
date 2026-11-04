@@ -35,15 +35,29 @@ object InnerTubeClient {
     private val gson = Gson()
 
     private fun buildClient(cacheDir: File? = null): OkHttpClient {
+        // Android 6's older platform TLS/ALPN implementation can fail while negotiating
+        // HTTP/2 with modern Google endpoints. HTTP/1.1 is supported by the same API and
+        // avoids making Explore depend on ALPN on API 23.
+        val isAndroid6 = android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M
         val builder = OkHttpClient.Builder()
             .connectionPool(ConnectionPool(20, 10, TimeUnit.MINUTES))
-            .protocols(listOf(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1))
-            .pingInterval(15, TimeUnit.SECONDS)
+            .protocols(
+                if (isAndroid6) {
+                    listOf(okhttp3.Protocol.HTTP_1_1)
+                } else {
+                    listOf(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1)
+                }
+            )
             .retryOnConnectionFailure(true)
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
             .writeTimeout(10, TimeUnit.SECONDS)
             .followRedirects(true)
+
+        // HTTP/2 keep-alive pings are useful on newer devices; API 23 is forced to HTTP/1.1.
+        if (!isAndroid6) {
+            builder.pingInterval(15, TimeUnit.SECONDS)
+        }
         
         // Enable 100MB dynamic disk cache for player manifests & repetitive metadata responses
         cacheDir?.let {
