@@ -80,6 +80,9 @@ fun OnlineCollectionActionsBottomSheet(
     var cachedSongs by remember(collection, initialSongs, initialContinuation) {
         mutableStateOf(initialSongs?.takeIf { it.isNotEmpty() })
     }
+    var hasCompleteTrackList by remember(collection, initialSongs, initialContinuation) {
+        mutableStateOf(collection !is SearchItem.Playlist || initialContinuation.isNullOrBlank())
+    }
     var isWorking by remember(collection) { mutableStateOf(false) }
     val activeDownloadIds by SongDownloader.activeDownloadIds.collectAsStateWithLifecycle()
     val downloadedVideoIds by SongDownloader.downloadedVideoIds.collectAsStateWithLifecycle()
@@ -87,7 +90,7 @@ fun OnlineCollectionActionsBottomSheet(
     val activeCollectionDownloadCount = activeCollectionSongs.size
     val totalCollectionSongs = cachedSongs?.size ?: 0
     val downloadedCollectionCount = cachedSongs.orEmpty().count { it.videoId in downloadedVideoIds }
-    val allCollectionSongsDownloaded = totalCollectionSongs > 0 &&
+    val allCollectionSongsDownloaded = hasCompleteTrackList && totalCollectionSongs > 0 &&
         downloadedCollectionCount == totalCollectionSongs
 
     val title = when (collection) {
@@ -131,7 +134,9 @@ fun OnlineCollectionActionsBottomSheet(
     suspend fun resolveSongs(): List<OnlineSong> {
         cachedSongs?.let { songs ->
             val completeSongs = if (collection is SearchItem.Playlist) {
-                loadAllPlaylistTracks(songs, initialContinuation)
+                loadAllPlaylistTracks(songs, initialContinuation).also {
+                    hasCompleteTrackList = true
+                }
             } else {
                 songs
             }
@@ -145,7 +150,9 @@ fun OnlineCollectionActionsBottomSheet(
             is SearchItem.Album -> YouTubeMusic.album(collection.album.browseId).getOrThrow().songs
             is SearchItem.Playlist -> {
                 val firstPage = YouTubeMusic.playlist(collection.playlist.playlistId).getOrThrow()
-                loadAllPlaylistTracks(firstPage.songs, firstPage.continuation)
+                loadAllPlaylistTracks(firstPage.songs, firstPage.continuation).also {
+                    hasCompleteTrackList = true
+                }
             }
             else -> emptyList()
         }
