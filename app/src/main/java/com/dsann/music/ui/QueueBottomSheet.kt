@@ -661,10 +661,9 @@ class DragDropState(
         val currentOffset = anchor.offset + draggedDistance
         val size = anchor.size
 
-        moveDraggedItemToPointer()
-
-        // Edge auto-scroll uses the finger's real position relative to the original
-        // row anchor, even after the queue has reordered several times.
+        // At either viewport edge, let the list move first. Reordering against the
+        // currently visible edge row before scrolling makes the dragged song jump
+        // between rows instead of following the finger into the next viewport.
         val viewportStart = lazyListState.layoutInfo.viewportStartOffset.toFloat()
         val viewportEnd = lazyListState.layoutInfo.viewportEndOffset.toFloat()
         val overscrollThreshold = 80f
@@ -673,7 +672,13 @@ class DragDropState(
             currentOffset + size > viewportEnd - overscrollThreshold -> 20f
             else -> 0f
         }
-        updateAutoScroll(scrollDelta)
+
+        if (scrollDelta != 0f) {
+            updateAutoScroll(scrollDelta)
+        } else {
+            stopAutoScroll()
+            moveDraggedItemToPointer()
+        }
     }
 
     private fun updateAutoScroll(scrollDeltaPx: Float) {
@@ -700,10 +705,13 @@ class DragDropState(
                 }
                 lastFrameNanos = frameNanos
                 val frameScale = elapsedNanos.toFloat() / 16_666_667f
-                lazyListState.scrollBy(autoScrollDeltaPx * frameScale)
-                // When the finger stays at an edge, scrolling itself moves new rows
-                // under the drag point. Re-evaluate the target on every auto-scroll frame.
-                moveDraggedItemToPointer()
+                val scrolledPx = lazyListState.scrollBy(autoScrollDeltaPx * frameScale)
+                // Commit the new target only after scrollBy has moved the viewport.
+                // If the list is already at its absolute end, there is no further
+                // scroll to wait for, so the visible rows remain valid drop targets.
+                if (kotlin.math.abs(scrolledPx) > 0.5f || autoScrollDeltaPx != 0f) {
+                    moveDraggedItemToPointer()
+                }
             }
         }
     }
