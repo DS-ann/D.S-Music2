@@ -374,15 +374,20 @@ fun ExploreScreen(
 
     val appPrefs = remember { context.getSharedPreferences("AppSettings", 0) }
     val genreGradientStyle by appPrefs.observeKey("genre_card_gradient_style", "Theme")
+    // Read theme values in the composable scope. The remember calculation below is
+    // a regular lambda, so it must only use these already-resolved values.
+    val genreThemePrimary = DsmusicTheme.colorScheme.primary
+    val genreThemeSecondary = DsmusicTheme.colorScheme.secondary
+    val genreThemeTertiary = DsmusicTheme.colorScheme.tertiary
     val genreGradientPalette = remember(
         genreGradientStyle,
-        DsmusicTheme.colorScheme.primary,
-        DsmusicTheme.colorScheme.secondary,
-        DsmusicTheme.colorScheme.tertiary
+        genreThemePrimary,
+        genreThemeSecondary,
+        genreThemeTertiary
     ) {
-        val primary = DsmusicTheme.colorScheme.primary
-        val secondary = DsmusicTheme.colorScheme.secondary
-        val tertiary = DsmusicTheme.colorScheme.tertiary
+        val primary = genreThemePrimary
+        val secondary = genreThemeSecondary
+        val tertiary = genreThemeTertiary
         fun blend(start: Color, end: Color, amount: Float): Color {
             val t = amount.coerceIn(0f, 1f)
             return Color(
