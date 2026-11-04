@@ -60,6 +60,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.PlatformTextStyle
@@ -431,6 +432,34 @@ private fun LyricLineItem(
 
     val commonModifier = Modifier
         .fillMaxWidth()
+        .drawBehind {
+            if (isActive && !isKaraoke) {
+                val corner = 18.dp.toPx()
+                val accent = accentColor
+                // Draw the active row's tint and outline behind its text.
+                drawRoundRect(
+                    color = accent.copy(alpha = 0.20f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner, corner)
+                )
+                drawRoundRect(
+                    color = accent.copy(alpha = 0.72f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner, corner),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.25.dp.toPx())
+                )
+                // A strong leading rail makes the active line unmistakable
+                // without tinting or painting over the lyric glyphs.
+                val railHeight = (size.height - 20.dp.toPx()).coerceAtLeast(0f)
+                drawRoundRect(
+                    color = accent.copy(alpha = 0.98f),
+                    topLeft = androidx.compose.ui.geometry.Offset(5.dp.toPx(), 10.dp.toPx()),
+                    size = androidx.compose.ui.geometry.Size(3.dp.toPx(), railHeight),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(
+                        1.5.dp.toPx(),
+                        1.5.dp.toPx()
+                    )
+                )
+            }
+        }
         .clickable(
             interactionSource = remember { MutableInteractionSource() },
             indication = null,
@@ -468,7 +497,7 @@ private fun LyricLineItem(
         brush = lyricsBrush,
         fontFamily = lyricFontFamily,
         fontSize = 38.sp * textScale,
-        fontWeight = FontWeight.Bold,
+        fontWeight = if (isActive && !isKaraoke) FontWeight.ExtraBold else FontWeight.Bold,
         lineHeight = 50.sp * textScale,
         textAlign = lineAlignment,
         platformStyle = PlatformTextStyle(includeFontPadding = true)
