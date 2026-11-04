@@ -21,6 +21,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -125,6 +126,7 @@ fun AlbumDetailView(
         subtitle = "Album • ${albumPage.songs.size} tracks",
         sharedElementKey = albumPage.album.browseId,
         onBack = onBack,
+        landscapeHeaderOnLeft = true,
         headerActions = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -203,6 +205,7 @@ fun PlaylistDetailView(
         },
         sharedElementKey = playlistPage.playlist.playlistId,
         onBack = onBack,
+        landscapeHeaderOnLeft = true,
         headerActions = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -631,6 +634,7 @@ fun AdaptiveDetailContainer(
     sharedElementKey: String? = null,
     headerActions: @Composable (RowScope.() -> Unit)?,
     onBack: () -> Unit,
+    landscapeHeaderOnLeft: Boolean = false,
     content: LazyListScope.() -> Unit
 ) {
     val lazyListState = rememberLazyListState()
@@ -650,6 +654,108 @@ fun AdaptiveDetailContainer(
         modifier = Modifier.fillMaxSize()
     ) {
         if (isLandscape) {
+        if (landscapeHeaderOnLeft) {
+            // Album and playlist pages use a true 50/50 split: cover, metadata and
+            // collection actions stay in the left pane while the complete song list
+            // owns the right pane.
+            Row(
+                modifier = Modifier.fillMaxSize().background(DsmusicTheme.colorScheme.background),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(start = 18.dp, top = 10.dp, end = 16.dp, bottom = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        DsmusicIconButton(
+                            onClick = onBack,
+                            modifier = Modifier.background(DsmusicTheme.colorScheme.surfaceVariant, CircleShape),
+                            shape = IconButtonDefaults.filledShape
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = "Back",
+                                tint = DsmusicTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                    BoxWithConstraints(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val coverSize = minOf(maxWidth * 0.86f, maxHeight * 0.82f, 300.dp)
+                        val coverModifier = Modifier
+                            .size(coverSize)
+                            .clip(if (isCircular) CircleShape else RoundedCornerShape(24.dp))
+                        AsyncImage(
+                            model = rememberExploreImageRequest(thumbnailUrl, 512),
+                            contentDescription = null,
+                            modifier = if (sharedElementKey != null) {
+                                coverModifier.sharedElementIfAvailable("image-$sharedElementKey")
+                            } else coverModifier,
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                    Text(
+                        text = title,
+                        style = DsmusicTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = DsmusicTheme.colorScheme.onBackground,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (sharedElementKey != null) {
+                                    Modifier.sharedElementIfAvailable("title-$sharedElementKey")
+                                } else Modifier
+                            )
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = subtitle,
+                        style = DsmusicTheme.typography.bodyMedium,
+                        color = DsmusicTheme.colorScheme.primary.copy(alpha = 0.85f),
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (headerActions != null) {
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            headerActions()
+                        }
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(1.dp)
+                        .background(DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                )
+
+                LazyColumn(
+                    state = lazyListState,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    contentPadding = PaddingValues(top = 18.dp, bottom = 120.dp, start = 16.dp, end = 20.dp)
+                ) {
+                    content()
+                }
+            }
+        } else {
         // --- LANDSCAPE TWO-PANE ---
         Box(modifier = Modifier.fillMaxSize().background(DsmusicTheme.colorScheme.background)) {
             // Keep the ambient tint without drawing a second blurred copy of the full-size cover.
@@ -745,6 +851,7 @@ fun AdaptiveDetailContainer(
 
                 }
             }
+        }
         }
     } else {
         // --- PORTRAIT: PARALLAX ---
