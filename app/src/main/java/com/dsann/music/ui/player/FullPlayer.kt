@@ -787,7 +787,7 @@ fun FullPlayer(
             "Gradient" -> Brush.linearGradient(
                 listOf(
                     finalColor,
-                    finalColor.copy(alpha = if (isDark) 0.55f else 0.72f),
+                    finalColor.copy(alpha = 1f),
                     themePlayerBackground
                 )
             )
@@ -1018,16 +1018,17 @@ fun FullPlayer(
 
             Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 12.dp))
 
-            // Metadata row: title/artist
-            Row(
+            // Keep title and artist centered on the player, independently of the trailing info control.
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 4.dp)
             ) {
                 Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = if (playerTitleAlign == "Centered") Alignment.CenterHorizontally else Alignment.Start
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 48.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     val titleSize = when (playerTitleSize) {
                         "Small" -> 23.sp
@@ -1051,10 +1052,16 @@ fun FullPlayer(
                         fontWeight = titleWeight,
                         color = contentColor,
                         maxLines = 1,
-                        textAlign = if (playerTitleAlign == "Centered") androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
-                        modifier = if (playerTitleScroll && isPlayerVisible) {
-                            Modifier.basicMarqueeWithFadedEdges()
-                        } else Modifier
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (playerTitleScroll && isPlayerVisible) {
+                                    Modifier.basicMarqueeWithFadedEdges()
+                                } else {
+                                    Modifier
+                                }
+                            )
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -1067,10 +1074,17 @@ fun FullPlayer(
                         style = DsmusicTheme.typography.bodyMedium,
                         color = contentSecondary,
                         maxLines = 1,
-                        textAlign = if (playerTitleAlign == "Centered") androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
-                        modifier = (if (playerTitleScroll && isPlayerVisible) {
-                            Modifier.basicMarqueeWithFadedEdges()
-                        } else Modifier).clickable {
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (playerTitleScroll && isPlayerVisible) {
+                                    Modifier.basicMarqueeWithFadedEdges()
+                                } else {
+                                    Modifier
+                                }
+                            )
+                            .clickable {
                                 val song = uiState.currentSong
                                 if (song != null) {
                                     onArtistClick(song.artistId, song.artist)
@@ -1080,7 +1094,9 @@ fun FullPlayer(
                 }
                 DsmusicIconButton(
                     onClick = { showSongInfoDialog = true },
-                    modifier = Modifier.size(44.dp)
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .size(44.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Info,
@@ -1188,13 +1204,9 @@ fun FullPlayer(
                             isSelected = isQueueExpanded ||
                                 (useWidePlayer && isLandscapeWindow && landscapeShowsQueue),
                             onClick = {
-                                if (useWidePlayer && isLandscapeWindow) {
-                                    landscapeShowsQueue = true
-                                    onLyricsModeChanged(false)
-                                    viewModel.setQueueExpanded(false)
-                                } else {
-                                    viewModel.setQueueExpanded(true)
-                                }
+                                landscapeShowsQueue = false
+                                onLyricsModeChanged(false)
+                                viewModel.setQueueExpanded(true)
                             },
                             contentColor = contentColor,
                             accentColor = dynamicAccentColor,
