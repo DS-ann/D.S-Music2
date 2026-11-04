@@ -167,20 +167,28 @@ public class AudioFileManager {
             if (suppliedArtist == null || suppliedArtist.trim().isEmpty()) artist = parts[1].trim();
         }
 
+        String lowerFileName = sourceFile.getName().toLowerCase(java.util.Locale.ROOT);
+        boolean isWebmAudio = lowerFileName.endsWith(".webm");
+
         ContentValues values = new ContentValues();
         values.put(MediaStore.Audio.Media.DISPLAY_NAME, sourceFile.getName());
-        values.put(MediaStore.Audio.Media.TITLE, title);
-        values.put(MediaStore.Audio.Media.ARTIST, artist);
-        values.put(MediaStore.Audio.Media.ALBUM_ARTIST, artist);
-        if (suppliedAlbum != null && !suppliedAlbum.trim().isEmpty()) {
-            values.put(MediaStore.Audio.Media.ALBUM, suppliedAlbum.trim());
+
+        // Audio-specific indexed columns are not part of MediaStore.Downloads on
+        // older Android releases. WebM already carries its title/artist/album/cover
+        // in the embedded Matroska metadata written before this publish step.
+        if (!isWebmAudio) {
+            values.put(MediaStore.Audio.Media.TITLE, title);
+            values.put(MediaStore.Audio.Media.ARTIST, artist);
+            values.put(MediaStore.Audio.Media.ALBUM_ARTIST, artist);
+            if (suppliedAlbum != null && !suppliedAlbum.trim().isEmpty()) {
+                values.put(MediaStore.Audio.Media.ALBUM, suppliedAlbum.trim());
+            }
         }
 
-        String lowerFileName = sourceFile.getName().toLowerCase(java.util.Locale.ROOT);
         String mimeType;
         if (lowerFileName.endsWith(".mp3")) mimeType = "audio/mpeg";
         else if (lowerFileName.endsWith(".m4a") || lowerFileName.endsWith(".aac")) mimeType = "audio/mp4";
-        else if (lowerFileName.endsWith(".webm")) mimeType = "audio/webm";
+        else if (isWebmAudio) mimeType = "audio/webm";
         else if (lowerFileName.endsWith(".ogg") || lowerFileName.endsWith(".opus")) mimeType = "audio/ogg";
         else if (lowerFileName.endsWith(".flac")) mimeType = "audio/flac";
         else if (lowerFileName.endsWith(".wav")) mimeType = "audio/wav";
@@ -190,7 +198,6 @@ public class AudioFileManager {
         // Android's MediaStore.Audio collection does not consistently recognize audio/webm
         // as an insertable MIME type. Keep WebM/Opus in its real container and publish it
         // through the generic Downloads collection instead of lying about it as audio/ogg.
-        boolean isWebmAudio = lowerFileName.endsWith(".webm");
         Uri collectionUri;
         String relativePath;
         if (isWebmAudio) {
