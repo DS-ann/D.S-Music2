@@ -238,6 +238,8 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 val isPlayerExpanded by playerViewModel.isPlayerExpanded.collectAsStateWithLifecycle()
+                val playerExpansionFraction by playerViewModel.playerExpansionFraction.collectAsStateWithLifecycle()
+                val isPlayerBackActive = isPlayerExpanded || playerExpansionFraction >= 0.5f
 
                 var editingSong by remember { mutableStateOf<SongItem?>(null) }
                 val configuration = androidx.compose.ui.platform.LocalConfiguration.current
@@ -788,7 +790,7 @@ class MainActivity : AppCompatActivity() {
                                 // The full player overlays it, so only one discrete remeasure is
                                 // needed when the player enters or leaves its expanded state.
                                 val startInsetPx = if (
-                                    useNavigationRail && railInset > 0.dp && !isPlayerExpanded
+                                    useNavigationRail && railInset > 0.dp && !isPlayerBackActive
                                 ) railInset.roundToPx().coerceAtLeast(0) else 0
                                 val childMaxWidth = (constraints.maxWidth - startInsetPx).coerceAtLeast(0)
                                 val childMinWidth = (constraints.minWidth - startInsetPx)
@@ -814,7 +816,7 @@ class MainActivity : AppCompatActivity() {
                         // nested Settings page (such as Appearance/Customize) can pop its route.
                         // The actual animation remains owned by PlayerBottomSheetCompose.
                         androidx.activity.compose.BackHandler(
-                            enabled = isPlayerExpanded
+                            enabled = isPlayerBackActive
                         ) {
                             playerViewModel.requestPlayerCollapseFromBack()
                         }

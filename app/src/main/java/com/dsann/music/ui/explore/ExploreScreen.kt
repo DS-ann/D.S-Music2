@@ -358,6 +358,8 @@ fun ExploreScreen(
     val searchListState = rememberLazyListState()
 
     val isPlayerExpanded by playerSharedViewModel.isPlayerExpanded.collectAsStateWithLifecycle()
+    val playerExpansionFraction by playerSharedViewModel.playerExpansionFraction.collectAsStateWithLifecycle()
+    val isPlayerBackActive = isPlayerExpanded || playerExpansionFraction >= 0.5f
 
     androidx.activity.compose.BackHandler(enabled = showCreditsForSong != null && !isPlayerExpanded) {
         showCreditsForSong = null
@@ -505,29 +507,36 @@ fun ExploreScreen(
 
     val handleDetailBack = remember(viewModel, mainActivity) {
         {
-            val currentStackSize = viewModel.uiState.value.detailStack.size
-            val isLastDetail = currentStackSize <= 1
-            val wasFromLibrary = viewModel.cameFromLibrary && isLastDetail
+            val currentState = viewModel.uiState.value
+            if (currentState.isLoadingDetail) {
+                // A pending page has not been pushed onto detailStack yet. Cancel it and
+                // reveal the same parent page instead of consuming Back against an empty stack.
+                viewModel.cancelDetailLoad()
+            } else {
+                val currentStackSize = currentState.detailStack.size
+                val isLastDetail = currentStackSize <= 1
+                val wasFromLibrary = viewModel.cameFromLibrary && isLastDetail
 
-            viewModel.popDetailStack()
+                viewModel.popDetailStack()
 
-            if (isLastDetail) {
-                viewModel.cameFromLibrary = false
-            }
+                if (isLastDetail) {
+                    viewModel.cameFromLibrary = false
+                }
 
-            if (wasFromLibrary) {
-                onNavigateToLibrary()
+                if (wasFromLibrary) {
+                    onNavigateToLibrary()
+                }
             }
         }
     }
 
-    androidx.activity.compose.BackHandler(enabled = detailScreenActive && !isPlayerExpanded) {
+    androidx.activity.compose.BackHandler(enabled = detailScreenActive && !isPlayerBackActive) {
         handleDetailBack()
     }
 
     // Active query entry must take priority over the non-active results back handler.
     // Otherwise the first back press only clears the query while leaving the query page open.
-    androidx.activity.compose.BackHandler(enabled = isSearchActive && !isPlayerExpanded) {
+    androidx.activity.compose.BackHandler(enabled = isSearchActive && !isPlayerBackActive) {
         if (isSearchDestination) {
             onLeaveSearchDestination()
         } else {
@@ -537,15 +546,15 @@ fun ExploreScreen(
     }
 
     androidx.activity.compose.BackHandler(
-        enabled = !isSearchActive && searchQuery.isNotBlank() && !isPlayerExpanded
+        enabled = !isSearchActive && searchQuery.isNotBlank() && !isPlayerBackActive
     ) {
         viewModel.clearSearch()
     }
 
     androidx.activity.compose.BackHandler(
-        enabled = isSearchDestination && !isSearchActive &&
-            (showSearchGenreBrowser || (searchQuery.isBlank() && !detailScreenActive)) &&
-            !isPlayerExpanded
+        enabled = isSearchDestination && !isSearchActive && !detailScreenActive &&
+            (showSearchGenreBrowser || searchQuery.isBlank()) &&
+            !isPlayerBackActive
     ) {
         if (showSearchGenreBrowser) {
             showSearchGenreBrowser = false
@@ -554,7 +563,7 @@ fun ExploreScreen(
         }
     }
 
-    androidx.activity.compose.BackHandler(enabled = isAccountVisible && !isPlayerExpanded) {
+    androidx.activity.compose.BackHandler(enabled = isAccountVisible && !isPlayerBackActive) {
         isAccountVisible = false
     }
 
@@ -1033,11 +1042,13 @@ fun ExploreScreen(
                                                                             .clip(RoundedCornerShape(20.dp))
                                                                             .background(tileBackground)
                                                                             .clickable {
-                                                                                showSearchGenreBrowser = false
+                                                                                // Keep the genre browser as this detail page's parent so Back
+                                                                                // returns to the same category cards, not the Search home page.
                                                                                 viewModel.loadSectionDetails(
                                                                                     category.browseId,
                                                                                     category.params,
-                                                                                    category.title
+                                                                                    category.title,
+                                                                                    preferFallbackTitle = true
                                                                                 )
                                                                             }
                                                                             .padding(12.dp)

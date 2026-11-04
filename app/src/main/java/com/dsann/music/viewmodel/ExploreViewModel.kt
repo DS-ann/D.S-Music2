@@ -229,6 +229,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private var homeContinuationJob: Job? = null
     private var searchContinuationJob: Job? = null
     private var detailLoadJob: Job? = null
+    private var detailLoadGeneration: Long = 0L
     private var artistResolveJob: Job? = null
 
     private data class CachedHomeFeed(
@@ -286,8 +287,11 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         homeContinuationJob = null
         searchContinuationJob?.cancel()
         searchContinuationJob = null
+        detailLoadGeneration += 1L
         detailLoadJob?.cancel()
         detailLoadJob = null
+        artistResolveJob?.cancel()
+        artistResolveJob = null
         _uiState.update {
             it.copy(
                 isSearching = false,
@@ -1093,24 +1097,52 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     // ========== Detail Pages ==========
 
-    fun loadAlbum(browseId: String) {
-        _uiState.update { it.copy(isLoadingDetail = true) }
+    private fun beginDetailLoad(): Long {
+        detailLoadGeneration += 1L
         detailLoadJob?.cancel()
+        detailLoadJob = null
+        artistResolveJob?.cancel()
+        artistResolveJob = null
+        _uiState.update { it.copy(isLoadingDetail = true, error = null) }
+        return detailLoadGeneration
+    }
+
+    private fun finishDetailLoad(requestId: Long) {
+        // A cancelled request must never clear the loading state of a newer page request.
+        if (requestId == detailLoadGeneration) {
+            detailLoadJob = null
+            _uiState.update { it.copy(isLoadingDetail = false) }
+        }
+    }
+
+    fun cancelDetailLoad() {
+        detailLoadGeneration += 1L
+        detailLoadJob?.cancel()
+        detailLoadJob = null
+        artistResolveJob?.cancel()
+        artistResolveJob = null
+        _uiState.update { it.copy(isLoadingDetail = false) }
+    }
+
+    fun loadAlbum(browseId: String) {
+        val requestId = beginDetailLoad()
         detailLoadJob = viewModelScope.launch {
             try {
                 val result = YouTubeMusic.album(browseId)
-                result.onSuccess { res ->
-                    _uiState.update {
-                        it.copy(
-                            albumDetail = res,
-                            detailStack = it.detailStack + DetailType.ALBUM
-                        )
+                if (requestId == detailLoadGeneration) {
+                    result.onSuccess { res ->
+                        _uiState.update {
+                            it.copy(
+                                albumDetail = res,
+                                detailStack = it.detailStack + DetailType.ALBUM
+                            )
+                        }
+                        prefetchUrls(listOfNotNull(res.album.thumbnailUrl) + res.songs.map { it.thumbnailUrl })
                     }
-                    prefetchUrls(listOfNotNull(res.album.thumbnailUrl) + res.songs.map { it.thumbnailUrl })
+                    result.onFailure { _uiState.update { it.copy(error = "Failed to load album") } }
                 }
-                result.onFailure { _uiState.update { it.copy(error = "Failed to load album") } }
             } finally {
-                _uiState.update { it.copy(isLoadingDetail = false) }
+                finishDetailLoad(requestId)
             }
         }
     }
@@ -1118,18 +1150,22 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     fun loadArtistByName(name: String, fallbackThumbnailUrl: String? = null) {
         val cleanName = name.trim()
         if (cleanName.isBlank() || cleanName.equals("Unknown Artist", ignoreCase = true)) return
+        detailLoadGeneration += 1L
+        val requestId = detailLoadGeneration
+        detailLoadJob?.cancel()
+        detailLoadJob = null
         artistResolveJob?.cancel()
+        _uiState.update { it.copy(isLoadingDetail = true, error = null) }
         artistResolveJob = viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingDetail = true, error = null) }
             try {
                 val result = YouTubeMusic.search(cleanName, SearchFilter.ARTISTS)
+                if (requestId != detailLoadGeneration) return@launch
                 val artists = result.getOrNull()?.items?.filterIsInstance<SearchItem.Artist>().orEmpty()
                 val match = artists.firstOrNull {
                     it.artist.title.trim().equals(cleanName, ignoreCase = true)
                 } ?: artists.firstOrNull()
                 artistResolveJob = null
                 if (match != null) {
-                    _uiState.update { it.copy(isLoadingDetail = false) }
                     loadArtist(match.artist.browseId, match.artist.thumbnailUrl ?: fallbackThumbnailUrl)
                 } else {
                     _uiState.update {
@@ -1138,58 +1174,61 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 }
             } catch (error: Exception) {
                 if (error is kotlinx.coroutines.CancellationException) throw error
-                _uiState.update {
-                    it.copy(isLoadingDetail = false, error = error.message ?: "Could not open artist page")
+                if (requestId == detailLoadGeneration) {
+                    artistResolveJob = null
+                    _uiState.update {
+                        it.copy(isLoadingDetail = false, error = error.message ?: "Could not open artist page")
+                    }
                 }
             }
         }
     }
 
     fun loadArtist(browseId: String, fallbackThumbnailUrl: String? = null) {
-        artistResolveJob?.cancel()
-        artistResolveJob = null
-        _uiState.update { it.copy(isLoadingDetail = true) }
-        detailLoadJob?.cancel()
+        val requestId = beginDetailLoad()
         detailLoadJob = viewModelScope.launch {
             try {
                 val result = YouTubeMusic.artist(browseId)
-                result.onSuccess { res ->
-                    _uiState.update { state ->
-                        val correctedThumbnailUrl = res.artist.thumbnailUrl.takeIf { !it.isNullOrBlank() } ?: fallbackThumbnailUrl
-                        val updatedArtist = res.artist.copy(thumbnailUrl = correctedThumbnailUrl)
-                        state.copy(
-                            artistDetail = res.copy(artist = updatedArtist),
-                            detailStack = state.detailStack + DetailType.ARTIST
-                        )
+                if (requestId == detailLoadGeneration) {
+                    result.onSuccess { res ->
+                        _uiState.update { state ->
+                            val correctedThumbnailUrl = res.artist.thumbnailUrl.takeIf { !it.isNullOrBlank() } ?: fallbackThumbnailUrl
+                            val updatedArtist = res.artist.copy(thumbnailUrl = correctedThumbnailUrl)
+                            state.copy(
+                                artistDetail = res.copy(artist = updatedArtist),
+                                detailStack = state.detailStack + DetailType.ARTIST
+                            )
+                        }
+                        prefetchUrls(listOfNotNull(res.artist.thumbnailUrl))
+                        prefetchThumbnails(res.sections.flatMap { it.items.take(4) })
                     }
-                    prefetchUrls(listOfNotNull(res.artist.thumbnailUrl))
-                    prefetchThumbnails(res.sections.flatMap { it.items.take(4) })
+                    result.onFailure { _uiState.update { it.copy(error = "Failed to load artist") } }
                 }
-                result.onFailure { _uiState.update { it.copy(error = "Failed to load artist") } }
             } finally {
-                _uiState.update { it.copy(isLoadingDetail = false) }
+                finishDetailLoad(requestId)
             }
         }
     }
 
     fun loadPlaylist(playlistId: String) {
-        _uiState.update { it.copy(isLoadingDetail = true) }
-        detailLoadJob?.cancel()
+        val requestId = beginDetailLoad()
         detailLoadJob = viewModelScope.launch {
             try {
                 val result = YouTubeMusic.playlist(playlistId)
-                result.onSuccess { res ->
-                    _uiState.update {
-                        it.copy(
-                            playlistDetail = res,
-                            detailStack = it.detailStack + DetailType.PLAYLIST
-                        )
+                if (requestId == detailLoadGeneration) {
+                    result.onSuccess { res ->
+                        _uiState.update {
+                            it.copy(
+                                playlistDetail = res,
+                                detailStack = it.detailStack + DetailType.PLAYLIST
+                            )
+                        }
+                        prefetchUrls(listOfNotNull(res.playlist.thumbnailUrl) + res.songs.map { it.thumbnailUrl })
                     }
-                    prefetchUrls(listOfNotNull(res.playlist.thumbnailUrl) + res.songs.map { it.thumbnailUrl })
+                    result.onFailure { _uiState.update { it.copy(error = "Failed to load playlist") } }
                 }
-                result.onFailure { _uiState.update { it.copy(error = "Failed to load playlist") } }
             } finally {
-                _uiState.update { it.copy(isLoadingDetail = false) }
+                finishDetailLoad(requestId)
             }
         }
     }
@@ -1216,25 +1255,38 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun loadSectionDetails(browseId: String, params: String?, fallbackTitle: String = "Section") {
-        _uiState.update { it.copy(isLoadingDetail = true) }
-        detailLoadJob?.cancel()
+    fun loadSectionDetails(
+        browseId: String,
+        params: String?,
+        fallbackTitle: String = "Section",
+        preferFallbackTitle: Boolean = false
+    ) {
+        val requestId = beginDetailLoad()
         detailLoadJob = viewModelScope.launch {
             try {
                 val result = YouTubeMusic.section(browseId, params)
-                result.onSuccess { res ->
-                    _uiState.update {
-                        val correctedTitle = if (res.title == "Section") fallbackTitle else res.title
-                        it.copy(
-                            sectionDetail = res.copy(title = correctedTitle),
-                            detailStack = it.detailStack + DetailType.SECTION
-                        )
+                if (requestId == detailLoadGeneration) {
+                    result.onSuccess { res ->
+                        _uiState.update {
+                            val cardTitle = fallbackTitle.takeIf { it.isNotBlank() }
+                            val correctedTitle = if (preferFallbackTitle && cardTitle != null) {
+                                cardTitle
+                            } else if (res.title == "Section") {
+                                fallbackTitle
+                            } else {
+                                res.title
+                            }
+                            it.copy(
+                                sectionDetail = res.copy(title = correctedTitle),
+                                detailStack = it.detailStack + DetailType.SECTION
+                            )
+                        }
+                        prefetchThumbnails(res.items.take(12))
                     }
-                    prefetchThumbnails(res.items.take(12))
+                    result.onFailure { _uiState.update { it.copy(error = "Failed to load section") } }
                 }
-                result.onFailure { _uiState.update { it.copy(error = "Failed to load section") } }
             } finally {
-                _uiState.update { it.copy(isLoadingDetail = false) }
+                finishDetailLoad(requestId)
             }
         }
     }

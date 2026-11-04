@@ -649,8 +649,10 @@ fun AdaptiveDetailContainer(
         activity?.let { androidx.lifecycle.ViewModelProvider(it)[PlayerSharedViewModel::class.java] }
     }
     val isPlayerExpanded = playerSharedViewModel?.isPlayerExpanded?.collectAsStateWithLifecycle()?.value ?: false
+    val playerExpansionFraction = playerSharedViewModel?.playerExpansionFraction?.collectAsStateWithLifecycle()?.value ?: 0f
+    val isPlayerBackActive = isPlayerExpanded || playerExpansionFraction >= 0.5f
 
-    androidx.activity.compose.BackHandler(enabled = !isPlayerExpanded) {
+    androidx.activity.compose.BackHandler(enabled = !isPlayerBackActive) {
         onBack()
     }
 

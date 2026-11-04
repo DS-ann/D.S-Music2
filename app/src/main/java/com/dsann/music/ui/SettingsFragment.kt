@@ -1355,6 +1355,8 @@ fun SettingsScreenContent(
     val darkMode by viewModel.darkMode.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val isPlayerExpanded by playerSharedViewModel.isPlayerExpanded.collectAsStateWithLifecycle()
+    val playerExpansionFraction by playerSharedViewModel.playerExpansionFraction.collectAsStateWithLifecycle()
+    val isPlayerBackActive = isPlayerExpanded || playerExpansionFraction >= 0.5f
     val amoledBlack by viewModel.amoledBlack.collectAsStateWithLifecycle()
     val dynamicAlbumTheme by viewModel.dynamicAlbumTheme.collectAsStateWithLifecycle()
     val savedAppearanceLooks by viewModel.savedAppearanceLooks.collectAsStateWithLifecycle()
@@ -1764,7 +1766,7 @@ fun SettingsScreenContent(
         }
     }
 
-    androidx.activity.compose.BackHandler(enabled = canPop && !isPlayerExpanded) {
+    androidx.activity.compose.BackHandler(enabled = canPop && !isPlayerBackActive) {
         navController.popBackStack()
     }
 }
