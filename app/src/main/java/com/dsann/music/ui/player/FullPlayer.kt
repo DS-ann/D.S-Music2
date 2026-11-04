@@ -823,6 +823,10 @@ fun FullPlayer(
     val isShuffleEnabled by viewModel.isShuffleEnabled.collectAsStateWithLifecycle()
     val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
     val currentSongIndex by viewModel.currentSongIndex.collectAsStateWithLifecycle()
+    // This is the selected destination for the landscape player's right-side pane.
+    // Lyrics is the default, so its player action is selected as soon as a wide
+    // landscape player is shown.
+    var landscapeShowsQueue by remember { mutableStateOf(false) }
 
     // Unify BackHandler to collapse the sliding Queue drawer first
     BackHandler(enabled = isLyricsModeEnabled || isQueueExpanded) {
@@ -849,19 +853,6 @@ fun FullPlayer(
             lightSaturationRange = 0.30f..0.48f
         )
         androidx.compose.ui.graphics.SolidColor(finalColor)
-    }
-
-    // Trigger lyrics load when enabled
-    LaunchedEffect(isLyricsModeEnabled, currentSongId) {
-        if (!isLyricsModeEnabled) return@LaunchedEffect
-        if (currentSongId == null) {
-            lastLyricsFetchSongId = null
-            return@LaunchedEffect
-        }
-        if (lastLyricsFetchSongId != currentSongId) {
-            lastLyricsFetchSongId = currentSongId
-            onFetchLyrics()
-        }
     }
 
     BoxWithConstraints(
@@ -898,6 +889,27 @@ fun FullPlayer(
         // A spring can undershoot its zero target. Compose padding rejects negative values,
         // so clamp the animated inset before passing it to Modifier.padding.
         val queueDockInset = animatedQueueDockInset.coerceAtLeast(0.dp)
+        // The fullscreen lyrics overlay and the landscape side pane share this one
+        // fetch trigger. A track is requested once when either lyrics surface becomes active.
+        val landscapeLyricsVisible = useWidePlayer && isLandscapeWindow && !landscapeShowsQueue
+        LaunchedEffect(
+            isLyricsModeEnabled,
+            landscapeLyricsVisible,
+            currentSongId,
+            hasLyrics,
+            isLyricsLoading
+        ) {
+            if (!isLyricsModeEnabled && !landscapeLyricsVisible) return@LaunchedEffect
+            if (currentSongId == null) {
+                lastLyricsFetchSongId = null
+                return@LaunchedEffect
+            }
+            if (!hasLyrics && !isLyricsLoading && lastLyricsFetchSongId != currentSongId) {
+                lastLyricsFetchSongId = currentSongId
+                onFetchLyrics()
+            }
+        }
+
         // Dense controls are used for landscape and short-height resized player windows.
         val compactLandscape = isLandscapeWindow || screenHeight < 760.dp
         val portraitArtHeightFactor = when {
@@ -1149,13 +1161,12 @@ fun FullPlayer(
                             style = playerButtonStyle,
                             icon = painterResource(id = R.drawable.ic_lyrics),
                             label = "Lyrics",
-                            isSelected = isLyricsModeEnabled,
+                            isSelected = isLyricsModeEnabled ||
+                                (useWidePlayer && isLandscapeWindow && !landscapeShowsQueue),
                             onClick = {
+                                landscapeShowsQueue = false
+                                viewModel.setQueueExpanded(false)
                                 onLyricsModeChanged(true)
-                                if (currentSongId != null && lastLyricsFetchSongId != currentSongId && !hasLyrics && !isLyricsLoading) {
-                                    lastLyricsFetchSongId = currentSongId
-                                    onFetchLyrics()
-                                }
                             },
                             contentColor = contentColor,
                             accentColor = dynamicAccentColor,
@@ -1184,8 +1195,17 @@ fun FullPlayer(
                             style = playerButtonStyle,
                             icon = painterResource(id = R.drawable.ic_keyboard_arrow_down),
                             label = "Up next",
-                            isSelected = isQueueExpanded,
-                            onClick = { viewModel.setQueueExpanded(true) },
+                            isSelected = isQueueExpanded ||
+                                (useWidePlayer && isLandscapeWindow && landscapeShowsQueue),
+                            onClick = {
+                                if (useWidePlayer && isLandscapeWindow) {
+                                    landscapeShowsQueue = true
+                                    onLyricsModeChanged(false)
+                                    viewModel.setQueueExpanded(false)
+                                } else {
+                                    viewModel.setQueueExpanded(true)
+                                }
+                            },
                             contentColor = contentColor,
                             accentColor = dynamicAccentColor,
                             isDark = isDark
@@ -1474,6 +1494,12 @@ fun FullPlayer(
                 if (isPlayerVisible) {
                     LandscapePlayerDetailsPane(
                         modifier = Modifier.weight(0.46f).fillMaxHeight(),
+                        showQueue = landscapeShowsQueue,
+                        onShowQueueChange = { landscapeShowsQueue = it },
+                        onOpenFullScreenLyrics = {
+                            landscapeShowsQueue = false
+                            onLyricsModeChanged(true)
+                        },
                         syncedLyrics = syncedLyrics,
                         plainLyrics = plainLyrics,
                         isLyricsLoading = isLyricsLoading,
