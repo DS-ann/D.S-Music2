@@ -330,7 +330,13 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
     onCollapse: () -> Unit,
     onExpand: () -> Unit,
     dragModifier: Modifier,
-    miniPlayerHeight: Dp
+    miniPlayerHeight: Dp,
+    currentSheetTranslationY: Animatable<Float, AnimationVector1D>,
+    collapsedSheetOffsetY: Float,
+    miniPlayerWidthFraction: Float,
+    miniPlayerBackgroundColor: Color,
+    miniPlayerShape: Shape,
+    miniPlayerElevation: Dp
 ) {
     val currentSong = uiState.currentSong ?: return
     val isPlaying = uiState.isPlaying
@@ -377,13 +383,17 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
     Box(
         modifier = Modifier
             .align(Alignment.TopCenter)
-            .fillMaxWidth()
+            .fillMaxWidth(miniPlayerWidthFraction)
             .height(miniPlayerHeight)
             .graphicsLayer {
-                // Keep both layers visible through the same progress range so the
-                // mini/full transition never has a transparent frame between them.
+                // Counter the sheet's endpoint snap/drag translation so the mini
+                // layer stays at the dock while the full player fades at screen top.
+                translationY = collapsedSheetOffsetY - currentSheetTranslationY.value
                 alpha = (1f - playerContentExpansionFraction.value).coerceIn(0f, 1f)
             }
+            .shadow(miniPlayerElevation, miniPlayerShape)
+            .clip(miniPlayerShape)
+            .background(miniPlayerBackgroundColor, miniPlayerShape)
             .zIndex(miniPlayerZIndex)
     ) {
         MiniPlayerContentInternal(
@@ -418,8 +428,10 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
                     }
                 }
                 .graphicsLayer {
-                    val fraction = playerContentExpansionFraction.value
-                    alpha = fraction.coerceIn(0f, 1f)
+                    // Keep the expanded player anchored to the top edge. Only opacity
+                    // changes; it does not travel upward with the collapsed sheet.
+                    translationY = -currentSheetTranslationY.value
+                    alpha = playerContentExpansionFraction.value.coerceIn(0f, 1f)
                 }
                 .zIndex(fullPlayerZIndex)
         ) {
@@ -1270,31 +1282,20 @@ fun PlayerBottomSheetCompose(
                 sheetCollapsedTargetYState.value.coerceIn(0f, screenHeightPx)
             }
             val destFraction = if (targetExpanded) 1f else 0f
-            val totalDistance = destY.coerceAtLeast(1f)
-            val initialFractionVelocity = if (totalDistance > 0f) {
-                -initialVelocity / totalDistance
-            } else 0f
             val resolvedAnimationSpec = animationSpec
-                ?: tween(durationMillis = 340, easing = FastOutSlowInEasing)
+                ?: tween(durationMillis = 220, easing = LinearEasing)
 
             isSheetAnimating = true
             try {
-                coroutineScope {
-                    launch {
-                        currentSheetTranslationY.animateTo(
-                            targetValue = destY,
-                            animationSpec = resolvedAnimationSpec,
-                            initialVelocity = initialVelocity
-                        )
-                    }
-                    launch {
-                        playerContentExpansionFraction.animateTo(
-                            targetValue = destFraction,
-                            animationSpec = resolvedAnimationSpec,
-                            initialVelocity = initialFractionVelocity
-                        )
-                    }
-                }
+                // Position and size changes are not animated. Both visual layers are
+                // already anchored to their final positions, so the transition is a
+                // single lightweight alpha fade instead of a moving/resizing morph.
+                currentSheetTranslationY.snapTo(destY)
+                playerContentExpansionFraction.animateTo(
+                    targetValue = destFraction,
+                    animationSpec = resolvedAnimationSpec,
+                    initialVelocity = 0f
+                )
                 // Persist only the settled state. Publishing every animation frame to the
                 // Activity ViewModel creates unnecessary flow work and UI invalidations.
                 viewModel.setPlayerExpansionFraction(destFraction)
