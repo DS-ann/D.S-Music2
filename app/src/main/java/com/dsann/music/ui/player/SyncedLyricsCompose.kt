@@ -431,13 +431,6 @@ private fun LyricLineItem(
 
     val commonModifier = Modifier
         .fillMaxWidth()
-        // A synced line has no per-word sweep, so its active state is expressed as
-        // a full-strength line highlight rather than a faint partial word fill.
-        .background(
-            color = if (isActive && !isKaraoke) accentColor.copy(alpha = 0.22f)
-                else Color.Transparent,
-            shape = RoundedCornerShape(18.dp)
-        )
         .clickable(
             interactionSource = remember { MutableInteractionSource() },
             indication = null,
@@ -469,16 +462,10 @@ private fun LyricLineItem(
         "Center" -> TextAlign.Center
         else -> if (line.isRightAligned) TextAlign.End else TextAlign.Start
     }
-    val activeSyncedLineShadow = if (isActive && !isKaraoke) {
-        androidx.compose.ui.graphics.Shadow(
-            color = accentColor.copy(alpha = 0.64f),
-            offset = androidx.compose.ui.geometry.Offset(0f, 0f),
-            blurRadius = 10f
-        )
-    } else null
+    // Ordinary line-synced lyrics are rendered once, without a backdrop or
+    // glow layer. Karaoke keeps its separate word-timing overlay below.
     val mainTextStyle = DsmusicTheme.typography.headlineMedium.copy(
         brush = lyricsBrush,
-        shadow = activeSyncedLineShadow,
         fontFamily = lyricFontFamily,
         fontSize = 38.sp * textScale,
         fontWeight = FontWeight.Bold,
