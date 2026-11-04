@@ -2303,62 +2303,53 @@ private fun ExploreCustomizerDialog(
         // over the results and make the screen appear to open and immediately close.
         Column(modifier = Modifier.statusBarsPadding()) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 18.dp, top = 14.dp, bottom = 10.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 DsmusicPageHeading(
                     title = if (isSearchDestination) "Search" else "Explore",
+                    subtitle = if (isSearchDestination) "Find your next favourite." else null,
+                    kicker = if (isSearchDestination) "FIND YOUR SOUND" else "D.S MUSIC",
                     modifier = Modifier.weight(1f)
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    BasicText(
-                        text = if (isSearchDestination) "SEARCH" else "DISCOVER",
-                        style = DsmusicTheme.typography.labelSmall.copy(
-                            color = DsmusicTheme.colorScheme.onSurfaceVariant,
-                            letterSpacing = 1.2.sp
+                if (!isSearchDestination) {
+                    DsmusicIconButton(
+                        onClick = onCustomizeExplore,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .background(DsmusicTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(14.dp)),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Settings,
+                            contentDescription = "Customize Explore",
+                            modifier = Modifier.size(21.dp),
+                            tint = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
-                    )
-                    if (!showSearchEntry) {
-                        if (!isSearchDestination) {
-                            DsmusicIconButton(
-                                onClick = onCustomizeExplore,
-                                modifier = Modifier.size(40.dp),
-                                shape = RoundedCornerShape(13.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Settings,
-                                    contentDescription = "Customize Explore",
-                                    modifier = Modifier.size(22.dp),
-                                    tint = DsmusicTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        Box(
-                            Modifier.size(40.dp).clip(RoundedCornerShape(13.dp))
-                                .background(DsmusicTheme.colorScheme.surfaceContainerLow)
-                                .clickable { onAccountVisibleChange(true) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (userProfile?.avatarUrl != null) {
-                                AsyncImage(
-                                    model = rememberExploreImageRequest(userProfile.avatarUrl, 96),
-                                    contentDescription = "Account",
-                                    modifier = Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Rounded.AccountCircle,
-                                    contentDescription = "Account",
-                                    modifier = Modifier.size(26.dp),
-                                    tint = DsmusicTheme.colorScheme.primary
-                                )
-                            }
-                        }
+                    }
+                }
+                DsmusicIconButton(
+                    onClick = { onAccountVisibleChange(true) },
+                    modifier = Modifier
+                        .size(42.dp)
+                        .background(DsmusicTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(14.dp)),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    if (userProfile?.avatarUrl != null) {
+                        AsyncImage(
+                            model = rememberExploreImageRequest(userProfile.avatarUrl, 96),
+                            contentDescription = "Account",
+                            modifier = Modifier.size(30.dp).clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Rounded.AccountCircle,
+                            contentDescription = "Account",
+                            modifier = Modifier.size(25.dp),
+                            tint = DsmusicTheme.colorScheme.primary
+                        )
                     }
                 }
             }
@@ -2366,28 +2357,23 @@ private fun ExploreCustomizerDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(54.dp)
-                        .clip(RoundedCornerShape(17.dp))
-                        .background(DsmusicTheme.colorScheme.surfaceContainerLow)
+                        .padding(horizontal = 18.dp, vertical = 4.dp)
+                        .height(60.dp)
+                        .clip(RoundedCornerShape(21.dp))
+                        .background(DsmusicTheme.colorScheme.surfaceContainerHigh)
                         .clickable { onSearchActiveChange(true) }
-                        .padding(horizontal = 15.dp),
+                        .padding(horizontal = 17.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(11.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Search,
                         contentDescription = null,
-                        tint = DsmusicTheme.colorScheme.primary
+                        tint = DsmusicTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
                     )
                     BasicText(
-                        text = searchQuery.ifBlank { "Search music, artists, albums..." },
+                        text = searchQuery.ifBlank { "Songs, artists, albums, playlists..." },
                         modifier = Modifier.weight(1f),
                         style = DsmusicTheme.typography.bodyLarge.copy(
                             color = if (searchQuery.isBlank()) DsmusicTheme.colorScheme.onSurfaceVariant
@@ -2395,45 +2381,19 @@ private fun ExploreCustomizerDialog(
                         ),
                         maxLines = 1
                     )
-                }
-
-                if (searchQuery.isNotBlank()) {
-                    Box(
-                        Modifier.size(40.dp).clip(RoundedCornerShape(13.dp))
-                            .background(DsmusicTheme.colorScheme.surfaceContainerLow)
-                            .clickable { onClearSearch() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = "Clear search",
-                            tint = DsmusicTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                } else {
-                    Box(
-                        Modifier.size(40.dp).clip(RoundedCornerShape(13.dp))
-                            .background(DsmusicTheme.colorScheme.surfaceContainerLow)
-                            .clickable { onAccountVisibleChange(true) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (userProfile?.avatarUrl != null) {
-                            AsyncImage(
-                                model = rememberExploreImageRequest(userProfile.avatarUrl, 96),
-                                contentDescription = "Account",
-                                modifier = Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
+                    if (searchQuery.isNotBlank()) {
+                        DsmusicIconButton(
+                            onClick = onClearSearch,
+                            modifier = Modifier.size(34.dp)
+                        ) {
                             Icon(
-                                imageVector = Icons.Rounded.AccountCircle,
-                                contentDescription = "Account",
-                                modifier = Modifier.size(26.dp),
-                                tint = DsmusicTheme.colorScheme.primary
+                                Icons.Rounded.Close,
+                                contentDescription = "Clear search",
+                                tint = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
-                }
                 }
             }
 
