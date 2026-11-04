@@ -132,6 +132,7 @@ object SongDownloader {
 
     fun isDownloading(videoId: String?): Boolean =
         !videoId.isNullOrBlank() && activeDownloads.containsKey(videoId)
+
     /** Refresh persisted download state off the main thread, including deleted-file results. */
     fun refreshDownloadedStatus(context: Context, song: SongItem) {
         refreshDownloadedStatuses(context, listOf(song))
@@ -556,7 +557,7 @@ object SongDownloader {
                 throw IOException("Could not publish the downloaded audio to the music library")
             }
             rememberDownloadedSong(context, videoId, outputFile)
-            _downloadedVideoIds.value = _downloadedVideoIds.value + videoId
+            _downloadedVideoIds.update { it + videoId }
             showFinishedNotification(context, metadataTitle, metadataArtist, notificationId)
             _downloadProgress.value += (videoId to 100)
 

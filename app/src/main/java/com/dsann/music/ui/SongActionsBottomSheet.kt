@@ -976,7 +976,7 @@ fun ActionButtonRow2(
                         !isDownloaded -> com.dsann.music.util.SongDownloader.downloadSong(context, it)
                     }
                 }
-                onDismiss()
+                // Keep the sheet open so this same control can turn into Cancel and then Downloaded.
             }
         ) {
             Icon(
