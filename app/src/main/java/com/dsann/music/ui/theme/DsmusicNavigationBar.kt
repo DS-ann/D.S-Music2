@@ -34,10 +34,9 @@ data class DsmusicNavigationDestination(
 )
 
 /**
- * Small, flat navigation surface matching D.S Launcher.
- * Uses Foundation layout, BasicText and drawable icons instead of Material
- * NavigationBar / NavigationBarItem so it does not create Material indicator
- * or tonal-elevation layers during each navigation update.
+ * Lightweight bottom navigation dock. The system gesture/navigation inset is
+ * reserved as a separate bottom region, so it cannot reduce the actual icon/label
+ * viewport and clip the dock on compact phone layouts.
  */
 @Composable
 fun DsmusicNavigationBar(
@@ -61,57 +60,70 @@ fun DsmusicNavigationBar(
     }
     val horizontalInset = if (barStyle == "Floating") 14.dp else 0.dp
     val verticalInset = if (barStyle == "Floating") 4.dp else 0.dp
-    Row(
+    val iconSlotHeight = when {
+        iconSize.value <= 22f -> 30.dp
+        iconSize.value >= 30f -> 34.dp
+        else -> 34.dp
+    }
+
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = horizontalInset, vertical = verticalInset)
             .clip(dockShape)
             .background(if (barStyle == "Minimal") Color.Transparent else surface)
-            .padding(bottom = bottomInset, start = 6.dp, end = 6.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        destinations.forEach { destination ->
-            val selected = currentRoute == destination.route
-            val tint = if (selected) selectedColor else inactiveColor
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clickable { onNavigate(destination.route) }
-                    .padding(horizontal = 3.dp, vertical = 3.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Box(
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                // Leave the system-navigation area outside the icon/label viewport.
+                .padding(bottom = bottomInset, start = 6.dp, end = 6.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            destinations.forEach { destination ->
+                val selected = currentRoute == destination.route
+                val tint = if (selected) selectedColor else inactiveColor
+                Column(
                     modifier = Modifier
-                        .size(width = 52.dp, height = 34.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            if (selected && barStyle != "Minimal") selectedColor.copy(alpha = 0.16f)
-                            else Color.Transparent
-                        ),
-                    contentAlignment = Alignment.Center
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable { onNavigate(destination.route) }
+                        .padding(horizontal = 3.dp, vertical = 1.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Image(
-                        painter = painterResource(destination.iconResId),
-                        contentDescription = destination.label,
-                        colorFilter = ColorFilter.tint(tint),
-                        modifier = Modifier.size(iconSize)
-                    )
-                }
-                if (labelsMode == "Always" || (labelsMode == "Selected" && selected)) {
-                    BasicText(
-                        text = destination.label,
-                        style = TextStyle(
-                            color = tint,
-                            fontSize = 10.sp,
-                            lineHeight = 12.sp,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                            textAlign = TextAlign.Center
-                        ),
-                        maxLines = 1
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(width = 52.dp, height = iconSlotHeight)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (selected && barStyle != "Minimal") selectedColor.copy(alpha = 0.16f)
+                                else Color.Transparent
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(destination.iconResId),
+                            contentDescription = destination.label,
+                            colorFilter = ColorFilter.tint(tint),
+                            modifier = Modifier.size(iconSize)
+                        )
+                    }
+                    if (labelsMode == "Always" || (labelsMode == "Selected" && selected)) {
+                        BasicText(
+                            text = destination.label,
+                            style = TextStyle(
+                                color = tint,
+                                fontSize = 10.sp,
+                                lineHeight = 14.sp,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                textAlign = TextAlign.Center
+                            ),
+                            maxLines = 1
+                        )
+                    }
                 }
             }
         }
