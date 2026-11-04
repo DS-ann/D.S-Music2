@@ -1476,8 +1476,10 @@ fun FullPlayer(
                 }
             }
 
-            // Keep the queue opener close to the transport controls. A weighted spacer
-            // here expanded to most of the available height on phones and tablets.
+            // Split the otherwise-unused lower space 80/20 around the queue opener.
+            // This moves the same 48dp touch target toward the bottom edge while leaving
+            // one-fifth of the available slack below it on phones and wide-player layouts.
+            Spacer(modifier = Modifier.weight(4f, fill = true))
             Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 8.dp))
 
             // Swipe Up / Click Chevron Up Indicator to expand Queue
@@ -1509,6 +1511,7 @@ fun FullPlayer(
                         .graphicsLayer { rotationZ = 180f }
                 )
             }
+            Spacer(modifier = Modifier.weight(1f, fill = true))
         }
 
         if (useWidePlayer) {
