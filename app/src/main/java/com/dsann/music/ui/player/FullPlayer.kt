@@ -53,6 +53,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.dsann.music.ui.theme.Icon
@@ -91,7 +92,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dsann.music.MainActivity
 import com.dsann.music.ui.SettingsViewModel
+import com.dsann.music.ui.QueueListItem
+import com.dsann.music.ui.rememberDragDropState
 import com.dsann.music.ui.showQueueSongActions
+import com.dsann.music.ui.theme.ListItemDefaults
 import com.dsann.music.R
 import com.dsann.music.data.lyrics.LyricLine
 import com.dsann.music.data.lyrics.LyricsResult
@@ -411,9 +415,13 @@ private fun LandscapePlayerDetailsPane(
     onSeekTo: (Int) -> Unit,
     onFetchLyrics: () -> Unit,
     onRetryLyrics: () -> Unit,
+    onReorderQueue: (Int, Int) -> Unit,
+    onSongLongClick: (SongItem) -> Unit,
     onPlayQueueItem: (Int) -> Unit
 ) {
     var showProviderPicker by remember { mutableStateOf(false) }
+    val queueListState = rememberLazyListState()
+    val queueDragDropState = rememberDragDropState(queueListState, onReorderQueue)
     val panelShape = RoundedCornerShape(24.dp)
 
     Column(
@@ -492,46 +500,23 @@ private fun LandscapePlayerDetailsPane(
                 }
             } else {
                 LazyColumn(
+                    state = queueListState,
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     itemsIndexed(songList, key = { _, song -> song.id }) { index, song ->
-                        val isCurrent = index == currentSongIndex
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    if (isCurrent) accentColor.copy(alpha = 0.13f) else Color.Transparent,
-                                    RoundedCornerShape(14.dp)
-                                )
-                                .clickable { onPlayQueueItem(index) }
-                                .padding(horizontal = 12.dp, vertical = 11.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    text = song.title,
-                                    color = if (isCurrent) accentColor else contentColor,
-                                    style = DsmusicTheme.typography.bodyMedium,
-                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = song.artist,
-                                    color = secondaryColor,
-                                    style = DsmusicTheme.typography.labelSmall,
-                                    maxLines = 1
-                                )
-                            }
-                            if (isCurrent) {
-                                Text(
-                                    text = "PLAYING",
-                                    color = accentColor,
-                                    style = DsmusicTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
+                        QueueListItem(
+                            song = song,
+                            isPlaying = index == currentSongIndex,
+                            shapes = ListItemDefaults.segmentedShapes(
+                                index = index,
+                                count = songList.size
+                            ),
+                            dragDropState = queueDragDropState,
+                            index = index,
+                            onLongClick = { onSongLongClick(song) },
+                            onClick = { onPlayQueueItem(index) }
+                        )
                     }
                 }
             }
@@ -1525,6 +1510,8 @@ fun FullPlayer(
                         onSeekTo = onSeekTo,
                         onFetchLyrics = onFetchLyrics,
                         onRetryLyrics = onRetryLyrics,
+                        onReorderQueue = { from, to -> viewModel.reorderQueue(from, to) },
+                        onSongLongClick = { song -> showQueueSongActions(context, song, viewModel) },
                         onPlayQueueItem = { index -> viewModel.playSongAtIndex(index) }
                     )
                 } else {
