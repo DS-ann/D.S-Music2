@@ -546,7 +546,7 @@ object YouTubeMusic {
      */
     suspend fun home(): Result<HomePage> = withContext(Dispatchers.IO) {
         runCatching {
-            kotlinx.coroutines.withTimeout(7000L.milliseconds) {
+            kotlinx.coroutines.withTimeout(25000L.milliseconds) {
                 val response = InnerTubeClient.browse(browseId = "FEmusic_home")
                 InnerTubeParser.parseHomePage(response)
             }
@@ -558,7 +558,7 @@ object YouTubeMusic {
      */
     suspend fun homeContinuation(continuation: String): Result<HomePage> = withContext(Dispatchers.IO) {
         runCatching {
-            kotlinx.coroutines.withTimeout(7000L.milliseconds) {
+            kotlinx.coroutines.withTimeout(25000L.milliseconds) {
                 val response = InnerTubeClient.browse(continuation = continuation)
                 InnerTubeParser.parseHomePage(response)
             }
@@ -570,7 +570,7 @@ object YouTubeMusic {
      */
     suspend fun explore(): Result<HomePage> = withContext(Dispatchers.IO) {
         runCatching {
-            kotlinx.coroutines.withTimeout(7000L.milliseconds) {
+            kotlinx.coroutines.withTimeout(25000L.milliseconds) {
                 val response = InnerTubeClient.browse(browseId = "FEmusic_explore")
                 InnerTubeParser.parseHomePage(response)
             }
