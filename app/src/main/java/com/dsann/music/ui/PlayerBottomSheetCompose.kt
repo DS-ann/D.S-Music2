@@ -1594,22 +1594,21 @@ fun PlayerBottomSheetCompose(
                     }
                     val widePortraitArtHeightFactor =
                         if (containerHeight < 760.dp) 0.34f else 0.50f
-                    val albumArtSizeDp = (
-                        if (isLandscapeWindow) {
-                            minOf(containerHeight * landscapeArtHeightFactor, containerWidthDp * 0.30f) *
-                                (albumArtScale / 0.9f)
-                        } else if (useWidePlayer) {
-                            minOf(containerHeight * widePortraitArtHeightFactor, containerWidthDp * 0.42f) *
-                                (albumArtScale / 0.9f)
-                        } else {
-                            // Limit portrait artwork by both available width and height so the
-                            // title, transport controls and queue handle remain in the window.
-                            minOf(
-                                containerWidthDp * albumArtScale,
-                                containerHeight * portraitArtHeightFactor
-                            )
-                        }
-                    ) * artworkScaleFactor
+                    // Reserve a stable artwork slot for the controls column. The selected
+                    // artwork scale changes only the floating cover's rendered size.
+                    val albumArtSlotSizeDp = if (isLandscapeWindow) {
+                        minOf(containerHeight * landscapeArtHeightFactor, containerWidthDp * 0.30f) *
+                            (albumArtScale / 0.9f)
+                    } else if (useWidePlayer) {
+                        minOf(containerHeight * widePortraitArtHeightFactor, containerWidthDp * 0.42f) *
+                            (albumArtScale / 0.9f)
+                    } else {
+                        minOf(
+                            containerWidthDp * albumArtScale,
+                            containerHeight * portraitArtHeightFactor
+                        )
+                    }
+                    val albumArtSizeDp = albumArtSlotSizeDp * artworkScaleFactor
                     val statusBarTopPx = WindowInsets.statusBars.getTop(density).toFloat()
                     // Keep the shared cover aligned with the player pane while the
                     // landscape queue animates into its dedicated 42% side panel.
@@ -1677,9 +1676,13 @@ fun PlayerBottomSheetCompose(
                                 val topOffsetDp = if (useWidePlayer) {
                                     minTopOffsetDp
                                 } else {
-                                    ((containerHeight - albumArtSizeDp) / 2f - 220.dp).coerceAtLeast(minTopOffsetDp)
+                                    ((containerHeight - albumArtSlotSizeDp) / 2f - 220.dp).coerceAtLeast(minTopOffsetDp)
                                 }
-                                val yEndPx = with(density) { topOffsetDp.toPx() }
+                                // Keep the cover centered in the fixed slot while its visible
+                                // size changes; the content below the slot remains stationary.
+                                val yEndPx = with(density) {
+                                    (topOffsetDp + (albumArtSlotSizeDp - albumArtSizeDp) / 2f).toPx()
+                                }
 
                                 val normalX = androidx.compose.ui.util.lerp(
                                     xStartPx,
