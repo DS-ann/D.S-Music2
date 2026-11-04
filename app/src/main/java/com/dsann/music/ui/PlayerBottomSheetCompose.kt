@@ -1119,8 +1119,11 @@ fun PlayerBottomSheetCompose(
                 isQueueExpanded && playerContentExpansionFraction.value >= 0.995f
             }
         }
+        // In landscape the queue occupies a separate side pane. Keep the
+        // shared artwork visible in the player pane instead of fading it away.
+        val hideArtworkForQueue = isQueuePresentationActive && !isLandscapeWindow
         val artworkAlpha by animateFloatAsState(
-            targetValue = if (isQueuePresentationActive) 0f else 1f,
+            targetValue = if (hideArtworkForQueue) 0f else 1f,
             animationSpec = spring(dampingRatio = 0.85f, stiffness = 300f),
             label = "ArtworkAlpha"
         )
