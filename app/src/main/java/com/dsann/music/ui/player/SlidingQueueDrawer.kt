@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -17,12 +18,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import androidx.compose.ui.zIndex
 import com.dsann.music.R
 import com.dsann.music.model.SongItem
@@ -159,6 +162,7 @@ fun SlidingQueueDrawer(
         Box(modifier = Modifier.fillMaxSize()) {
             val boxScope = this
             val lazyListState = rememberLazyListState()
+            val queueScope = rememberCoroutineScope()
             
             val dragDropState = rememberDragDropState(lazyListState = lazyListState) { from, to ->
                 onReorderQueue(from, to)
@@ -219,13 +223,46 @@ fun SlidingQueueDrawer(
                             }
                         }
 
-                        // Right Side
-                        Text(
-                            text = "${songList.size} tracks",
-                            style = DsmusicTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = DsmusicTheme.colorScheme.onSurfaceVariant
-                        )
+                        // A stable shortcut makes the current track easy to find after manual queue edits.
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(DsmusicTheme.colorScheme.primaryContainer)
+                                    .clickable(enabled = currentSongIndex in songList.indices) {
+                                        queueScope.launch {
+                                            if (currentSongIndex in songList.indices) {
+                                                lazyListState.animateScrollToItem(currentSongIndex)
+                                            }
+                                        }
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_play),
+                                    contentDescription = "Jump to playing song",
+                                    tint = DsmusicTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Jump to playing",
+                                    style = DsmusicTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = DsmusicTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                            Text(
+                                text = "${songList.size} tracks",
+                                style = DsmusicTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = DsmusicTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
 
@@ -256,10 +293,11 @@ fun SlidingQueueDrawer(
                                 .zIndex(if (isDragging) 1f else 0f)
                                 .graphicsLayer {
                                     translationY = displacement
-                                    if (isDragging) {
-                                        scaleX = 1.02f
-                                        scaleY = 1.02f
-                                    }
+                                    val liftScale = if (isDragging) 1.05f else 1f
+                                    scaleX = liftScale
+                                    scaleY = liftScale
+                                    shadowElevation = if (isDragging) 14.dp.toPx() else 0f
+                                    shape = RoundedCornerShape(18.dp)
                                 }
                         ) {
                             QueueListItem(
