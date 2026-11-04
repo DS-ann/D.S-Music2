@@ -1076,6 +1076,9 @@ fun ModalBottomSheet(
 class DsmusicPullToRefreshState {
     var progress by mutableFloatStateOf(0f)
     internal var pullDistancePx by mutableFloatStateOf(0f)
+    internal var peakPullDistancePx by mutableFloatStateOf(0f)
+    internal var reverseDistancePx by mutableFloatStateOf(0f)
+    internal var reversedAfterThreshold by mutableStateOf(false)
 }
 @Composable fun rememberPullToRefreshState(): DsmusicPullToRefreshState = remember { DsmusicPullToRefreshState() }
 
@@ -1134,9 +1137,12 @@ fun PullToRefreshBox(
 ) {
     val density = LocalDensity.current
     val thresholdPx = with(density) { 72.dp.toPx() }
+    // A deliberate 8 dp upward reversal after the threshold is crossed cancels
+    // this pull, even if the finger remains beyond the refresh threshold.
+    val reverseCancelDistancePx = with(density) { 8.dp.toPx() }
     val latestOnRefresh by rememberUpdatedState(onRefresh)
     val latestIsRefreshing by rememberUpdatedState(isRefreshing)
-    val refreshConnection = remember(state, thresholdPx) {
+    val refreshConnection = remember(state, thresholdPx, reverseCancelDistancePx) {
         object : NestedScrollConnection {
             override fun onPostScroll(
                 consumed: Offset,
@@ -1151,12 +1157,21 @@ fun PullToRefreshBox(
                     // Only the unconsumed downward drag reaches here when the list is at
                     // its top. Normal scrolling inside the feed remains owned by LazyColumn.
                     state.pullDistancePx += available.y
+                    state.peakPullDistancePx = maxOf(state.peakPullDistancePx, state.pullDistancePx)
                     state.progress = (state.pullDistancePx / thresholdPx).coerceIn(0f, 1f)
                     return Offset(0f, available.y)
                 }
 
                 if (available.y < 0f && state.pullDistancePx > 0f) {
                     val consumedY = maxOf(available.y, -state.pullDistancePx)
+                    if (state.peakPullDistancePx >= thresholdPx) {
+                        // Once armed, reversing the drag is an explicit cancellation.
+                        // Do not re-arm this same gesture if the finger moves downward again.
+                        state.reverseDistancePx += -consumedY
+                        if (state.reverseDistancePx >= reverseCancelDistancePx) {
+                            state.reversedAfterThreshold = true
+                        }
+                    }
                     state.pullDistancePx = (state.pullDistancePx + consumedY).coerceAtLeast(0f)
                     state.progress = (state.pullDistancePx / thresholdPx).coerceIn(0f, 1f)
                     return Offset(0f, consumedY)
@@ -1166,11 +1181,16 @@ fun PullToRefreshBox(
             }
 
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                // This callback runs only after the user's pointer is released. Merely
-                // crossing the threshold never starts a request; pulling back below it
-                // disarms the gesture and the content returns to its resting position.
-                val shouldRefresh = state.progress >= 1f && !latestIsRefreshing
+                // This callback runs only after the user's pointer is released.
+                // A pull that was deliberately reversed after arming is cancelled,
+                // even when its final distance is still above the threshold.
+                val shouldRefresh = state.progress >= 1f &&
+                    !state.reversedAfterThreshold &&
+                    !latestIsRefreshing
                 state.pullDistancePx = 0f
+                state.peakPullDistancePx = 0f
+                state.reverseDistancePx = 0f
+                state.reversedAfterThreshold = false
                 state.progress = 0f
                 if (shouldRefresh) latestOnRefresh()
                 return Velocity.Zero
@@ -1181,6 +1201,9 @@ fun PullToRefreshBox(
     LaunchedEffect(isRefreshing, state) {
         if (isRefreshing) {
             state.pullDistancePx = 0f
+            state.peakPullDistancePx = 0f
+            state.reverseDistancePx = 0f
+            state.reversedAfterThreshold = false
             state.progress = 0f
         }
     }

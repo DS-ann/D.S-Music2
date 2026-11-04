@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.SearchItem
 import com.dsann.music.ui.explore.SearchResultItem
-import com.dsann.music.ui.common.rememberReversiblePullToRefreshCallback
 
 /**
  * A beautiful dedicated page showing Listening History as a list of songs,
@@ -75,12 +74,9 @@ fun HistoryScreen(
         }
     ) { paddingValues ->
         val pullToRefreshState = rememberPullToRefreshState()
-        val refreshAfterRelease =
-            rememberReversiblePullToRefreshCallback(pullToRefreshState, onRefresh)
-        
         PullToRefreshBox(
             isRefreshing = isRefreshing,
-            onRefresh = refreshAfterRelease,
+            onRefresh = onRefresh,
             state = pullToRefreshState,
             modifier = Modifier
                 .fillMaxSize()

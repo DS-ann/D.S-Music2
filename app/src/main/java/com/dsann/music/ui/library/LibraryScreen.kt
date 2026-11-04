@@ -172,7 +172,6 @@ import com.dsann.music.service.CachedMediaMetadata
 import com.dsann.music.util.SongDownloader
 import com.dsann.music.model.toSongItem
 import com.dsann.music.ui.CreateLocalPlaylistDialog
-import com.dsann.music.ui.common.rememberReversiblePullToRefreshCallback
 import com.dsann.music.ui.LocalPlaylistPickerDialog
 import com.dsann.music.ui.SongActionsBottomSheet
 import com.dsann.music.ui.explore.AccountScreen
@@ -623,14 +622,9 @@ fun LibraryScreen(
                         }
 
                         val pullToRefreshState = rememberPullToRefreshState()
-                        val refreshAfterRelease =
-                            rememberReversiblePullToRefreshCallback(pullToRefreshState) {
-                                onRefreshAction()
-                            }
-
                         PullToRefreshBox(
                             isRefreshing = isRefreshing,
-                            onRefresh = refreshAfterRelease,
+                            onRefresh = { onRefreshAction() },
                             state = pullToRefreshState,
                             modifier = Modifier.fillMaxSize()
                         ) {
