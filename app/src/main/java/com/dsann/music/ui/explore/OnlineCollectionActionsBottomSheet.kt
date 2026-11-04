@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +43,7 @@ import com.dsann.music.data.innertube.SearchItem
 import com.dsann.music.data.innertube.YouTubeMusic
 import com.dsann.music.model.SongItem
 import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.DsmusicIconButton
 import com.dsann.music.ui.theme.HorizontalDivider
 import com.dsann.music.ui.theme.Icon
 import com.dsann.music.ui.theme.LoadingIndicator
@@ -191,33 +193,24 @@ fun OnlineCollectionActionsBottomSheet(
                 .padding(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                AsyncImage(
-                    model = rememberExploreImageRequest(thumbnail, 160),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(54.dp).clip(RoundedCornerShape(10.dp))
-                )
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        title,
-                        style = DsmusicTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        subtitle,
-                        style = DsmusicTheme.typography.bodySmall,
-                        color = DsmusicTheme.colorScheme.onSurfaceVariant
-                    )
+            ExploreActionSheetHeader(
+                thumbnailUrl = thumbnail,
+                title = title,
+                subtitle = subtitle,
+                trailingContent = {
+                    if (isWorking) {
+                        LoadingIndicator(Modifier.size(22.dp))
+                    } else {
+                        DsmusicIconButton(onClick = onDismissRequest) {
+                            Icon(
+                                Icons.Rounded.Close,
+                                contentDescription = "Close",
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
                 }
-                if (isWorking) LoadingIndicator(Modifier.size(22.dp))
-            }
+            )
 
             HorizontalDivider(color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
 
