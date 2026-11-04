@@ -1164,8 +1164,8 @@ fun PlayerBottomSheetCompose(
             pendingSheetAnimation = SheetAnimationRequest(
                 targetExpanded = false,
                 animationSpec = tween(
-                    durationMillis = 340,
-                    easing = FastOutSlowInEasing
+                    durationMillis = 220,
+                    easing = LinearEasing
                 ),
                 initialVelocity = 0f
             )
@@ -1200,7 +1200,7 @@ fun PlayerBottomSheetCompose(
         val isLegacyCompactArtwork by remember(playerContentExpansionFraction, isLyricsModeEnabled) {
             derivedStateOf {
                 android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M &&
-                    playerContentExpansionFraction.value <= 0.015f &&
+                    playerContentExpansionFraction.value < 0.5f &&
                     !isLyricsModeEnabled
             }
         }
