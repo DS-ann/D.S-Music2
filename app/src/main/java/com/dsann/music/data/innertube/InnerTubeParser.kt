@@ -30,8 +30,10 @@ object InnerTubeParser {
                 "contents.singleColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.contents.0.musicEditablePlaylistDetailHeaderRenderer.header.musicResponsiveHeaderRenderer"
             )?.asJsonObject
 
-        val title = header?.path("title.runs.0.text")?.asString ?: "Section"
-        
+        var title = header?.path("title.runs.0.text")?.asString
+            ?: header?.path("title.simpleText")?.asString
+            ?: "Section"
+
         // Parse items
         var itemContents = response.path(
             "contents.twoColumnBrowseResultsRenderer.secondaryContents.sectionListRenderer.contents.0.musicPlaylistShelfRenderer.contents"
@@ -72,6 +74,21 @@ object InnerTubeParser {
                 parseTwoRowItem(twoRowRenderer)?.let { items.add(it) }
             } else if (listRenderer != null) {
                 parseSearchItem(obj)?.let { items.add(it) }
+            }
+        }
+
+        // Genre/mood browse pages can contain several shelves and do not always use
+        // the single first-shelf layout handled above. Fall back to the same general
+        // shelf parser used by Home/Explore, then combine unique browseable results.
+        if (items.isEmpty()) {
+            val fallbackShelves = parseHomePage(response).sections
+            fallbackShelves.flatMap { it.items }.forEach { item ->
+                if (items.none { searchItemKey(it) == searchItemKey(item) }) {
+                    items.add(item)
+                }
+            }
+            if (title == "Section") {
+                title = fallbackShelves.firstOrNull()?.title?.takeIf { it.isNotBlank() } ?: title
             }
         }
 
@@ -852,6 +869,59 @@ object InnerTubeParser {
         }
 
         return HomePage(sections)
+    }
+
+    /**
+     * YouTube Music's Search discovery page uses musicNavigationButtonRenderer entries,
+     * not the chipCloudRenderer used by the Home page. Keep the real browse destination
+     * (including params) so every mood/genre opens its own catalogue page.
+     */
+    fun parseMoodsAndGenres(json: JsonObject): List<HomeCategory> {
+        val categories = mutableListOf<HomeCategory>()
+
+        fun add(title: String?, browse: JsonObject?) {
+            val cleanTitle = title?.trim().orEmpty()
+            val browseId = browse?.get("browseId")?.asString?.takeIf { it.isNotBlank() }
+            if (cleanTitle.isNotEmpty() && browseId != null) {
+                categories.add(
+                    HomeCategory(
+                        title = cleanTitle,
+                        browseId = browseId,
+                        params = browse.get("params")?.asString?.takeIf { it.isNotBlank() }
+                    )
+                )
+            }
+        }
+
+        findObjects(json, "musicNavigationButtonRenderer").forEach { renderer ->
+            val title = renderer.path("buttonText.runs")?.asJsonArray
+                ?.joinToString("") { run ->
+                    run.takeIf { it.isJsonObject }?.asJsonObject?.get("text")?.asString.orEmpty()
+                }
+                ?.takeIf { it.isNotBlank() }
+                ?: renderer.path("buttonText.simpleText")?.asString
+                ?: renderer.get("buttonText")?.takeIf { it.isJsonPrimitive }?.asString
+
+            val browse = renderer.path("clickCommand.browseEndpoint")?.asJsonObject
+                ?: renderer.path("clickCommand.commandExecutorCommand.commands.0.browseEndpoint")?.asJsonObject
+                ?: renderer.path("navigationEndpoint.browseEndpoint")?.asJsonObject
+            add(title, browse)
+        }
+
+        // Retain compatibility with older Web layouts where discovery destinations
+        // are supplied as chipCloudChipRenderer entries instead.
+        if (categories.isEmpty()) {
+            findObjects(json, "chipCloudChipRenderer").forEach { renderer ->
+                val title = renderer.path("text.runs.0.text")?.asString
+                    ?: renderer.path("text.simpleText")?.asString
+                val browse = renderer.path("navigationEndpoint.browseEndpoint")?.asJsonObject
+                    ?: renderer.path("onSelectCommand.browseEndpoint")?.asJsonObject
+                    ?: renderer.path("navigationEndpoint.commandExecutorCommand.commands.0.browseEndpoint")?.asJsonObject
+                add(title, browse)
+            }
+        }
+
+        return categories.distinctBy { it.browseId + "|" + it.params.orEmpty() }
     }
 
     private fun parseHomeSection(section: JsonObject): HomeSection? {

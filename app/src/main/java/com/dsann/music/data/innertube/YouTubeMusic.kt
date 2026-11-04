@@ -577,6 +577,23 @@ object YouTubeMusic {
         }
     }
 
+    /**
+     * Load the dedicated YouTube Music moods-and-genres catalogue used by Search.
+     * This is the same browse surface used by Prism; it is separate from Home's chips.
+     */
+    suspend fun moodsAndGenres(): Result<List<HomeCategory>> = withContext(Dispatchers.IO) {
+        runCatching {
+            kotlinx.coroutines.withTimeout(25000L.milliseconds) {
+                val response = InnerTubeClient.browse(browseId = "FEmusic_moods_and_genres")
+                val categories = InnerTubeParser.parseMoodsAndGenres(response)
+                if (categories.isEmpty()) {
+                    throw java.io.IOException("YouTube Music returned no moods or genres.")
+                }
+                categories
+            }
+        }
+    }
+
     // ========== Albums ==========
 
     /**

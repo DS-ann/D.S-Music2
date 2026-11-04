@@ -415,7 +415,12 @@ class MainActivity : AppCompatActivity() {
 
                     LaunchedEffect(currentDestination?.route) {
                         exploreViewModel.setExplorePageActive(currentDestination?.route == "explore")
-                        searchViewModel.setExplorePageActive(currentDestination?.route == "search")
+                        // Search has its own ViewModel and loads only the dedicated moods/genres
+                        // catalogue. It must not trigger a second copy of the Explore home feed.
+                        searchViewModel.setExplorePageActive(
+                            active = currentDestination?.route == "search",
+                            loadHomeOnActivate = false
+                        )
                     }
                     // Keep the tab viewport and navigation dock at their normal dimensions while the player expands.
                     // PlayerBottomSheetCompose is drawn later in this Box and overlays both surfaces.

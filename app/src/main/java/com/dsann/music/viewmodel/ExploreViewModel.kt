@@ -38,9 +38,36 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
+import java.util.concurrent.Executors
 
 enum class DetailType {
     ALBUM, PLAYLIST, ARTIST, SECTION
+}
+
+/**
+ * Serializes small Explore cache snapshots outside viewModelScope. Android may destroy
+ * the Activity's ViewModels while the app is backgrounded; a ViewModel-owned write could
+ * otherwise be cancelled before SharedPreferences receives the last feed snapshot.
+ */
+private object ExplorePreferenceCacheWriter {
+    private val versions = HashMap<String, Long>()
+    private val executor = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "DSMusic-ExploreCache").apply { isDaemon = true }
+    }
+
+    fun enqueue(key: String, write: () -> Unit) {
+        val version = synchronized(versions) {
+            val next = (versions[key] ?: 0L) + 1L
+            versions[key] = next
+            next
+        }
+        executor.execute {
+            val isLatest = synchronized(versions) { versions[key] == version }
+            if (isLatest) {
+                runCatching(write)
+            }
+        }
+    }
 }
 
 /**
@@ -103,6 +130,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private var exploreContinuationToken: String? = null
     private var homeLoaded = false
     private var explorePageActive = false
+    private var genresLoaded = false
+    private var genresJob: Job? = null
+    private var cookieSyncInitialized = false
+    private var lastSyncedCookie: String? = null
 
     fun setMood(mood: String?) {
         if (_uiState.value.currentMood == mood) return
@@ -116,6 +147,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private val prefs = application.getSharedPreferences("explore_prefs", 0)
     private val SEARCH_HISTORY_KEY = "search_history"
     private val HOME_FEED_CACHE_KEY = "home_feed_cache_v1"
+    private val GENRES_CACHE_KEY = "moods_and_genres_cache_v1"
     private val gson = com.google.gson.Gson()
     private val MAX_HISTORY = 20
 
@@ -129,7 +161,9 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 notInterestedIds = notInterested
             )
         }
+        syncCookieFromDisk()
         homeLoaded = restoreHomeFeedCache()
+        genresLoaded = restoreGenresCache()
     }
 
     private fun loadSearchHistory() {
@@ -195,16 +229,18 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private var searchContinuationJob: Job? = null
     private var detailLoadJob: Job? = null
     private var artistResolveJob: Job? = null
-    private var homeCacheSaveJob: Job? = null
-    @Volatile private var homeCacheSaveVersion = 0L
 
     private data class CachedHomeFeed(
         val sections: List<CachedHomeFeedSection> = emptyList(),
         val moods: List<String> = emptyList(),
-        val categories: List<HomeCategory> = emptyList(),
         val currentMood: String? = null,
         val homeContinuation: String? = null,
-        val exploreContinuation: String? = null
+        val exploreContinuation: String? = null,
+        val loaded: Boolean = false
+    )
+
+    private data class CachedGenres(
+        val categories: List<HomeCategory> = emptyList()
     )
 
     private data class CachedHomeFeedSection(
@@ -226,11 +262,14 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
      * Stop page content requests when Explore is hidden but preserve its already-loaded state.
      * Thumbnail prefetches remain cache-only and do not cause hidden pages to be composed.
      */
-    fun setExplorePageActive(active: Boolean) {
-        if (explorePageActive == active) return
+    fun setExplorePageActive(active: Boolean, loadHomeOnActivate: Boolean = true) {
+        if (explorePageActive == active) {
+            if (active && loadHomeOnActivate && !homeLoaded) loadHomeFeed()
+            return
+        }
         explorePageActive = active
         if (active) {
-            if (!homeLoaded) loadHomeFeed()
+            if (loadHomeOnActivate && !homeLoaded) loadHomeFeed()
             return
         }
 
@@ -518,7 +557,11 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private fun syncCookieFromDisk() {
         val ctx = getApplication<Application>()
         val cookie = ctx.getSharedPreferences("AppSettings", 0).getString("yt_cookies", null)
-        InnerTubeClient.cookie = cookie
+        if (!cookieSyncInitialized || cookie != lastSyncedCookie) {
+            InnerTubeClient.cookie = cookie
+            lastSyncedCookie = cookie
+            cookieSyncInitialized = true
+        }
     }
 
     private fun restoreHomeFeedCache(): Boolean {
@@ -542,14 +585,17 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     params = section.params
                 )
             }
-            if (restoredSections.isEmpty()) return false
+            // A successful feed can legitimately contain no shelves (for example an
+            // empty Explore response). Preserve its loaded marker to avoid refetching
+            // every time the Activity/Explore ViewModel is recreated.
+            val hasSnapshot = cached.loaded || restoredSections.isNotEmpty() || cached.moods.isNotEmpty()
+            if (!hasSnapshot) return false
             homeContinuationToken = cached.homeContinuation
             exploreContinuationToken = cached.exploreContinuation
             _uiState.update { state ->
                 state.copy(
                     homeSections = restoredSections,
                     homeMoods = cached.moods,
-                    homeCategories = cached.categories,
                     currentMood = cached.currentMood,
                     isLoadingHome = false,
                     homeFeedError = null
@@ -564,7 +610,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     private fun persistHomeFeedCache() {
         val state = _uiState.value
-        if (state.homeSections.isEmpty()) return
+        if (!homeLoaded && state.homeSections.isEmpty() && state.homeMoods.isEmpty()) return
         val cached = CachedHomeFeed(
             sections = state.homeSections.map { section ->
                 CachedHomeFeedSection(
@@ -582,27 +628,91 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 )
             },
             moods = state.homeMoods,
-            categories = state.homeCategories,
             currentMood = state.currentMood,
             homeContinuation = homeContinuationToken,
-            exploreContinuation = exploreContinuationToken
+            exploreContinuation = exploreContinuationToken,
+            loaded = homeLoaded
         )
-        val saveVersion = ++homeCacheSaveVersion
-        homeCacheSaveJob?.cancel()
-        homeCacheSaveJob = viewModelScope.launch(Dispatchers.IO) {
-            val json = runCatching { gson.toJson(cached) }.getOrNull() ?: return@launch
-            // A newer feed update supersedes this write, avoiding an older snapshot
-            // overwriting the newest cache when updates happen close together.
-            if (saveVersion == homeCacheSaveVersion) {
-                prefs.edit().putString(HOME_FEED_CACHE_KEY, json).commit()
+        ExplorePreferenceCacheWriter.enqueue(HOME_FEED_CACHE_KEY) {
+            val json = gson.toJson(cached)
+            prefs.edit().putString(HOME_FEED_CACHE_KEY, json).commit()
+        }
+    }
+
+    private fun restoreGenresCache(): Boolean {
+        val json = prefs.getString(GENRES_CACHE_KEY, null) ?: return false
+        return runCatching {
+            val cached = gson.fromJson(json, CachedGenres::class.java) ?: return false
+            if (cached.categories.isEmpty()) return false
+            _uiState.update { it.copy(homeCategories = cached.categories, genresError = null) }
+            true
+        }.getOrElse { error ->
+            Log.w(TAG, "Ignoring invalid moods-and-genres cache", error)
+            false
+        }
+    }
+
+    private fun persistGenresCache(categories: List<HomeCategory>) {
+        if (categories.isEmpty()) return
+        val cached = CachedGenres(categories)
+        ExplorePreferenceCacheWriter.enqueue(GENRES_CACHE_KEY) {
+            prefs.edit().putString(GENRES_CACHE_KEY, gson.toJson(cached)).commit()
+        }
+    }
+
+    /**
+     * Search discovery genres come from YouTube Music's dedicated catalogue browse
+     * endpoint (FEmusic_moods_and_genres), not the Home feed's chip cloud.
+     */
+    fun loadMoodsAndGenres(forceRefresh: Boolean = false) {
+        if (!forceRefresh && (genresLoaded || _uiState.value.homeCategories.isNotEmpty())) return
+        if (genresJob?.isActive == true) return
+        _uiState.update { it.copy(isLoadingGenres = true, genresError = null) }
+        genresJob = viewModelScope.launch {
+            try {
+                val result = YouTubeMusic.moodsAndGenres()
+                result.onSuccess { categories ->
+                    _uiState.update {
+                        it.copy(
+                            homeCategories = categories,
+                            isLoadingGenres = false,
+                            genresError = null
+                        )
+                    }
+                    genresLoaded = categories.isNotEmpty()
+                    persistGenresCache(categories)
+                }.onFailure { error ->
+                    Log.w(TAG, "Moods and genres failed to load", error)
+                    _uiState.update {
+                        it.copy(
+                            isLoadingGenres = false,
+                            genresError = "Couldn't load genres. Check your connection and try again."
+                        )
+                    }
+                }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                Log.w(TAG, "Moods and genres request failed", error)
+                _uiState.update {
+                    it.copy(
+                        isLoadingGenres = false,
+                        genresError = "Couldn't load genres. Check your connection and try again."
+                    )
+                }
+            } finally {
+                genresJob = null
             }
         }
     }
 
     fun forceReloadHomeFeed() {
+        val diskCookie = getApplication<Application>()
+            .getSharedPreferences("AppSettings", 0)
+            .getString("yt_cookies", null)
+        if (cookieSyncInitialized && diskCookie == lastSyncedCookie) return
         syncCookieFromDisk()
         homeLoaded = false
-        loadHomeFeed()
+        if (explorePageActive) loadHomeFeed()
     }
 
     private suspend fun fetchMergedHomeFeed(): List<HomeSection> = coroutineScope {
@@ -676,12 +786,9 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         if (allMoods.isEmpty()) {
             explorePage?.moods?.let { allMoods.addAll(it) }
         }
-        val categories = (explorePage?.categories.orEmpty() + homePage?.categories.orEmpty())
-            .distinctBy { it.browseId + "|" + it.params.orEmpty() }
         _uiState.update { state ->
             state.copy(
-                homeMoods = allMoods.distinct().ifEmpty { state.homeMoods },
-                homeCategories = categories.ifEmpty { state.homeCategories }
+                homeMoods = allMoods.distinct().ifEmpty { state.homeMoods }
             )
         }
 
@@ -1492,6 +1599,8 @@ data class ExploreUiState(
     val searchHistory: List<String> = emptyList(),
     val homeMoods: List<String> = emptyList(),
     val homeCategories: List<HomeCategory> = emptyList(),
+    val isLoadingGenres: Boolean = false,
+    val genresError: String? = null,
     val searchFilter: SearchFilter? = null,
     val streamUrl: String? = null,
     val streamError: String? = null,
