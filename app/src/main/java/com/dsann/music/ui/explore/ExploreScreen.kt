@@ -849,6 +849,314 @@ fun ExploreScreen(
 
                                         Box(modifier = Modifier.weight(1f)) {
                                             when {
+                                                isSearchDestination && !isSearchActive && searchQuery.isBlank() -> {
+                                                    LazyColumn(
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentPadding = PaddingValues(
+                                                            start = 18.dp,
+                                                            end = 18.dp,
+                                                            top = 18.dp,
+                                                            bottom = 124.dp
+                                                        ),
+                                                        verticalArrangement = Arrangement.spacedBy(22.dp)
+                                                    ) {
+                                                        item(key = "search-landing-hero") {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .clip(RoundedCornerShape(26.dp))
+                                                                    .background(
+                                                                        Brush.linearGradient(
+                                                                            listOf(
+                                                                                DsmusicTheme.colorScheme.primaryContainer.copy(alpha = 0.78f),
+                                                                                DsmusicTheme.colorScheme.surfaceContainerHigh,
+                                                                                DsmusicTheme.colorScheme.surfaceContainerLow
+                                                                            )
+                                                                        )
+                                                                    )
+                                                                    .padding(22.dp)
+                                                            ) {
+                                                                Row(
+                                                                    modifier = Modifier.fillMaxWidth(),
+                                                                    verticalAlignment = Alignment.CenterVertically,
+                                                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                                                ) {
+                                                                    Column(
+                                                                        modifier = Modifier.weight(1f),
+                                                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                                                    ) {
+                                                                        Text(
+                                                                            "YOUR NEXT FAVOURITE STARTS HERE",
+                                                                            style = DsmusicTheme.typography.labelSmall.copy(
+                                                                                letterSpacing = 1.35.sp,
+                                                                                fontWeight = FontWeight.Bold
+                                                                            ),
+                                                                            color = DsmusicTheme.colorScheme.primary
+                                                                        )
+                                                                        Text(
+                                                                            "Find your\nnext repeat.",
+                                                                            style = DsmusicTheme.typography.headlineLarge.copy(
+                                                                                fontSize = 29.sp,
+                                                                                lineHeight = 33.sp,
+                                                                                fontWeight = FontWeight.ExtraBold
+                                                                            ),
+                                                                            color = DsmusicTheme.colorScheme.onSurface
+                                                                        )
+                                                                        Text(
+                                                                            "Songs, artists, albums and playlists — all in one place.",
+                                                                            style = DsmusicTheme.typography.bodySmall,
+                                                                            color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                                                        )
+                                                                    }
+                                                                    Box(
+                                                                        modifier = Modifier
+                                                                            .size(68.dp)
+                                                                            .clip(CircleShape)
+                                                                            .background(DsmusicTheme.colorScheme.primary.copy(alpha = 0.13f)),
+                                                                        contentAlignment = Alignment.Center
+                                                                    ) {
+                                                                        Icon(
+                                                                            Icons.Rounded.Search,
+                                                                            contentDescription = null,
+                                                                            tint = DsmusicTheme.colorScheme.primary,
+                                                                            modifier = Modifier.size(34.dp)
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+
+                                                        if (homeMoods.isNotEmpty()) {
+                                                            item(key = "search-moods-heading") {
+                                                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                                    Text(
+                                                                        "Explore by mood",
+                                                                        style = DsmusicTheme.typography.titleMedium,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        color = DsmusicTheme.colorScheme.onSurface
+                                                                    )
+                                                                    Text(
+                                                                        "Pick a feeling and find its soundtrack.",
+                                                                        style = DsmusicTheme.typography.bodySmall,
+                                                                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                                                    )
+                                                                }
+                                                            }
+                                                            item(key = "search-moods") {
+                                                                LazyRow(
+                                                                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                                                                    contentPadding = PaddingValues(end = 4.dp)
+                                                                ) {
+                                                                    items(homeMoods, key = { "search-mood:$it" }) { mood ->
+                                                                        val selected = currentMood == mood
+                                                                        DsmusicFilterChip(
+                                                                            selected = selected,
+                                                                            onClick = { onMoodClick(if (selected) null else mood) },
+                                                                            shape = CircleShape,
+                                                                            label = {
+                                                                                Text(
+                                                                                    mood,
+                                                                                    style = DsmusicTheme.typography.labelMedium,
+                                                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                                                                )
+                                                                            }
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+
+                                                        if (searchHistory.isNotEmpty()) {
+                                                            item(key = "search-recent-heading") {
+                                                                Row(
+                                                                    modifier = Modifier.fillMaxWidth(),
+                                                                    verticalAlignment = Alignment.CenterVertically
+                                                                ) {
+                                                                    Column(modifier = Modifier.weight(1f)) {
+                                                                        Text(
+                                                                            "Recent searches",
+                                                                            style = DsmusicTheme.typography.titleMedium,
+                                                                            fontWeight = FontWeight.Bold,
+                                                                            color = DsmusicTheme.colorScheme.onSurface
+                                                                        )
+                                                                        Text(
+                                                                            "Pick up where you left off.",
+                                                                            style = DsmusicTheme.typography.bodySmall,
+                                                                            color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                                                        )
+                                                                    }
+                                                                    DsmusicTextButton(onClick = onClearSearchHistory) {
+                                                                        Text("Clear all")
+                                                                    }
+                                                                }
+                                                            }
+                                                            itemsIndexed(
+                                                                searchHistory,
+                                                                key = { index, item -> "landing-history:$index:$item" }
+                                                            ) { index, historyItem ->
+                                                                Column {
+                                                                    Row(
+                                                                        modifier = Modifier
+                                                                            .fillMaxWidth()
+                                                                            .clip(RoundedCornerShape(12.dp))
+                                                                            .clickable { onHistoryItemClick(historyItem) }
+                                                                            .padding(horizontal = 4.dp, vertical = 8.dp),
+                                                                        verticalAlignment = Alignment.CenterVertically
+                                                                    ) {
+                                                                        Box(
+                                                                            modifier = Modifier
+                                                                                .size(36.dp)
+                                                                                .clip(CircleShape)
+                                                                                .background(DsmusicTheme.colorScheme.surfaceContainerHigh),
+                                                                            contentAlignment = Alignment.Center
+                                                                        ) {
+                                                                            Icon(
+                                                                                Icons.Rounded.History,
+                                                                                contentDescription = null,
+                                                                                tint = DsmusicTheme.colorScheme.primary,
+                                                                                modifier = Modifier.size(18.dp)
+                                                                            )
+                                                                        }
+                                                                        Spacer(Modifier.width(12.dp))
+                                                                        Text(
+                                                                            historyItem,
+                                                                            modifier = Modifier.weight(1f),
+                                                                            style = DsmusicTheme.typography.bodyMedium,
+                                                                            color = DsmusicTheme.colorScheme.onSurface,
+                                                                            maxLines = 1,
+                                                                            overflow = TextOverflow.Ellipsis
+                                                                        )
+                                                                        DsmusicIconButton(
+                                                                            onClick = { onRemoveFromSearchHistory(historyItem) },
+                                                                            modifier = Modifier.size(36.dp)
+                                                                        ) {
+                                                                            Icon(
+                                                                                Icons.Rounded.Close,
+                                                                                contentDescription = "Remove search",
+                                                                                tint = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                                                                modifier = Modifier.size(17.dp)
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                    if (index < searchHistory.lastIndex) {
+                                                                        Box(
+                                                                            Modifier
+                                                                                .fillMaxWidth()
+                                                                                .padding(start = 52.dp, end = 8.dp)
+                                                                                .height(0.7.dp)
+                                                                                .background(DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.24f))
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+
+                                                        if (userProfile != null && recentAccountHistory.isNotEmpty()) {
+                                                            item(key = "search-played-heading") {
+                                                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                                    Text(
+                                                                        "Recently played",
+                                                                        style = DsmusicTheme.typography.titleMedium,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        color = DsmusicTheme.colorScheme.onSurface
+                                                                    )
+                                                                    Text(
+                                                                        "Jump straight back into your music.",
+                                                                        style = DsmusicTheme.typography.bodySmall,
+                                                                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                                                    )
+                                                                }
+                                                            }
+                                                            itemsIndexed(
+                                                                recentAccountHistory,
+                                                                key = { index, _ -> "search-played:$index" }
+                                                            ) { index, song ->
+                                                                Column {
+                                                                    Row(
+                                                                        modifier = Modifier
+                                                                            .fillMaxWidth()
+                                                                            .clip(RoundedCornerShape(12.dp))
+                                                                            .clickable {
+                                                                                onAccountHistorySongClick(song, recentAccountHistory, index)
+                                                                            }
+                                                                            .padding(vertical = 7.dp, horizontal = 4.dp),
+                                                                        verticalAlignment = Alignment.CenterVertically
+                                                                    ) {
+                                                                        AsyncImage(
+                                                                            model = rememberExploreImageRequest(song.thumbnailUrl, 144),
+                                                                            contentDescription = null,
+                                                                            modifier = Modifier
+                                                                                .size(48.dp)
+                                                                                .clip(RoundedCornerShape(11.dp)),
+                                                                            contentScale = ContentScale.Crop
+                                                                        )
+                                                                        Spacer(Modifier.width(12.dp))
+                                                                        Column(modifier = Modifier.weight(1f)) {
+                                                                            Text(
+                                                                                song.title,
+                                                                                style = DsmusicTheme.typography.bodyMedium,
+                                                                                fontWeight = FontWeight.SemiBold,
+                                                                                color = DsmusicTheme.colorScheme.onSurface,
+                                                                                maxLines = 1,
+                                                                                overflow = TextOverflow.Ellipsis
+                                                                            )
+                                                                            Text(
+                                                                                song.artist,
+                                                                                style = DsmusicTheme.typography.bodySmall,
+                                                                                color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                                                                maxLines = 1,
+                                                                                overflow = TextOverflow.Ellipsis
+                                                                            )
+                                                                        }
+                                                                        Icon(
+                                                                            Icons.Rounded.MusicNote,
+                                                                            contentDescription = "Play",
+                                                                            tint = DsmusicTheme.colorScheme.primary,
+                                                                            modifier = Modifier.padding(horizontal = 8.dp).size(19.dp)
+                                                                        )
+                                                                    }
+                                                                    if (index < recentAccountHistory.lastIndex) {
+                                                                        Box(
+                                                                            Modifier
+                                                                                .fillMaxWidth()
+                                                                                .padding(start = 64.dp, end = 8.dp)
+                                                                                .height(0.7.dp)
+                                                                                .background(DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.24f))
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+
+                                                        if (homeMoods.isEmpty() && searchHistory.isEmpty() && recentAccountHistory.isEmpty()) {
+                                                            item(key = "search-empty-start") {
+                                                                Column(
+                                                                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                                                ) {
+                                                                    Icon(
+                                                                        Icons.Rounded.MusicNote,
+                                                                        contentDescription = null,
+                                                                        tint = DsmusicTheme.colorScheme.primary,
+                                                                        modifier = Modifier.size(30.dp)
+                                                                    )
+                                                                    Text(
+                                                                        "A world of music awaits.",
+                                                                        style = DsmusicTheme.typography.titleMedium,
+                                                                        fontWeight = FontWeight.SemiBold
+                                                                    )
+                                                                    Text(
+                                                                        "Tap the search field above to get started.",
+                                                                        style = DsmusicTheme.typography.bodySmall,
+                                                                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
                                                 isSearching && searchResults.isEmpty() && searchTopResult == null -> {
                                                     Box(
                                                         modifier = Modifier.fillMaxSize(),
