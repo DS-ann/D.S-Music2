@@ -1345,39 +1345,19 @@ fun PlayerBottomSheetCompose(
             miniPlayerHeight = miniPlayerHeight
         )
 
-        // Dynamic Shape instantiation
-        val playerShadowShape = remember(sheetVisualState.overallSheetTopCornerRadiusProvider, sheetVisualState.playerContentActualBottomRadiusProvider, sheetVisualState.playerContentAreaHeightPxProvider) {
-            PlayerSheetDynamicShape(
-                topRadiusProvider = sheetVisualState.overallSheetTopCornerRadiusProvider,
-                bottomRadiusProvider = sheetVisualState.playerContentActualBottomRadiusProvider,
-                virtualHeightProvider = sheetVisualState.playerContentAreaHeightPxProvider
-            )
+        // The mini card keeps its own shape while the full player supplies its
+        // own fullscreen background. Neither background needs a moving morph layer.
+        val miniPlayerShape: Shape = when (miniPlayerStyle) {
+            "Flat" -> RoundedCornerShape(0.dp)
+            "Compact" -> RoundedCornerShape(18.dp)
+            "Pill" -> CircleShape
+            else -> RoundedCornerShape(22.dp)
         }
-        val playerShellShape: Shape = if (currentSheetContentState == PlayerSheetState.COLLAPSED) {
-            when (miniPlayerStyle) {
-                "Flat" -> RoundedCornerShape(0.dp)
-                "Compact" -> RoundedCornerShape(18.dp)
-                "Pill" -> CircleShape
-                // Card is a distinct floating rounded rectangle, not the dynamic capsule.
-                else -> RoundedCornerShape(22.dp)
-            }
-        } else playerShadowShape
-        val playerShellElevation = if (
-            currentSheetContentState == PlayerSheetState.COLLAPSED &&
-            miniPlayerStyle != "Card"
-        ) 0.dp else if (currentSheetContentState == PlayerSheetState.COLLAPSED) 6.dp else 0.dp
+        val miniPlayerElevation = if (miniPlayerStyle == "Card") 6.dp else 0.dp
 
-        // In landscape, keep the collapsed mini-player at half the usable tab width.
-        // Center it in the content area (to the right of the navigation rail), then
-        // expand it back to the full tab width with the full-player transition.
-        val playerShellWidthFraction by animateFloatAsState(
-            targetValue = if (
-                isLandscapeWindow &&
-                currentSheetContentState == PlayerSheetState.COLLAPSED
-            ) 0.5f else 1f,
-            animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
-            label = "LandscapeMiniPlayerWidth"
-        )
+        // The mini card has its own width. It does not animate horizontally during
+        // the opacity transition.
+        val miniPlayerWidthFraction = if (isLandscapeWindow) 0.5f else 1f
 
         val velocityTracker = remember { VelocityTracker() }
         
@@ -1420,9 +1400,9 @@ fun PlayerBottomSheetCompose(
             DsmusicSurface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .fillMaxWidth(playerShellWidthFraction)
-                    // Apply per-frame movement in the draw layer rather than triggering
-                    // a fresh parent placement pass for every animation frame.
+                    .fillMaxWidth()
+                    // Parent movement is retained for direct drag gestures. During the
+                    // open/close fade the two visual layers counter-translate to stay put.
                     .graphicsLayer {
                         translationY = sheetVisualState.visualSheetTranslationYProvider()
                     }
@@ -1445,11 +1425,16 @@ fun PlayerBottomSheetCompose(
                                 .fillMaxWidth()
                                 // Phase-Optimized Layout measuring (Zero-Recomposition)
                                 .layout { measurable, constraints ->
-                                    val targetHeightPx = sheetVisualState.playerContentAreaHeightPxProvider().toInt()
-                                    val startPaddingPx = sheetVisualState.currentHorizontalPaddingStartPxProvider().toInt()
-                                    val endPaddingPx = sheetVisualState.currentHorizontalPaddingEndPxProvider().toInt()
-                                    val innerWidth = (constraints.maxWidth - startPaddingPx - endPaddingPx)
-                                    
+                                    // Measure only at the two settled endpoints. The previous
+                                    // fraction-based height/padding interpolation forced a new
+                                    // measure on every transition frame.
+                                    val expanded = currentSheetContentState == PlayerSheetState.EXPANDED
+                                    val targetHeightPx = with(density) {
+                                        (if (expanded) containerHeight else miniPlayerHeight).roundToPx()
+                                    }
+                                    val sidePaddingPx = if (expanded) 0 else with(density) { 12.dp.roundToPx() }
+                                    val innerWidth = (constraints.maxWidth - sidePaddingPx * 2).coerceAtLeast(0)
+
                                     val placeable = measurable.measure(
                                         constraints.copy(
                                             minWidth = innerWidth,
@@ -1459,7 +1444,7 @@ fun PlayerBottomSheetCompose(
                                         )
                                     )
                                     layout(constraints.maxWidth, targetHeightPx) {
-                                        placeable.placeRelative(startPaddingPx, 0)
+                                        placeable.placeRelative(sidePaddingPx, 0)
                                     }
                                 }
                                 .then(
@@ -1498,14 +1483,6 @@ fun PlayerBottomSheetCompose(
                                     translationX = offsetAnimatable.value
                                     transformOrigin = TransformOrigin(0.5f, 1f)
                                 }
-                                .shadow(
-                                    elevation = playerShellElevation,
-                                    shape = playerShellShape
-                                )
-                                .background(
-                                    color = dynamicBgColor,
-                                    shape = playerShellShape
-                                )
                                 .playerSheetVerticalDragGesture(
                                     enabled = currentSheetContentState == PlayerSheetState.COLLAPSED &&
                                         !isLyricsModeEnabled && !isQueueExpanded,
@@ -1544,7 +1521,13 @@ fun PlayerBottomSheetCompose(
                                 onCollapse = { collapsePlayerFully() },
                                 onExpand = { currentSheetContentState = PlayerSheetState.EXPANDED },
                                 dragModifier = verticalDragModifier,
-                                miniPlayerHeight = miniPlayerHeight
+                                miniPlayerHeight = miniPlayerHeight,
+                                currentSheetTranslationY = currentSheetTranslationY,
+                                collapsedSheetOffsetY = sheetCollapsedTargetYState.value,
+                                miniPlayerWidthFraction = miniPlayerWidthFraction,
+                                miniPlayerBackgroundColor = dynamicBgColor,
+                                miniPlayerShape = miniPlayerShape,
+                                miniPlayerElevation = miniPlayerElevation
                             )
                         }
                     }
