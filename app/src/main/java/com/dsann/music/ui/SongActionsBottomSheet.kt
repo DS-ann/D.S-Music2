@@ -488,6 +488,7 @@ fun DestructiveActionRow(
             Spacer(Modifier.width(8.dp))
             Text("Delete", style = DsmusicTheme.typography.labelLarge, fontFamily = GoogleSansFlex, color = DsmusicTheme.colorScheme.onErrorContainer)
         }
+        }
     }
 }
 
