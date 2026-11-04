@@ -135,6 +135,7 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
 
     private var song: SongItem? = null
     private var actionListener: ActionListener? = null
+    private var showAddToQueue: Boolean = true
 
     interface ActionListener {
         fun onPlayNext(song: SongItem)
@@ -148,10 +149,14 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
 
     companion object {
         @JvmStatic
-        fun newInstance(song: SongItem): SongActionsBottomSheet {
+        fun newInstance(
+            song: SongItem,
+            showAddToQueue: Boolean = true
+        ): SongActionsBottomSheet {
             val fragment = SongActionsBottomSheet()
             val args = Bundle()
             args.putSerializable("song", song)
+            args.putBoolean("showAddToQueue", showAddToQueue)
             fragment.arguments = args
             return fragment
         }
@@ -166,6 +171,7 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         song = arguments?.getSerializable("song") as? SongItem
+        showAddToQueue = arguments?.getBoolean("showAddToQueue", true) ?: true
         viewModel = ViewModelProvider(requireActivity())[PlayerSharedViewModel::class.java]
     }
 
@@ -182,6 +188,7 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
                         song = song,
                         actionListener = actionListener,
                         viewModel = viewModel,
+                        showAddToQueue = showAddToQueue,
                         onDismiss = { dismiss() }
                     )
                 }
@@ -198,6 +205,7 @@ fun BottomSheetScaffoldContent(
     song: SongItem?,
     actionListener: SongActionsBottomSheet.ActionListener?,
     viewModel: PlayerSharedViewModel,
+    showAddToQueue: Boolean = true,
     onDismiss: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(BottomSheetTab.OPTIONS) }
@@ -303,7 +311,7 @@ fun BottomSheetScaffoldContent(
                         label = "TabTransition"
                     ) { tab ->
                         if (tab == BottomSheetTab.OPTIONS) {
-                            OptionsContent(song, isFavorite, { isFavorite = it }, actionListener, onAddToPlaylist = { showAddToPlaylistDialog = true }, onDismiss)
+                            OptionsContent(song, isFavorite, { isFavorite = it }, actionListener, onAddToPlaylist = { showAddToPlaylistDialog = true }, showAddToQueue = showAddToQueue, onDismiss)
                         } else {
                             InfoContent(song)
                         }
@@ -357,7 +365,7 @@ fun BottomSheetScaffoldContent(
                             label = "TabTransition"
                         ) { tab ->
                             if (tab == BottomSheetTab.OPTIONS) {
-                                OptionsContent(song, isFavorite, { isFavorite = it }, actionListener, onAddToPlaylist = { showAddToPlaylistDialog = true }, onDismiss)
+                                OptionsContent(song, isFavorite, { isFavorite = it }, actionListener, onAddToPlaylist = { showAddToPlaylistDialog = true }, showAddToQueue = showAddToQueue, onDismiss)
                             } else {
                                 InfoContent(song)
                             }
@@ -376,6 +384,7 @@ fun OptionsContent(
     onFavoriteChange: (Boolean) -> Unit,
     actionListener: SongActionsBottomSheet.ActionListener?,
     onAddToPlaylist: () -> Unit,
+    showAddToQueue: Boolean = true,
     onDismiss: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -383,7 +392,7 @@ fun OptionsContent(
         ActionButtonRow1(song, isFavorite, onFavoriteChange, actionListener, onDismiss)
         
         // Secondary Actions (Queue, Next)
-        ActionButtonRow2(song, actionListener, onDismiss)
+        ActionButtonRow2(song, actionListener, onDismiss, showAddToQueue = showAddToQueue)
         
         // Danger Zone / Playlist
         DestructiveActionRow(song, actionListener, onAddToPlaylist, onDismiss)
@@ -806,57 +815,60 @@ fun ActionButtonRow1(
 fun ActionButtonRow2(
     song: SongItem?,
     actionListener: SongActionsBottomSheet.ActionListener?,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    showAddToQueue: Boolean = true
 ) {
     val context = LocalContext.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        val queueInteraction = remember { MutableInteractionSource() }
-        val queuePressed by queueInteraction.collectIsPressedAsState()
-        val queueWeight by animateFloatAsState(
-            targetValue = if (queuePressed) 1.4f else 1f,
-            animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f)
-        )
-        ToggleButton(
-            checked = queuePressed,
-            onCheckedChange = {
-                song?.let { actionListener?.onAddToQueue(it) }
-                onDismiss()
-            },
-            interactionSource = queueInteraction,
-            modifier = Modifier
-                .weight(queueWeight)
-                .height(72.dp)
-                .zIndex(if (queuePressed) 1f else 0f),
-            shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-            colors = ToggleButtonDefaults.toggleButtonColors(
-                containerColor = DsmusicTheme.colorScheme.secondaryContainer,
-                contentColor = DsmusicTheme.colorScheme.onSecondaryContainer,
-                checkedContainerColor = DsmusicTheme.colorScheme.secondary,
-                checkedContentColor = DsmusicTheme.colorScheme.onSecondary
-            ),
-            contentPadding = PaddingValues(0.dp)
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+        if (showAddToQueue) {
+            val queueInteraction = remember { MutableInteractionSource() }
+            val queuePressed by queueInteraction.collectIsPressedAsState()
+            val queueWeight by animateFloatAsState(
+                targetValue = if (queuePressed) 1.4f else 1f,
+                animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f)
+            )
+            ToggleButton(
+                checked = queuePressed,
+                onCheckedChange = {
+                    song?.let { actionListener?.onAddToQueue(it) }
+                    onDismiss()
+                },
+                interactionSource = queueInteraction,
+                modifier = Modifier
+                    .weight(queueWeight)
+                    .height(72.dp)
+                    .zIndex(if (queuePressed) 1f else 0f),
+                shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
+                colors = ToggleButtonDefaults.toggleButtonColors(
+                    containerColor = DsmusicTheme.colorScheme.secondaryContainer,
+                    contentColor = DsmusicTheme.colorScheme.onSecondaryContainer,
+                    checkedContainerColor = DsmusicTheme.colorScheme.secondary,
+                    checkedContentColor = DsmusicTheme.colorScheme.onSecondary
+                ),
+                contentPadding = PaddingValues(0.dp)
             ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_queue_music),
-                    contentDescription = null,
-                    tint = DsmusicTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Queue",
-                    color = DsmusicTheme.colorScheme.onSecondaryContainer,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = GoogleSansFlex
-                )
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_queue_music),
+                        contentDescription = null,
+                        tint = DsmusicTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Queue",
+                        color = DsmusicTheme.colorScheme.onSecondaryContainer,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = GoogleSansFlex
+                    )
+                }
             }
         }
 
