@@ -386,22 +386,9 @@ class MainActivity : AppCompatActivity() {
                     // negative animated inset into Compose's non-negative padding modifier.
                     val railInset = railInsetState.value.coerceAtLeast(0.dp)
 
-                    // Read the high-frequency expansion state during measurement rather than
-                    // composition. This keeps each animation frame from recomposing the entire
-                    // root navigation tree and all retained tab hosts.
-                    // Only the navigation rail needs the per-frame expansion value.
-                    // Subscribe while the rail is present; phone tabs must not recompose
-                    // for every player-sheet animation frame.
-                    val playerExpansionFractionState = remember { mutableStateOf(0f) }
-                    LaunchedEffect(useNavigationRail) {
-                        if (useNavigationRail) {
-                            playerViewModel.playerExpansionFraction.collect { fraction ->
-                                playerExpansionFractionState.value = fraction
-                            }
-                        } else {
-                            playerExpansionFractionState.value = 0f
-                        }
-                    }
+                    // The full player covers the navigation rail after expansion. Use a
+                    // single state change instead of measuring the entire retained NavHost
+                    // on every animation frame; the sheet itself owns the smooth transition.
 
                     // Base padding target not considering expansion
                     val baseTargetPadding = if (!useNavigationRail && showBottomBar) {
@@ -696,14 +683,12 @@ class MainActivity : AppCompatActivity() {
                             viewModel = playerViewModel,
                             bottomNavigationVisible = showBottomBar && !useNavigationRail,
                             modifier = Modifier.layout { measurable, constraints ->
-                                // Phone layouts have no navigation rail, so their player sheet
-                                // must not subscribe to the 60 Hz expansion value or remeasure every frame.
-                                val startInsetPx = if (useNavigationRail && railInset > 0.dp) {
-                                    val expansion = playerExpansionFractionState.value.coerceIn(0f, 1f)
-                                    (railInset.toPx() * (1f - expansion)).roundToInt().coerceAtLeast(0)
-                                } else {
-                                    0
-                                }
+                                // Keep the rail inset stable during the sheet animation.
+                                // The full player overlays it, so only one discrete remeasure is
+                                // needed when the player enters or leaves its expanded state.
+                                val startInsetPx = if (
+                                    useNavigationRail && railInset > 0.dp && !isPlayerExpanded
+                                ) railInset.roundToPx().coerceAtLeast(0) else 0
                                 val childMaxWidth = (constraints.maxWidth - startInsetPx).coerceAtLeast(0)
                                 val childMinWidth = (constraints.minWidth - startInsetPx)
                                     .coerceAtLeast(0)
