@@ -240,6 +240,60 @@ fun LibraryScreen(
         fragmentActivity?.let { ViewModelProvider(it)[ExploreViewModel::class.java] }
     }
 
+    // Library's local tabs are pages too: swap them only at zero opacity so the
+    // outgoing and incoming LazyColumn/grid trees are never animated together.
+    var renderedLibraryTab by remember { mutableStateOf(activeTab) }
+    val libraryTabOpacity = remember {
+        androidx.compose.animation.core.Animatable(1f)
+    }
+    LaunchedEffect(activeTab) {
+        if (renderedLibraryTab != activeTab) {
+            libraryTabOpacity.animateTo(
+                targetValue = 0f,
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 140,
+                    easing = androidx.compose.animation.core.LinearEasing
+                )
+            )
+            renderedLibraryTab = activeTab
+            libraryTabOpacity.snapTo(0f)
+            libraryTabOpacity.animateTo(
+                targetValue = 1f,
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 140,
+                    easing = androidx.compose.animation.core.LinearEasing
+                )
+            )
+        }
+    }
+
+    val libraryOverlayVisible =
+        (showAccountScreen && accountViewModel != null) || showHistoryScreen
+    val libraryBaseOpacity = remember {
+        androidx.compose.animation.core.Animatable(1f)
+    }
+    LaunchedEffect(libraryOverlayVisible) {
+        if (libraryOverlayVisible) {
+            libraryBaseOpacity.animateTo(
+                targetValue = 0f,
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 140,
+                    easing = androidx.compose.animation.core.LinearEasing
+                )
+            )
+        } else if (libraryBaseOpacity.value < 1f) {
+            // Let the overlay finish fading out before revealing the Library page.
+            kotlinx.coroutines.delay(140L)
+            libraryBaseOpacity.animateTo(
+                targetValue = 1f,
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 140,
+                    easing = androidx.compose.animation.core.LinearEasing
+                )
+            )
+        }
+    }
+
     val history by accountViewModel?.history?.collectAsStateWithLifecycle(emptyList()) ?: remember { mutableStateOf(emptyList()) }
     val currentOnlineSong by exploreViewModel?.currentOnlineSong?.collectAsStateWithLifecycle(null) ?: remember { mutableStateOf(null) }
     val isLoadingStream by exploreViewModel?.isLoadingStream?.collectAsStateWithLifecycle(false) ?: remember { mutableStateOf(false) }
@@ -531,8 +585,12 @@ fun LibraryScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .nestedScroll(nestedScrollConnection)
+                    .graphicsLayer {
+                        alpha = (libraryTabOpacity.value * libraryBaseOpacity.value)
+                            .coerceIn(0f, 1f)
+                    }
             ) {
-                when (activeTab) {
+                when (renderedLibraryTab) {
                     "Playlists" -> PlaylistsTabContent(
                         nestedScrollConnection,
                         viewModel,
@@ -1031,8 +1089,19 @@ fun LibraryScreen(
         // Overlay AccountScreen
         AnimatedVisibility(
             visible = showAccountScreen && accountViewModel != null,
-            enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
-            exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
+            enter = fadeIn(
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 140,
+                    delayMillis = 140,
+                    easing = androidx.compose.animation.core.LinearEasing
+                )
+            ),
+            exit = fadeOut(
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 140,
+                    easing = androidx.compose.animation.core.LinearEasing
+                )
+            ),
             modifier = Modifier.fillMaxSize()
         ) {
             if (accountViewModel != null) {
@@ -1053,8 +1122,19 @@ fun LibraryScreen(
         // Overlay HistoryScreen
         AnimatedVisibility(
             visible = showHistoryScreen,
-            enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
-            exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
+            enter = fadeIn(
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 140,
+                    delayMillis = 140,
+                    easing = androidx.compose.animation.core.LinearEasing
+                )
+            ),
+            exit = fadeOut(
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 140,
+                    easing = androidx.compose.animation.core.LinearEasing
+                )
+            ),
             modifier = Modifier.fillMaxSize()
         ) {
             HistoryScreen(
