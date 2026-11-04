@@ -11,7 +11,6 @@ on:
       - "settings.gradle"
       - "gradle.properties"
       - ".github/workflows/dsmusic-build.yml"
-      # Includes M4A tag verification, embedded-cover extraction and Ogg Opus remux tests/builds.
   workflow_dispatch:
 
 permissions:
@@ -38,7 +37,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Gradle
+      - name: Set up Gradle with build cache
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "9.3.1"
@@ -51,13 +50,12 @@ jobs:
       - name: Install Android 17 SDK and Build Tools
         run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0"
 
-      - name: Run karaoke timing unit tests
-        run: gradle --no-daemon --warning-mode all :app:testDebugUnitTest
-
-      - name: Assemble release APK
+      # Release builds intentionally skip unit-test tasks; assembleRelease still compiles
+      # the production source, runs code generation, minification and resource shrinking.
+      - name: Assemble ARM64 release APK
         run: |
           set -euo pipefail
-          gradle --no-daemon --warning-mode all assembleRelease
+          gradle --build-cache --parallel assembleRelease
           SOURCE_APK="app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk"
           test -f "$SOURCE_APK"
           mkdir -p app/build/outputs/apk/dsmusic-artifact

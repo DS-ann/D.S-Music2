@@ -9,7 +9,8 @@ on:
         type: string
         default: master
   push:
-    branches: [ master, 'fix/download-metadata-cache-playback', dsmusic ]
+    # dsmusic has its own APK workflow to prevent duplicate release builds.
+    branches: [ master, 'fix/download-metadata-cache-playback' ]
     paths:
       - 'app/**'
       - 'gradle/**'
@@ -66,7 +67,7 @@ jobs:
         run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0"
 
       - name: Compile ARM64-v8a release APK
-        run: gradle --no-daemon --warning-mode all assembleRelease
+        run: gradle --build-cache --parallel assembleRelease
 
       - name: Sign with shared D.S-Apps release key and highly compress APK
         env:
@@ -94,9 +95,6 @@ jobs:
           OUTPUT_ZIP="$BUILD_DIR/dsmusic.zip"
           ZIPALIGN="$ANDROID_HOME/build-tools/37.0.0/zipalign"
           APK_SIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
-
-          printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
-          chmod 600 "$KEYSTORE"
 
           "$ZIPALIGN" -f -p 4 "$SOURCE_APK" "$ALIGNED_APK"
           "$APK_SIGNER" sign \
