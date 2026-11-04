@@ -1825,7 +1825,16 @@ fun OnlineSongBottomSheet(
     val favoritesManager = remember { FavoritesManager(context) }
     var isFavorite by remember(song.videoId) { mutableStateOf(favoritesManager.isFavorite(song.videoId.hashCode().toLong())) }
 
-    val onlineSongItem = remember(song.videoId) {
+    val onlineSongItem = remember(
+        song.videoId,
+        song.title,
+        song.artist,
+        song.durationMs,
+        song.thumbnailUrl,
+        song.albumName,
+        song.artistId,
+        song.artistRefs
+    ) {
         SongItem.createOnlineSong(
             song.videoId,
             song.title,
@@ -1834,6 +1843,7 @@ fun OnlineSongBottomSheet(
             song.durationMs,
             song.thumbnailUrl,
             song.artistId,
+            albumName = song.albumName,
             artistRefs = song.artistRefs
         )
     }

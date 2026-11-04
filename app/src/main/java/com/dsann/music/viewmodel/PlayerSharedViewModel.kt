@@ -1082,6 +1082,7 @@ class PlayerSharedViewModel @Inject constructor(
                 _likesCount.value = "Like"
                 _isCurrentSongDisliked.value = false
                 if (song != null) {
+                    SongDownloader.refreshDownloadedStatus(appContext, song)
                     // Load embedded artwork bytes for legacy notification/artwork references
                     val embedded = withContext(Dispatchers.IO) { song.getEmbeddedPicture(appContext) }
                     _currentSongArtwork.value = embedded
@@ -1104,8 +1105,9 @@ class PlayerSharedViewModel @Inject constructor(
         bgScope.launch(Dispatchers.Default) {
             combine(
                 currentSong,
-                SongDownloader.downloadProgress
-            ) { song, progressMap ->
+                SongDownloader.downloadProgress,
+                SongDownloader.downloadedVideoIds
+            ) { song, progressMap, downloadedIds ->
                 if (song == null) {
                     false to null
                 } else {
@@ -1117,7 +1119,10 @@ class PlayerSharedViewModel @Inject constructor(
                         if (progress != null) {
                             false to progress
                         } else {
-                            val downloaded = SongDownloader.isSongDownloaded(appContext, song)
+                            val downloaded = videoId in downloadedIds ||
+                                withContext(Dispatchers.IO) {
+                                    SongDownloader.isSongDownloaded(appContext, song)
+                                }
                             downloaded to null
                         }
                     }

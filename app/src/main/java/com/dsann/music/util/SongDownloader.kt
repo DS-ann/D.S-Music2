@@ -26,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.BufferedOutputStream
@@ -56,6 +57,10 @@ object SongDownloader {
 
     private val _activeDownloadIds = MutableStateFlow<Set<String>>(emptySet())
     val activeDownloadIds: StateFlow<Set<String>> = _activeDownloadIds.asStateFlow()
+
+    // Shared completed state keeps every download control consistent across screens.
+    private val _downloadedVideoIds = MutableStateFlow<Set<String>>(emptySet())
+    val downloadedVideoIds: StateFlow<Set<String>> = _downloadedVideoIds.asStateFlow()
 
     fun cleanTitle(title: String): String {
         var clean = title
@@ -127,6 +132,24 @@ object SongDownloader {
 
     fun isDownloading(videoId: String?): Boolean =
         !videoId.isNullOrBlank() && activeDownloads.containsKey(videoId)
+    /** Refresh persisted download state off the main thread, including deleted-file results. */
+    fun refreshDownloadedStatus(context: Context, song: SongItem) {
+        refreshDownloadedStatuses(context, listOf(song))
+    }
+
+    fun refreshDownloadedStatuses(context: Context, songs: List<SongItem>) {
+        val candidates = songs.filter { !it.videoId.isNullOrBlank() }.distinctBy { it.videoId }
+        if (candidates.isEmpty()) return
+        scope.launch(Dispatchers.IO) {
+            candidates.forEach { song ->
+                val videoId = song.videoId ?: return@forEach
+                val downloaded = isSongDownloaded(context.applicationContext, song)
+                _downloadedVideoIds.update { current ->
+                    if (downloaded) current + videoId else current - videoId
+                }
+            }
+        }
+    }
 
     private const val PREF_DOWNLOADED_TRACK_URIS = "spatialflow_downloaded_track_uris"
 
@@ -358,6 +381,7 @@ object SongDownloader {
             // Do not let a stale player UI state launch a duplicate download. This check runs
             // inside the IO download job, never on the main thread.
             if (isSongDownloaded(context, song)) {
+                _downloadedVideoIds.update { it + videoId }
                 cancelNotification(context, notificationId)
                 withContext(Dispatchers.Main) {
                     com.dsann.music.ui.SnackbarController.showMessage(
@@ -471,53 +495,69 @@ object SongDownloader {
 
             var artworkBytes: ByteArray? = null
             if (cachedStream != null) {
-                // Cached downloads stay fully offline; only use artwork already saved locally.
+                // Reuse artwork captured with cached playback when available.
                 val cachedArtwork = AudioPlaybackService.getCachedMediaArtworkFile(context, song.id.toString())
                 if (cachedArtwork.isFile && cachedArtwork.length() > 0L) {
                     artworkBytes = runCatching { cachedArtwork.readBytes() }.getOrNull()
                 }
-            } else {
-                val thumbnailUrl = song.thumbnailUrl
-                if (!thumbnailUrl.isNullOrEmpty()) {
-                    try {
-                        val future = Glide.with(context)
-                            .asBitmap()
-                            .load(thumbnailUrl)
-                            .submit()
-                        val originalBitmap = future.get()
-                        if (originalBitmap != null) {
-                            val size = originalBitmap.width.coerceAtMost(originalBitmap.height)
-                            val x = (originalBitmap.width - size) / 2
-                            val y = (originalBitmap.height - size) / 2
-                            val croppedBitmap = Bitmap.createBitmap(originalBitmap, x, y, size, size)
-                            val stream = ByteArrayOutputStream()
-                            croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)
-                            artworkBytes = stream.toByteArray()
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to fetch and crop thumbnail", e)
+            }
+
+            // Older cached sessions and some queue entries have no local artwork file or
+            // thumbnail attached. Resolve a metadata-only thumbnail as a fallback.
+            val artworkUrl = song.thumbnailUrl?.takeIf { it.isNotBlank() } ?: runCatching {
+                com.dsann.music.data.innertube.YouTubeMusic
+                    .player(videoId, metadataOnly = true)
+                    .getOrNull()
+                    ?.thumbnailUrl
+                    ?.takeIf { it.isNotBlank() }
+            }.getOrNull()
+
+            if (artworkBytes.isNullOrEmpty() && !artworkUrl.isNullOrBlank()) {
+                try {
+                    val future = Glide.with(context)
+                        .asBitmap()
+                        .load(artworkUrl)
+                        .submit()
+                    val originalBitmap = future.get()
+                    if (originalBitmap != null) {
+                        val size = originalBitmap.width.coerceAtMost(originalBitmap.height)
+                        val x = (originalBitmap.width - size) / 2
+                        val y = (originalBitmap.height - size) / 2
+                        val croppedBitmap = Bitmap.createBitmap(originalBitmap, x, y, size, size)
+                        val stream = ByteArrayOutputStream()
+                        croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)
+                        artworkBytes = stream.toByteArray()
                     }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to fetch and crop thumbnail", e)
                 }
             }
 
             coroutineContext.ensureActive()
 
+            // Keep the exact source metadata in tags and MediaStore. Filename cleaning is
+            // only for filesystem safety and must not rewrite the displayed song information.
+            val metadataTitle = song.title.trim().ifBlank { cleanTitleStr }
+            val metadataArtist = song.artist.trim().ifBlank { cleanArtistStr }
+            val metadataAlbum = song.albumName?.trim()?.takeIf { it.isNotEmpty() }
+
             val metadataEmbedded = embedMetadataSafely(
                 outputFile = outputFile,
-                title = cleanTitleStr,
-                artist = cleanArtistStr,
-                album = song.albumName,
+                title = metadataTitle,
+                artist = metadataArtist,
+                album = metadataAlbum,
                 videoId = videoId,
                 fromCache = cachedStream != null,
                 artworkBytes = artworkBytes
             )
 
             coroutineContext.ensureActive()
-            if (!AudioFileManager.scanFile(context, outputFile, cleanTitleStr, cleanArtistStr, song.albumName)) {
+            if (!AudioFileManager.scanFile(context, outputFile, metadataTitle, metadataArtist, metadataAlbum)) {
                 throw IOException("Could not publish the downloaded audio to the music library")
             }
             rememberDownloadedSong(context, videoId, outputFile)
-            showFinishedNotification(context, cleanTitleStr, cleanArtistStr, notificationId)
+            _downloadedVideoIds.value = _downloadedVideoIds.value + videoId
+            showFinishedNotification(context, metadataTitle, metadataArtist, notificationId)
             _downloadProgress.value += (videoId to 100)
 
             withContext(Dispatchers.Main) {
@@ -685,7 +725,7 @@ object SongDownloader {
     ): Boolean {
         val extension = outputFile.extension
         if (extension.equals("webm", ignoreCase = true)) {
-            return embedWebmMetadataSafely(outputFile, title, artist, album, videoId, fromCache)
+            return embedWebmMetadataSafely(outputFile, title, artist, album, videoId, fromCache, artworkBytes)
         }
         val taggedFile = File(outputFile.parentFile, "${outputFile.nameWithoutExtension}.tagging.$extension")
         var backupFile: File? = null
@@ -814,7 +854,8 @@ object SongDownloader {
         artist: String,
         album: String?,
         videoId: String,
-        fromCache: Boolean
+        fromCache: Boolean,
+        artworkBytes: ByteArray?
     ): Boolean {
         val stagedFile = File(outputFile.parentFile, "${outputFile.nameWithoutExtension}.tagging.webm")
         var backupFile: File? = null
@@ -829,7 +870,10 @@ object SongDownloader {
                 "Downloaded from YouTube Music (video ID: $videoId)"
             }
             val tags = buildWebmMetadataTags(title, artist, album, sourceComment)
-            appendWebmMetadataTags(stagedFile, tags)
+            val coverAttachment = artworkBytes
+                ?.takeIf { it.isNotEmpty() }
+                ?.let(::buildWebmCoverAttachment)
+            appendWebmMetadataTags(stagedFile, tags, coverAttachment)
 
             backupFile = File(outputFile.parentFile, "${outputFile.name}.raw-backup")
             if (backupFile.exists() && !backupFile.delete()) {
@@ -888,6 +932,19 @@ object SongDownloader {
 
     private fun webmElement(id: ByteArray, payload: ByteArray): ByteArray =
         id + encodeWebmSize(payload.size.toLong()) + payload
+    /** Matroska cover art is stored as an AttachedFile child inside the Segment. */
+    private fun buildWebmCoverAttachment(artworkBytes: ByteArray): ByteArray {
+        val description = webmElement(byteArrayOf(0x46, 0x7E), "Front cover".toByteArray(Charsets.UTF_8))
+        val fileName = webmElement(byteArrayOf(0x46, 0x6E), "cover.jpg".toByteArray(Charsets.UTF_8))
+        val mimeType = webmElement(byteArrayOf(0x46, 0x60), "image/jpeg".toByteArray(Charsets.UTF_8))
+        val fileData = webmElement(byteArrayOf(0x46, 0x5C), artworkBytes)
+        val fileUid = webmElement(byteArrayOf(0x46, 0xAE.toByte()), byteArrayOf(1))
+        val attachedFile = webmElement(
+            byteArrayOf(0x61, 0xA7.toByte()),
+            description + fileName + mimeType + fileData + fileUid
+        )
+        return webmElement(byteArrayOf(0x19, 0x41, 0xA4.toByte(), 0x69), attachedFile)
+    }
 
     private fun encodeWebmSize(value: Long, fixedWidth: Int? = null): ByteArray {
         if (value < 0L) throw IOException("Invalid EBML element size")
@@ -907,7 +964,8 @@ object SongDownloader {
         return encoded
     }
 
-    private fun appendWebmMetadataTags(file: File, tags: ByteArray) {
+    private fun appendWebmMetadataTags(file: File, tags: ByteArray, coverAttachment: ByteArray?) {
+        val segmentChildren = if (coverAttachment.isNullOrEmpty()) tags else tags + coverAttachment
         java.io.RandomAccessFile(file, "rw").use { randomFile ->
             val fileLength = randomFile.length()
             if (fileLength < 8L) throw IOException("Downloaded WebM file is too small to tag")
@@ -950,7 +1008,7 @@ object SongDownloader {
             if (unknownSize) {
                 // Unknown-size Segments extend to EOF, so adding another Segment child is safe.
                 randomFile.seek(fileLength)
-                randomFile.write(tags)
+                randomFile.write(segmentChildren)
                 return
             }
 
@@ -959,11 +1017,11 @@ object SongDownloader {
             if (expectedEnd != fileLength) {
                 throw IOException("Unexpected trailing bytes after the WebM Segment")
             }
-            val newSize = encodeWebmSize(segmentSize + tags.size.toLong(), width)
+            val newSize = encodeWebmSize(segmentSize + segmentChildren.size.toLong(), width)
             randomFile.seek(sizeOffset)
             randomFile.write(newSize)
             randomFile.seek(fileLength)
-            randomFile.write(tags)
+            randomFile.write(segmentChildren)
         }
     }
 
@@ -1143,6 +1201,8 @@ object SongDownloader {
             .setSmallIcon(com.dsann.music.R.drawable.ic_music_note)
             .setContentTitle("Downloading Track")
             .setContentText("$title ($progress%)")
+            .setSubText("D.S Music · Cancel anytime")
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -1176,42 +1236,12 @@ object SongDownloader {
     }
 
     fun isSongDownloaded(context: Context, song: SongItem): Boolean {
-        if (song.videoId.isNullOrEmpty()) return true // Local songs are already available offline
-
-        val cleanTitleStr = cleanTitle(song.title)
-        val cleanArtistStr = cleanArtist(song.artist)
-        val extensions = listOf("m4a", "mp3", "webm", "ogg", "flac", "aac", "wav", "opus")
-        val cleanNames = extensions.map { extension ->
-            "$cleanTitleStr - $cleanArtistStr.$extension"
-                .replace(Regex("[^a-zA-Z0-9._\\s()\\[\\]-]"), "_")
-        }
-
-        // 1. Check both the current folder and the old folder on Android versions before scoped storage.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val appFolders = listOf("D.S Music", "SpatialFlow").map { File(downloads, it) }
-            if (cleanNames.any { name -> appFolders.any { folder -> File(folder, name).isFile } }) return true
-        }
-
-        // 2. Match every container the downloader can create. Previously only .mp3 was
-        // checked, so valid .m4a/.webm exports appeared undownloaded and the player state
-        // could stay stale or offer a duplicate download.
-        val projection = arrayOf(MediaStore.Audio.Media._ID)
-        for (cleanName in cleanNames) {
-            try {
-                context.contentResolver.query(
-                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                    projection,
-                    "${MediaStore.Audio.Media.DISPLAY_NAME} = ?",
-                    arrayOf(cleanName),
-                    null
-                )?.use { cursor ->
-                    if (cursor.moveToFirst()) return true
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error checking if song is downloaded as $cleanName", e)
-            }
-        }
-        return false
+        if (song.videoId.isNullOrBlank()) return true // Local songs are already available offline
+        return findDownloadedUri(
+            context.applicationContext,
+            song.videoId,
+            song.title,
+            song.artist
+        ) != null
     }
 }

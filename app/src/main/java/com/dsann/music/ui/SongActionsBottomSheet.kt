@@ -899,9 +899,15 @@ fun ActionButtonRow2(
     showAddToQueue: Boolean = true
 ) {
     val context = LocalContext.current
-    val isOnline = song?.videoId != null
+    val videoId = song?.videoId
+    val isOnline = !videoId.isNullOrBlank()
     val activeDownloadIds by com.dsann.music.util.SongDownloader.activeDownloadIds.collectAsStateWithLifecycle()
-    val isDownloading = song?.videoId?.let { it in activeDownloadIds } == true
+    val downloadedVideoIds by com.dsann.music.util.SongDownloader.downloadedVideoIds.collectAsStateWithLifecycle()
+    LaunchedEffect(videoId, song?.title, song?.artist) {
+        song?.let { com.dsann.music.util.SongDownloader.refreshDownloadedStatus(context, it) }
+    }
+    val isDownloading = videoId?.let { it in activeDownloadIds } == true
+    val isDownloaded = videoId?.let { it in downloadedVideoIds } == true
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -947,25 +953,27 @@ fun ActionButtonRow2(
             label = when {
                 !isOnline -> "Offline"
                 isDownloading -> "Cancel"
+                isDownloaded -> "Downloaded"
                 else -> "Download"
             },
             containerColor = when {
                 !isOnline -> DsmusicTheme.colorScheme.surfaceVariant
                 isDownloading -> DsmusicTheme.colorScheme.errorContainer
+                isDownloaded -> DsmusicTheme.colorScheme.secondaryContainer
                 else -> DsmusicTheme.colorScheme.primaryContainer
             },
             contentColor = when {
                 !isOnline -> DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
                 isDownloading -> DsmusicTheme.colorScheme.onErrorContainer
+                isDownloaded -> DsmusicTheme.colorScheme.onSecondaryContainer
                 else -> DsmusicTheme.colorScheme.onPrimaryContainer
             },
-            enabled = isOnline,
+            enabled = isOnline && (isDownloading || !isDownloaded),
             onClick = {
                 song?.let {
-                    if (isDownloading) {
-                        com.dsann.music.util.SongDownloader.cancelDownload(context, it)
-                    } else {
-                        com.dsann.music.util.SongDownloader.downloadSong(context, it)
+                    when {
+                        isDownloading -> com.dsann.music.util.SongDownloader.cancelDownload(context, it)
+                        !isDownloaded -> com.dsann.music.util.SongDownloader.downloadSong(context, it)
                     }
                 }
                 onDismiss()
@@ -975,12 +983,18 @@ fun ActionButtonRow2(
                 imageVector = when {
                     !isOnline -> Icons.Rounded.Check
                     isDownloading -> Icons.Rounded.Close
+                    isDownloaded -> Icons.Rounded.Check
                     else -> Icons.Rounded.Download
                 },
-                contentDescription = if (isDownloading) "Cancel download" else "Download",
+                contentDescription = when {
+                    isDownloading -> "Cancel download"
+                    isDownloaded -> "Downloaded"
+                    else -> "Download"
+                },
                 tint = when {
                     !isOnline -> DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
                     isDownloading -> DsmusicTheme.colorScheme.onErrorContainer
+                    isDownloaded -> DsmusicTheme.colorScheme.onSecondaryContainer
                     else -> DsmusicTheme.colorScheme.onPrimaryContainer
                 },
                 modifier = Modifier.size(23.dp)
@@ -988,7 +1002,6 @@ fun ActionButtonRow2(
         }
     }
 }
-
 @SuppressLint("UseOfNonLambdaOffsetOverload")
 @Composable
 fun ExpressiveTabSwitcher(selectedTab: BottomSheetTab, onTabSelected: (BottomSheetTab) -> Unit) {

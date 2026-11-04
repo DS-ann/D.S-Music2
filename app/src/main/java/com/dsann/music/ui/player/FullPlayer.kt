@@ -1176,7 +1176,14 @@ fun FullPlayer(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 val songForActions = uiState.currentSong
-                val realDownloaded = uiState.isCurrentSongDownloaded
+                val downloadedVideoIds by com.dsann.music.util.SongDownloader.downloadedVideoIds.collectAsStateWithLifecycle()
+                LaunchedEffect(songForActions?.videoId, songForActions?.title, songForActions?.artist) {
+                    songForActions?.let {
+                        com.dsann.music.util.SongDownloader.refreshDownloadedStatus(context, it)
+                    }
+                }
+                val realDownloaded = uiState.isCurrentSongDownloaded ||
+                    (songForActions?.videoId?.let { it in downloadedVideoIds } == true)
                 val realDownloadProgress = uiState.currentSongDownloadProgress
                 val isDownloading = realDownloadProgress != null ||
                     com.dsann.music.util.SongDownloader.isDownloading(songForActions?.videoId)
@@ -1277,10 +1284,13 @@ fun FullPlayer(
                                 onClick = {
                                     val currentSong = songForActions
                                     if (currentSong != null) {
-                                        if (com.dsann.music.util.SongDownloader.isDownloading(currentSong.videoId)) {
-                                            com.dsann.music.util.SongDownloader.cancelDownload(context, currentSong)
-                                        } else {
-                                            com.dsann.music.util.SongDownloader.downloadSong(context, currentSong)
+                                        when {
+                                            isDownloading ->
+                                                com.dsann.music.util.SongDownloader.cancelDownload(context, currentSong)
+                                            !realDownloaded ->
+                                                com.dsann.music.util.SongDownloader.downloadSong(context, currentSong)
+                                            else ->
+                                                com.dsann.music.ui.SnackbarController.showMessage("Already downloaded")
                                         }
                                     }
                                 },

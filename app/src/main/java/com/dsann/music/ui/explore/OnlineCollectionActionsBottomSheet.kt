@@ -21,8 +21,10 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -80,8 +82,13 @@ fun OnlineCollectionActionsBottomSheet(
     }
     var isWorking by remember(collection) { mutableStateOf(false) }
     val activeDownloadIds by SongDownloader.activeDownloadIds.collectAsStateWithLifecycle()
+    val downloadedVideoIds by SongDownloader.downloadedVideoIds.collectAsStateWithLifecycle()
     val activeCollectionSongs = cachedSongs.orEmpty().filter { it.videoId in activeDownloadIds }
     val activeCollectionDownloadCount = activeCollectionSongs.size
+    val totalCollectionSongs = cachedSongs?.size ?: 0
+    val downloadedCollectionCount = cachedSongs.orEmpty().count { it.videoId in downloadedVideoIds }
+    val allCollectionSongsDownloaded = totalCollectionSongs > 0 &&
+        downloadedCollectionCount == totalCollectionSongs
 
     val title = when (collection) {
         is SearchItem.Album -> collection.album.title
@@ -176,6 +183,11 @@ fun OnlineCollectionActionsBottomSheet(
         song.albumName,
         song.artistRefs
     )
+    LaunchedEffect(cachedSongs) {
+        cachedSongs?.let { songs ->
+            SongDownloader.refreshDownloadedStatuses(context, songs.map(::toSongItem))
+        }
+    }
 
     val shareUrl = when (collection) {
         is SearchItem.Album -> collection.album.playlistId
@@ -281,20 +293,29 @@ fun OnlineCollectionActionsBottomSheet(
             )
 
             CollectionActionRow(
-                title = if (activeCollectionDownloadCount > 0) "Cancel downloads" else "Download",
-                subtitle = if (activeCollectionDownloadCount > 0) {
-                    "Cancel $activeCollectionDownloadCount active downloads"
-                } else {
-                    "Download every track for offline playback"
+                title = when {
+                    activeCollectionDownloadCount > 0 -> "Cancel downloads"
+                    allCollectionSongsDownloaded -> "Downloaded"
+                    downloadedCollectionCount > 0 -> "Download remaining"
+                    else -> "Download"
+                },
+                subtitle = when {
+                    activeCollectionDownloadCount > 0 ->
+                        "Cancel $activeCollectionDownloadCount active downloads"
+                    allCollectionSongsDownloaded ->
+                        "All $totalCollectionSongs tracks are saved offline"
+                    downloadedCollectionCount > 0 ->
+                        "$downloadedCollectionCount of $totalCollectionSongs tracks already saved"
+                    else -> "Download every track for offline playback"
                 },
                 icon = {
-                    if (activeCollectionDownloadCount > 0) {
-                        Icon(Icons.Rounded.Close, null)
-                    } else {
-                        Icon(Icons.Default.Download, null)
+                    when {
+                        activeCollectionDownloadCount > 0 -> Icon(Icons.Rounded.Close, null)
+                        allCollectionSongsDownloaded -> Icon(Icons.Rounded.Check, null)
+                        else -> Icon(Icons.Default.Download, null)
                     }
                 },
-                enabled = !isWorking
+                enabled = !isWorking && !allCollectionSongsDownloaded
             ) {
                 if (activeCollectionSongs.isNotEmpty()) {
                     activeCollectionSongs.forEach {
@@ -306,10 +327,29 @@ fun OnlineCollectionActionsBottomSheet(
                 } else {
                     runTrackAction { songs ->
                         cachedSongs = songs
-                        songs.forEach { SongDownloader.downloadSong(context, toSongItem(it)) }
-                        com.dsann.music.ui.SnackbarController.showMessage(
-                            "Started downloads for ${songs.size} tracks"
-                        )
+                        val activeIdsNow = SongDownloader.activeDownloadIds.value
+                        val activeNow = songs.filter { it.videoId in activeIdsNow }
+                        if (activeNow.isNotEmpty()) {
+                            activeNow.forEach { SongDownloader.cancelDownload(context, toSongItem(it)) }
+                            com.dsann.music.ui.SnackbarController.showMessage(
+                                "Cancelling ${activeNow.size} downloads"
+                            )
+                        } else {
+                            val pendingSongs = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                songs.filter { song ->
+                                    song.videoId !in SongDownloader.downloadedVideoIds.value &&
+                                        !SongDownloader.isSongDownloaded(context, toSongItem(song))
+                                }
+                            }
+                            if (pendingSongs.isEmpty()) {
+                                com.dsann.music.ui.SnackbarController.showMessage("All tracks are already downloaded")
+                            } else {
+                                pendingSongs.forEach { SongDownloader.downloadSong(context, toSongItem(it)) }
+                                com.dsann.music.ui.SnackbarController.showMessage(
+                                    "Started downloads for ${pendingSongs.size} tracks"
+                                )
+                            }
+                        }
                     }
                 }
             }
