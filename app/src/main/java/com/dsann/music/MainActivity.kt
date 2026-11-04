@@ -365,6 +365,35 @@ class MainActivity : AppCompatActivity() {
                         currentRoute == "tag_editor" || currentRoute == "google_signin" -> lastRootTab
                         else -> null
                     }
+
+                    // Root tabs are retained for state restoration, but are swapped only
+                    // after the outgoing tab has fully faded to zero. This produces a true
+                    // 100% -> 0% -> 100% opacity hand-off instead of two tabs crossfading.
+                    var renderedRootTab by remember { mutableStateOf(activeCachedRootTab) }
+                    val rootTabOpacity = remember {
+                        androidx.compose.animation.core.Animatable(1f)
+                    }
+                    LaunchedEffect(activeCachedRootTab) {
+                        if (activeCachedRootTab != null && activeCachedRootTab != renderedRootTab) {
+                            rootTabOpacity.animateTo(
+                                targetValue = 0f,
+                                animationSpec = androidx.compose.animation.core.tween(
+                                    durationMillis = 140,
+                                    easing = androidx.compose.animation.core.LinearEasing
+                                )
+                            )
+                            renderedRootTab = activeCachedRootTab
+                            rootTabOpacity.snapTo(0f)
+                            rootTabOpacity.animateTo(
+                                targetValue = 1f,
+                                animationSpec = androidx.compose.animation.core.tween(
+                                    durationMillis = 140,
+                                    easing = androidx.compose.animation.core.LinearEasing
+                                )
+                            )
+                        }
+                    }
+
                     LaunchedEffect(currentDestination?.route) {
                         exploreViewModel.setExplorePageActive(currentDestination?.route == "explore")
                         searchViewModel.setExplorePageActive(currentDestination?.route == "search")
@@ -450,11 +479,15 @@ class MainActivity : AppCompatActivity() {
                             // old roots are evicted to reduce repeated layout, draw and memory work;
                             // rememberSaveableStateHolder restores their saveable UI state on return.
                             visitedRootTabs.forEach { cachedRoute ->
-                                val tabIsActive = cachedRoute == activeCachedRootTab
+                                val tabIsActive = cachedRoute == renderedRootTab
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .graphicsLayer { alpha = if (tabIsActive) 1f else 0f }
+                                        .graphicsLayer {
+                                            alpha = if (tabIsActive) {
+                                                rootTabOpacity.value.coerceIn(0f, 1f)
+                                            } else 0f
+                                        }
                                         .zIndex(if (tabIsActive) 1f else 0f)
                                         .pointerInput(tabIsActive) {
                                             if (!tabIsActive) {
@@ -544,10 +577,42 @@ class MainActivity : AppCompatActivity() {
                                 navController = currentNavController,
                                 startDestination = if (hasSeenOnboarding) "explore" else "onboarding",
                                 modifier = Modifier.fillMaxSize(),
-                                enterTransition = { androidx.compose.animation.EnterTransition.None },
-                                exitTransition = { androidx.compose.animation.ExitTransition.None },
-                                popEnterTransition = { androidx.compose.animation.EnterTransition.None },
-                                popExitTransition = { androidx.compose.animation.ExitTransition.None },
+                                // Non-root destinations use the same sequential opacity
+                                // mapping as the cached root tabs: outgoing 1 -> 0, then incoming 0 -> 1.
+                                enterTransition = {
+                                    androidx.compose.animation.fadeIn(
+                                        animationSpec = androidx.compose.animation.core.tween(
+                                            durationMillis = 140,
+                                            delayMillis = 140,
+                                            easing = androidx.compose.animation.core.LinearEasing
+                                        )
+                                    )
+                                },
+                                exitTransition = {
+                                    androidx.compose.animation.fadeOut(
+                                        animationSpec = androidx.compose.animation.core.tween(
+                                            durationMillis = 140,
+                                            easing = androidx.compose.animation.core.LinearEasing
+                                        )
+                                    )
+                                },
+                                popEnterTransition = {
+                                    androidx.compose.animation.fadeIn(
+                                        animationSpec = androidx.compose.animation.core.tween(
+                                            durationMillis = 140,
+                                            delayMillis = 140,
+                                            easing = androidx.compose.animation.core.LinearEasing
+                                        )
+                                    )
+                                },
+                                popExitTransition = {
+                                    androidx.compose.animation.fadeOut(
+                                        animationSpec = androidx.compose.animation.core.tween(
+                                            durationMillis = 140,
+                                            easing = androidx.compose.animation.core.LinearEasing
+                                        )
+                                    )
+                                },
 
                             ) {
                                 composable("onboarding") {
