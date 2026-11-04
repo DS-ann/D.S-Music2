@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
@@ -167,7 +168,8 @@ fun OnlineCollectionActionsBottomSheet(
         song.durationMs,
         song.thumbnailUrl,
         song.artistId,
-        song.albumName
+        song.albumName,
+        song.artistRefs
     )
 
     val shareUrl = when (collection) {
@@ -214,53 +216,74 @@ fun OnlineCollectionActionsBottomSheet(
 
             HorizontalDivider(color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
 
-            CollectionActionRow(
-                title = "Add to queue",
-                subtitle = "Add every track to the end of Up Next",
-                icon = { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) },
-                enabled = !isWorking
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(9.dp)
             ) {
-                runTrackAction { songs ->
-                    songs.forEach { song ->
-                        playerSharedViewModel.addToQueue(toSongItem(song))
-                        exploreViewModel.addToQueueLast(song)
+                CollectionPrimaryAction(
+                    modifier = Modifier.weight(1f),
+                    title = "Play",
+                    icon = Icons.Default.PlayArrow,
+                    enabled = !isWorking
+                ) {
+                    runTrackAction { songs ->
+                        if (songs.isNotEmpty()) {
+                            exploreViewModel.playOnlineSongWithQueue(songs.first(), songs, 0)
+                            com.dsann.music.ui.SnackbarController.showMessage("Playing $title")
+                            onDismissRequest()
+                        }
                     }
-                    com.dsann.music.ui.SnackbarController.showMessage(
-                        "Added ${songs.size} tracks to queue"
-                    )
-                    onDismissRequest()
+                }
+                CollectionPrimaryAction(
+                    modifier = Modifier.weight(1f),
+                    title = "Queue",
+                    icon = Icons.AutoMirrored.Filled.PlaylistPlay,
+                    enabled = !isWorking
+                ) {
+                    runTrackAction { songs ->
+                        songs.forEach { song ->
+                            playerSharedViewModel.addToQueue(toSongItem(song))
+                            exploreViewModel.addToQueueLast(song)
+                        }
+                        com.dsann.music.ui.SnackbarController.showMessage("Added ${songs.size} tracks to queue")
+                        onDismissRequest()
+                    }
+                }
+                CollectionPrimaryAction(
+                    modifier = Modifier.weight(1f),
+                    title = "Next",
+                    icon = Icons.Default.PlayArrow,
+                    enabled = !isWorking
+                ) {
+                    runTrackAction { songs ->
+                        songs.asReversed().forEach { song ->
+                            playerSharedViewModel.addToQueueNext(toSongItem(song))
+                            exploreViewModel.addToQueueNext(song)
+                        }
+                        com.dsann.music.ui.SnackbarController.showMessage("Playing next: $title")
+                        onDismissRequest()
+                    }
                 }
             }
 
-            CollectionActionRow(
-                title = "Play next",
-                subtitle = "Place the tracks directly after the current song",
-                icon = { Icon(Icons.Default.PlayArrow, null) },
-                enabled = !isWorking
-            ) {
-                runTrackAction { songs ->
-                    songs.asReversed().forEach { song ->
-                        playerSharedViewModel.addToQueueNext(toSongItem(song))
-                        exploreViewModel.addToQueueNext(song)
-                    }
-                    com.dsann.music.ui.SnackbarController.showMessage(
-                        "Playing next: $title"
-                    )
-                    onDismissRequest()
-                }
-            }
+            Text(
+                "MORE OPTIONS",
+                style = DsmusicTheme.typography.labelSmall.copy(
+                    letterSpacing = 1.1.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = DsmusicTheme.colorScheme.onSurfaceVariant
+            )
 
             CollectionActionRow(
                 title = "Download",
-                subtitle = "Download the tracks for offline playback",
+                subtitle = "Download every track for offline playback",
                 icon = { Icon(Icons.Default.Download, null) },
                 enabled = !isWorking
             ) {
                 runTrackAction { songs ->
                     songs.forEach { SongDownloader.downloadSong(context, toSongItem(it)) }
-                    com.dsann.music.ui.SnackbarController.showMessage(
-                        "Started downloads for ${songs.size} tracks"
-                    )
+                    com.dsann.music.ui.SnackbarController.showMessage("Started downloads for ${songs.size} tracks")
                     onDismissRequest()
                 }
             }
@@ -291,6 +314,39 @@ fun OnlineCollectionActionsBottomSheet(
                 onDismissRequest()
             }
         }
+    }
+}
+
+@Composable
+private fun CollectionPrimaryAction(
+    modifier: Modifier = Modifier,
+    title: String,
+    icon: ImageVector,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .height(78.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(DsmusicTheme.colorScheme.primaryContainer)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = DsmusicTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.size(23.dp)
+        )
+        Text(
+            title,
+            style = DsmusicTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = DsmusicTheme.colorScheme.onPrimaryContainer
+        )
     }
 }
 

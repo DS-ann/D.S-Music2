@@ -420,7 +420,8 @@ fun OptionsContent(
     actionListener: SongActionsBottomSheet.ActionListener?,
     onAddToPlaylist: () -> Unit,
     showAddToQueue: Boolean = true,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    showDelete: Boolean = true
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // Main Actions (Play, Fav, Share)
@@ -430,7 +431,7 @@ fun OptionsContent(
         ActionButtonRow2(song, actionListener, onDismiss, showAddToQueue = showAddToQueue)
         
         // Danger Zone / Playlist
-        DestructiveActionRow(song, actionListener, onAddToPlaylist, onDismiss)
+        DestructiveActionRow(song, actionListener, onAddToPlaylist, onDismiss, showDelete = showDelete)
     }
 }
 
@@ -440,7 +441,8 @@ fun DestructiveActionRow(
     song: SongItem?,
     actionListener: SongActionsBottomSheet.ActionListener?,
     onAddToPlaylist: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    showDelete: Boolean = true
 ) {
     val deleteInteraction = remember { MutableInteractionSource() }
     val dPressed by deleteInteraction.collectIsPressedAsState()
@@ -467,6 +469,7 @@ fun DestructiveActionRow(
             Text("Add to Playlist", style = DsmusicTheme.typography.labelLarge, fontFamily = GoogleSansFlex, color = DsmusicTheme.colorScheme.onSecondaryContainer)
         }
 
+        if (showDelete) {
         // Delete Button
         ToggleButton(
             checked = dPressed,
@@ -735,6 +738,8 @@ fun HeaderSection(
                 overflow = TextOverflow.Ellipsis
             )
         }
+        }
+
     }
 }
 

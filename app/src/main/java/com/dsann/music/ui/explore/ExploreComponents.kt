@@ -126,6 +126,8 @@ import com.dsann.music.data.innertube.OnlinePlaylist
 import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.SearchItem
 import com.dsann.music.model.SongItem
+import com.dsann.music.ui.OptionsContent
+import com.dsann.music.ui.SongActionsBottomSheet
 import com.dsann.music.util.FavoritesManager
 import com.dsann.music.util.SongDownloader
 import com.dsann.music.viewmodel.ExploreViewModel
@@ -1822,13 +1824,6 @@ fun OnlineSongBottomSheet(
     onRemoveFromCache: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
-    // Each row observes only its own download state. Collecting the entire progress map
-    // made every visible song card recompose on every byte-progress update for any song.
-    val isSongDownloading by remember(song.videoId) {
-        SongDownloader.downloadProgress
-            .map { progress -> song.videoId in progress }
-            .distinctUntilChanged()
-    }.collectAsState(initial = false)
     val favoritesManager = remember { FavoritesManager(context) }
     var isFavorite by remember(song.videoId) { mutableStateOf(favoritesManager.isFavorite(song.videoId.hashCode().toLong())) }
 
@@ -1840,20 +1835,44 @@ fun OnlineSongBottomSheet(
             "https://music.youtube.com/watch?v=${song.videoId}",
             song.durationMs,
             song.thumbnailUrl,
-            song.artistId
+            song.artistId,
+            artistRefs = song.artistRefs
         )
     }
-    var isDownloaded by remember(song.videoId) { mutableStateOf(false) }
-    LaunchedEffect(song.videoId, isSongDownloading) {
-        if (isSongDownloading) {
-            isDownloaded = false
-        } else {
-            isDownloaded = withContext(Dispatchers.IO) {
-                SongDownloader.isSongDownloaded(context, onlineSongItem)
+    val queueStyleListener = remember(song.videoId) {
+        object : SongActionsBottomSheet.ActionListener {
+            override fun onPlayNext(songItem: SongItem) {
+                playerSharedViewModel.addToQueueNext(songItem)
+                exploreViewModel.addToQueueNext(song)
+            }
+            override fun onAddToQueue(songItem: SongItem) {
+                playerSharedViewModel.addToQueue(songItem)
+                exploreViewModel.addToQueueLast(song)
+            }
+            override fun onDelete(songItem: SongItem) = Unit
+            override fun onEdit(songItem: SongItem) = Unit
+            override fun onPlay(songItem: SongItem) {
+                exploreViewModel.playOnlineSongWithQueue(song, listOf(song), 0)
+            }
+            override fun onFavorite(songItem: SongItem, isFav: Boolean) {
+                favoritesManager.setFavorite(songItem.id, isFav)
+                com.dsann.music.ui.SnackbarController.showMessage(
+                    if (isFav) "Added to library" else "Removed from library"
+                )
+            }
+            override fun onShare(songItem: SongItem) {
+                val shareIntent = android.content.Intent().apply {
+                    action = android.content.Intent.ACTION_SEND
+                    putExtra(
+                        android.content.Intent.EXTRA_TEXT,
+                        "Check out ${song.title} by ${song.artist}: https://music.youtube.com/watch?v=${song.videoId}"
+                    )
+                    type = "text/plain"
+                }
+                context.startActivity(android.content.Intent.createChooser(shareIntent, "Share via"))
             }
         }
     }
-
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
@@ -1883,23 +1902,6 @@ fun OnlineSongBottomSheet(
                 subtitle = song.artist,
                 trailingContent = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        DsmusicIconButton(
-                            onClick = {
-                                val target = !isFavorite
-                                favoritesManager.setFavorite(song.videoId.hashCode().toLong(), target)
-                                isFavorite = target
-                                com.dsann.music.ui.SnackbarController.showMessage(
-                                    if (target) "Added to library" else "Removed from library"
-                                )
-                            }
-                        ) {
-                            Icon(
-                                imageVector = if (isFavorite) Icons.Rounded.ThumbUp else Icons.Rounded.ThumbUpOffAlt,
-                                contentDescription = "Like",
-                                tint = if (isFavorite) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
                         DsmusicIconButton(onClick = onDismissRequest) {
                             Icon(
                                 imageVector = Icons.Rounded.Close,
@@ -1913,141 +1915,81 @@ fun OnlineSongBottomSheet(
 
             HorizontalDivider(color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
-            // Big Square Button Grid: Play next, Share
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // Card 1: Play next
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable {
-                            playerSharedViewModel.addToQueueNext(onlineSongItem)
-                            exploreViewModel.addToQueueNext(song)
-                            com.dsann.music.ui.SnackbarController.showMessage("Playing next: ${song.title}")
-                            onDismissRequest()
-                        }
-                        .padding(bottom = 4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .aspectRatio(1.5f)
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(DsmusicTheme.colorScheme.surfaceContainerHighest),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.PlaylistPlay,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    Text("Play next", style = DsmusicTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                }
+            Text(
+                "QUICK ACTIONS",
+                style = DsmusicTheme.typography.labelSmall.copy(
+                    letterSpacing = 1.1.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = DsmusicTheme.colorScheme.onSurfaceVariant
+            )
+            OptionsContent(
+                song = onlineSongItem,
+                isFavorite = isFavorite,
+                onFavoriteChange = { isFavorite = it },
+                actionListener = queueStyleListener,
+                onAddToPlaylist = {
+                    onPlaylistAddClick(onlineSongItem)
+                    onDismissRequest()
+                },
+                showAddToQueue = true,
+                onDismiss = onDismissRequest,
+                showDelete = false
+            )
 
-                // Card 2: Share
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable {
-                            val shareIntent = android.content.Intent().apply {
-                                action = android.content.Intent.ACTION_SEND
-                                putExtra(android.content.Intent.EXTRA_TEXT, "Check out ${song.title} by ${song.artist}: https://music.youtube.com/watch?v=${song.videoId}")
-                                type = "text/plain"
-                            }
-                            context.startActivity(android.content.Intent.createChooser(shareIntent, "Share via"))
-                            onDismissRequest()
-                        }
-                        .padding(bottom = 4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .aspectRatio(1.5f)
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(DsmusicTheme.colorScheme.surfaceContainerHighest),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Share,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    Text("Share", style = DsmusicTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                }
-            }
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                "MORE FOR THIS TRACK",
+                style = DsmusicTheme.typography.labelSmall.copy(
+                    letterSpacing = 1.1.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = DsmusicTheme.colorScheme.onSurfaceVariant
+            )
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            // Optimized 2-Pane Actions for Landscape Width
+            val artistMenuItems = song.artistRefs
+                .distinctBy { it.id ?: it.name.trim().lowercase() }
+                .map { artist ->
+                    Triple("Open ${artist.name}", Icons.Rounded.Person) {
+                        if (!artist.id.isNullOrBlank()) {
+                            exploreViewModel.loadArtist(artist.id)
+                        } else {
+                            exploreViewModel.loadArtistByName(artist.name)
+                        }
+                        onDismissRequest()
+                    }
+                }.ifEmpty {
+                    listOf(
+                        Triple("Go to artist", Icons.Rounded.Person) {
+                            if (!song.artistId.isNullOrBlank()) {
+                                exploreViewModel.loadArtist(song.artistId)
+                            } else {
+                                exploreViewModel.loadArtistByName(song.artist)
+                            }
+                            onDismissRequest()
+                        }
+                    )
+                }
+
             val baseMenuItems = listOf(
                 Triple("Start mix", Icons.Rounded.Radio) {
                     exploreViewModel.startRadio(song)
                     com.dsann.music.ui.SnackbarController.showMessage("Starting mix based on ${song.title}")
                     onDismissRequest()
                 },
-                Triple("Add to queue", Icons.AutoMirrored.Rounded.PlaylistPlay) {
-                    playerSharedViewModel.addToQueue(onlineSongItem)
-                    exploreViewModel.addToQueueLast(song)
-                    com.dsann.music.ui.SnackbarController.showMessage(
-                        "Added to queue",
-                        iconVector = androidx.compose.material.icons.Icons.AutoMirrored.Rounded.PlaylistAdd
-                    )
-                    onDismissRequest()
-                },
-                Triple("Add to playlist", Icons.AutoMirrored.Rounded.PlaylistAdd) {
-                    onPlaylistAddClick(onlineSongItem)
-                    onDismissRequest()
-                },
-                Triple(
-                    when {
-                        isSongDownloading -> "Cancel download"
-                        isDownloaded -> "Downloaded"
-                        else -> "Download"
-                    },
-                    when {
-                        isSongDownloading -> Icons.Rounded.Close
-                        isDownloaded -> Icons.Rounded.Check
-                        else -> Icons.Rounded.Download
-                    }
-                ) {
-                    when {
-                        isSongDownloading -> SongDownloader.downloadSong(context, onlineSongItem)
-                        isDownloaded -> com.dsann.music.ui.SnackbarController.showMessage(
-                            "Already downloaded: ${song.title}"
-                        )
-                        else -> SongDownloader.downloadSong(context, onlineSongItem)
-                    }
-                    onDismissRequest()
-                },
                 Triple("Go to album", Icons.Rounded.Album) {
-                    val id = song.albumId
-                    if (!id.isNullOrBlank()) {
-                        exploreViewModel.loadAlbum(id)
+                    val albumId = song.albumId
+                    if (!albumId.isNullOrBlank()) {
+                        exploreViewModel.loadAlbum(albumId)
                         onDismissRequest()
                     } else {
                         com.dsann.music.ui.SnackbarController.showMessage("Album information unavailable")
                     }
-                },
-                Triple("Go to artist", Icons.Rounded.Person) {
-                    val aId = song.artistId
-                    if (!aId.isNullOrBlank()) {
-                        exploreViewModel.loadArtist(aId)
-                        onDismissRequest()
-                    } else {
-                        exploreViewModel.search(song.artist)
-                        onDismissRequest()
-                    }
-                },
+                }
+            ) + artistMenuItems + listOf(
                 Triple("View song credits", Icons.Rounded.Groups) {
                     onViewCreditsClick(song)
                     onDismissRequest()
