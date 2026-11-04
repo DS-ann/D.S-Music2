@@ -91,6 +91,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dsann.music.MainActivity
 import com.dsann.music.ui.SettingsViewModel
+import com.dsann.music.ui.showQueueSongActions
 import com.dsann.music.R
 import com.dsann.music.data.lyrics.LyricLine
 import com.dsann.music.data.lyrics.LyricsResult
@@ -1618,7 +1619,8 @@ fun FullPlayer(
             onShowSleepTimerDialog = { showSleepTimerDialog = true },
             playerBackgroundColor = uiState.playerBackgroundColor,
             dynamicAccentColor = dynamicAccentColor,
-            isDark = isDark
+            isDark = isDark,
+            onSongLongClick = { song -> showQueueSongActions(context, song, viewModel) }
         )
 
         // --- Standalone Sleep Timer Bottom Sheet ---
