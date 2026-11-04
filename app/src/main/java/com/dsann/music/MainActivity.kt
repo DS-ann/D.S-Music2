@@ -373,7 +373,9 @@ class MainActivity : AppCompatActivity() {
                     // Root tabs are retained for state restoration, but are swapped only
                     // after the outgoing tab has fully faded to zero. This produces a true
                     // 100% -> 0% -> 100% opacity hand-off instead of two tabs crossfading.
-                    var renderedRootTab by remember { mutableStateOf(activeCachedRootTab) }
+                    // Start with no rendered root; the first resolved destination
+                    // is installed at zero opacity and then faded in.
+                    var renderedRootTab by remember { mutableStateOf<String?>(null) }
                     val rootTabOpacity = remember {
                         androidx.compose.animation.core.Animatable(1f)
                     }
