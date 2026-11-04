@@ -34,7 +34,7 @@ internal object DownloadedAudioMetadataReader {
         val retriever = MediaMetadataRetriever()
         var sourceConfigured = false
         try {
-            val file = filePath?.takeIf { it.isNotBlank() }?.let(::File)?.takeIf { it.isFile }
+            val file = filePath?.takeIf { it.isNotBlank() }?.let { File(it) }?.takeIf { it.isFile }
             if (file != null) {
                 sourceConfigured = runCatching {
                     retriever.setDataSource(file.absolutePath)
