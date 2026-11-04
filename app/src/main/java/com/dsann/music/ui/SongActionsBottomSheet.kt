@@ -127,6 +127,9 @@ import com.dsann.music.ui.theme.GoogleSansFlex
 import com.dsann.music.ui.theme.DsmusicAppTheme
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import android.widget.FrameLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -173,6 +176,22 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
         song = arguments?.getSerializable("song") as? SongItem
         showAddToQueue = arguments?.getBoolean("showAddToQueue", true) ?: true
         viewModel = ViewModelProvider(requireActivity())[PlayerSharedViewModel::class.java]
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val sheetDialog = dialog as? BottomSheetDialog ?: return
+        val sheetContainer = sheetDialog.findViewById<FrameLayout>(
+            com.google.android.material.R.id.design_bottom_sheet
+        ) ?: return
+
+        // The queue action sheet should open as a complete action panel, not
+        // stop at Material's default peek/half-expanded position.
+        sheetContainer.post {
+            val behavior = BottomSheetBehavior.from(sheetContainer)
+            behavior.skipCollapsed = true
+            behavior.state = BottomSheetBehavior.STATE_EXPANDED
+        }
     }
 
     override fun onCreateView(
