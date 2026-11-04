@@ -905,7 +905,11 @@ fun ActionButtonRow2(
                 .weight(nextWeight)
                 .height(72.dp)
                 .zIndex(if (nextPressed) 1f else 0f),
-            shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
+            shapes = if (showAddToQueue) {
+                ButtonGroupDefaults.connectedMiddleButtonShapes()
+            } else {
+                ButtonGroupDefaults.connectedLeadingButtonShapes()
+            },
             colors = ToggleButtonDefaults.toggleButtonColors(
                 containerColor = DsmusicTheme.colorScheme.tertiaryContainer,
                 contentColor = DsmusicTheme.colorScheme.onTertiaryContainer,
