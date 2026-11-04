@@ -365,13 +365,8 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
         }
     }
 
-    val showLegacyCompactArtwork by remember(playerContentExpansionFraction, isLyricsModeEnabled) {
-        derivedStateOf {
-            android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M &&
-                playerContentExpansionFraction.value < 0.5f &&
-                !isLyricsModeEnabled
-        }
-    }
+    // The shared artwork layer now owns the cover from the collapsed dock through expansion.
+    val showLegacyCompactArtwork = false
 
     val miniPlayerZIndex by remember {
         derivedStateOf { if (playerContentExpansionFraction.value < 0.5f) 1f else 0f }
@@ -432,7 +427,8 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
                     // Keep the expanded player anchored to the top edge. Only opacity
                     // changes; it does not travel upward with the collapsed sheet.
                     translationY = -currentSheetTranslationY.value
-                    alpha = playerContentExpansionFraction.value.coerceIn(0f, 1f)
+                    // Once mounted, the expanded surface is opaque; the mini layer remains above it until mid-transition.
+                    alpha = if (playerContentExpansionFraction.value > 0.015f) 1f else 0f
                 }
                 .zIndex(fullPlayerZIndex)
         ) {
@@ -1198,13 +1194,8 @@ fun PlayerBottomSheetCompose(
         var isDragging by remember { mutableStateOf(false) }
 
         val showPlayerContentArea = currentSong != null
-        val isLegacyCompactArtwork by remember(playerContentExpansionFraction, isLyricsModeEnabled) {
-            derivedStateOf {
-                android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M &&
-                    playerContentExpansionFraction.value < 0.5f &&
-                    !isLyricsModeEnabled
-            }
-        }
+        // Keep the same shared artwork instance on API 23 and newer devices.
+        val isLegacyCompactArtwork = false
 
         LaunchedEffect(currentSheetContentState) {
             viewModel.setPlayerExpanded(currentSheetContentState == PlayerSheetState.EXPANDED)
@@ -1581,23 +1572,24 @@ fun PlayerBottomSheetCompose(
 
                                 val miniSizePx = 48.dp.toPx()
                                 val fullSizePx = albumArtSizeDp.toPx()
-                                // Switch between the two fixed artwork positions while its
-                                // alpha is zero. No per-frame scale or position interpolation.
-                                val artTransitionProgress = if (t >= 0.5f) 1f else 0f
-                                val normalScale = if (artTransitionProgress == 0f) {
-                                    miniSizePx / fullSizePx
-                                } else {
-                                    1f
-                                }
+                                // One shared cover travels from its exact mini-player anchor
+                                // to the full-player anchor. All motion stays in this draw layer.
+                                val artTransitionProgress = t.coerceIn(0f, 1f)
+                                val normalScale = androidx.compose.ui.util.lerp(
+                                    miniSizePx / fullSizePx,
+                                    1f,
+                                    artTransitionProgress
+                                )
 
-                                // Account for the fixed horizontal padding at the collapsed endpoint.
-                                val startPaddingPx = if (
-                                    currentSheetContentState == PlayerSheetState.COLLAPSED
-                                ) 12.dp.toPx() else 0f
-
-                                // Position relative to the Surface top-left
-                                val xStartPx = startPaddingPx +
-                                    (if (isLandscapeWindow) 10.dp else 16.dp).toPx()
+                                // The mini player is centered in the landscape half-width layout.
+                                val xStartPx = (if (isLandscapeWindow) 10.dp else 16.dp).toPx() +
+                                    if (isLandscapeWindow) {
+                                        with(density) {
+                                            (containerWidthDp * ((1f - miniPlayerWidthFraction) / 2f)).toPx()
+                                        }
+                                    } else {
+                                        0f
+                                    }
                                 val xEndPx = if (useWidePlayer) {
                                     with(density) {
                                         (20.dp + (containerWidthDp - 60.dp) * 0.54f / 2f - albumArtSizeDp / 2f).toPx()
@@ -1623,15 +1615,21 @@ fun PlayerBottomSheetCompose(
                                 }
                                 val yEndPx = with(density) { topOffsetDp.toPx() }
 
-                                val normalX = if (artTransitionProgress == 0f) xStartPx else xEndPx
-                                // Artwork is anchored to the dock in mini mode and to its
-                                // final full-player location after the midpoint.
-                                val normalY = if (artTransitionProgress == 0f) {
-                                    sheetCollapsedTargetYState.value + yStartPx
-                                } else {
-                                    yEndPx
-                                }
-                                val normalShadow = if (artTransitionProgress == 0f) 0f else 16.dp.toPx()
+                                val normalX = androidx.compose.ui.util.lerp(
+                                    xStartPx,
+                                    xEndPx,
+                                    artTransitionProgress
+                                )
+                                val normalY = androidx.compose.ui.util.lerp(
+                                    sheetCollapsedTargetYState.value + yStartPx,
+                                    yEndPx,
+                                    artTransitionProgress
+                                )
+                                val normalShadow = androidx.compose.ui.util.lerp(
+                                    0f,
+                                    16.dp.toPx(),
+                                    artTransitionProgress
+                                )
 
                                 val appBarThumbSizePx = 44.dp.toPx()
                                 val appBarScale = appBarThumbSizePx / fullSizePx
@@ -1653,12 +1651,7 @@ fun PlayerBottomSheetCompose(
                                 shape = if (isVideoMode) androidx.compose.ui.graphics.RectangleShape else playerArtworkShape
                                 clip = true
                                 shadowElevation = androidx.compose.ui.util.lerp(normalShadow, 6.dp.toPx(), lyricsT)
-                                val artworkFade = if (t < 0.5f) {
-                                    (1f - t * 2f).coerceIn(0f, 1f)
-                                } else {
-                                    ((t - 0.5f) * 2f).coerceIn(0f, 1f)
-                                }
-                                alpha = artworkAlpha * artworkFade
+                                alpha = artworkAlpha
                             }
                             // Put the click target inside the transformed layer. With clickable
                             // outside graphicsLayer, taps on the old 90%-screen layout bounds could
