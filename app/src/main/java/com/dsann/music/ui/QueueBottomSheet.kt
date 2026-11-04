@@ -527,7 +527,7 @@ fun QueueListItem(
                 .size(48.dp)
                 .pointerInput(dragDropState, song.id) {
                     val state = dragDropState ?: return@pointerInput
-                    detectDragGesturesAfterLongPress(
+                    detectDragGestures(
                         onDragStart = {
                             val startIndex = latestIndex.value
                             if (startIndex >= 0) state.onDragStartAtIndex(startIndex)
