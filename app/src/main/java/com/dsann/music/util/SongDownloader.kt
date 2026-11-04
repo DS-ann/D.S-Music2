@@ -569,7 +569,15 @@ object SongDownloader {
             cachedMetadata?.thumbnailUrl?.takeIf { it.isNotBlank() }?.let(artworkUrls::add)
             sourceMetadata?.thumbnailUrl?.takeIf { it.isNotBlank() }?.let(artworkUrls::add)
 
-            if (artworkBytes.isNullOrEmpty() && artworkUrls.isEmpty()) {
+            if (artworkBytes.isNullOrEmpty()) {
+                for (artworkUrl in artworkUrls.distinct()) {
+                    artworkBytes = fetchArtworkBytes(context, artworkUrl)
+                    if (!artworkBytes.isNullOrEmpty()) break
+                }
+            }
+
+            // Only request source metadata after all already-known image URLs have failed.
+            if (artworkBytes.isNullOrEmpty()) {
                 val metadataThumbnail = runCatching {
                     com.dsann.music.data.innertube.YouTubeMusic
                         .player(videoId, metadataOnly = true)
@@ -577,17 +585,15 @@ object SongDownloader {
                         ?.thumbnailUrl
                         ?.takeIf { it.isNotBlank() }
                 }.getOrNull()
-                metadataThumbnail?.let(artworkUrls::add)
-            }
-            videoId.takeIf { it.isNotBlank() }
-                ?.let { "https://img.youtube.com/vi/$it/hqdefault.jpg" }
-                ?.let(artworkUrls::add)
-
-            if (artworkBytes.isNullOrEmpty()) {
-                for (artworkUrl in artworkUrls.distinct()) {
-                    artworkBytes = fetchArtworkBytes(context, artworkUrl)
-                    if (!artworkBytes.isNullOrEmpty()) break
+                if (!metadataThumbnail.isNullOrBlank() && metadataThumbnail !in artworkUrls) {
+                    artworkBytes = fetchArtworkBytes(context, metadataThumbnail)
                 }
+            }
+            if (artworkBytes.isNullOrEmpty() && !videoId.isBlank()) {
+                artworkBytes = fetchArtworkBytes(
+                    context,
+                    "https://img.youtube.com/vi/$videoId/hqdefault.jpg"
+                )
             }
 
             coroutineContext.ensureActive()
