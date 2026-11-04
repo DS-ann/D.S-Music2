@@ -259,12 +259,7 @@ internal fun SyncedLyricsCompose(
     // Keep each active lyric line centred. Re-key by song as well as line index:
     // two tracks can begin on the same lyric index, but must not inherit old scroll.
     val density = LocalDensity.current
-    var lastScrolledSongId by remember { mutableStateOf<Long?>(Long.MIN_VALUE) }
     LaunchedEffect(currentSong?.id, displayItems, activeIndex, density) {
-        if (lastScrolledSongId != currentSong?.id) {
-            listState.scrollToItem(0)
-            lastScrolledSongId = currentSong?.id
-        }
         if (activeIndex >= 0) {
             performSmoothedScroll(
                 listState,
@@ -273,6 +268,8 @@ internal fun SyncedLyricsCompose(
                 with(density) { 36.dp.roundToPx() }
             )
         } else if (lyricClock.intValue <= (displayItems.firstOrNull()?.line?.startTimeMs ?: 0L)) {
+            // A new song or a seek to its beginning must not inherit the previous
+            // track's old list offset, even when both tracks share the same line index.
             listState.scrollToItem(0)
         }
     }
