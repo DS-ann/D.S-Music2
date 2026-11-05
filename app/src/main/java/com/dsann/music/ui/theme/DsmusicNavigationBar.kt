@@ -2,6 +2,7 @@ package com.dsann.music.ui.theme
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,8 +18,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -60,32 +63,41 @@ fun DsmusicNavigationBar(
         "Minimal" -> RoundedCornerShape(0.dp)
         else -> RoundedCornerShape(26.dp)
     }
-    val horizontalInset = if (barStyle == "Floating") 14.dp else 0.dp
-    val verticalInset = if (barStyle == "Floating") 4.dp else 0.dp
+    val isFloating = barStyle == "Floating"
+    val horizontalInset = if (isFloating) 14.dp else 0.dp
+    val verticalInset = if (isFloating) 4.dp else 0.dp
+    // Use a true black/white hairline independent of the active accent or album colour.
+    val borderBase = if (surface.luminance() > 0.5f) Color.Black else Color.White
+    val borderColor = borderBase.copy(alpha = if (isFloating) 0.78f else 0.56f)
     val iconSlotHeight = when {
         iconSize.value <= 22f -> 30.dp
         iconSize.value >= 30f -> 34.dp
         else -> 34.dp
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(
-                start = horizontalInset,
-                top = verticalInset,
-                end = horizontalInset,
-                bottom = if (bottomInset > 0.dp) verticalInset else 0.dp
-            )
-            .clip(dockShape)
-            .background(if (barStyle == "Minimal") Color.Transparent else surface)
-    ) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                // Leave the system-navigation area outside the icon/label viewport.
-                .padding(bottom = bottomInset, start = 6.dp, end = 6.dp),
+                .padding(
+                    start = horizontalInset,
+                    top = verticalInset,
+                    end = horizontalInset,
+                    bottom = verticalInset
+                )
+                .then(
+                    if (isFloating) Modifier.shadow(12.dp, dockShape, clip = false)
+                    else Modifier
+                )
+                .clip(dockShape)
+                .background(if (barStyle == "Minimal") Color.Transparent else surface)
+                .border(
+                    width = if (isFloating) 0.9.dp else 0.75.dp,
+                    color = borderColor,
+                    shape = dockShape
+                )
+                .padding(horizontal = 6.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -134,6 +146,10 @@ fun DsmusicNavigationBar(
                     }
                 }
             }
+        }
+        // Keep the gesture/navigation inset outside the outlined floating surface.
+        if (bottomInset > 0.dp) {
+            androidx.compose.foundation.layout.Spacer(Modifier.size(width = 1.dp, height = bottomInset))
         }
     }
 }
