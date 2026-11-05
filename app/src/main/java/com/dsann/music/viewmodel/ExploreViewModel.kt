@@ -1046,10 +1046,27 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     }
                     persistHomeFeedCache()
                     prefetchThumbnails(page.sections.take(3).flatMap { it.items.take(4) })
+                }.onFailure { failure ->
+                    _uiState.update {
+                        it.copy(
+                            homeFeedOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                                failure,
+                                getApplication<Application>()
+                            )
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "Load more home sections failed", e)
+                _uiState.update {
+                    it.copy(
+                        homeFeedOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                            e,
+                            getApplication<Application>()
+                        )
+                    )
+                }
             } finally {
                 _uiState.update { it.copy(isLoadingMoreHome = false) }
             }
@@ -1771,7 +1788,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         _uiState.update { 
             it.copy(
                 error = null,
-                streamError = null
+                streamError = null,
+                detailOfflineError = false
             )
         }
     }
