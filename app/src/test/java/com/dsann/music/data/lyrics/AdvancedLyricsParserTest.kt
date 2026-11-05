@@ -98,6 +98,16 @@ class AdvancedLyricsParserTest {
     }
 
     @Test
+    fun ttmlPartiallyTimedSpansDoNotPretendUntimedTextIsKaraoke() {
+        val lines = TtmlParser.parse(
+            """<tt><body><div><p begin="1s" end="3s"><span begin="1s" end="2s">Timed</span> <span>plain</span></p></div></body></tt>"""
+        )
+        val line = lines.single()
+        assertFalse(line.isWordByWord)
+        assertTrue(line.words.isEmpty())
+    }
+
+    @Test
     fun ttmlStartOnlyWordsUseNextTimestampAndParagraphEnd() {
         val lines = TtmlParser.parse(
             """<tt><body><div><p begin="1s" end="3s"><span begin="1s">Hello </span><span begin="1.8s">world</span></p></div></body></tt>"""

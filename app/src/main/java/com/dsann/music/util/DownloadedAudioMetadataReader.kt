@@ -101,6 +101,16 @@ internal object DownloadedAudioMetadataReader {
     }
 
     private fun readMp4Tags(file: File): ParsedTags? {
+        // Prefer the same native atom reader used to verify M4A writes. Jaudiotagger
+        // remains a compatibility fallback for older files tagged by previous builds.
+        Mp4MetadataRemuxer.readMetadata(file)?.let { metadata ->
+            return ParsedTags(
+                usable(metadata.title),
+                usable(metadata.artist),
+                usable(metadata.album),
+                metadata.artwork?.takeIf { it.isNotEmpty() }
+            )
+        }
         return try {
             val audioFile = org.jaudiotagger.audio.AudioFileIO.read(file)
             val tag = audioFile.tag ?: return null

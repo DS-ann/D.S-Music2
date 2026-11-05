@@ -912,6 +912,9 @@ object SongDownloader {
         if (extension.equals("mka", ignoreCase = true)) {
             return embedMatroskaMetadataSafely(outputFile, title, artist, album, videoId, fromCache, artworkBytes)
         }
+        if (extension.lowercase() in setOf("m4a", "mp4", "m4p", "m4b")) {
+            return embedMp4MetadataSafely(outputFile, title, artist, album, videoId, fromCache, artworkBytes)
+        }
         val taggedFile = File(outputFile.parentFile, "${outputFile.nameWithoutExtension}.tagging.$extension")
         var backupFile: File? = null
         try {
@@ -1075,6 +1078,78 @@ object SongDownloader {
         } catch (error: Exception) {
             Log.w(TAG, "Metadata embedding failed safely for ${outputFile.name}; original audio will be preserved", error)
             taggedFile.delete()
+            if (backupFile?.exists() == true && !outputFile.exists()) {
+                backupFile.renameTo(outputFile)
+            }
+            return false
+        }
+    }
+
+    /**
+     * Rebuild native MP4 ilst atoms like the Opus packet-remux path. No AAC decode,
+     * re-encode, or generic tag-library commit is involved.
+     */
+    private fun embedMp4MetadataSafely(
+        outputFile: File,
+        title: String,
+        artist: String,
+        album: String?,
+        videoId: String,
+        fromCache: Boolean,
+        artworkBytes: ByteArray?
+    ): Boolean {
+        val extension = outputFile.extension.ifBlank { "m4a" }
+        val stagedFile = File(outputFile.parentFile, "${outputFile.nameWithoutExtension}.tagging.$extension")
+        var backupFile: File? = null
+        try {
+            if (stagedFile.exists() && !stagedFile.delete()) {
+                throw IOException("Could not clear the MP4 metadata staging file")
+            }
+            val sourceComment = if (fromCache) {
+                "Exported from D.S Music cached audio (video ID: $videoId)"
+            } else {
+                "Downloaded from YouTube Music (video ID: $videoId)"
+            }
+            Mp4MetadataRemuxer.writeTaggedMp4(
+                inputFile = outputFile,
+                outputFile = stagedFile,
+                title = title.trim(),
+                artist = artist.trim(),
+                album = album?.trim()?.takeIf { it.isNotBlank() },
+                comment = sourceComment,
+                artworkBytes = artworkBytes
+            )
+
+            // Atom-level read-back is authoritative. Framework extraction is diagnostic
+            // only because some Android 6 vendor extractors omit otherwise-valid ilst data.
+            runCatching {
+                verifyMp4MetadataWithPlatform(
+                    file = stagedFile,
+                    title = title,
+                    artist = artist,
+                    album = album,
+                    expectArtwork = artworkBytes != null && artworkBytes.isNotEmpty()
+                )
+            }.onFailure {
+                Log.w(TAG, "Android extractor did not expose tagged M4A metadata; atom read-back passed", it)
+            }
+
+            backupFile = File(outputFile.parentFile, "${outputFile.name}.raw-backup")
+            if (backupFile.exists() && !backupFile.delete()) {
+                throw IOException("Could not clear the original M4A backup file")
+            }
+            if (!outputFile.renameTo(backupFile)) {
+                throw IOException("Could not preserve the original M4A audio before tagging")
+            }
+            if (!stagedFile.renameTo(outputFile)) {
+                backupFile.renameTo(outputFile)
+                throw IOException("Could not install the tagged M4A file")
+            }
+            backupFile.delete()
+            return true
+        } catch (error: Exception) {
+            Log.w(TAG, "Native M4A metadata embedding failed safely for ${outputFile.name}", error)
+            stagedFile.delete()
             if (backupFile?.exists() == true && !outputFile.exists()) {
                 backupFile.renameTo(outputFile)
             }

@@ -201,26 +201,38 @@ object AdvancedLyricsParser {
         val visibleEnd = joined.indexOfLast { !it.isWhitespace() } + 1
         val out = mutableListOf<LyricWord>()
         var sourceCursor = 0
-        var outputCursor = 0
         words.forEach { word ->
             val sourceEnd = sourceCursor + word.text.length
-            val overlapStart = maxOf(sourceCursor, visibleStart)
-            val overlapEnd = minOf(sourceEnd, visibleEnd)
+            val tokenLeadingTrim = word.text.indexOfFirst { !it.isWhitespace() }
+                .takeIf { it >= 0 } ?: word.text.length
+            val tokenTrailingEnd = word.text.indexOfLast { !it.isWhitespace() } + 1
+            val visibleTokenStart = sourceCursor + tokenLeadingTrim
+            val visibleTokenEnd = sourceCursor + tokenTrailingEnd
+            val overlapStart = maxOf(visibleTokenStart, visibleStart)
+            val overlapEnd = minOf(visibleTokenEnd, visibleEnd)
             if (overlapStart < overlapEnd) {
                 val from = overlapStart - sourceCursor
                 val until = overlapEnd - sourceCursor
                 val visible = word.text.substring(from, until)
+                val charStart = overlapStart - visibleStart
                 out += word.copy(
                     text = visible,
-                    charRange = outputCursor..(outputCursor + visible.length - 1)
+                    charRange = charStart..(charStart + visible.length - 1)
                 )
-                outputCursor += visible.length
             }
             sourceCursor = sourceEnd
         }
         // Guard against a malformed provider payload whose token text does not reproduce
-        // the line string. In that case, keep no partial karaoke ranges.
-        return out.takeIf { outputCursor == lineText.length }.orEmpty()
+        // the line string. Keep original positions, but never emit partial/misaligned ranges.
+        val covered = BooleanArray(lineText.length)
+        out.forEach { word ->
+            for (index in word.charRange.first..word.charRange.last) {
+                if (index in covered.indices) covered[index] = true
+            }
+        }
+        return out.takeIf { lineText.indices.all { index ->
+            lineText[index].isWhitespace() || covered[index]
+        } }.orEmpty()
     }
 
     private fun addInterludes(input: List<LyricLine>): List<LyricLine> {
