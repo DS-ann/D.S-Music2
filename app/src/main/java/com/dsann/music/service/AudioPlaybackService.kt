@@ -2904,7 +2904,7 @@ class AudioPlaybackService : MediaSessionService() {
         return when (mode) {
             NotificationPlaybackMode.SHUFFLE -> R.drawable.ic_shuffle_noti
             NotificationPlaybackMode.REPEAT_OFF -> R.drawable.ic_notification_repeat_off
-            NotificationPlaybackMode.REPEAT_ONCE -> R.drawable.ic_notification_repeat
+            NotificationPlaybackMode.REPEAT_ONCE -> R.drawable.ic_notification_repeat_one
             NotificationPlaybackMode.REPEAT_INFINITY -> R.drawable.ic_notification_repeat_infinity
         }
     }
@@ -2947,7 +2947,7 @@ class AudioPlaybackService : MediaSessionService() {
         }
         "shuffle" -> R.drawable.ic_notification_shuffle
         "repeat" -> when (viewModel?.repeatMode?.value ?: PlayerSharedViewModel.REPEAT_OFF) {
-            PlayerSharedViewModel.REPEAT_ONCE -> R.drawable.ic_notification_repeat
+            PlayerSharedViewModel.REPEAT_ONCE -> R.drawable.ic_notification_repeat_one
             PlayerSharedViewModel.REPEAT_INFINITY -> R.drawable.ic_notification_repeat_infinity
             else -> R.drawable.ic_notification_repeat_off
         }
