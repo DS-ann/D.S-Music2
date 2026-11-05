@@ -31,10 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.sample
+import kotlinx.coroutines.flow.collect
 import com.dsann.music.R
 import com.dsann.music.data.lyrics.LyricsResult
 import com.dsann.music.model.SongItem
@@ -282,7 +280,6 @@ internal fun PillChip(
     }
 }
 
-@OptIn(kotlinx.coroutines.FlowPreview::class)
 @Composable
 internal fun WavySliderWithLabels(
     currentPositionProvider: () -> Int,
@@ -323,47 +320,42 @@ internal fun WavySliderWithLabels(
 
     // The service can publish at 20-60 FPS. Time labels only need a 4 Hz snapshot;
     // the actual slider line samples Media3 in the draw pass below on every selected frame.
-    // Only the displayed second is needed by the time labels. Sampling this flow at 1 Hz
-    // keeps paused seeks and state restoration responsive without high-frequency recomposition.
-    val labelPositionFlow = remember(currentPositionFlow) {
-        currentPositionFlow.sample(1000L)
-    }
-    val observedPosition by labelPositionFlow.collectAsStateWithLifecycle(
-        initialValue = currentPositionFlow.value
-    )
     val liveProgressEnabled = isPlayerVisible && isPlaying
     val latestPositionProvider = rememberUpdatedState(currentPositionProvider)
     var labelPositionMs by remember(currentPositionFlow) {
         mutableIntStateOf(currentPositionFlow.value.coerceAtLeast(0))
     }
 
-    LaunchedEffect(liveProgressEnabled) {
-        if (!liveProgressEnabled) return@LaunchedEffect
-        var lastDisplayedSecond = Int.MIN_VALUE
-        while (true) {
-            // This loop is driven by Compose's MonotonicFrameClock (display VSYNC).
-            // Read every frame, but mutate Compose state only when the mm:ss label changes.
-            withFrameNanos {
-                val latest = latestPositionProvider.value().coerceAtLeast(0)
-                val displayedSecond = latest / 1000
-                if (displayedSecond != lastDisplayedSecond) {
-                    lastDisplayedSecond = displayedSecond
+    LaunchedEffect(isPlayerVisible, isPlaying, currentPositionFlow) {
+        if (liveProgressEnabled) {
+            var lastDisplayedSecond = Int.MIN_VALUE
+            while (true) {
+                // One read per display frame, but only one state update per displayed second.
+                withFrameNanos {
+                    val latest = latestPositionProvider.value().coerceAtLeast(0)
+                    val displayedSecond = latest / 1000
+                    if (displayedSecond != lastDisplayedSecond) {
+                        lastDisplayedSecond = displayedSecond
+                        labelPositionMs = latest
+                    }
+                }
+            }
+        } else if (isPlayerVisible) {
+            // While paused, only seek/track StateFlow events can change the elapsed label.
+            currentPositionFlow.collect { position ->
+                val latest = position.coerceAtLeast(0)
+                if (latest / 1000 != labelPositionMs / 1000) {
                     labelPositionMs = latest
                 }
             }
         }
     }
-    LaunchedEffect(liveProgressEnabled, observedPosition) {
-        if (!liveProgressEnabled) {
-            labelPositionMs = observedPosition.coerceAtLeast(0)
-        }
-    }
 
-    val currentPosition = when {
-        liveProgressEnabled -> labelPositionMs
-        isPlayerVisible -> observedPosition
-        else -> currentPositionProvider()
-    }.coerceAtLeast(0)
+    val currentPosition = if (isPlayerVisible) {
+        labelPositionMs
+    } else {
+        currentPositionProvider().coerceAtLeast(0)
+    }
     // A missing duration is not a one-millisecond track. Treat progress as unknown/zero
     // until Media3 publishes a valid duration, otherwise any restored position renders full.
     val safeDur = duration.takeIf { it > 0 }?.toFloat()
