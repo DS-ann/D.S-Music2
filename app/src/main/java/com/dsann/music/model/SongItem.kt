@@ -90,20 +90,61 @@ data class SongItem(
      * which is not available on all supported Android versions.
      */
     fun getEmbeddedPicture(context: android.content.Context): ByteArray? {
-        val currentPath = path ?: return null
-        if (currentPath.startsWith("http")) return null
-        return try {
-            context.contentResolver.openFileDescriptor(contentUri, "r")?.use { pfd ->
-                val retriever = android.media.MediaMetadataRetriever()
-                try {
-                    retriever.setDataSource(pfd.fileDescriptor)
-                    retriever.embeddedPicture
-                } finally {
-                    try {
-                        retriever.release()
-                    } catch (_: Exception) {
-                        // Preserve the artwork read result if release fails.
+        // A downloaded track can keep its original remote/null path while its playback
+        // source changes to a local file:// URI. Resolve the active source first rather
+        // than requiring path to be populated before attempting to read embedded art.
+        val sourceUri = runCatching { contentUri }.getOrNull()
+        val localPath = sequenceOf(path, data)
+            .mapNotNull { raw ->
+                raw?.takeIf { it.isNotBlank() }?.let { value ->
+                    when {
+                        value.startsWith("file://", ignoreCase = true) ->
+                            runCatching { android.net.Uri.parse(value).path }.getOrNull()
+                        value.startsWith("http://", ignoreCase = true) ||
+                            value.startsWith("https://", ignoreCase = true) ||
+                            value.contains("://") -> null
+                        else -> value
                     }
+                }
+            }
+            .firstOrNull()
+
+        return try {
+            val retriever = android.media.MediaMetadataRetriever()
+            try {
+                // Prefer the granted MediaStore/document descriptor when the active
+                // source is content://. This also works on Android 6.
+                val contentArtwork = if (sourceUri?.scheme == "content") {
+                    runCatching {
+                        context.contentResolver.openFileDescriptor(sourceUri, "r")?.use { pfd ->
+                            retriever.setDataSource(pfd.fileDescriptor)
+                            retriever.embeddedPicture
+                        }
+                    }.getOrNull()
+                } else {
+                    null
+                }
+
+                if (contentArtwork != null) {
+                    contentArtwork
+                } else {
+                    // The downloaded source is normally file:// on Android 6. Use its
+                    // actual filesystem path; openFileDescriptor(file://) is not reliable
+                    // across legacy ContentResolver implementations.
+                    val sourcePath = sourceUri
+                        ?.takeIf { it.scheme == "file" }
+                        ?.path
+                        ?.takeIf { it.isNotBlank() }
+                        ?: localPath
+                        ?: return null
+                    retriever.setDataSource(sourcePath)
+                    retriever.embeddedPicture
+                }
+            } finally {
+                try {
+                    retriever.release()
+                } catch (_: Exception) {
+                    // Preserve the artwork read result if release fails.
                 }
             }
         } catch (_: Exception) {
