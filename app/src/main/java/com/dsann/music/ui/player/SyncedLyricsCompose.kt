@@ -319,11 +319,38 @@ internal fun SyncedLyricsCompose(
         if (scrollTargetIndex == 0) {
             listState.scrollToItem(0)
         } else if (scrollTargetIndex > 0) {
+            val previousLineIndex = (scrollTargetIndex - 1 downTo 0)
+                .firstOrNull { !displayItems[it].line.isInterlude }
+            val previousLine = previousLineIndex?.let { displayItems[it].line }
+            val nextLine = displayItems[scrollTargetIndex].line
+            val lastWordEndMs = previousLine?.words
+                ?.maxOfOrNull { it.absoluteStartTimeMs + it.durationMs }
+            val nextFirstWordStartMs = nextLine.words
+                .minOfOrNull { it.absoluteStartTimeMs }
+                ?: nextLine.startTimeMs
+
+            val gapMs = lastWordEndMs?.let {
+                (nextFirstWordStartMs - it).coerceAtLeast(0L)
+            } ?: 0L
+            val playbackPositionMs = lyricClock.intValue.toLong()
+            val remainingGapMs = (nextFirstWordStartMs - playbackPositionMs).coerceAtLeast(0L)
+            val playbackSpeed = playbackSpeedProvider()
+                .takeIf { it.isFinite() && it > 0f } ?: 1f
+            val scrollDurationMs = if (gapMs > 0L && remainingGapMs > 0L) {
+                (remainingGapMs.toDouble() / playbackSpeed.toDouble())
+                    .roundToInt()
+                    .coerceAtLeast(16)
+            } else {
+                // No timed gap exists (ordinary LRC or overlapping karaoke words).
+                140
+            }
+
             performSmoothedScroll(
                 listState,
                 scrollTargetIndex,
                 displayItems,
-                with(density) { 36.dp.roundToPx() }
+                with(density) { 36.dp.roundToPx() },
+                scrollDurationMs = scrollDurationMs
             )
         } else if (lyricClock.intValue <= (displayItems.firstOrNull()?.line?.startTimeMs ?: 0L)) {
             listState.scrollToItem(0)
@@ -952,7 +979,8 @@ private suspend fun performSmoothedScroll(
     listState: androidx.compose.foundation.lazy.LazyListState,
     activeIndex: Int,
     displayItems: List<LyricDisplayItem>,
-    estimatedItemHalfHeightPx: Int
+    estimatedItemHalfHeightPx: Int,
+    scrollDurationMs: Int = 140
 ) {
     if (activeIndex !in displayItems.indices) return
 
@@ -979,21 +1007,19 @@ private suspend fun performSmoothedScroll(
         item = layout.visibleItemsInfo.firstOrNull { it.index == activeIndex } ?: return
     }
 
-    // Use item and viewport coordinates from the same LazyListLayoutInfo. This avoids
-    // content-padding and device-inset assumptions in a hand-calculated scrollOffset.
-    repeat(2) {
-        val viewportCenter = (layout.viewportStartOffset + layout.viewportEndOffset) / 2f
-        val itemCenter = item!!.offset + item!!.size / 2f
-        val correctionPx = itemCenter - viewportCenter
-        if (abs(correctionPx) <= 1.5f) return
-
+    // Use item and viewport coordinates from the same LazyListLayoutInfo. One timed
+    // correction keeps the entire movement inside the measured inter-line timing window.
+    val viewportCenter = (layout.viewportStartOffset + layout.viewportEndOffset) / 2f
+    val itemCenter = item!!.offset + item!!.size / 2f
+    val correctionPx = itemCenter - viewportCenter
+    if (abs(correctionPx) > 1.5f) {
         listState.animateScrollBy(
             value = correctionPx,
-            animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing)
+            animationSpec = tween(
+                durationMillis = scrollDurationMs.coerceAtLeast(1),
+                easing = FastOutSlowInEasing
+            )
         )
-        withFrameNanos { }
-        layout = listState.layoutInfo
-        item = layout.visibleItemsInfo.firstOrNull { it.index == activeIndex } ?: return
     }
 }
 

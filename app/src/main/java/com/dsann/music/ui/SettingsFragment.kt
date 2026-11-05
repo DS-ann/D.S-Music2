@@ -4675,7 +4675,7 @@ private fun AboutScreen(
             Spacer(modifier = Modifier.height(16.dp))
             
             Icon(
-                painter = painterResource(R.drawable.ic_applogo),
+                painter = painterResource(R.drawable.ic_launcher_art),
                 contentDescription = null,
                 tint = androidx.compose.ui.graphics.Color.Unspecified,
                 modifier = Modifier.size(120.dp)

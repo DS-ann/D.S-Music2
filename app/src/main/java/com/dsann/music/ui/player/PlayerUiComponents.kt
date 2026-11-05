@@ -323,31 +323,44 @@ internal fun WavySliderWithLabels(
 
     // The service can publish at 20-60 FPS. Time labels only need a 4 Hz snapshot;
     // the actual slider line samples Media3 in the draw pass below on every selected frame.
+    // Only the displayed second is needed by the time labels. Sampling this flow at 1 Hz
+    // keeps paused seeks and state restoration responsive without high-frequency recomposition.
     val labelPositionFlow = remember(currentPositionFlow) {
-        currentPositionFlow.sample(250L)
+        currentPositionFlow.sample(1000L)
     }
     val observedPosition by labelPositionFlow.collectAsStateWithLifecycle(
         initialValue = currentPositionFlow.value
     )
     val liveProgressEnabled = isPlayerVisible && isPlaying
-    var api23LabelPosition by remember(currentPositionFlow, currentPositionProvider) {
-        mutableIntStateOf(currentPositionProvider().coerceAtLeast(0))
+    val latestPositionProvider = rememberUpdatedState(currentPositionProvider)
+    var labelPositionMs by remember(currentPositionFlow) {
+        mutableIntStateOf(currentPositionFlow.value.coerceAtLeast(0))
     }
-    LaunchedEffect(isApi23, isPlayerVisible, isPlaying, currentPositionProvider) {
-        if (!isApi23 || !isPlayerVisible) return@LaunchedEffect
-        if (!isPlaying) {
-            api23LabelPosition = currentPositionProvider().coerceAtLeast(0)
-            return@LaunchedEffect
-        }
+
+    LaunchedEffect(liveProgressEnabled) {
+        if (!liveProgressEnabled) return@LaunchedEffect
+        var lastDisplayedSecond = Int.MIN_VALUE
         while (true) {
-            val latestPosition = currentPositionProvider().coerceAtLeast(0)
-            if (api23LabelPosition != latestPosition) api23LabelPosition = latestPosition
-            delay(200L)
+            // This loop is driven by Compose's MonotonicFrameClock (display VSYNC).
+            // Read every frame, but mutate Compose state only when the mm:ss label changes.
+            withFrameNanos {
+                val latest = latestPositionProvider.value().coerceAtLeast(0)
+                val displayedSecond = latest / 1000
+                if (displayedSecond != lastDisplayedSecond) {
+                    lastDisplayedSecond = displayedSecond
+                    labelPositionMs = latest
+                }
+            }
         }
     }
+    LaunchedEffect(liveProgressEnabled, observedPosition) {
+        if (!liveProgressEnabled) {
+            labelPositionMs = observedPosition.coerceAtLeast(0)
+        }
+    }
+
     val currentPosition = when {
-        liveProgressEnabled && isApi23 -> api23LabelPosition
-        liveProgressEnabled -> currentPositionProvider()
+        liveProgressEnabled -> labelPositionMs
         isPlayerVisible -> observedPosition
         else -> currentPositionProvider()
     }.coerceAtLeast(0)
