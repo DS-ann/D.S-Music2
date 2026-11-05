@@ -411,12 +411,14 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
     }
 
     // Mini content shares the sheet's origin and moves with its interpolated frame.
+    // Keep the gesture/hit-test layer full-width inside its collapsed frame. The visible
+    // capsule is a separate inset child, so the left/right gutters stay genuinely transparent
+    // instead of being painted by the capsule surface or its shadow.
     Box(
         modifier = Modifier
             .align(Alignment.TopCenter)
             .fillMaxWidth(miniPlayerWidthFraction)
             .height(miniPlayerHeight)
-            .padding(horizontal = 24.dp * miniPlayerWidthFraction)
             .then(miniSwipeModifier)
             .playerSheetVerticalDragGesture(
                 enabled = !isSheetExpanded && !isLyricsModeEnabled && !isQueueExpanded,
@@ -425,27 +427,34 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
             .graphicsLayer {
                 alpha = (1f - playerContentExpansionFraction.value).coerceIn(0f, 1f)
             }
-            .shadow(miniPlayerElevation, miniPlayerShape)
-            .clip(miniPlayerShape)
-            .background(miniPlayerBackgroundColor, miniPlayerShape)
             .zIndex(miniPlayerZIndex)
     ) {
-        MiniPlayerContentInternal(
-            viewModel = viewModel,
-            currentSong = currentSong,
-            isPlaying = isPlaying,
-            accentColor = baseAccentColor,
-            showLegacyCompactArtwork = showLegacyCompactArtwork,
-            expansionFraction = playerContentExpansionFraction,
-            onClick = {
-                // A tap on the mini player always opens the normal full player.
-                // Lyrics and Queue are explicit modes, never inherited from the last session.
-                viewModel.setLyricsModeEnabled(false)
-                viewModel.setQueueExpanded(false)
-                onExpand()
-            },
-            modifier = Modifier.fillMaxSize()
-        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxSize()
+                .padding(horizontal = 24.dp * miniPlayerWidthFraction)
+                .shadow(miniPlayerElevation, miniPlayerShape)
+                .clip(miniPlayerShape)
+                .background(miniPlayerBackgroundColor, miniPlayerShape)
+        ) {
+            MiniPlayerContentInternal(
+                viewModel = viewModel,
+                currentSong = currentSong,
+                isPlaying = isPlaying,
+                accentColor = baseAccentColor,
+                showLegacyCompactArtwork = showLegacyCompactArtwork,
+                expansionFraction = playerContentExpansionFraction,
+                onClick = {
+                    // A tap on the mini player always opens the normal full player.
+                    // Lyrics and Queue are explicit modes, never inherited from the last session.
+                    viewModel.setLyricsModeEnabled(false)
+                    viewModel.setQueueExpanded(false)
+                    onExpand()
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 
     // Mount the expensive full-player tree only after the sheet is actually open.
