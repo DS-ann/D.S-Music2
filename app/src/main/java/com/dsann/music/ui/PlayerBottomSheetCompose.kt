@@ -1011,8 +1011,8 @@ fun PlayerBottomSheetCompose(
                             )
                         )
                     }
-                } catch (_: kotlinx.coroutines.CancellationException) {
-                    throw kotlinx.coroutines.CancellationException("Video quality lookup cancelled")
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
                 } catch (_: Exception) {
                     videoQualityOptions = emptyList()
                     selectedVideoQuality = playerPreferences.getString("video_quality_preferred_label", null)
