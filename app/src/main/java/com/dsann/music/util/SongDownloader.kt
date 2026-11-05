@@ -375,7 +375,22 @@ object SongDownloader {
         val expectedName = "$baseName.opus"
         val canonicalUri = findDsmusicMediaStoreUri(context, expectedName)
             ?: findLegacyDownloadedFile(expectedName)
-        val isAppOwned = rawUri in mappedUris || canonicalUri?.toString() == rawUri
+        val sourceFile = sourceUri.path?.let(::File)
+        val downloadsRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val isInsideDsmusicDownloads = sourceFile?.let { candidate ->
+            val candidatePath = runCatching { candidate.canonicalPath }.getOrNull()
+            val allowedDirectories = listOf(
+                File(downloadsRoot, "D.S Music"),
+                File(downloadsRoot, "SpatialFlow")
+            )
+            candidatePath != null && candidate.name.equals(expectedName, ignoreCase = true) &&
+                allowedDirectories.any { directory ->
+                    val directoryPath = runCatching { directory.canonicalPath }.getOrNull()
+                    directoryPath != null && candidatePath.startsWith(directoryPath + File.separator)
+                }
+        } == true
+        val isAppOwned = rawUri in mappedUris || canonicalUri?.toString() == rawUri ||
+            (sourceUri.scheme == "file" && isInsideDsmusicDownloads)
         if (!isAppOwned) {
             Log.w(TAG, "Refusing to delete Opus source outside the D.S Music download store: $sourceUri")
             return false
@@ -415,6 +430,14 @@ object SongDownloader {
             return false
         }
 
+        // Android 10+ downloads are first staged in this app cache folder and then
+        // copied into MediaStore. Clean up any legacy staging copy left by an older build.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val stagedCopy = File(File(context.cacheDir, "D.S-Music_output"), expectedName)
+            if (stagedCopy.exists() && !stagedCopy.delete()) {
+                Log.w(TAG, "Could not delete old Opus staging copy: ${stagedCopy.absolutePath}")
+            }
+        }
         if (videoId != null) {
             val editor = prefs.edit()
                 .remove("opus_uri_$videoId")
