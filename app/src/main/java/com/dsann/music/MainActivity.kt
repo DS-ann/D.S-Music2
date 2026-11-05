@@ -441,9 +441,9 @@ class MainActivity : AppCompatActivity() {
                     // attaches to the screen edge; Floating keeps a margin and rounded shell;
                     // Minimal removes the shell surface.
                     val railWidth = when (navBarSize) {
-                        "Compact" -> 80.dp
-                        "Tall" -> 96.dp
-                        else -> 88.dp
+                        "Compact" -> 60.dp
+                        "Tall" -> 76.dp
+                        else -> 68.dp
                     }
                     val railOuterGap = if (navBarStyle == "Docked") 0.dp else 12.dp
                     val railStartPadding = railSystemInset + railOuterGap
