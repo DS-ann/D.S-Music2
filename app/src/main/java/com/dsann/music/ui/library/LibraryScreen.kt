@@ -64,6 +64,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -75,6 +77,8 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Clear
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Favorite
@@ -402,6 +406,7 @@ fun LibraryScreen(
                 videoId = item.videoId,
                 title = item.title,
                 artist = item.artist,
+                albumName = item.albumName,
                 durationMs = item.durationMs,
                 thumbnailUrl = android.net.Uri.fromFile(
                     AudioPlaybackService.getCachedMediaArtworkFile(context, item.songId)
@@ -620,6 +625,9 @@ fun LibraryScreen(
                                 isRefreshing = false
                             }
                         }
+                        var isSelectingDownloads by remember { mutableStateOf(false) }
+                        var selectedDownloadIds by remember { mutableStateOf(setOf<Long>()) }
+                        var downloadSelectionMenuExpanded by remember { mutableStateOf(false) }
 
                         val pullToRefreshState = rememberPullToRefreshState()
                         PullToRefreshBox(
@@ -849,6 +857,107 @@ fun LibraryScreen(
                                     }
                                 }
 
+                                if (sourceSongs.isNotEmpty()) {
+                                    if (!isSelectingDownloads) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+                                            horizontalArrangement = Arrangement.End
+                                        ) {
+                                            DsmusicTextButton(onClick = { isSelectingDownloads = true }) {
+                                                Text("Select songs")
+                                            }
+                                        }
+                                    } else {
+                                        val selectedSongs = sourceSongs.filter { it.id in selectedDownloadIds }
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(
+                                                "${selectedDownloadIds.size} selected",
+                                                modifier = Modifier.weight(1f),
+                                                style = DsmusicTheme.typography.labelLarge,
+                                                color = DsmusicTheme.colorScheme.primary
+                                            )
+                                            DsmusicTextButton(onClick = {
+                                                selectedDownloadIds = filteredSongs.map { it.id }.toSet()
+                                            }) { Text("Select all") }
+                                            Box {
+                                                DsmusicIconButton(onClick = { downloadSelectionMenuExpanded = true }) {
+                                                    Icon(Icons.Rounded.MoreVert, contentDescription = "Selected download actions")
+                                                }
+                                                DropdownMenu(
+                                                    expanded = downloadSelectionMenuExpanded,
+                                                    onDismissRequest = { downloadSelectionMenuExpanded = false }
+                                                ) {
+                                                    DropdownMenuItem(
+                                                        text = { Text("Play next") },
+                                                        onClick = {
+                                                            selectedSongs.asReversed().forEach(viewModel::addToQueueNext)
+                                                            downloadSelectionMenuExpanded = false
+                                                            selectedDownloadIds = emptySet()
+                                                            isSelectingDownloads = false
+                                                            com.dsann.music.ui.SnackbarController.showMessage("Added ${selectedSongs.size} songs to play next")
+                                                        }
+                                                    )
+                                                    DropdownMenuItem(
+                                                        text = { Text("Add to queue") },
+                                                        onClick = {
+                                                            selectedSongs.forEach(viewModel::addToQueue)
+                                                            downloadSelectionMenuExpanded = false
+                                                            selectedDownloadIds = emptySet()
+                                                            isSelectingDownloads = false
+                                                            com.dsann.music.ui.SnackbarController.showMessage("Added ${selectedSongs.size} songs to queue")
+                                                        }
+                                                    )
+                                                    DropdownMenuItem(
+                                                        text = { Text("Delete selected") },
+                                                        onClick = {
+                                                            downloadSelectionMenuExpanded = false
+                                                            scope.launch {
+                                                                val deletedCount = withContext(Dispatchers.IO) {
+                                                                    selectedSongs.count { selectedSong ->
+                                                                        val rowsDeleted = runCatching {
+                                                                            context.contentResolver.delete(selectedSong.contentUri, null, null)
+                                                                        }.getOrDefault(0)
+                                                                        if (rowsDeleted > 0) {
+                                                                            true
+                                                                        } else {
+                                                                            val rawPath = (selectedSong.path ?: selectedSong.data).orEmpty()
+                                                                            if (rawPath.isBlank()) false else {
+                                                                                val file = java.io.File(rawPath)
+                                                                                !file.exists() || file.delete()
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                                scanLocalFiles(context, viewModel)
+                                                                selectedDownloadIds = emptySet()
+                                                                isSelectingDownloads = false
+                                                                com.dsann.music.ui.SnackbarController.showMessage("Deleted $deletedCount of ${selectedSongs.size} selected songs")
+                                                            }
+                                                        }
+                                                    )
+                                                    DropdownMenuItem(
+                                                        text = { Text("Clear selection") },
+                                                        onClick = {
+                                                            downloadSelectionMenuExpanded = false
+                                                            selectedDownloadIds = emptySet()
+                                                            isSelectingDownloads = false
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                            DsmusicTextButton(onClick = {
+                                                selectedDownloadIds = emptySet()
+                                                isSelectingDownloads = false
+                                                downloadSelectionMenuExpanded = false
+                                            }) { Text("Done") }
+                                        }
+                                    }
+                                }
+
                                 if (sortedAndGrouped.isEmpty()) {
                                     Box(
                                         modifier = Modifier
@@ -873,6 +982,85 @@ fun LibraryScreen(
                                         contentPadding = PaddingValues(bottom = 160.dp),
                                         verticalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
+                                        item(key = "download-playlist-header") {
+                                            val headerSong = filteredSongs.firstOrNull()
+                                            if (headerSong != null) {
+                                                Column(
+                                                    modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        AsyncImage(
+                                                            model = headerSong.getAlbumArtUri() ?: R.drawable.ic_music_note,
+                                                            contentDescription = "Downloaded songs artwork",
+                                                            modifier = Modifier.size(112.dp).clip(RoundedCornerShape(14.dp)),
+                                                            contentScale = ContentScale.Crop
+                                                        )
+                                                        Column(
+                                                            modifier = Modifier.weight(1f).padding(start = 14.dp),
+                                                            verticalArrangement = Arrangement.spacedBy(5.dp)
+                                                        ) {
+                                                            Text(
+                                                                "Downloads",
+                                                                style = DsmusicTheme.typography.headlineSmall,
+                                                                fontWeight = FontWeight.ExtraBold
+                                                            )
+                                                            Text(
+                                                                "D.S Music · ${sourceSongs.size} songs",
+                                                                style = DsmusicTheme.typography.bodyMedium,
+                                                                color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                            Text(
+                                                                "Saved on this device",
+                                                                style = DsmusicTheme.typography.labelMedium,
+                                                                color = DsmusicTheme.colorScheme.primary
+                                                            )
+                                                        }
+                                                    }
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                                    ) {
+                                                        DsmusicButton(
+                                                            onClick = {
+                                                                val playlist = filteredSongs
+                                                                if (playlist.isNotEmpty()) {
+                                                                    viewModel.setShuffleEnabled(false)
+                                                                    viewModel.setSongList(playlist)
+                                                                    viewModel.playSong(playlist.first())
+                                                                }
+                                                            },
+                                                            enabled = filteredSongs.isNotEmpty(),
+                                                            modifier = Modifier.weight(1f)
+                                                        ) {
+                                                            Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                                                            Spacer(Modifier.width(6.dp))
+                                                            Text("Play all")
+                                                        }
+                                                        DsmusicOutlinedButton(
+                                                            onClick = {
+                                                                val playlist = filteredSongs.shuffled()
+                                                                if (playlist.isNotEmpty()) {
+                                                                    viewModel.setShuffleEnabled(true)
+                                                                    viewModel.setSongList(playlist)
+                                                                    viewModel.playSong(playlist.first())
+                                                                }
+                                                            },
+                                                            enabled = filteredSongs.isNotEmpty(),
+                                                            modifier = Modifier.weight(1f)
+                                                        ) {
+                                                            Icon(Icons.Rounded.Shuffle, contentDescription = null)
+                                                            Spacer(Modifier.width(6.dp))
+                                                            Text("Shuffle")
+                                                        }
+                                                    }
+                                                    com.dsann.music.ui.theme.HorizontalDivider()
+                                                }
+                                            }
+                                        }
                                         itemsIndexed(
                                             items = sortedAndGrouped,
                                             key = { _, item ->
@@ -903,7 +1091,7 @@ fun LibraryScreen(
                                                 // SwipeToDismissBox implementation
                                                 val dismissState = rememberSwipeToDismissBoxState(
                                                     confirmValueChange = { dismissValue ->
-                                                        when (dismissValue) {
+                                                        if (isSelectingDownloads) false else when (dismissValue) {
                                                             SwipeToDismissBoxValue.StartToEnd -> {
                                                                 viewModel.addToQueueNext(item)
                                                                 scope.launch {
@@ -983,12 +1171,29 @@ fun LibraryScreen(
                                                             isFavorite = isFav,
                                                             localIndex = localIndex,
                                                             localCount = count,
+                                                            selectionMode = isSelectingDownloads,
+                                                            isSelected = item.id in selectedDownloadIds,
                                                             onClick = {
-                                                                // Play clicked song, set the entire filtered songs list as queue
-                                                                viewModel.setSongList(filteredSongs)
-                                                                viewModel.playSong(item)
+                                                                if (isSelectingDownloads) {
+                                                                    selectedDownloadIds = if (item.id in selectedDownloadIds) {
+                                                                        selectedDownloadIds - item.id
+                                                                    } else {
+                                                                        selectedDownloadIds + item.id
+                                                                    }
+                                                                } else {
+                                                                    // Play clicked song, set the entire filtered songs list as queue
+                                                                    viewModel.setSongList(filteredSongs)
+                                                                    viewModel.playSong(item)
+                                                                }
                                                             },
                                                             onLongClick = {
+                                                                if (isSelectingDownloads) {
+                                                                    selectedDownloadIds = if (item.id in selectedDownloadIds) {
+                                                                        selectedDownloadIds - item.id
+                                                                    } else {
+                                                                        selectedDownloadIds + item.id
+                                                                    }
+                                                                } else {
                                                                 val bs = SongActionsBottomSheet.newInstance(item)
                                                                 bs.setActionListener(object : SongActionsBottomSheet.ActionListener {
                                                                     override fun onPlay(song: SongItem) {
@@ -1051,6 +1256,7 @@ fun LibraryScreen(
                                                                     }
                                                                 })
                                                                 fragmentManager?.let { bs.show(it, "SongActionsBottomSheet") }
+                                                                }
                                                             }
                                                         )
                                                     }
@@ -1275,7 +1481,9 @@ fun SongListItem(
     localCount: Int,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    artworkRequestSizePx: Int = 128
+    artworkRequestSizePx: Int = 128,
+    selectionMode: Boolean = false,
+    isSelected: Boolean = false
 ) {
     val context = LocalContext.current
     val artModel = remember(song.id, song.thumbnailUrl, song.albumId, song.path) { song.getAlbumArtUri() ?: R.drawable.ic_music_note }
@@ -1313,15 +1521,18 @@ fun SongListItem(
             .padding(horizontal = 10.dp, vertical = 3.dp)
             .clip(shape)
             .background(
-                if (isPlaying) accent.copy(alpha = 0.13f)
-                else DsmusicTheme.colorScheme.surfaceContainerLow
+                when {
+                    isSelected -> DsmusicTheme.colorScheme.primaryContainer.copy(alpha = 0.82f)
+                    isPlaying -> accent.copy(alpha = 0.13f)
+                    else -> DsmusicTheme.colorScheme.surfaceContainerLow
+                }
             )
             .then(
-                if (isPlaying) Modifier.border(
-                    1.dp,
-                    accent.copy(alpha = 0.48f),
-                    shape
-                ) else Modifier
+                when {
+                    isSelected -> Modifier.border(1.dp, DsmusicTheme.colorScheme.primary.copy(alpha = 0.65f), shape)
+                    isPlaying -> Modifier.border(1.dp, accent.copy(alpha = 0.48f), shape)
+                    else -> Modifier
+                }
             )
             .combinedClickable(
                 onClick = onClick,
@@ -1330,6 +1541,24 @@ fun SongListItem(
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (selectionMode) {
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(if (isSelected) DsmusicTheme.colorScheme.primary else Color.Transparent)
+                    .border(1.dp, if (isSelected) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.outline, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isSelected) Icon(
+                    Icons.Rounded.Check,
+                    contentDescription = "Selected",
+                    tint = DsmusicTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+        }
         AsyncImage(
             model = artworkRequest,
             contentDescription = "Album Art",
@@ -3568,6 +3797,7 @@ private data class CachedSongEntry(
     val songId: String,
     val title: String,
     val artist: String,
+    val albumName: String,
     val videoId: String,
     val durationMs: Long,
     val cachedUri: String
@@ -3619,6 +3849,7 @@ private suspend fun readCacheTabSnapshot(
             songId = metadata.songId,
             title = metadata.title,
             artist = metadata.artist.ifBlank { "Unknown artist" },
+            albumName = metadata.albumName,
             videoId = metadata.videoId,
             durationMs = metadata.durationMs,
             cachedUri = cachedUri
