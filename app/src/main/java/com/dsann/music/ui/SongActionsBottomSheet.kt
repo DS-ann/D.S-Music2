@@ -242,6 +242,17 @@ fun BottomSheetScaffoldContent(
     val context = LocalContext.current
     val conversionScope = rememberCoroutineScope()
     val favoritesManager = remember { com.dsann.music.util.FavoritesManager(context) }
+    val handleEditSong: () -> Unit = {
+        val target = song
+        // Close the dialog fragment before changing the Activity navigation destination.
+        // Posting the callback avoids competing fragment transactions on the same frame.
+        onDismiss()
+        if (target != null) {
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                actionListener?.onEdit(target)
+            }
+        }
+    }
     val completedDownloads by com.dsann.music.util.SongDownloader.downloadedVideoIds
         .collectAsStateWithLifecycle(emptySet())
     var hasDownloadedOpus by remember(song?.id) { mutableStateOf(false) }
@@ -369,10 +380,7 @@ fun BottomSheetScaffoldContent(
 
             if (!isLandscape) {
                 // PORTRAIT: Standard Vertical Layout
-                HeaderSection(song, albumArtBitmap, onEdit = {
-                    song?.let { actionListener?.onEdit(it) }
-                    onDismiss()
-                })
+                HeaderSection(song, albumArtBitmap, onEdit = handleEditSong)
 
                 Spacer(modifier = Modifier.height(18.dp))
 
@@ -429,10 +437,7 @@ fun BottomSheetScaffoldContent(
                         HeaderSection(
                             song = song,
                             bitmap = albumArtBitmap,
-                            onEdit = {
-                                song?.let { actionListener?.onEdit(it) }
-                                onDismiss()
-                            },
+                            onEdit = handleEditSong,
                             isLandscape = true
                         )
                     }
