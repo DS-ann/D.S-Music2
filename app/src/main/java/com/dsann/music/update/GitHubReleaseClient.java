@@ -13,6 +13,11 @@ public class GitHubReleaseClient {
     private static final String TAG = "GitHubReleaseClient";
     private final String owner;
     private final String repo;
+    private volatile Exception lastError;
+
+    public Exception getLastError() {
+        return lastError;
+    }
 
     public GitHubReleaseClient(String owner, String repo) {
         this.owner = owner;
@@ -20,6 +25,7 @@ public class GitHubReleaseClient {
     }
 
     public ReleaseInfo getLatestRelease() {
+        lastError = null;
         try {
             String apiUrl = "https://api.github.com/repos/" + owner + "/" + repo + "/releases/latest";
             URL url = new URL(apiUrl);
@@ -65,12 +71,14 @@ public class GitHubReleaseClient {
             }
 
         } catch (Exception e) {
+            lastError = e;
             Log.e(TAG, "Failed to fetch latest release", e);
         }
         return null;
     }
 
     public java.util.List<ReleaseInfo> getAllReleases() {
+        lastError = null;
         java.util.List<ReleaseInfo> releases = new java.util.ArrayList<>();
         try {
             String apiUrl = "https://api.github.com/repos/" + owner + "/" + repo + "/releases";
@@ -119,6 +127,7 @@ public class GitHubReleaseClient {
                 Log.e(TAG, "GitHub API returned code: " + responseCode);
             }
         } catch (Exception e) {
+            lastError = e;
             Log.e(TAG, "Failed to fetch all releases", e);
         }
         return releases;
