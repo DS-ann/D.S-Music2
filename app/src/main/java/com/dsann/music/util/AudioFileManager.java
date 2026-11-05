@@ -98,7 +98,13 @@ public class AudioFileManager {
             return false;
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            return copyToMediaStore(context, file, title, artist, album);
+            boolean published = copyToMediaStore(context, file, title, artist, album);
+            if (published && file.exists() && !file.delete()) {
+                // MediaStore now owns the published copy; do not leave the staged audio
+                // file in the app cache after a successful export.
+                Log.w(TAG, "Could not remove staged audio after MediaStore publish: " + file.getAbsolutePath());
+            }
+            return published;
         }
         try {
             // The downloader immediately refreshes the local library after publishing a file.
