@@ -84,6 +84,10 @@ fun OnlineCollectionActionsBottomSheet(
         mutableStateOf(collection !is SearchItem.Playlist || initialContinuation.isNullOrBlank())
     }
     var isWorking by remember(collection) { mutableStateOf(false) }
+    var noInternetError by remember(collection) { mutableStateOf(false) }
+    var pendingTrackAction by remember(collection) {
+        mutableStateOf<(suspend (List<OnlineSong>) -> Unit)?>(null)
+    }
     val activeDownloadIds by SongDownloader.activeDownloadIds.collectAsStateWithLifecycle()
     val downloadedVideoIds by SongDownloader.downloadedVideoIds.collectAsStateWithLifecycle()
     val activeCollectionSongs = cachedSongs.orEmpty().filter { it.videoId in activeDownloadIds }
@@ -165,14 +169,22 @@ fun OnlineCollectionActionsBottomSheet(
 
     fun runTrackAction(action: suspend (List<OnlineSong>) -> Unit) {
         if (isWorking) return
+        pendingTrackAction = action
+        noInternetError = false
         isWorking = true
         scope.launch {
             try {
                 action(resolveSongs())
             } catch (error: Exception) {
-                com.dsann.music.ui.SnackbarController.showMessage(
-                    error.message ?: "Could not load this collection"
+                noInternetError = com.dsann.music.util.NetworkFailureClassifier.isNoInternetFailure(
+                    error,
+                    context
                 )
+                if (!noInternetError) {
+                    com.dsann.music.ui.SnackbarController.showMessage(
+                        error.message ?: "Could not load this collection"
+                    )
+                }
             } finally {
                 isWorking = false
             }
@@ -240,6 +252,15 @@ fun OnlineCollectionActionsBottomSheet(
 
             HorizontalDivider(color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
 
+            if (noInternetError) {
+                com.dsann.music.ui.theme.NoInternetState(
+                    modifier = Modifier.fillMaxWidth(),
+                    onRetry = { pendingTrackAction?.let { runTrackAction(it) } },
+                    compact = true,
+                    message = "This collection couldn't be loaded. Check your connection and retry."
+                )
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(9.dp)
@@ -248,7 +269,7 @@ fun OnlineCollectionActionsBottomSheet(
                     modifier = Modifier.weight(1f),
                     title = "Play",
                     icon = Icons.Default.PlayArrow,
-                    enabled = !isWorking
+                    enabled = !isWorking && !noInternetError
                 ) {
                     runTrackAction { songs ->
                         if (songs.isNotEmpty()) {
@@ -262,7 +283,7 @@ fun OnlineCollectionActionsBottomSheet(
                     modifier = Modifier.weight(1f),
                     title = "Queue",
                     icon = Icons.AutoMirrored.Filled.PlaylistPlay,
-                    enabled = !isWorking
+                    enabled = !isWorking && !noInternetError
                 ) {
                     runTrackAction { songs ->
                         songs.forEach { song ->
@@ -322,7 +343,7 @@ fun OnlineCollectionActionsBottomSheet(
                         else -> Icon(Icons.Default.Download, null)
                     }
                 },
-                enabled = !isWorking && !allCollectionSongsDownloaded
+                enabled = !isWorking && !noInternetError && !allCollectionSongsDownloaded
             ) {
                 if (activeCollectionSongs.isNotEmpty()) {
                     activeCollectionSongs.forEach {
@@ -365,7 +386,7 @@ fun OnlineCollectionActionsBottomSheet(
                 title = "Add to playlist",
                 subtitle = "Add every track to one of your local playlists",
                 icon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null) },
-                enabled = !isWorking
+                enabled = !isWorking && !noInternetError
             ) {
                 runTrackAction { songs ->
                     onAddToPlaylist(songs.map(::toSongItem))
