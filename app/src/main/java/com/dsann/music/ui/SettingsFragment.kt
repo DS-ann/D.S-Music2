@@ -500,12 +500,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     // ── Player, your way ────────────────────────────────────────────────────
     private val _playerLayout = MutableStateFlow(
         prefs.getString("player_layout", "Standard")?.takeIf {
-            it in listOf("Standard", "Cover", "Lyrics", "Minimal", "Vinyl", "Cassette")
+            it in listOf("Standard", "Vinyl", "Cassette")
         } ?: "Standard"
     )
     val playerLayout: StateFlow<String> = _playerLayout.asStateFlow()
     fun setPlayerLayout(value: String) {
-        val safe = value.takeIf { it in listOf("Standard", "Cover", "Lyrics", "Minimal", "Vinyl", "Cassette") } ?: "Standard"
+        val safe = value.takeIf { it in listOf("Standard", "Vinyl", "Cassette") } ?: "Standard"
         _playerLayout.value = safe
         prefs.edit { putString("player_layout", safe) }
     }
@@ -542,19 +542,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     private val availableSessionButtons = listOf("like", "shuffle", "repeat", "dislike", "back10", "ahead30")
-    private val defaultSessionButtons = listOf("like", "shuffle", "repeat", "back10", "ahead30")
+    private val defaultSessionButtons = listOf("like", "shuffle")
     private fun readSessionButtons(): List<String> {
-        val stored = prefs.getString("session_buttons", null)
-        val parsed = stored?.split(",")?.map { it.trim().lowercase() }
-            ?.filter { it in availableSessionButtons }?.distinct().orEmpty()
-        return (parsed + defaultSessionButtons.filter { it !in parsed }).take(6)
-            .let { safe -> if (safe.size >= 2) safe else defaultSessionButtons }
+        val stored = prefs.getString("session_buttons", null) ?: return defaultSessionButtons
+        return stored.split(",").map { it.trim().lowercase() }
+            .filter { it in availableSessionButtons }.distinct().take(2)
     }
     private val _sessionButtons = MutableStateFlow(readSessionButtons())
     val sessionButtons: StateFlow<List<String>> = _sessionButtons.asStateFlow()
     fun setSessionButtons(buttons: List<String>) {
-        val safe = buttons.filter { it in availableSessionButtons }.distinct().take(6)
-        if (safe.size < 2) return
+        val safe = buttons.filter { it in availableSessionButtons }.distinct().take(2)
         _sessionButtons.value = safe
         prefs.edit { putString("session_buttons", safe.joinToString(",")) }
     }
@@ -622,10 +619,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putString("scrubber_color", safe) }
     }
 
-    private val _visualizerStyle = MutableStateFlow(prefs.getString("player_visualizer", "Off") ?: "Off")
+    private val _visualizerStyle = MutableStateFlow(
+        (prefs.getString("player_visualizer", "Off") ?: "Off")
+            .let { if (it == "Ring") "Oval" else it }
+            .takeIf { it in listOf("Off", "Bars", "Wave", "Oval", "Pulse", "Glow") }
+            ?: "Off"
+    )
     val visualizerStyle: StateFlow<String> = _visualizerStyle.asStateFlow()
     fun setVisualizerStyle(value: String) {
-        val safe = value.takeIf { it in listOf("Off", "Bars", "Wave", "Ring", "Pulse", "Glow") } ?: "Off"
+        val migrated = if (value == "Ring") "Oval" else value
+        val safe = migrated.takeIf { it in listOf("Off", "Bars", "Wave", "Oval", "Pulse", "Glow") } ?: "Off"
         _visualizerStyle.value = safe
         prefs.edit { putString("player_visualizer", safe) }
     }
@@ -653,12 +656,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putString("player_button_style", safe) }
     }
 
-    private val _scrubberThickness = MutableStateFlow(prefs.getFloat("scrubber_thickness", 1f).coerceIn(0.6f, 2f))
+    // Progress thickness is fixed at 1.5×; legacy saved values no longer override it.
+    private val _scrubberThickness = MutableStateFlow(1.5f)
     val scrubberThickness: StateFlow<Float> = _scrubberThickness.asStateFlow()
     fun setScrubberThickness(value: Float) {
-        val safe = value.coerceIn(0.6f, 2f)
-        _scrubberThickness.value = safe
-        prefs.edit { putFloat("scrubber_thickness", safe) }
+        _scrubberThickness.value = 1.5f
+        prefs.edit { putFloat("scrubber_thickness", 1.5f) }
     }
 
     private val _scrubberThumbStyle = MutableStateFlow(prefs.getString("scrubber_thumb_style", "Auto") ?: "Auto")
@@ -1384,7 +1387,6 @@ fun SettingsScreenContent(
     val scrubberColor by viewModel.scrubberColor.collectAsStateWithLifecycle()
     val visualizerStyle by viewModel.visualizerStyle.collectAsStateWithLifecycle()
     val playerButtonStyle by viewModel.playerButtonStyle.collectAsStateWithLifecycle()
-    val scrubberThickness by viewModel.scrubberThickness.collectAsStateWithLifecycle()
     val scrubberThumbStyle by viewModel.scrubberThumbStyle.collectAsStateWithLifecycle()
     val visualizerColor by viewModel.visualizerColor.collectAsStateWithLifecycle()
     val lyricsTextSize by viewModel.lyricsTextSize.collectAsStateWithLifecycle()
@@ -1664,7 +1666,6 @@ fun SettingsScreenContent(
                 navBarSize = navBarSize,
                 onNavBarSizeChange = { viewModel.setNavBarSize(it) },
                 playerLayout = playerLayout,
-                onPlayerLayoutChange = { viewModel.setPlayerLayout(it) },
                 playerButtons = playerButtons,
                 onPlayerButtonsChange = { viewModel.setPlayerButtons(it) },
                 onMovePlayerButton = { from, to -> viewModel.movePlayerButton(from, to) },
@@ -1695,8 +1696,6 @@ fun SettingsScreenContent(
                 onVisualizerStyleChange = { viewModel.setVisualizerStyle(it) },
                 playerButtonStyle = playerButtonStyle,
                 onPlayerButtonStyleChange = { viewModel.setPlayerButtonStyle(it) },
-                scrubberThickness = scrubberThickness,
-                onScrubberThicknessChange = { viewModel.setScrubberThickness(it) },
                 scrubberThumbStyle = scrubberThumbStyle,
                 onScrubberThumbStyleChange = { viewModel.setScrubberThumbStyle(it) },
                 visualizerColor = visualizerColor,
@@ -2907,7 +2906,6 @@ private fun AppearanceScreen(
     navBarSize: String,
     onNavBarSizeChange: (String) -> Unit,
     playerLayout: String,
-    onPlayerLayoutChange: (String) -> Unit,
     playerButtons: List<String>,
     onPlayerButtonsChange: (List<String>) -> Unit,
     onMovePlayerButton: (Int, Int) -> Unit,
@@ -2932,8 +2930,6 @@ private fun AppearanceScreen(
     onVisualizerStyleChange: (String) -> Unit,
     playerButtonStyle: String,
     onPlayerButtonStyleChange: (String) -> Unit,
-    scrubberThickness: Float,
-    onScrubberThicknessChange: (Float) -> Unit,
     scrubberThumbStyle: String,
     onScrubberThumbStyleChange: (String) -> Unit,
     visualizerColor: String,
@@ -3013,16 +3009,7 @@ private fun AppearanceScreen(
                 )
             })
 
-            SettingsHeader("Player layout")
-            SettingsGroupCard(listOf {
-                SettingsChoiceRow(
-                    title = "Layout preset",
-                    description = "Standard balances the controls; Cover enlarges artwork; Lyrics opens directly to lyrics; Minimal, Vinyl and Cassette change the presentation.",
-                    selected = playerLayout,
-                    options = listOf("Standard", "Cover", "Lyrics", "Minimal", "Vinyl", "Cassette"),
-                    onSelected = onPlayerLayoutChange
-                )
-            })
+            SettingsHeader("Artwork size")
             SettingsGroupCard(listOf {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Text(
@@ -3036,7 +3023,7 @@ private fun AppearanceScreen(
                         valueRange = 0.65f..1f
                     )
                     Text(
-                        "Adjust the full-player cover independently of its layout preset.",
+                        "Adjust the full-player cover without moving the transport controls.",
                         style = DsmusicTheme.typography.bodySmall,
                         color = DsmusicTheme.colorScheme.onSurfaceVariant
                     )
@@ -3155,12 +3142,24 @@ private fun AppearanceScreen(
                     )
                 },
                 {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-                        Text("Track thickness: " + scrubberThickness.toString() + "×")
-                        Slider(
-                            value = scrubberThickness,
-                            onValueChange = onScrubberThicknessChange,
-                            valueRange = 0.6f..2f
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Track thickness", style = DsmusicTheme.typography.bodyMedium)
+                            Text(
+                                "Fixed progress-track weight",
+                                style = DsmusicTheme.typography.bodySmall,
+                                color = DsmusicTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            "1.5×",
+                            style = DsmusicTheme.typography.labelLarge,
+                            color = DsmusicTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
@@ -3172,7 +3171,7 @@ private fun AppearanceScreen(
                     title = "Player animation",
                     description = "Playback-state animation only. It does not use the microphone or record audio. Off uses the least resources.",
                     selected = visualizerStyle,
-                    options = listOf("Off", "Bars", "Wave", "Ring", "Pulse", "Glow"),
+                    options = listOf("Off", "Bars", "Wave", "Oval", "Pulse", "Glow"),
                     onSelected = onVisualizerStyleChange
                 )
             })
@@ -3523,12 +3522,8 @@ private fun PlayerCustomizationPreview(
         "None" -> RoundedCornerShape(3.dp)
         else -> RoundedCornerShape(10.dp)
     }
-    val artworkSize = (when (layout) {
-        "Cover" -> 104.dp
-        "Minimal" -> 64.dp
-        "Vinyl", "Cassette" -> 88.dp
-        else -> 84.dp
-    }) * artworkScale.coerceIn(0.65f, 1f)
+    val artworkSize = (if (layout == "Vinyl" || layout == "Cassette") 88.dp else 84.dp) *
+        artworkScale.coerceIn(0.65f, 1f)
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
@@ -3750,7 +3745,7 @@ private fun SessionButtonsSettings(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                "Choose and arrange media-session actions. The first two appear beside playback controls in the notification; compatible controllers can use the full selected set.",
+                "Choose up to two actions for the notification and lock screen, then arrange their order.",
                 style = DsmusicTheme.typography.bodySmall,
                 color = DsmusicTheme.colorScheme.onSurfaceVariant
             )
@@ -3760,9 +3755,10 @@ private fun SessionButtonsSettings(
                     com.dsann.music.ui.theme.Checkbox(
                         checked = true,
                         onCheckedChange = { enabled ->
-                            if (!enabled && ordered.size > 2) onSelectionChanged(ordered - key)
+                            if (!enabled) onSelectionChanged(ordered - key)
                         }
                     )
+                    Spacer(Modifier.width(10.dp))
                     Text(sessionButtonNames[key] ?: key, Modifier.weight(1f), style = DsmusicTheme.typography.bodyMedium)
                     DsmusicTextButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) { Text("↑") }
                     DsmusicTextButton(onClick = { onMove(index, index + 1) }, enabled = index < ordered.lastIndex) { Text("↓") }
@@ -3772,18 +3768,20 @@ private fun SessionButtonsSettings(
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     com.dsann.music.ui.theme.Checkbox(
                         checked = false,
-                        enabled = ordered.size < 6,
+                        enabled = ordered.size < 2,
                         onCheckedChange = { enabled ->
-                            if (enabled && ordered.size < 6) onSelectionChanged(ordered + key)
+                            if (enabled && ordered.size < 2) onSelectionChanged(ordered + key)
                         }
                     )
+                    Spacer(Modifier.width(10.dp))
                     Text(label, Modifier.weight(1f), style = DsmusicTheme.typography.bodyMedium,
                         color = DsmusicTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            if (ordered != listOf("like", "shuffle", "repeat", "back10", "ahead30")) {
+            Text("\u0024{ordered.size}/2 selected", color = DsmusicTheme.colorScheme.primary, style = DsmusicTheme.typography.labelSmall)
+            if (ordered != listOf("like", "shuffle")) {
                 DsmusicTextButton(
-                    onClick = { onSelectionChanged(listOf("like", "shuffle", "repeat", "back10", "ahead30")) }
+                    onClick = { onSelectionChanged(listOf("like", "shuffle")) }
                 ) { Text("Restore default order") }
             }
         }
@@ -3840,6 +3838,7 @@ private fun PlayerButtonsSettings(
                             }
                         }
                     )
+                    Spacer(Modifier.width(10.dp))
                     Text(label, Modifier.weight(1f), style = DsmusicTheme.typography.bodyMedium)
                     DsmusicTextButton(
                         onClick = { onMove(index, index - 1) },
@@ -3871,6 +3870,7 @@ private fun PlayerButtonsSettings(
                                 }
                             }
                         )
+                        Spacer(Modifier.width(10.dp))
                         Text(
                             label,
                             Modifier.weight(1f),
