@@ -2879,8 +2879,9 @@ class AudioPlaybackService : MediaSessionService() {
 
     private enum class NotificationPlaybackMode {
         SHUFFLE,
-        LOOP_ONE,
-        LOOP_ALL
+        REPEAT_OFF,
+        REPEAT_ONCE,
+        REPEAT_INFINITY
     }
 
     private fun currentNotificationPlaybackMode(vm: PlayerSharedViewModel?): NotificationPlaybackMode {
@@ -2888,17 +2889,18 @@ class AudioPlaybackService : MediaSessionService() {
         val shuffleEnabled = vm?.isShuffleEnabled?.value == true
         return when {
             shuffleEnabled -> NotificationPlaybackMode.SHUFFLE
-            repeatMode == PlayerSharedViewModel.REPEAT_ONE -> NotificationPlaybackMode.LOOP_ONE
-            repeatMode == PlayerSharedViewModel.REPEAT_ALL -> NotificationPlaybackMode.LOOP_ALL
-            else -> NotificationPlaybackMode.SHUFFLE
+            repeatMode == PlayerSharedViewModel.REPEAT_ONCE -> NotificationPlaybackMode.REPEAT_ONCE
+            repeatMode == PlayerSharedViewModel.REPEAT_INFINITY -> NotificationPlaybackMode.REPEAT_INFINITY
+            else -> NotificationPlaybackMode.REPEAT_OFF
         }
     }
 
     private fun notificationPlaybackModeIcon(mode: NotificationPlaybackMode): Int {
         return when (mode) {
             NotificationPlaybackMode.SHUFFLE -> R.drawable.ic_shuffle_noti
-            NotificationPlaybackMode.LOOP_ONE -> R.drawable.ic_repeat_one_noti
-            NotificationPlaybackMode.LOOP_ALL -> R.drawable.ic_repeat_noti
+            NotificationPlaybackMode.REPEAT_OFF -> R.drawable.ic_notification_repeat_off
+            NotificationPlaybackMode.REPEAT_ONCE -> R.drawable.ic_notification_repeat
+            NotificationPlaybackMode.REPEAT_INFINITY -> R.drawable.ic_notification_repeat_infinity
         }
     }
 
@@ -2936,9 +2938,9 @@ class AudioPlaybackService : MediaSessionService() {
         }
         "shuffle" -> R.drawable.ic_notification_shuffle
         "repeat" -> when (viewModel?.repeatMode?.value ?: PlayerSharedViewModel.REPEAT_OFF) {
-            PlayerSharedViewModel.REPEAT_ONE -> R.drawable.ic_notification_repeat_one
-            PlayerSharedViewModel.REPEAT_ALL -> R.drawable.ic_notification_repeat
-            else -> R.drawable.ic_notification_repeat
+            PlayerSharedViewModel.REPEAT_ONCE -> R.drawable.ic_notification_repeat
+            PlayerSharedViewModel.REPEAT_INFINITY -> R.drawable.ic_notification_repeat_infinity
+            else -> R.drawable.ic_notification_repeat_off
         }
         "dislike" -> R.drawable.ic_notification_dislike
         "back10" -> android.R.drawable.ic_media_rew
@@ -2975,11 +2977,11 @@ class AudioPlaybackService : MediaSessionService() {
             }
             shuffleEnabled -> {
                 vm.setShuffleEnabled(false)
-                vm.setRepeatMode(PlayerSharedViewModel.REPEAT_ONE)
+                vm.setRepeatMode(PlayerSharedViewModel.REPEAT_ONCE)
             }
-            repeatMode == PlayerSharedViewModel.REPEAT_ONE -> {
+            repeatMode == PlayerSharedViewModel.REPEAT_ONCE -> {
                 vm.setShuffleEnabled(false)
-                vm.setRepeatMode(PlayerSharedViewModel.REPEAT_ALL)
+                vm.setRepeatMode(PlayerSharedViewModel.REPEAT_INFINITY)
             }
             else -> {
                 vm.setShuffleEnabled(false)
