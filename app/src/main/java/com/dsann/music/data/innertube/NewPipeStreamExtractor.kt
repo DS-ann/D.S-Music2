@@ -24,6 +24,10 @@ data class VideoStreamOption(
     /** Non-null when YouTube exposes this resolution as a video-only DASH stream. */
     val audioUrl: String? = null,
     val audioMimeType: String? = null,
+    /** Exact byte length of the selected video stream, plus companion audio when known. */
+    val contentLengthBytes: Long? = null,
+    /** Video bitrate, including the paired audio bitrate for separate DASH streams. */
+    val bitrateBps: Long? = null,
     val videoTitle: String? = null,
     val videoUploader: String? = null,
     val durationMs: Long = 0L,
@@ -484,6 +488,8 @@ object NewPipeStreamExtractor {
                     resolution = stream.resolution,
                     height = height,
                     mimeType = stream.format?.mimeType?.substringBefore(';')?.trim(),
+                    contentLengthBytes = stream.itagItem?.contentLength?.takeIf { it > 0L },
+                    bitrateBps = stream.bitrate.takeIf { it > 0 }.toLong(),
                     videoTitle = info.name,
                     videoUploader = info.uploaderName,
                     durationMs = (info.duration * 1000L).coerceAtLeast(0L),
@@ -527,6 +533,17 @@ object NewPipeStreamExtractor {
                         mimeType = stream.format?.mimeType?.substringBefore(';')?.trim(),
                         audioUrl = separateAudio.content,
                         audioMimeType = separateAudio.format?.mimeType?.substringBefore(';')?.trim(),
+                        contentLengthBytes = (
+                            stream.itagItem?.contentLength?.takeIf { it > 0L }?.let { videoBytes ->
+                                separateAudio.itagItem?.contentLength?.takeIf { it > 0L }?.let { audioBytes ->
+                                    videoBytes + audioBytes
+                                }
+                            }
+                        ),
+                        bitrateBps = (
+                            (if (stream.bitrate > 0) stream.bitrate.toLong() else 0L) +
+                                (if (separateAudio.bitrate > 0) separateAudio.bitrate.toLong() else 0L)
+                        ).takeIf { it > 0L },
                         videoTitle = info.name,
                         videoUploader = info.uploaderName,
                         durationMs = (info.duration * 1000L).coerceAtLeast(0L),
