@@ -59,7 +59,14 @@ internal object OpusToMp3Converter {
                 .ifBlank { "D.S Music export" }
             val outputName = "$baseName.mp3"
             if (SongDownloader.findDownloadedExportUri(appContext, outputName) != null) {
-                return Mp3ConversionResult(true, "MP3 already exists: $outputName")
+                return if (SongDownloader.deleteDownloadedOpusSource(appContext, song, sourceUri)) {
+                    Mp3ConversionResult(true, "MP3 already exists; removed the redundant Opus original: $outputName")
+                } else {
+                    Mp3ConversionResult(
+                        false,
+                        "MP3 already exists, but the Opus original could not be deleted. Check storage access and retry."
+                    )
+                }
             }
 
             outputFile = AudioFileManager.createOutputFile(appContext, outputName)
@@ -86,10 +93,18 @@ internal object OpusToMp3Converter {
                 throw IllegalStateException("MP3 was encoded but the music library could not verify it")
             }
             SongDownloader.rememberDownloadedExport(appContext, song, outputFile)
+            // The MP3 is now fully written, tagged, published and verified. Only at this
+            // point is it safe to remove the original Opus download.
             published = true
+            if (!SongDownloader.deleteDownloadedOpusSource(appContext, song, sourceUri)) {
+                throw IllegalStateException(
+                    "MP3 was saved, but the original Opus file could not be deleted. " +
+                        "Check storage access and retry from the three-dot menu."
+                )
+            }
             return Mp3ConversionResult(
                 true,
-                "Saved ${targetBitrateKbps} kbps MP3 with embedded metadata: $outputName"
+                "Saved ${targetBitrateKbps} kbps MP3 with embedded metadata; deleted the Opus original: $outputName"
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
