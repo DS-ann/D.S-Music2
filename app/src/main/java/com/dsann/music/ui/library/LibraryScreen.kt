@@ -307,6 +307,8 @@ fun LibraryScreen(
     val history by accountViewModel?.history?.collectAsStateWithLifecycle(emptyList()) ?: remember { mutableStateOf(emptyList()) }
     val accountOfflineError by accountViewModel?.offlineError?.collectAsStateWithLifecycle(false)
         ?: remember { mutableStateOf(false) }
+    val accountHistoryOfflineError by accountViewModel?.historyOfflineError?.collectAsStateWithLifecycle(false)
+        ?: remember { mutableStateOf(false) }
     val currentOnlineSong by exploreViewModel?.currentOnlineSong?.collectAsStateWithLifecycle(null) ?: remember { mutableStateOf(null) }
     val isLoadingStream by exploreViewModel?.isLoadingStream?.collectAsStateWithLifecycle(false) ?: remember { mutableStateOf(false) }
 
@@ -1225,7 +1227,7 @@ itemsIndexed(
                         currentOnlineSong = currentOnlineSong,
                         isLoadingStream = isLoadingStream,
                         isRefreshing = accountViewModel?.isLoading?.collectAsStateWithLifecycle()?.value == true,
-                        isOfflineError = accountOfflineError,
+                        isOfflineError = accountHistoryOfflineError,
                         onRefresh = { accountViewModel?.loadLibrary() },
                         onBack = { activeTab = "Playlists" },
                         onSongClick = { song, queue, index ->
@@ -1306,7 +1308,7 @@ itemsIndexed(
                 currentOnlineSong = currentOnlineSong,
                 isLoadingStream = isLoadingStream,
                 isRefreshing = accountViewModel?.isLoading?.collectAsStateWithLifecycle()?.value == true,
-                        isOfflineError = accountOfflineError,
+                        isOfflineError = accountHistoryOfflineError,
                 onRefresh = { accountViewModel?.loadLibrary() },
                 onBack = { showHistoryScreen = false },
                 onSongClick = { song, queue, index ->
