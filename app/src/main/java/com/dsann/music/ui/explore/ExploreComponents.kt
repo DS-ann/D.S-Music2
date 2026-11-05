@@ -1830,7 +1830,8 @@ fun OnlineSongBottomSheet(
     onPlaylistAddClick: (SongItem) -> Unit,
     onViewCreditsClick: (OnlineSong) -> Unit,
     modifier: Modifier = Modifier,
-    onRemoveFromCache: (() -> Unit)? = null
+    onRemoveFromCache: (() -> Unit)? = null,
+    onNavigateToExplore: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val favoritesManager = remember { FavoritesManager(context) }
@@ -2052,20 +2053,15 @@ fun OnlineSongBottomSheet(
                     icon = Icons.Rounded.Album
                 ) {
                     val albumId = song.albumId
+                    exploreViewModel.cameFromLibrary = onNavigateToExplore != null
                     when {
-                        !albumId.isNullOrBlank() -> {
-                            exploreViewModel.loadAlbum(albumId)
-                            onDismissRequest()
-                        }
-                        !song.albumName.isNullOrBlank() -> {
+                        !albumId.isNullOrBlank() -> exploreViewModel.loadAlbum(albumId)
+                        !song.albumName.isNullOrBlank() ->
                             exploreViewModel.loadAlbumByName(song.albumName.orEmpty(), song.artist)
-                            onDismissRequest()
-                        }
-                        else -> {
-                            exploreViewModel.loadAlbumForSong(song.title, song.artist)
-                            onDismissRequest()
-                        }
+                        else -> exploreViewModel.loadAlbumForSong(song.title, song.artist)
                     }
+                    onDismissRequest()
+                    onNavigateToExplore?.invoke()
                 }
             ) + artistMenuItems + listOf(
                 ExploreTrackMenuItem(
