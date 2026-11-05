@@ -514,46 +514,85 @@ class PlayerSharedViewModel @Inject constructor(
         _playerGestureSettings.value = PlayerGestureSettings.fromPreferences(gesturePreferences)
     }
 
-    // One recommendation job is shared by proactive preloading and the actual end-of-queue
-    // transition. This prevents two simultaneous YouTube requests and duplicate queue writes.
+    // Autoplay keeps a 20-track buffer ahead of the current song. Each refill is
+    // anchored to the last queued online track so later batches continue the radio chain.
+    private companion object AutoplayQueueConfig {
+        const val AUTOPLAY_REFILL_THRESHOLD = 20
+        const val AUTOPLAY_REFILL_BATCH_SIZE = 20
+    }
+
     private var autoplayFetchJob: Job? = null
-    private var autoplayFetchingVideoId: String? = null
     private val autoplayFetchedVideoIds = mutableSetOf<String>()
 
-    fun prefetchAutoplayRecommendations(videoId: String): Job? {
-        if (videoId.isBlank() || !isAutoplayEnabled()) return null
-        if (autoplayFetchingVideoId == videoId && autoplayFetchJob?.isActive == true) {
-            return autoplayFetchJob
+    /**
+     * Add another batch before the queue runs out. The current song is excluded from the
+     * remaining count. Shuffle can select any other queued song, so all non-current entries
+     * count as available; repeat-one does not need queue extension.
+     */
+    fun maybeRefillAutoplayQueue() {
+        if (!isAutoplayEnabled() || _repeatMode.value == REPEAT_ONE) return
+        val songs = _songList.value
+        val currentSong = _currentSong.value ?: return
+        val currentIndex = songs.indexOfFirst { it.id == currentSong.id }
+        if (currentIndex !in songs.indices) return
+
+        val remaining = if (_isShuffleEnabled.value) {
+            (songs.size - 1).coerceAtLeast(0)
+        } else {
+            (songs.size - currentIndex - 1).coerceAtLeast(0)
         }
+        if (remaining >= AUTOPLAY_REFILL_THRESHOLD) return
+
+        // Start recommendations from the end of the existing queue, not the currently
+        // playing item. This avoids re-requesting the same radio list on every refill.
+        val seedVideoId = songs.lastOrNull { !it.videoId.isNullOrBlank() }?.videoId
+            ?: return
+        prefetchAutoplayRecommendations(seedVideoId, AUTOPLAY_REFILL_BATCH_SIZE)
+    }
+
+    // A single request at a time prevents multiple transitions from issuing duplicate
+    // recommendation requests while the queue is being refilled.
+    fun prefetchAutoplayRecommendations(
+        videoId: String,
+        batchSize: Int = AUTOPLAY_REFILL_BATCH_SIZE
+    ): Job? {
+        if (videoId.isBlank() || !isAutoplayEnabled()) return null
+        autoplayFetchJob?.takeIf { it.isActive }?.let { return it }
         if (videoId in autoplayFetchedVideoIds) return null
-        autoplayFetchingVideoId = videoId
+        if (_songList.value.none { it.videoId == videoId }) return null
+
         val requestJob = viewModelScope.launch {
             try {
-                val currentVideoId = _currentSong.value?.videoId
-                if (currentVideoId != videoId || !isAutoplayEnabled()) return@launch
+                if (!isAutoplayEnabled()) return@launch
 
-                // Continue with a generated radio queue first, as Prism does. The ordinary
-                // Up Next list is a fallback when radio has no new recommendations.
-                var candidates = YouTubeMusic.startRadio(videoId).getOrDefault(emptyList())
+                // Continue with a generated radio queue first. If it contains fewer than
+                // the requested batch, merge related tracks as a fallback to reach 20.
+                val radioResult = YouTubeMusic.startRadio(videoId)
+                var candidates = radioResult.getOrDefault(emptyList())
+                var requestSucceeded = radioResult.isSuccess
+
                 val existingIds = _songList.value.mapNotNull { it.videoId }.toMutableSet()
-                var fresh = candidates.filter { it.videoId.isNotBlank() && it.videoId !in existingIds }
-                    .distinctBy { it.videoId }
+                var fresh = candidates.filter {
+                    it.videoId.isNotBlank() && it.videoId !in existingIds
+                }.distinctBy { it.videoId }
 
-                if (fresh.isEmpty()) {
-                    candidates = YouTubeMusic.relatedSongs(videoId).getOrDefault(emptyList())
-                    fresh = candidates.filter { it.videoId.isNotBlank() && it.videoId !in existingIds }
-                        .distinctBy { it.videoId }
+                if (fresh.size < batchSize) {
+                    val relatedResult = YouTubeMusic.relatedSongs(videoId)
+                    candidates = candidates + relatedResult.getOrDefault(emptyList())
+                    requestSucceeded = requestSucceeded || relatedResult.isSuccess
+                    fresh = candidates.filter {
+                        it.videoId.isNotBlank() && it.videoId !in existingIds
+                    }.distinctBy { it.videoId }
                 }
 
-                if (_currentSong.value?.videoId != videoId || !isAutoplayEnabled()) return@launch
+                if (!isAutoplayEnabled()) return@launch
 
-                if (fresh.isEmpty()) {
-                    Log.w(TAG, "Autoplay returned no new songs for $videoId")
-                    return@launch
-                }
-                autoplayFetchedVideoIds += videoId
+                // Do not append recommendations for a queue item that was removed while
+                // the network request was running (for example, after the user cleared it).
+                val latest = _songList.value
+                if (latest.none { it.videoId == videoId }) return@launch
 
-                val additions = fresh.map { onlineSong ->
+                val additions = fresh.take(batchSize).map { onlineSong ->
                     SongItem.createOnlineSong(
                         onlineSong.videoId,
                         onlineSong.title,
@@ -565,21 +604,26 @@ class PlayerSharedViewModel @Inject constructor(
                         onlineSong.albumName
                     ).apply { isAutoplayRecommendation = true }
                 }
-                val latest = _songList.value
                 val latestIds = latest.mapNotNull { it.videoId }.toSet()
                 val uniqueAdditions = additions.filter { it.videoId !in latestIds }
                 if (uniqueAdditions.isNotEmpty()) {
                     _songList.value = latest + uniqueAdditions
                     audioService?.refreshNativeQueue()
-                    Log.d(TAG, "Autoplay queued ${uniqueAdditions.size} new recommendations for $videoId")
+                    Log.d(
+                        TAG,
+                        "Autoplay queued ${uniqueAdditions.size} new recommendations for $videoId"
+                    )
+                } else {
+                    Log.w(TAG, "Autoplay returned no new songs for $videoId")
                 }
+
+                // Remember completed attempts (including valid empty responses) to avoid
+                // repeatedly fetching the same radio seed on every queue refresh.
+                if (requestSucceeded) autoplayFetchedVideoIds += videoId
             } catch (error: Exception) {
                 Log.w(TAG, "Autoplay recommendation request failed for $videoId", error)
             } finally {
-                if (autoplayFetchingVideoId == videoId) {
-                    autoplayFetchingVideoId = null
-                    autoplayFetchJob = null
-                }
+                autoplayFetchJob = null
             }
         }
         autoplayFetchJob = requestJob
