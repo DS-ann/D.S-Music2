@@ -692,6 +692,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putString("lyrics_text_size", safe) }
     }
 
+    // Show the currently active synced line in the portrait full-player's free control gap.
+    private val _showSyncedLyricsInPlayer = MutableStateFlow(
+        prefs.getBoolean("show_synced_lyrics_in_player", true)
+    )
+    val showSyncedLyricsInPlayer: StateFlow<Boolean> = _showSyncedLyricsInPlayer.asStateFlow()
+    fun setShowSyncedLyricsInPlayer(enabled: Boolean) {
+        _showSyncedLyricsInPlayer.value = enabled
+        prefs.edit { putBoolean("show_synced_lyrics_in_player", enabled) }
+    }
+
     private val _lyricsAlignment = MutableStateFlow(
         prefs.getString("lyrics_alignment", "Original") ?: "Original"
     )
@@ -789,7 +799,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         "player_title_weight", "player_title_scroll", "player_times", "scrubber_style",
         "scrubber_color", "player_visualizer", "player_button_style", "scrubber_thickness",
         "scrubber_thumb_style", "visualizer_color", "lyrics_text_size", "lyrics_alignment",
-        "lyrics_font_family", "lyrics_color_style", "ui_density", "ui_font_family", "ui_font_scale",
+        "lyrics_font_family", "lyrics_color_style", "show_synced_lyrics_in_player",
+        "ui_density", "ui_font_family", "ui_font_scale",
         "ui_font_weight", "ui_letter_spacing", "nav_label_mode", "hide_nav_labels",
         "dynamic_nav_style", "nav_bar_style", "nav_bar_size"
     )
@@ -871,6 +882,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         setScrubberThumbStyle(look.optString("scrubber_thumb_style", _scrubberThumbStyle.value))
         setVisualizerColor(look.optString("visualizer_color", _visualizerColor.value))
         setLyricsTextSize(look.optString("lyrics_text_size", _lyricsTextSize.value))
+        setShowSyncedLyricsInPlayer(
+            look.optBoolean("show_synced_lyrics_in_player", _showSyncedLyricsInPlayer.value)
+        )
         setLyricsAlignment(look.optString("lyrics_alignment", _lyricsAlignment.value))
         setLyricsFontFamily(look.optString("lyrics_font_family", _lyricsFontFamily.value))
         setLyricsColorStyle(look.optString("lyrics_color_style", _lyricsColorStyle.value))
@@ -1392,6 +1406,7 @@ fun SettingsScreenContent(
     val scrubberThumbStyle by viewModel.scrubberThumbStyle.collectAsStateWithLifecycle()
     val visualizerColor by viewModel.visualizerColor.collectAsStateWithLifecycle()
     val lyricsTextSize by viewModel.lyricsTextSize.collectAsStateWithLifecycle()
+    val showSyncedLyricsInPlayer by viewModel.showSyncedLyricsInPlayer.collectAsStateWithLifecycle()
     val lyricsAlignment by viewModel.lyricsAlignment.collectAsStateWithLifecycle()
     val lyricsFontFamily by viewModel.lyricsFontFamily.collectAsStateWithLifecycle()
     val lyricsColorStyle by viewModel.lyricsColorStyle.collectAsStateWithLifecycle()
@@ -1643,6 +1658,8 @@ fun SettingsScreenContent(
                 onMiniPlayerProgressStyleChange = { viewModel.setMiniPlayerProgressStyle(it) },
                 lyricsTextSize = lyricsTextSize,
                 onLyricsTextSizeChange = { viewModel.setLyricsTextSize(it) },
+                showSyncedLyricsInPlayer = showSyncedLyricsInPlayer,
+                onShowSyncedLyricsInPlayerChange = { viewModel.setShowSyncedLyricsInPlayer(it) },
                 lyricsAlignment = lyricsAlignment,
                 onLyricsAlignmentChange = { viewModel.setLyricsAlignment(it) },
                 lyricsFontFamily = lyricsFontFamily,
@@ -2898,6 +2915,8 @@ private fun AppearanceScreen(
     onMiniPlayerProgressStyleChange: (String) -> Unit,
     lyricsTextSize: String,
     onLyricsTextSizeChange: (String) -> Unit,
+    showSyncedLyricsInPlayer: Boolean,
+    onShowSyncedLyricsInPlayerChange: (Boolean) -> Unit,
     lyricsAlignment: String,
     onLyricsAlignmentChange: (String) -> Unit,
     lyricsFontFamily: String,
@@ -3295,6 +3314,33 @@ private fun AppearanceScreen(
             }
             SettingsAccordionSection("Lyrics") {
             SettingsGroupCard(listOf(
+                {
+                    DsmusicListItem(
+                        onClick = {
+                            onShowSyncedLyricsInPlayerChange(!showSyncedLyricsInPlayer)
+                        },
+                        content = {
+                            Column {
+                                Text(
+                                    "Show synced lyrics in player",
+                                    style = DsmusicTheme.typography.bodyLarge
+                                )
+                                Text(
+                                    "Show one active lyric line between the title or visualizer and the action buttons in portrait mode. Karaoke lines advance after the final word completes.",
+                                    style = DsmusicTheme.typography.bodyMedium,
+                                    color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        },
+                        trailingContent = {
+                            DsmusicSwitch(
+                                checked = showSyncedLyricsInPlayer,
+                                onCheckedChange = onShowSyncedLyricsInPlayerChange
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                },
                 {
                     SettingsChoiceRow(
                         title = "Lyrics text size",
