@@ -1589,7 +1589,8 @@ class PlayerSharedViewModel @Inject constructor(
     }
 
     fun setCurrentSong(song: SongItem?) {
-        if (_currentSong.value?.id != song?.id) {
+        val previousSong = _currentSong.value
+        if (previousSong?.id != song?.id || previousSong?.videoId != song?.videoId) {
             lyricsController.clearForSongChange(song)
             _isVideoMode.value = false
             _videoPlaybackMetadata.value = null
@@ -1619,8 +1620,18 @@ class PlayerSharedViewModel @Inject constructor(
             Log.d(TAG, "Injected lazy resolver URI for: ${song.title}")
         }
 
+        val previousSong = _currentSong.value
+        val isDifferentTrack = previousSong?.id != song.id ||
+            previousSong?.videoId != song.videoId
+
         _currentSongIndex.value = index
         lyricsController.clearForSongChange(song)
+        // Keep video mode enabled across queue changes so the service can bind the
+        // matching video for the new track. It validates both song ID and video ID,
+        // and falls back to this track's audio stream when no video is available.
+        if (isDifferentTrack) {
+            _videoPlaybackMetadata.value = null
+        }
 
         // SongItem equality includes its playback source, so selecting a cached/downloaded
         // representation of the same track ID emits a real current-song update without a
