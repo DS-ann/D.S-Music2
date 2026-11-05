@@ -70,8 +70,9 @@ fun DsmusicNavigationBar(
         modifier = modifier
             .fillMaxWidth()
             .padding(
-                horizontal = horizontalInset,
+                start = horizontalInset,
                 top = verticalInset,
+                end = horizontalInset,
                 bottom = if (bottomInset > 0.dp) verticalInset else 0.dp
             )
             .clip(dockShape)
