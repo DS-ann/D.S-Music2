@@ -106,6 +106,19 @@ class QueueBottomSheet : BottomSheetDialogFragment() {
 
     private lateinit var viewModel: PlayerSharedViewModel
 
+    override fun onStart() {
+        super.onStart()
+        val sheetDialog = dialog as? com.google.android.material.bottomsheet.BottomSheetDialog ?: return
+        val sheetContainer = sheetDialog.findViewById<View>(
+            com.google.android.material.R.id.design_bottom_sheet
+        ) ?: return
+
+        // The Compose queue surface is borderless; keep Material's dialog container
+        // transparent so its default drawable cannot draw a second white perimeter.
+        sheetDialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        sheetContainer.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewModel = ViewModelProvider(requireActivity())[PlayerSharedViewModel::class.java]
