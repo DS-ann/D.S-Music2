@@ -1098,7 +1098,7 @@ fun HomeSectionRow(
                                         .combinedClickable(
                                             onClick = {
                                                 when (item) {
-                                                    is SearchItem.Song -> onSongMenuClick(item.song)
+                                                    is SearchItem.Song -> onSongClick(item.song)
                                                     is SearchItem.Album -> onAlbumClick(item.album)
                                                     is SearchItem.Artist -> onArtistClick(item.artist)
                                                     is SearchItem.Playlist -> onPlaylistClick(item.playlist)

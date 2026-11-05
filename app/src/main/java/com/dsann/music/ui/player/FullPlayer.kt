@@ -1154,6 +1154,12 @@ fun FullPlayer(
                 Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 10.dp))
             }
 
+            // Move three quarters of the flexible gap above the action controls.
+            // Together with the 1f spacer below the transport controls, this keeps
+            // the queue opener at the same position while reducing the remaining
+            // controls-to-opener gap to exactly one quarter of its previous size.
+            Spacer(modifier = Modifier.weight(3f, fill = true))
+
             // Reorderable action chips. The selected order is saved by Customize.
             Row(
                 modifier = Modifier
@@ -1476,10 +1482,10 @@ fun FullPlayer(
                 }
             }
 
-            // Split the otherwise-unused lower space 80/20 around the queue opener.
-            // This moves the same 48dp touch target toward the bottom edge while leaving
-            // one-fifth of the available slack below it on phones and wide-player layouts.
-            Spacer(modifier = Modifier.weight(4f, fill = true))
+            // Keep only one quarter of the former flexible gap between the controls
+            // and the queue opener. The 3f spacer above the action row preserves the
+            // original total weight above the opener, so its position does not move.
+            Spacer(modifier = Modifier.weight(1f, fill = true))
             Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 8.dp))
 
             // Swipe Up / Click Chevron Up Indicator to expand Queue
