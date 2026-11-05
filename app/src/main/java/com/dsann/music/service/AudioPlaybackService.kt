@@ -1539,6 +1539,11 @@ class AudioPlaybackService : MediaSessionService() {
      */
     private fun preloadNextSongIntoQueue() {
         val vm = viewModel ?: return
+
+        // Top up the queue while there is still enough time to finish the network request.
+        // This check runs after playback starts, queue edits, and every native track transition.
+        vm.maybeRefillAutoplayQueue()
+
         val songs = vm.songList.value
         if (songs.isEmpty()) return
         
