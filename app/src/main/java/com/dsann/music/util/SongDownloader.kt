@@ -354,6 +354,79 @@ object SongDownloader {
             .apply()
     }
 
+    /**
+     * Remove an app-owned Ogg Opus source after a verified MP3 export.
+     * Refuse to delete an arbitrary third-party .opus file passed through a SongItem.
+     */
+    fun deleteDownloadedOpusSource(context: Context, song: SongItem, sourceUri: Uri): Boolean {
+        if (!uriExtension(context, sourceUri).equals("opus", ignoreCase = true)) return false
+
+        val videoId = song.videoId?.takeIf { it.isNotBlank() }
+        val prefs = context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
+        val rawUri = sourceUri.toString()
+        val mappedUris = videoId?.let {
+            listOfNotNull(
+                prefs.getString("opus_uri_$it", null),
+                prefs.getString("uri_$it", null)
+            )
+        }.orEmpty()
+        val baseName = "${cleanTitle(song.title)} - ${cleanArtist(song.artist)}"
+            .replace(Regex("[^a-zA-Z0-9._\\s()\\[\\]-]"), "_")
+        val expectedName = "$baseName.opus"
+        val canonicalUri = findDsmusicMediaStoreUri(context, expectedName)
+            ?: findLegacyDownloadedFile(expectedName)
+        val isAppOwned = rawUri in mappedUris || canonicalUri?.toString() == rawUri
+        if (!isAppOwned) {
+            Log.w(TAG, "Refusing to delete Opus source outside the D.S Music download store: $sourceUri")
+            return false
+        }
+
+        val deleted = try {
+            when (sourceUri.scheme) {
+                "file" -> {
+                    val path = sourceUri.path ?: return false
+                    val file = File(path)
+                    val removed = !file.exists() || file.delete()
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                        // Remove the stale legacy MediaStore row as well as the physical file.
+                        runCatching {
+                            context.contentResolver.delete(
+                                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                                "${MediaStore.Audio.Media.DATA} = ?",
+                                arrayOf(path)
+                            )
+                        }
+                    }
+                    removed
+                }
+                "content" -> {
+                    val rows = context.contentResolver.delete(sourceUri, null, null)
+                    rows > 0 || !isUriReadable(context, sourceUri)
+                }
+                else -> false
+            }
+        } catch (error: Exception) {
+            Log.w(TAG, "Could not delete converted Opus source $sourceUri", error)
+            false
+        }
+
+        if (!deleted) {
+            Log.w(TAG, "MP3 was saved, but the original Opus file could not be deleted: $sourceUri")
+            return false
+        }
+
+        if (videoId != null) {
+            val editor = prefs.edit()
+                .remove("opus_uri_$videoId")
+            if (prefs.getString("uri_$videoId", null) == rawUri) {
+                editor.remove("uri_$videoId").remove("name_$videoId")
+            }
+            editor.apply()
+        }
+        Log.i(TAG, "Deleted converted Opus source: $sourceUri")
+        return true
+    }
+
     private fun findDsmusicMediaStoreUri(context: Context, filename: String): Uri? {
         val projection = mutableListOf(MediaStore.Audio.Media._ID).apply {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
