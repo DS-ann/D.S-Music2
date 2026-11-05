@@ -78,6 +78,8 @@ data class VideoPlaybackMetadata(
     val title: String,
     val uploader: String,
     val durationMs: Long = 0L,
+    val contentLengthBytes: Long? = null,
+    val bitrateBps: Long? = null,
     val resolution: String? = null,
     val mimeType: String? = null,
     val description: String? = null,
