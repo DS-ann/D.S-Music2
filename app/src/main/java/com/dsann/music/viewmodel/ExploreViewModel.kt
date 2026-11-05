@@ -21,6 +21,7 @@ import com.dsann.music.data.innertube.SearchFilter
 import com.dsann.music.data.innertube.SearchItem
 import com.dsann.music.data.innertube.YouTubeMusic
 import com.dsann.music.ui.explore.buildExploreImageRequest
+import com.dsann.music.util.NetworkFailureClassifier
 import coil.imageLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -126,6 +127,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         .map { it.isLoadingStream }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    private var lastDetailRetry: (() -> Unit)? = null
     private var searchContinuation: String? = null
     private var homeContinuationToken: String? = null
     private var exploreContinuationToken: String? = null
@@ -332,6 +334,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
             it.copy(
                 searchQuery = query,
                 isSearching = true,
+                searchOfflineError = false,
                 suggestions = emptyList(),
                 suggestionItems = emptyList(),
                 searchResults = emptyList(),
@@ -393,7 +396,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                             searchTopResult = visibleTop,
                             searchSections = visibleSections,
                             suggestions = emptyList(),
-                            suggestionItems = emptyList()
+                            suggestionItems = emptyList(),
+                            searchOfflineError = false
                         )
                     }
                     searchContinuation = searchResult.continuation
@@ -407,12 +411,28 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 }
                 result.onFailure { e ->
                     Log.e(TAG, "Search failed", e)
-                    _uiState.update { it.copy(error = "Search failed: ${e.message}") }
+                    _uiState.update {
+                        it.copy(
+                            error = "Search failed: ${e.message}",
+                            searchOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                                e,
+                                getApplication<Application>()
+                            )
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "Search error", e)
-                _uiState.update { it.copy(error = e.message) }
+                _uiState.update {
+                    it.copy(
+                        error = e.message,
+                        searchOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                            e,
+                            getApplication<Application>()
+                        )
+                    )
+                }
             } finally {
                 _uiState.update { it.copy(isSearching = false) }
             }
@@ -464,6 +484,14 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "Load more failed", e)
+                _uiState.update {
+                    it.copy(
+                        searchOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                            e,
+                            getApplication<Application>()
+                        )
+                    )
+                }
             } finally {
                 _uiState.update { it.copy(isSearching = false) }
             }
@@ -678,7 +706,9 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     fun loadMoodsAndGenres(forceRefresh: Boolean = false) {
         if (!forceRefresh && (genresLoaded || _uiState.value.homeCategories.isNotEmpty())) return
         if (genresJob?.isActive == true) return
-        _uiState.update { it.copy(isLoadingGenres = true, genresError = null) }
+        _uiState.update {
+            it.copy(isLoadingGenres = true, genresError = null, genresOfflineError = false)
+        }
         genresJob = viewModelScope.launch {
             try {
                 val result = YouTubeMusic.moodsAndGenres()
@@ -687,7 +717,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                         it.copy(
                             homeCategories = categories,
                             isLoadingGenres = false,
-                            genresError = null
+                            genresError = null,
+                            genresOfflineError = false
                         )
                     }
                     genresLoaded = categories.isNotEmpty()
@@ -697,7 +728,11 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     _uiState.update {
                         it.copy(
                             isLoadingGenres = false,
-                            genresError = "Couldn't load genres. Check your connection and try again."
+                            genresError = "Couldn't load genres. Check your connection and try again.",
+                            genresOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                                error,
+                                getApplication<Application>()
+                            )
                         )
                     }
                 }
@@ -707,7 +742,11 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 _uiState.update {
                     it.copy(
                         isLoadingGenres = false,
-                        genresError = "Couldn't load genres. Check your connection and try again."
+                        genresError = "Couldn't load genres. Check your connection and try again.",
+                        genresOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                            error,
+                            getApplication<Application>()
+                        )
                     )
                 }
             } finally {
@@ -892,7 +931,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         _uiState.update {
             it.copy(
                 isLoadingHome = true,
-                homeFeedError = null
+                homeFeedError = null,
+                homeFeedOfflineError = false
             )
         }
         homeFeedJob?.cancel()
@@ -904,7 +944,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     it.copy(
                         homeSections = mergedSections,
                         isLoadingHome = false,
-                        homeFeedError = null
+                        homeFeedError = null,
+                        homeFeedOfflineError = false
                     )
                 }
                 homeLoaded = true
@@ -917,7 +958,11 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 homeLoaded = _uiState.value.homeSections.isNotEmpty()
                 _uiState.update {
                     it.copy(
-                        homeFeedError = "Network not available. Check your connection and try again."
+                        homeFeedError = "Couldn't load Explore. Please try again.",
+                        homeFeedOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                            e,
+                            getApplication<Application>()
+                        )
                     )
                 }
             } finally {
@@ -933,7 +978,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         _uiState.update {
             it.copy(
                 isRefreshing = true,
-                homeFeedError = null
+                homeFeedError = null,
+                homeFeedOfflineError = false
             )
         }
         homeFeedJob?.cancel()
@@ -944,7 +990,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 _uiState.update {
                     it.copy(
                         homeSections = mergedSections,
-                        homeFeedError = null
+                        homeFeedError = null,
+                        homeFeedOfflineError = false
                     )
                 }
                 homeLoaded = true
@@ -957,7 +1004,11 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 homeLoaded = _uiState.value.homeSections.isNotEmpty()
                 _uiState.update {
                     it.copy(
-                        homeFeedError = "Network not available. Check your connection and try again."
+                        homeFeedError = "Couldn't refresh Explore. Please try again.",
+                        homeFeedOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                            e,
+                            getApplication<Application>()
+                        )
                     )
                 }
             } finally {
@@ -1097,13 +1148,19 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     // ========== Detail Pages ==========
 
+    fun retryLastDetailLoad() {
+        lastDetailRetry?.invoke()
+    }
+
     private fun beginDetailLoad(): Long {
         detailLoadGeneration += 1L
         detailLoadJob?.cancel()
         detailLoadJob = null
         artistResolveJob?.cancel()
         artistResolveJob = null
-        _uiState.update { it.copy(isLoadingDetail = true, error = null) }
+        _uiState.update {
+            it.copy(isLoadingDetail = true, error = null, detailOfflineError = false)
+        }
         return detailLoadGeneration
     }
 
@@ -1125,6 +1182,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun loadAlbum(browseId: String) {
+        lastDetailRetry = { loadAlbum(browseId) }
         val requestId = beginDetailLoad()
         detailLoadJob = viewModelScope.launch {
             try {
@@ -1139,7 +1197,17 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                         }
                         prefetchUrls(listOfNotNull(res.album.thumbnailUrl) + res.songs.map { it.thumbnailUrl })
                     }
-                    result.onFailure { _uiState.update { it.copy(error = "Failed to load album") } }
+                    result.onFailure { failure ->
+                        _uiState.update {
+                            it.copy(
+                                error = "Failed to load album",
+                                detailOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                                    failure,
+                                    getApplication<Application>()
+                                )
+                            )
+                        }
+                    }
                 }
             } finally {
                 finishDetailLoad(requestId)
@@ -1164,7 +1232,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         detailLoadJob?.cancel()
         detailLoadJob = null
         artistResolveJob?.cancel()
-        _uiState.update { it.copy(isLoadingDetail = true, error = null) }
+        _uiState.update {
+            it.copy(isLoadingDetail = true, error = null, detailOfflineError = false)
+        }
+        lastDetailRetry = { loadAlbumByName(albumName, artistName) }
 
         artistResolveJob = viewModelScope.launch {
             try {
@@ -1195,7 +1266,11 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                         it.copy(
                             isLoadingDetail = false,
                             error = result.exceptionOrNull()?.message
-                                ?: "Could not find the album \"$cleanAlbumName\""
+                                ?: "Could not find the album \"$cleanAlbumName\"",
+                            detailOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                                result.exceptionOrNull(),
+                                getApplication<Application>()
+                            )
                         )
                     }
                 }
@@ -1206,7 +1281,11 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     _uiState.update {
                         it.copy(
                             isLoadingDetail = false,
-                            error = error.message ?: "Could not open album page"
+                            error = error.message ?: "Could not open album page",
+                            detailOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                                error,
+                                getApplication<Application>()
+                            )
                         )
                     }
                 }
@@ -1231,7 +1310,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         detailLoadJob?.cancel()
         detailLoadJob = null
         artistResolveJob?.cancel()
-        _uiState.update { it.copy(isLoadingDetail = true, error = null) }
+        _uiState.update {
+            it.copy(isLoadingDetail = true, error = null, detailOfflineError = false)
+        }
+        lastDetailRetry = { loadAlbumForSong(title, artistName) }
 
         artistResolveJob = viewModelScope.launch {
             try {
@@ -1260,7 +1342,11 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                         it.copy(
                             isLoadingDetail = false,
                             error = result.exceptionOrNull()?.message
-                                ?: "Could not find the album for \"$cleanTitle\""
+                                ?: "Could not find the album for \"$cleanTitle\"",
+                            detailOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                                result.exceptionOrNull(),
+                                getApplication<Application>()
+                            )
                         )
                     }
                     !exactMatch.albumId.isNullOrBlank() -> loadAlbum(exactMatch.albumId)
@@ -1277,7 +1363,11 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     _uiState.update {
                         it.copy(
                             isLoadingDetail = false,
-                            error = error.message ?: "Could not resolve this song's album"
+                            error = error.message ?: "Could not resolve this song's album",
+                            detailOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                                error,
+                                getApplication<Application>()
+                            )
                         )
                     }
                 }
@@ -1293,7 +1383,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         detailLoadJob?.cancel()
         detailLoadJob = null
         artistResolveJob?.cancel()
-        _uiState.update { it.copy(isLoadingDetail = true, error = null) }
+        _uiState.update {
+            it.copy(isLoadingDetail = true, error = null, detailOfflineError = false)
+        }
+        lastDetailRetry = { loadArtistByName(name, fallbackThumbnailUrl) }
         artistResolveJob = viewModelScope.launch {
             try {
                 val result = YouTubeMusic.search(cleanName, SearchFilter.ARTISTS)
@@ -1307,7 +1400,14 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     loadArtist(match.artist.browseId, match.artist.thumbnailUrl ?: fallbackThumbnailUrl)
                 } else {
                     _uiState.update {
-                        it.copy(isLoadingDetail = false, error = "Could not find an artist page for $cleanName")
+                        it.copy(
+                            isLoadingDetail = false,
+                            error = "Could not find an artist page for $cleanName",
+                            detailOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                                result.exceptionOrNull(),
+                                getApplication<Application>()
+                            )
+                        )
                     }
                 }
             } catch (error: Exception) {
@@ -1315,7 +1415,14 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 if (requestId == detailLoadGeneration) {
                     artistResolveJob = null
                     _uiState.update {
-                        it.copy(isLoadingDetail = false, error = error.message ?: "Could not open artist page")
+                        it.copy(
+                            isLoadingDetail = false,
+                            error = error.message ?: "Could not open artist page",
+                            detailOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                                error,
+                                getApplication<Application>()
+                            )
+                        )
                     }
                 }
             }
@@ -1323,6 +1430,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun loadArtist(browseId: String, fallbackThumbnailUrl: String? = null) {
+        lastDetailRetry = { loadArtist(browseId, fallbackThumbnailUrl) }
         val requestId = beginDetailLoad()
         detailLoadJob = viewModelScope.launch {
             try {
@@ -1340,7 +1448,17 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                         prefetchUrls(listOfNotNull(res.artist.thumbnailUrl))
                         prefetchThumbnails(res.sections.flatMap { it.items.take(4) })
                     }
-                    result.onFailure { _uiState.update { it.copy(error = "Failed to load artist") } }
+                    result.onFailure { failure ->
+                        _uiState.update {
+                            it.copy(
+                                error = "Failed to load artist",
+                                detailOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                                    failure,
+                                    getApplication<Application>()
+                                )
+                            )
+                        }
+                    }
                 }
             } finally {
                 finishDetailLoad(requestId)
@@ -1349,6 +1467,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun loadPlaylist(playlistId: String) {
+        lastDetailRetry = { loadPlaylist(playlistId) }
         val requestId = beginDetailLoad()
         detailLoadJob = viewModelScope.launch {
             try {
@@ -1363,7 +1482,17 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                         }
                         prefetchUrls(listOfNotNull(res.playlist.thumbnailUrl) + res.songs.map { it.thumbnailUrl })
                     }
-                    result.onFailure { _uiState.update { it.copy(error = "Failed to load playlist") } }
+                    result.onFailure { failure ->
+                        _uiState.update {
+                            it.copy(
+                                error = "Failed to load playlist",
+                                detailOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                                    failure,
+                                    getApplication<Application>()
+                                )
+                            )
+                        }
+                    }
                 }
             } finally {
                 finishDetailLoad(requestId)
@@ -1399,6 +1528,9 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         fallbackTitle: String = "Section",
         preferFallbackTitle: Boolean = false
     ) {
+        lastDetailRetry = {
+            loadSectionDetails(browseId, params, fallbackTitle, preferFallbackTitle)
+        }
         val requestId = beginDetailLoad()
         detailLoadJob = viewModelScope.launch {
             try {
@@ -1421,7 +1553,17 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                         }
                         prefetchThumbnails(res.items.take(12))
                     }
-                    result.onFailure { _uiState.update { it.copy(error = "Failed to load section") } }
+                    result.onFailure { failure ->
+                        _uiState.update {
+                            it.copy(
+                                error = "Failed to load section",
+                                detailOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                                    failure,
+                                    getApplication<Application>()
+                                )
+                            )
+                        }
+                    }
                 }
             } finally {
                 finishDetailLoad(requestId)
@@ -1787,9 +1929,11 @@ data class ExploreUiState(
     val suggestions: List<String> = emptyList(),
     val suggestionItems: List<SearchItem> = emptyList(),
     val isSearching: Boolean = false,
+    val searchOfflineError: Boolean = false,
     val homeSections: List<HomeSection> = emptyList(),
     val isLoadingHome: Boolean = false,
     val homeFeedError: String? = null,
+    val homeFeedOfflineError: Boolean = false,
     val isLoadingStream: Boolean = false,
     val currentMood: String? = null,
     val currentOnlineSong: OnlineSong? = null,
@@ -1799,12 +1943,14 @@ data class ExploreUiState(
     val playlistDetail: PlaylistPage? = null,
     val sectionDetail: HomeSection? = null,
     val isLoadingDetail: Boolean = false,
+    val detailOfflineError: Boolean = false,
     val isRefreshing: Boolean = false,
     val searchHistory: List<String> = emptyList(),
     val homeMoods: List<String> = emptyList(),
     val homeCategories: List<HomeCategory> = emptyList(),
     val isLoadingGenres: Boolean = false,
     val genresError: String? = null,
+    val genresOfflineError: Boolean = false,
     val searchFilter: SearchFilter? = null,
     val streamUrl: String? = null,
     val streamError: String? = null,
