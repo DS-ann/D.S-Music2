@@ -516,10 +516,8 @@ class PlayerSharedViewModel @Inject constructor(
 
     // Autoplay keeps a 20-track buffer ahead of the current song. Each refill is
     // anchored to the last queued online track so later batches continue the radio chain.
-    private companion object AutoplayQueueConfig {
-        const val AUTOPLAY_REFILL_THRESHOLD = 20
-        const val AUTOPLAY_REFILL_BATCH_SIZE = 20
-    }
+    private val AUTOPLAY_REFILL_THRESHOLD = 20
+    private val AUTOPLAY_REFILL_BATCH_SIZE = 20
 
     private var autoplayFetchJob: Job? = null
     private val autoplayFetchedVideoIds = mutableSetOf<String>()
