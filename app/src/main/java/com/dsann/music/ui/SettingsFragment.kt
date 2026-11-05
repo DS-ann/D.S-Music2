@@ -635,7 +635,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putString("player_visualizer", safe) }
     }
 
-    // Additional Prism-style player customisation.
+    // Additional player customization.
     private val _playerButtonsPill = MutableStateFlow(prefs.getBoolean("player_buttons_pill", true))
     val playerButtonsPill: StateFlow<Boolean> = _playerButtonsPill.asStateFlow()
     fun setPlayerButtonsPill(enabled: Boolean) {
@@ -1961,14 +1961,6 @@ private fun ControlsAndGesturesScreen(
                 },
                 {
                     GestureSettingRow(
-                        "Swipe up",
-                        gestures.miniSwipeUp,
-                        PlayerGestureAction.choices(mini = true),
-                        onSelect = { playerViewModel.setPlayerGesture("mini_swipe_up", it) }
-                    )
-                },
-                {
-                    GestureSettingRow(
                         "Pull down",
                         gestures.miniSwipeDown,
                         PlayerGestureAction.choices(mini = true),
@@ -1991,14 +1983,13 @@ private fun ControlsAndGesturesScreen(
                             playerViewModel.setPlayerGesture("cover_long_press", PlayerGestureAction.NONE)
                             playerViewModel.setPlayerGesture("mini_swipe_left", PlayerGestureAction.NEXT)
                             playerViewModel.setPlayerGesture("mini_swipe_right", PlayerGestureAction.PREVIOUS)
-                            playerViewModel.setPlayerGesture("mini_swipe_up", PlayerGestureAction.OPEN)
                             playerViewModel.setPlayerGesture("mini_swipe_down", PlayerGestureAction.STOP)
                             playerViewModel.setDoubleTapSeekSeconds(10)
                         }
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Restore Prism-style defaults", modifier = Modifier.weight(1f), color = DsmusicTheme.colorScheme.primary)
+                    Text("Restore default actions", modifier = Modifier.weight(1f), color = DsmusicTheme.colorScheme.primary)
                     Icon(Icons.Rounded.Refresh, contentDescription = null, tint = DsmusicTheme.colorScheme.primary)
                 }
             })
