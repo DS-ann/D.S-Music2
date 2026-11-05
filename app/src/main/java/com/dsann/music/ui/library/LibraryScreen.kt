@@ -241,6 +241,8 @@ fun LibraryScreen(
 
     var showAccountScreen by remember { mutableStateOf(false) }
     var showHistoryScreen by remember { mutableStateOf(false) }
+    var isCacheScreenOpen by remember { mutableStateOf(false) }
+    val hideLibraryChrome = activeTab == "Downloaded songs" || isCacheScreenOpen
 
     val accountViewModel = remember(fragmentActivity) {
         fragmentActivity?.let { ViewModelProvider(it)[AccountViewModel::class.java] }
@@ -484,6 +486,7 @@ fun LibraryScreen(
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
+                if (!hideLibraryChrome) {
                 // Fixed D.S Launcher-style Library header. The header is static; only the content list scrolls.
                 Row(
                     modifier = Modifier
@@ -575,7 +578,6 @@ fun LibraryScreen(
                     "Albums" to "Albums",
                     "Artists" to "Artists",
                     "History" to "History",
-                    "Downloads" to "Downloaded songs",
                     "Podcasts" to "Podcasts"
                 ) + if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     listOf("Recap" to "Recap")
@@ -620,9 +622,12 @@ fun LibraryScreen(
                     )
                 }
 
+                }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .then(if (hideLibraryChrome) Modifier.statusBarsPadding() else Modifier)
                     .nestedScroll(nestedScrollConnection)
                     .graphicsLayer {
                         alpha = (libraryTabOpacity.value * libraryBaseOpacity.value)
@@ -639,7 +644,8 @@ fun LibraryScreen(
                         onOpenDownloads = {
                             activeTab = "Downloaded songs"
                             searchQuery = ""
-                        }
+                        },
+                        onCacheScreenChanged = { isCacheScreenOpen = it }
                     )
                     "Podcasts" -> PodcastsTabContent(nestedScrollConnection)
                     "Songs" -> SongsTabContent(nestedScrollConnection, viewModel)
@@ -1273,7 +1279,8 @@ itemsIndexed(
                         onOpenDownloads = {
                             activeTab = "Downloaded songs"
                             searchQuery = ""
-                        }
+                        },
+                        onCacheScreenChanged = { isCacheScreenOpen = it }
                     )
                 }
             }
@@ -2076,7 +2083,8 @@ private fun PlaylistsTabContent(
     showAsList: Boolean = false,
     isPlayerBackActive: Boolean = false,
     onCachedSongLongClick: (CachedSongEntry) -> Unit,
-    onOpenDownloads: () -> Unit
+    onOpenDownloads: () -> Unit,
+    onCacheScreenChanged: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     val lyricsCache = remember(context) { LyricsCacheManager(context.applicationContext) }
@@ -2095,6 +2103,9 @@ private fun PlaylistsTabContent(
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var selectedLocalPlaylist by remember { mutableStateOf<PlaylistEntity?>(null) }
     var showCachePlaylist by remember { mutableStateOf(false) }
+    LaunchedEffect(showCachePlaylist) {
+        onCacheScreenChanged(showCachePlaylist)
+    }
     val playlistGridState = rememberLazyGridState()
 
     BackHandler(enabled = showCachePlaylist && !isPlayerBackActive) {
