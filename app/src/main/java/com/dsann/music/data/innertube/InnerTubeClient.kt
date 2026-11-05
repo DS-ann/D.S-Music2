@@ -603,7 +603,7 @@ object InnerTubeClient {
  
         val isYoutube = url.contains("www.youtube.com")
         buildHeaders(clientType, isYoutube).forEach { (key, value) ->
-            // Search should behave like Prism's signed-out requests: it must not be biased by
+            // Signed-out searches must not be biased by
             // account search history or change the user's YouTube search history.
             if (!anonymous || (key != "Cookie" && key != "Authorization")) {
                 requestBuilder.header(key, value)
@@ -695,7 +695,7 @@ object InnerTubeClient {
             addProperty("title", title)
             addProperty("description", description)
             addProperty("privacyStatus", privacyStatus)
-            // Prism sends videoIds even for an empty playlist; keep the request shape identical.
+            // Include videoIds even for an empty playlist to keep the request shape consistent.
             val arr = com.google.gson.JsonArray()
             videoIds.forEach { arr.add(it) }
             add("videoIds", arr)
