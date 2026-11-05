@@ -596,7 +596,9 @@ fun OptionsContent(
     showDelete: Boolean = true,
     hasDownloadedOpus: Boolean = false,
     isConvertingToMp3: Boolean = false,
-    onConvertToMp3: () -> Unit = {}
+    onConvertToMp3: () -> Unit = {},
+    downloadedSongMode: Boolean = false,
+    onDeleteDownloaded: () -> Unit = {}
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -608,7 +610,14 @@ fun OptionsContent(
             color = DsmusicTheme.colorScheme.onSurfaceVariant
         )
         ActionButtonRow1(song, isFavorite, onFavoriteChange, actionListener, onDismiss)
-        ActionButtonRow2(song, actionListener, onDismiss, showAddToQueue = showAddToQueue)
+        ActionButtonRow2(
+            song,
+            actionListener,
+            onDismiss,
+            showAddToQueue = showAddToQueue,
+            downloadedSongMode = downloadedSongMode,
+            onDeleteDownloaded = onDeleteDownloaded
+        )
         DestructiveActionRow(song, actionListener, onAddToPlaylist, onDismiss, showDelete = showDelete)
         if (hasDownloadedOpus || isConvertingToMp3) {
             SongActionWideTile(
@@ -1233,7 +1242,9 @@ fun ActionButtonRow2(
     song: SongItem?,
     actionListener: SongActionsBottomSheet.ActionListener?,
     onDismiss: () -> Unit,
-    showAddToQueue: Boolean = true
+    showAddToQueue: Boolean = true,
+    downloadedSongMode: Boolean = false,
+    onDeleteDownloaded: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val videoId = song?.videoId
@@ -1293,6 +1304,7 @@ fun ActionButtonRow2(
         SongActionTile(
             modifier = Modifier.weight(1f),
             label = when {
+                downloadedSongMode -> "Delete"
                 isConvertingToMp3 -> "Converting to MP3…"
                 !isOnline -> "Offline"
                 isDownloading -> "Cancel"
@@ -1300,6 +1312,7 @@ fun ActionButtonRow2(
                 else -> "Download"
             },
             containerColor = when {
+                downloadedSongMode -> DsmusicTheme.colorScheme.errorContainer
                 isConvertingToMp3 -> DsmusicTheme.colorScheme.tertiaryContainer
                 !isOnline -> DsmusicTheme.colorScheme.surfaceVariant
                 isDownloading -> DsmusicTheme.colorScheme.errorContainer
@@ -1307,25 +1320,33 @@ fun ActionButtonRow2(
                 else -> DsmusicTheme.colorScheme.primaryContainer
             },
             contentColor = when {
+                downloadedSongMode -> DsmusicTheme.colorScheme.onErrorContainer
                 isConvertingToMp3 -> DsmusicTheme.colorScheme.onTertiaryContainer
                 !isOnline -> DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
                 isDownloading -> DsmusicTheme.colorScheme.onErrorContainer
                 isDownloaded -> DsmusicTheme.colorScheme.onSecondaryContainer
                 else -> DsmusicTheme.colorScheme.onPrimaryContainer
             },
-            enabled = !isConvertingToMp3 && isOnline && (isDownloading || !isDownloaded),
+            enabled = if (downloadedSongMode) !isConvertingToMp3 else
+                !isConvertingToMp3 && isOnline && (isDownloading || !isDownloaded),
             onClick = {
-                song?.let {
-                    when {
-                        isDownloading -> com.dsann.music.util.SongDownloader.cancelDownload(context, it)
-                        !isDownloaded -> com.dsann.music.util.SongDownloader.downloadSong(context, it)
+                if (downloadedSongMode) {
+                    onDeleteDownloaded()
+                    onDismiss()
+                } else {
+                    song?.let {
+                        when {
+                            isDownloading -> com.dsann.music.util.SongDownloader.cancelDownload(context, it)
+                            !isDownloaded -> com.dsann.music.util.SongDownloader.downloadSong(context, it)
+                        }
                     }
+                    // Keep the sheet open so this same control can turn into Cancel and then Downloaded.
                 }
-                // Keep the sheet open so this same control can turn into Cancel and then Downloaded.
             }
         ) {
             Icon(
                 imageVector = when {
+                    downloadedSongMode -> Icons.Rounded.DeleteOutline
                     isConvertingToMp3 -> Icons.Rounded.Download
                     !isOnline -> Icons.Rounded.Check
                     isDownloading -> Icons.Rounded.Close
@@ -1333,12 +1354,14 @@ fun ActionButtonRow2(
                     else -> Icons.Rounded.Download
                 },
                 contentDescription = when {
+                    downloadedSongMode -> "Delete downloaded song"
                     isConvertingToMp3 -> "Converting to MP3"
                     isDownloading -> "Cancel download"
                     isDownloaded -> "Downloaded"
                     else -> "Download"
                 },
                 tint = when {
+                    downloadedSongMode -> DsmusicTheme.colorScheme.onErrorContainer
                     isConvertingToMp3 -> DsmusicTheme.colorScheme.onTertiaryContainer
                     !isOnline -> DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
                     isDownloading -> DsmusicTheme.colorScheme.onErrorContainer

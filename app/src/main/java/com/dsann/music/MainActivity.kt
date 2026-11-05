@@ -1046,6 +1046,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Keep the existing Compose/NavHost trees alive across rotation. LocalConfiguration
+        // then recomposes the active layouts without closing open subsections or menus.
+        setupSystemBars()
+    }
+
     override fun onResume() {
         super.onResume()
         setupSystemBars()

@@ -7,6 +7,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -1622,8 +1623,13 @@ fun SwipeToDismissBox(
     val density = LocalDensity.current
     Box(
         modifier = modifier.pointerInput(state, enableDismissFromStartToEnd, enableDismissFromEndToStart) {
-            detectDragGestures(
-                onDrag = { change, amount -> change.consume(); state.dragWidth = size.width.toFloat().coerceAtLeast(1f); state.dragOffset = (state.dragOffset + amount.x).coerceIn(-size.width.toFloat(), size.width.toFloat()) },
+            detectHorizontalDragGestures(
+                onHorizontalDrag = { change, dragAmount ->
+                    change.consume()
+                    state.dragWidth = size.width.toFloat().coerceAtLeast(1f)
+                    state.dragOffset = (state.dragOffset + dragAmount)
+                        .coerceIn(-size.width.toFloat(), size.width.toFloat())
+                },
                 onDragEnd = {
                     val threshold = with(density) { 72.dp.toPx() }
                     val direction = when {

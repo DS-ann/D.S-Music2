@@ -59,6 +59,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -132,6 +133,7 @@ import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.SearchItem
 import com.dsann.music.model.SongItem
 import com.dsann.music.ui.OptionsContent
+import com.dsann.music.ui.InfoContent
 import com.dsann.music.ui.SongActionsBottomSheet
 import com.dsann.music.util.FavoritesManager
 import com.dsann.music.util.SongDownloader
@@ -1832,11 +1834,16 @@ fun OnlineSongBottomSheet(
     onViewCreditsClick: (OnlineSong) -> Unit,
     modifier: Modifier = Modifier,
     onRemoveFromCache: (() -> Unit)? = null,
-    onNavigateToExplore: (() -> Unit)? = null
+    onNavigateToExplore: (() -> Unit)? = null,
+    downloadedSong: SongItem? = null,
+    onDeleteDownloaded: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val favoritesManager = remember { FavoritesManager(context) }
-    var isFavorite by remember(song.videoId) { mutableStateOf(favoritesManager.isFavorite(song.videoId.hashCode().toLong())) }
+    var isFavorite by remember(song.videoId, downloadedSong?.id) {
+        mutableStateOf(favoritesManager.isFavorite(downloadedSong?.id ?: song.videoId.hashCode().toLong()))
+    }
+    var showDownloadedInfo by remember(song.videoId, downloadedSong?.id) { mutableStateOf(false) }
 
     // Legacy Gson records can contain null artistRefs (or null entries) despite
     // OnlineSong's Kotlin default. Normalize once before building actions/artist rows.
@@ -1855,9 +1862,10 @@ fun OnlineSongBottomSheet(
         song.thumbnailUrl,
         song.albumName,
         song.artistId,
-        safeArtistRefs
+        safeArtistRefs,
+        downloadedSong
     ) {
-        SongItem.createOnlineSong(
+        downloadedSong ?: SongItem.createOnlineSong(
             song.videoId,
             song.title,
             song.artist,
@@ -1900,20 +1908,21 @@ fun OnlineSongBottomSheet(
             }
         }
     }
-    val queueStyleListener = remember(song.videoId) {
+    val queueStyleListener = remember(song.videoId, downloadedSong?.id) {
         object : SongActionsBottomSheet.ActionListener {
             override fun onPlayNext(songItem: SongItem) {
                 playerSharedViewModel.addToQueueNext(songItem)
-                exploreViewModel.addToQueueNext(song)
+                if (downloadedSong == null) exploreViewModel.addToQueueNext(song)
             }
             override fun onAddToQueue(songItem: SongItem) {
                 playerSharedViewModel.addToQueue(songItem)
-                exploreViewModel.addToQueueLast(song)
+                if (downloadedSong == null) exploreViewModel.addToQueueLast(song)
             }
             override fun onDelete(songItem: SongItem) = Unit
             override fun onEdit(songItem: SongItem) = Unit
             override fun onPlay(songItem: SongItem) {
-                exploreViewModel.playOnlineSongWithQueue(song, listOf(song), 0)
+                if (downloadedSong != null) playerSharedViewModel.playSong(songItem)
+                else exploreViewModel.playOnlineSongWithQueue(song, listOf(song), 0)
             }
             override fun onFavorite(songItem: SongItem, isFav: Boolean) {
                 favoritesManager.setFavorite(songItem.id, isFav)
@@ -1924,11 +1933,18 @@ fun OnlineSongBottomSheet(
             override fun onShare(songItem: SongItem) {
                 val shareIntent = android.content.Intent().apply {
                     action = android.content.Intent.ACTION_SEND
-                    putExtra(
-                        android.content.Intent.EXTRA_TEXT,
-                        "Check out ${song.title} by ${song.artist}: https://music.youtube.com/watch?v=${song.videoId}"
-                    )
-                    type = "text/plain"
+                    if (downloadedSong != null) {
+                        type = "audio/*"
+                        putExtra(android.content.Intent.EXTRA_STREAM, downloadedSong.contentUri)
+                        putExtra(android.content.Intent.EXTRA_TEXT, "Listen to ${downloadedSong.title}")
+                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } else {
+                        putExtra(
+                            android.content.Intent.EXTRA_TEXT,
+                            "Check out ${song.title} by ${song.artist}: https://music.youtube.com/watch?v=${song.videoId}"
+                        )
+                        type = "text/plain"
+                    }
                 }
                 context.startActivity(android.content.Intent.createChooser(shareIntent, "Share via"))
             }
@@ -1976,6 +1992,77 @@ fun OnlineSongBottomSheet(
 
             HorizontalDivider(color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
+            if (downloadedSong != null) {
+                if (showDownloadedInfo) {
+                    DsmusicTextButton(
+                        onClick = { showDownloadedInfo = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Back to song actions")
+                    }
+                    InfoContent(downloadedSong)
+                } else {
+                    OptionsContent(
+                        song = downloadedSong,
+                        isFavorite = isFavorite,
+                        onFavoriteChange = { isFavorite = it },
+                        actionListener = queueStyleListener,
+                        onAddToPlaylist = {
+                            onPlaylistAddClick(downloadedSong)
+                            onDismissRequest()
+                        },
+                        showAddToQueue = true,
+                        onDismiss = onDismissRequest,
+                        showDelete = false,
+                        hasDownloadedOpus = hasDownloadedOpus,
+                        isConvertingToMp3 = isConvertingToMp3,
+                        onConvertToMp3 = convertToMp3,
+                        downloadedSongMode = true,
+                        onDeleteDownloaded = { onDeleteDownloaded?.invoke() }
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "MORE FOR THIS TRACK",
+                        style = DsmusicTheme.typography.labelSmall.copy(
+                            letterSpacing = 1.1.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
+                    DsmusicSurface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = DsmusicTheme.shapes.large,
+                        color = DsmusicTheme.colorScheme.surfaceContainerLow,
+                        onClick = { showDownloadedInfo = true }
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Info,
+                                contentDescription = null,
+                                tint = DsmusicTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Info",
+                                    style = DsmusicTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    "Track details and downloaded file information",
+                                    style = DsmusicTheme.typography.bodySmall,
+                                    color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
             OptionsContent(
                 song = onlineSongItem,
                 isFavorite = isFavorite,
@@ -2146,6 +2233,7 @@ fun OnlineSongBottomSheet(
                         }
                     }
                 }
+            }
             }
         }
     }

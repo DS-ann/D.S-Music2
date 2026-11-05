@@ -314,6 +314,7 @@ fun LibraryScreen(
 
     var selectedSongForMenu by remember { mutableStateOf<OnlineSong?>(null) }
     var selectedCachedSongForMenu by remember { mutableStateOf<CachedSongEntry?>(null) }
+    var selectedDownloadedSongForMenu by remember { mutableStateOf<SongItem?>(null) }
     var songToAddPlaylist by remember { mutableStateOf<SongItem?>(null) }
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
     var showCreditsForSong by remember { mutableStateOf<OnlineSong?>(null)}
@@ -422,6 +423,32 @@ fun LibraryScreen(
         } else {
             com.dsann.music.ui.SnackbarController.showMessage(
                 "Song options are unavailable right now"
+            )
+        }
+    }
+
+    val deleteDownloadedSong: (SongItem) -> Unit = { downloadedSong ->
+        scope.launch {
+            val deleted = withContext(Dispatchers.IO) {
+                val rowsDeleted = runCatching {
+                    context.contentResolver.delete(downloadedSong.contentUri, null, null)
+                }.getOrDefault(0)
+                if (rowsDeleted > 0) {
+                    true
+                } else {
+                    val rawPath = (downloadedSong.path ?: downloadedSong.data).orEmpty()
+                    if (rawPath.isBlank()) {
+                        false
+                    } else {
+                        val file = java.io.File(rawPath)
+                        !file.exists() || file.delete()
+                    }
+                }
+            }
+            scanLocalFiles(context, viewModel)
+            com.dsann.music.ui.SnackbarController.showMessage(
+                if (deleted) "Deleted: ${downloadedSong.title}"
+                else "Could not delete ${downloadedSong.title}. The file may require storage permission."
             )
         }
     }
@@ -1162,68 +1189,7 @@ itemsIndexed(
                                                                         selectedDownloadIds + item.id
                                                                     }
                                                                 } else {
-                                                                val bs = SongActionsBottomSheet.newInstance(item)
-                                                                bs.setActionListener(object : SongActionsBottomSheet.ActionListener {
-                                                                    override fun onPlay(song: SongItem) {
-                                                                        viewModel.playSong(song)
-                                                                    }
-                                                                    override fun onPlayNext(song: SongItem) {
-                                                                        viewModel.addToQueueNext(song)
-                                                                        scope.launch {
-                                                                            com.dsann.music.ui.SnackbarController.showMessage("Playing next: ${song.title}")
-                                                                        }
-                                                                    }
-                                                                    override fun onAddToQueue(song: SongItem) {
-                                                                        viewModel.addToQueue(song)
-                                                                        scope.launch {
-                                                                            com.dsann.music.ui.SnackbarController.showMessage("Added to queue: ${song.title}")
-                                                                        }
-                                                                    }
-                                                                    override fun onDelete(song: SongItem) {
-                                                                        scope.launch {
-                                                                            val deleted = withContext(Dispatchers.IO) {
-                                                                                // Downloaded songs on Android 10+ live in MediaStore. Deleting only
-                                                                                // song.path leaves the indexed MediaStore item behind.
-                                                                                val rowsDeleted = runCatching {
-                                                                                    context.contentResolver.delete(song.contentUri, null, null)
-                                                                                }.getOrDefault(0)
-                                                                                if (rowsDeleted > 0) {
-                                                                                    true
-                                                                                } else {
-                                                                                    val rawPath = (song.path ?: song.data).orEmpty()
-                                                                                    if (rawPath.isBlank()) {
-                                                                                        false
-                                                                                    } else {
-                                                                                        val file = java.io.File(rawPath)
-                                                                                        !file.exists() || file.delete()
-                                                                                    }
-                                                                                }
-                                                                            }
-                                                                            scanLocalFiles(context, viewModel)
-                                                                            com.dsann.music.ui.SnackbarController.showMessage(
-                                                                                if (deleted) "Deleted: ${song.title}"
-                                                                                else "Could not delete ${song.title}. The file may require storage permission."
-                                                                            )
-                                                                        }
-                                                                    }
-                                                                    override fun onEdit(song: SongItem) {
-                                                                        onEditSong(song)
-                                                                    }
-                                                                    override fun onFavorite(song: SongItem, isFav: Boolean) {
-                                                                        viewModel.toggleFavorite(song.id)
-                                                                    }
-                                                                    override fun onShare(song: SongItem) {
-                                                                        try {
-                                                                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                                                                type = "audio/*"
-                                                                                putExtra(Intent.EXTRA_STREAM, song.contentUri)
-                                                                                putExtra(Intent.EXTRA_TEXT, "Listen to ${song.title}")
-                                                                            }
-                                                                            context.startActivity(Intent.createChooser(intent, "Share Song"))
-                                                                        } catch (_: Exception) {}
-                                                                    }
-                                                                })
-                                                                fragmentManager?.let { bs.show(it, "SongActionsBottomSheet") }
+                                                                    selectedDownloadedSongForMenu = item
                                                                 }
                                                             }
                                                         )
@@ -1428,6 +1394,43 @@ itemsIndexed(
                     },
                     onNavigateToExplore = { onNavigateToExplore() }
                 )
+            }
+        }
+
+        selectedDownloadedSongForMenu?.let { downloadedSong ->
+            if (exploreViewModel != null) {
+                val downloadedMenuSong = OnlineSong(
+                    videoId = downloadedSong.videoId?.takeIf { it.isNotBlank() }
+                        ?: "local-track-${downloadedSong.id}",
+                    title = downloadedSong.title,
+                    artist = downloadedSong.artist,
+                    albumName = downloadedSong.albumName,
+                    albumId = downloadedSong.albumId.takeIf { it > 0L }?.toString(),
+                    artistId = downloadedSong.artistId,
+                    durationMs = downloadedSong.duration,
+                    thumbnailUrl = downloadedSong.getAlbumArtUri()?.toString(),
+                    artistRefs = downloadedSong.artistRefs.toList()
+                )
+                OnlineSongBottomSheet(
+                    song = downloadedMenuSong,
+                    isPinned = false,
+                    downloadedSong = downloadedSong,
+                    onDeleteDownloaded = { deleteDownloadedSong(downloadedSong) },
+                    onDismissRequest = { selectedDownloadedSongForMenu = null },
+                    playerSharedViewModel = viewModel,
+                    exploreViewModel = exploreViewModel,
+                    onPlaylistAddClick = { selectedSong ->
+                        songToAddPlaylist = selectedSong
+                        showAddToPlaylistDialog = true
+                    },
+                    onViewCreditsClick = {},
+                    onNavigateToExplore = { onNavigateToExplore() }
+                )
+            } else {
+                LaunchedEffect(downloadedSong.id) {
+                    com.dsann.music.ui.SnackbarController.showMessage("Song options are unavailable right now")
+                    selectedDownloadedSongForMenu = null
+                }
             }
         }
 
