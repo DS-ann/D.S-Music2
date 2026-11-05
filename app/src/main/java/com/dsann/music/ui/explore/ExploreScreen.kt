@@ -60,8 +60,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import com.dsann.music.ui.LocalPlaylistPickerDialog
-import com.dsann.music.ui.CreateLocalPlaylistDialog
+import com.dsann.music.ui.YouTubeMusicPlaylistPickerDialog
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Close
@@ -252,11 +251,7 @@ fun ExploreScreen(
     var showCreditsForSong by remember { mutableStateOf<OnlineSong?>(null) }
 
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
-    var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var songsToAddPlaylist by remember { mutableStateOf<List<SongItem>?>(null) }
-    val localPlaylists by playerSharedViewModel.localPlaylistsFlow.collectAsStateWithLifecycle(
-        emptyList()
-    )
 
     fun activateSearchItem(item: SearchItem, songQueue: List<OnlineSong>? = null) {
         when (item) {
@@ -2052,40 +2047,20 @@ fun ExploreScreen(
         }
 
         if (showAddToPlaylistDialog && !songsToAddPlaylist.isNullOrEmpty()) {
-            LocalPlaylistPickerDialog(
-                playlists = localPlaylists,
-                onCreateNew = {
-                    showCreatePlaylistDialog = true
-                    showAddToPlaylistDialog = false
-                },
-                onPlaylistSelected = { playlist ->
-                    val songs = songsToAddPlaylist.orEmpty()
-                    songs.forEach { song ->
-                        playerSharedViewModel.addSongToLocalPlaylist(playlist.id, song)
-                    }
+            val videoIds = songsToAddPlaylist.orEmpty().mapNotNull { it.videoId }
+                .filter { it.isNotBlank() }.distinct()
+            YouTubeMusicPlaylistPickerDialog(
+                videoIds = videoIds,
+                onPlaylistAdded = { playlistTitle ->
                     showAddToPlaylistDialog = false
                     songsToAddPlaylist = null
                     com.dsann.music.ui.SnackbarController.showMessage(
-                        "Added ${songs.size} tracks to playlist: ${playlist.title}"
+                        "Added ${videoIds.size} tracks to YouTube Music playlist: $playlistTitle"
                     )
                 },
                 onDismiss = {
                     showAddToPlaylistDialog = false
                     songsToAddPlaylist = null
-                }
-            )
-        }
-
-        if (showCreatePlaylistDialog) {
-            CreateLocalPlaylistDialog(
-                onConfirm = { name ->
-                    playerSharedViewModel.createLocalPlaylist(name)
-                    showCreatePlaylistDialog = false
-                    showAddToPlaylistDialog = true
-                },
-                onDismiss = {
-                    showCreatePlaylistDialog = false
-                    showAddToPlaylistDialog = true
                 }
             )
         }
