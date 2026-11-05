@@ -359,9 +359,10 @@ fun ExploreScreen(
 
     val isPlayerExpanded by playerSharedViewModel.isPlayerExpanded.collectAsStateWithLifecycle()
     val playerExpansionFraction by playerSharedViewModel.playerExpansionFraction.collectAsStateWithLifecycle()
-    val isPlayerBackActive = isPlayerExpanded || playerExpansionFraction >= 0.5f
+    // Keep every Explore-level Back action subordinate until the player is fully closed.
+    val isPlayerBackActive = isPlayerExpanded || playerExpansionFraction > 0.01f
 
-    androidx.activity.compose.BackHandler(enabled = showCreditsForSong != null && !isPlayerExpanded) {
+    androidx.activity.compose.BackHandler(enabled = showCreditsForSong != null && !isPlayerBackActive) {
         showCreditsForSong = null
     }
 
