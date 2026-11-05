@@ -528,7 +528,7 @@ class PlayerSharedViewModel @Inject constructor(
     /**
      * Add another batch before the queue runs out. The current song is excluded from the
      * remaining count. Shuffle can select any other queued song, so all non-current entries
-     * count as available; repeat-one does not need queue extension.
+     * count as available; repeat modes do not need automatic queue extension.
      */
     fun maybeRefillAutoplayQueue() {
         if (!isAutoplayEnabled() || _repeatMode.value != REPEAT_OFF) return
@@ -2033,7 +2033,12 @@ class PlayerSharedViewModel @Inject constructor(
     fun setShuffleEnabled(enabled: Boolean) {
         if (_isShuffleEnabled.value != enabled) {
             _isShuffleEnabled.value = enabled
-            if (_repeatMode.value == REPEAT_ONCE) resetRepeatOnceCycleFromCurrent()
+            if (_repeatMode.value == REPEAT_ONCE) {
+                resetRepeatOnceCycleFromCurrent()
+                audioService?.let { service ->
+                    service.runWhenPlayerReady { service.refreshNativeQueue() }
+                }
+            }
             audioService?.setShuffleModeEnabled(enabled)
         }
     }
