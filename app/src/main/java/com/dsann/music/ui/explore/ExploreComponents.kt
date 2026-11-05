@@ -86,8 +86,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -119,6 +121,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 import com.dsann.music.data.innertube.HomeSection
 import com.dsann.music.data.innertube.OnlineAlbum
 import com.dsann.music.data.innertube.OnlineArtist
@@ -1864,6 +1867,37 @@ fun OnlineSongBottomSheet(
             artistRefs = safeArtistRefs
         )
     }
+
+    val conversionScope = rememberCoroutineScope()
+    val convertingKeys by com.dsann.music.util.OpusToMp3Converter.convertingKeys
+        .collectAsStateWithLifecycle(emptySet())
+    val isConvertingToMp3 = com.dsann.music.util.OpusToMp3Converter
+        .conversionKeys(onlineSongItem).any { it in convertingKeys }
+    var hasDownloadedOpus by remember(song.videoId) { mutableStateOf(false) }
+
+    LaunchedEffect(song.videoId, song.title, song.artist, song.albumName) {
+        hasDownloadedOpus = withContext(Dispatchers.IO) {
+            SongDownloader.findDownloadedOpusUri(context, onlineSongItem) != null
+        }
+    }
+
+    val convertToMp3: () -> Unit = {
+        if (hasDownloadedOpus && !isConvertingToMp3) {
+            conversionScope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    com.dsann.music.util.OpusToMp3Converter.convert(
+                        context.applicationContext,
+                        onlineSongItem
+                    )
+                }
+                if (result.success) {
+                    hasDownloadedOpus = false
+                    SongDownloader.refreshDownloadedStatus(context, onlineSongItem)
+                }
+                com.dsann.music.ui.SnackbarController.showMessage(result.message)
+            }
+        }
+    }
     val queueStyleListener = remember(song.videoId) {
         object : SongActionsBottomSheet.ActionListener {
             override fun onPlayNext(songItem: SongItem) {
@@ -1951,7 +1985,10 @@ fun OnlineSongBottomSheet(
                 },
                 showAddToQueue = true,
                 onDismiss = onDismissRequest,
-                showDelete = false
+                showDelete = false,
+                hasDownloadedOpus = hasDownloadedOpus,
+                isConvertingToMp3 = isConvertingToMp3,
+                onConvertToMp3 = convertToMp3
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -2015,11 +2052,16 @@ fun OnlineSongBottomSheet(
                     icon = Icons.Rounded.Album
                 ) {
                     val albumId = song.albumId
-                    if (!albumId.isNullOrBlank()) {
-                        exploreViewModel.loadAlbum(albumId)
-                        onDismissRequest()
-                    } else {
-                        com.dsann.music.ui.SnackbarController.showMessage("Album information unavailable")
+                    when {
+                        !albumId.isNullOrBlank() -> {
+                            exploreViewModel.loadAlbum(albumId)
+                            onDismissRequest()
+                        }
+                        !song.albumName.isNullOrBlank() -> {
+                            exploreViewModel.loadAlbumByName(song.albumName, song.artist)
+                            onDismissRequest()
+                        }
+                        else -> com.dsann.music.ui.SnackbarController.showMessage("Album information unavailable")
                     }
                 }
             ) + artistMenuItems + listOf(
