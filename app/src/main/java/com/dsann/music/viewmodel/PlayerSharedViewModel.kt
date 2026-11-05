@@ -1527,14 +1527,20 @@ class PlayerSharedViewModel @Inject constructor(
     }
 
     fun updateSongIndexOnly(index: Int) {
+        if (index !in _songList.value.indices) return
+        val song = _songList.value[index]
+        val previousSong = _currentSong.value
+        val isDifferentTrack = previousSong?.id != song.id ||
+            previousSong?.videoId != song.videoId
+
         _currentSongIndex.value = index
-        if (index in _songList.value.indices) {
-            val song = _songList.value[index]
-            if (_currentSong.value?.id != song.id) {
-                lyricsController.clearForSongChange(song)
-            }
-            _currentSong.value = song
+        if (isDifferentTrack) {
+            lyricsController.clearForSongChange(song)
+            // Clear the previous video's title/uploader immediately. The player effect
+            // will ask AudioPlaybackService to resolve this queue item's matching video.
+            _videoPlaybackMetadata.value = null
         }
+        _currentSong.value = song
     }
     
     fun retryLyrics() = lyricsController.retryLyrics(appContext, _currentSong.value)
