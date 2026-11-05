@@ -138,7 +138,9 @@ fun AccountSettingsSection(
     val isLoggedIn = remember(userProfile) { AccountManager.isLoggedIn(context) }
     val accountName = userProfile?.name ?: AccountManager.getAccountName(context)
     val token = remember { AccountManager.getAuthCookie(context) ?: "No persistent credentials detected" }
-    val offlineError by viewModel.offlineError.collectAsStateWithLifecycle()
+    val libraryOfflineError by viewModel.offlineError.collectAsStateWithLifecycle()
+    val profileOfflineError by viewModel.profileOfflineError.collectAsStateWithLifecycle()
+    val offlineError = libraryOfflineError || profileOfflineError
 
     var syncEnabled by remember { mutableStateOf(AccountManager.isSyncEnabled(context)) }
     var showTokenAlert by remember { mutableStateOf(false) }
