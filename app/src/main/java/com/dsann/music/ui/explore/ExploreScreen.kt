@@ -353,17 +353,6 @@ fun ExploreScreen(
     val searchListState = rememberLazyListState()
     var hasVisitedSpecificSearchFilter by remember { mutableStateOf(false) }
 
-    // Returning from a filtered result type to Top results should show its first section,
-    // rather than retaining the previous category's deep scroll position.
-    LaunchedEffect(currentFilter) {
-        if (currentFilter != null) {
-            hasVisitedSpecificSearchFilter = true
-        } else if (hasVisitedSpecificSearchFilter) {
-            searchListState.scrollToItem(0)
-            hasVisitedSpecificSearchFilter = false
-        }
-    }
-
     val isPlayerExpanded by playerSharedViewModel.isPlayerExpanded.collectAsStateWithLifecycle()
     val playerExpansionFraction by playerSharedViewModel.playerExpansionFraction.collectAsStateWithLifecycle()
     // Keep every Explore-level Back action subordinate until the player is fully closed.
@@ -659,6 +648,17 @@ fun ExploreScreen(
     }
 
     val currentFilter by viewModel.searchFilter.collectAsStateWithLifecycle()
+
+    // Returning from a filtered result type to Top results should show its first section,
+    // rather than retaining the previous category's deep scroll position.
+    LaunchedEffect(currentFilter) {
+        if (currentFilter != null) {
+            hasVisitedSpecificSearchFilter = true
+        } else if (hasVisitedSpecificSearchFilter) {
+            searchListState.scrollToItem(0)
+            hasVisitedSpecificSearchFilter = false
+        }
+    }
 
     val onSearchHeaderQueryChange = remember(viewModel) {
         { query: String -> viewModel.setSearchQuery(query) }
