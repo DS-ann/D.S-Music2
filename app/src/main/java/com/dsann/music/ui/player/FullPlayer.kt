@@ -1762,6 +1762,15 @@ fun FullPlayer(
                         ?.toLong()
                 } else null
                 val reportedOnlineStreamBytes = onlineStreamMetadata?.contentLengthBytes
+                val reportedVideoStreamBytes = videoPlaybackMetadata?.contentLengthBytes
+                    ?.takeIf { isVideoMode && it > 0L }
+                val estimatedVideoStreamBytes = videoPlaybackMetadata?.bitrateBps
+                    ?.takeIf { isVideoMode && it > 0L && durationMs > 0L }
+                    ?.let { bitrate ->
+                        (bitrate.toDouble() * durationMs.toDouble() / 8000.0)
+                            .takeIf { it > 0.0 && it.isFinite() && it < Long.MAX_VALUE.toDouble() }
+                            ?.toLong()
+                    }
                 val totalSeconds = durationMs.coerceAtLeast(0L) / 1000L
                 val durationText = if (durationMs > 0L) {
                     if (totalSeconds >= 3600L) {
@@ -1776,7 +1785,14 @@ fun FullPlayer(
                 val fileBitrateBps = songFileMetadata.bitrateBps
                 val estimatedFileBitrateBps = songFileMetadata.estimatedBitrateBps
                 val sizeText = if (isVideoMode) {
-                    "Video stream size is not exposed by the selected source"
+                    when {
+                        reportedVideoStreamBytes != null ->
+                            android.text.format.Formatter.formatFileSize(context, reportedVideoStreamBytes)
+                        estimatedVideoStreamBytes != null ->
+                            "About " + android.text.format.Formatter.formatFileSize(context, estimatedVideoStreamBytes) +
+                                " (estimated from the selected stream bitrate and duration)"
+                        else -> "Video stream size is not exposed by the selected source"
+                    }
                 } else when {
                     fileSizeBytes != null ->
                         android.text.format.Formatter.formatFileSize(context, fileSizeBytes)
@@ -1790,7 +1806,9 @@ fun FullPlayer(
                     else -> "File provider does not expose the byte length"
                 }
                 val bitrateText = if (isVideoMode) {
-                    "Video bitrate is not exposed by the selected stream metadata"
+                    videoPlaybackMetadata?.bitrateBps?.takeIf { it > 0L }?.let {
+                        "${(it + 500L) / 1000L} kb/s (selected video stream)"
+                    } ?: "Video bitrate is not exposed by the selected stream metadata"
                 } else when {
                     fileBitrateBps != null ->
                         "${(fileBitrateBps + 500L) / 1000L} kb/s (file metadata)"
