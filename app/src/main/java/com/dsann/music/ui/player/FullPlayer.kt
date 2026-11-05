@@ -785,6 +785,32 @@ fun FullPlayer(
         }
     }
 
+    val playerProgressBackgroundColor = remember(
+        uiState.playerBackgroundColor,
+        isDark,
+        playerBackgroundStyle,
+        themePlayerBackground
+    ) {
+        val derivedArtworkSurface = deriveArtworkSurfaceColor(
+            sourceColor = Color(uiState.playerBackgroundColor),
+            isDark = isDark,
+            darkLightness = 0.155f,
+            lightLightness = 0.835f,
+            darkSaturationRange = 0.32f..0.54f,
+            lightSaturationRange = 0.30f..0.48f
+        )
+        when (playerBackgroundStyle) {
+            "Theme" -> themePlayerBackground
+            "Black" -> Color.Black
+            "Gradient" -> androidx.compose.ui.graphics.lerp(
+                derivedArtworkSurface,
+                themePlayerBackground,
+                0.5f
+            )
+            else -> derivedArtworkSurface
+        }
+    }
+
     val hasLyrics = !syncedLyrics.isNullOrEmpty() || !plainLyrics.isNullOrBlank()
     val currentSongId = uiState.currentSong?.id
     val audioService by viewModel.audioServiceState.collectAsStateWithLifecycle()
@@ -1408,7 +1434,8 @@ fun FullPlayer(
                 playerTimes = playerTimes,
                 scrubberThickness = scrubberThickness,
                 scrubberThumbStyle = scrubberThumbStyle,
-                coverDerivedColor = Color(uiState.playerBackgroundColor)
+                coverDerivedColor = Color(uiState.playerBackgroundColor),
+                backgroundSurfaceColor = playerProgressBackgroundColor
             )
 
             Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 16.dp))
