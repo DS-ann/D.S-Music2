@@ -2484,8 +2484,9 @@ private fun MiniPlayerContentInternal(
                 modifier = controlModifier(centerControlWidth)
             ) {
                 if (isLoading) {
-                    com.dsann.music.ui.theme.CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp), color = contentColor, strokeWidth = 2.dp
+                    com.dsann.music.ui.theme.LoadingIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = contentColor
                     )
                 } else if (controlIconSet == "Classic") {
                     Icon(
