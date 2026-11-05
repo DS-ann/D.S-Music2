@@ -1592,6 +1592,13 @@ fun PlayerBottomSheetCompose(
             )
         }
 
+        // Landscape should reveal the tab content beside the collapsed capsule.
+        // Do not mount the full-window opaque backdrop until the sheet has actually started
+        // expanding; portrait keeps its existing fade behavior unchanged.
+        val showLandscapePlayerBackdrop by remember(playerContentExpansionFraction) {
+            derivedStateOf { playerContentExpansionFraction.value > 0.015f }
+        }
+
         if (showPlayerContentArea) {
             DsmusicSurface(
                 modifier = Modifier
@@ -1618,14 +1625,16 @@ fun PlayerBottomSheetCompose(
                 // Keep the areas outside the mini-player capsule transparent while the capsule
                 // itself retains its solid surface. Fade the full-player background on its own draw layer.
                 // invalidate this entire composition tree.
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            alpha = playerContentExpansionFraction.value.coerceIn(0f, 1f)
-                        }
-                        .background(dynamicBgColor)
-                )
+                if (!isLandscapeWindow || showLandscapePlayerBackdrop) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha = playerContentExpansionFraction.value.coerceIn(0f, 1f)
+                            }
+                            .background(dynamicBgColor)
+                    )
+                }
                 Box(modifier = Modifier.fillMaxSize().padding(bottom = sheetVisualState.currentBottomPadding.coerceAtLeast(0.dp))) {
                     Column(
                         modifier = Modifier
