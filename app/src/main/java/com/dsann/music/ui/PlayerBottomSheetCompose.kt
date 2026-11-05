@@ -525,12 +525,16 @@ fun computeSheetVerticalDragFrame(
     initialFractionOnDragStart: Float,
     initialYOnDragStart: Float
 ): SheetVerticalDragFrame {
-    // Clamped strictly to expandedY to prevent vertical rubber-band/upward drift when fully expanded
+    // A drag that starts with the mini-player fully collapsed may open it upward,
+    // but must never pull the capsule below its normal dock position.
+    // Keep the small downward overscroll only for a drag that starts from the full player.
+    val maxDragY = if (initialFractionOnDragStart <= 0.001f) {
+        collapsedY
+    } else {
+        collapsedY + miniHeightPx * 0.2f
+    }
     val newY = (initialYOnDragStart + accumulatedDragY)
-        .coerceIn(
-            expandedY,
-            collapsedY + miniHeightPx * 0.2f
-        )
+        .coerceIn(expandedY, maxDragY)
     val denominator = (collapsedY - expandedY).coerceAtLeast(1f)
     val dragRatio = (initialYOnDragStart - newY) / denominator
     val newFraction = (initialFractionOnDragStart + dragRatio).coerceIn(0f, 1f)
