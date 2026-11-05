@@ -985,32 +985,22 @@ fun LibraryScreen(
                                         }
                                     }
                                 } else {
-                                    LazyVerticalGrid(
-                                        columns = if (isLandscapeLibraryLayout) {
-                                            GridCells.Adaptive(minSize = 260.dp)
-                                        } else {
-                                            GridCells.Fixed(1)
-                                        },
+                                    // Downloads is a single playlist in portrait. Use a LazyColumn
+                                    // rather than a one-column LazyVerticalGrid so vertical drags
+                                    // that begin on a song row stay with the scrolling list.
+                                    LazyColumn(
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .weight(1f),
                                         contentPadding = PaddingValues(
-                                            start = if (isLandscapeLibraryLayout) 12.dp else 0.dp,
+                                            start = 0.dp,
                                             top = 0.dp,
-                                            end = if (isLandscapeLibraryLayout) 12.dp else 0.dp,
+                                            end = 0.dp,
                                             bottom = 160.dp
                                         ),
-                                        horizontalArrangement = Arrangement.spacedBy(
-                                            if (isLandscapeLibraryLayout) 12.dp else 0.dp
-                                        ),
-                                        verticalArrangement = Arrangement.spacedBy(
-                                            if (isLandscapeLibraryLayout) 12.dp else 2.dp
-                                        )
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
-                                        item(
-                                            key = "download-playlist-header",
-                                            span = { GridItemSpan(maxLineSpan) }
-                                        ) {
+                                        item(key = "download-playlist-header") {
                                             val headerSong = filteredSongs.firstOrNull()
                                             if (headerSong != null) {
                                                 Column(
@@ -1087,7 +1077,7 @@ fun LibraryScreen(
                                                 }
                                             }
                                         }
-                                        gridItemsIndexed(
+                                        itemsIndexed(
                                             items = sortedAndGrouped,
                                             key = { _, item ->
                                                 if (item is SongItem) "downloaded-song:${item.id}"
@@ -1095,9 +1085,6 @@ fun LibraryScreen(
                                             },
                                             contentType = { _, item ->
                                                 if (item is SongItem) "downloaded-song" else "section-header"
-                                            },
-                                            span = { _, item ->
-                                                GridItemSpan(if (item is String) maxLineSpan else 1)
                                             }
                                         ) { index, item ->
                                             if (item is String) {
