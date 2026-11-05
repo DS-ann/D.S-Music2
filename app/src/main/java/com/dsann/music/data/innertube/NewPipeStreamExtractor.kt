@@ -489,7 +489,7 @@ object NewPipeStreamExtractor {
                     height = height,
                     mimeType = stream.format?.mimeType?.substringBefore(';')?.trim(),
                     contentLengthBytes = stream.itagItem?.contentLength?.takeIf { it > 0L },
-                    bitrateBps = stream.bitrate.takeIf { it > 0 }.toLong(),
+                    bitrateBps = stream.bitrate.takeIf { it > 0 }?.toLong(),
                     videoTitle = info.name,
                     videoUploader = info.uploaderName,
                     durationMs = (info.duration * 1000L).coerceAtLeast(0L),
