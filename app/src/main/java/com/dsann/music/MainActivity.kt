@@ -257,7 +257,15 @@ class MainActivity : AppCompatActivity() {
                         val showBottomBar = currentDestination?.route in listOf("explore", "search", "library", "local_music", "settings")
 
                         val density = LocalDensity.current
-                        val navigationBarsHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
+                        val reportedBottomPadding = WindowInsets.navigationBars
+                            .asPaddingValues()
+                            .calculateBottomPadding()
+                        val bottomPadding = if (!useNavigationRail) {
+                            reportedBottomPadding.coerceAtLeast(24.dp)
+                        } else {
+                            reportedBottomPadding
+                        }
+                        val navigationBarsHeightPx = with(density) { bottomPadding.toPx() }
                         val configuredNavHeight = when (navBarSize) {
                             "Compact" -> 56.dp
                             "Tall" -> 76.dp
@@ -294,8 +302,6 @@ class MainActivity : AppCompatActivity() {
                             animationSpec = if (isLegacyAndroid6) snap() else spring(stiffness = Spring.StiffnessMediumLow),
                             label = "navIconSize"
                         )
-                        val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-
                         DsmusicNavigationBar(
                             destinations = listOf(
                                 DsmusicNavigationDestination("explore", "Explore", R.drawable.ic_explore),
