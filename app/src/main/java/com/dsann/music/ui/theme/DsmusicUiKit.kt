@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -1106,10 +1107,9 @@ private fun PullRefreshIndicator(
             contentAlignment = Alignment.Center
         ) {
             if (isRefreshing) {
-                CircularProgressIndicator(
+                LoadingIndicator(
                     modifier = Modifier.size(17.dp),
-                    color = accent,
-                    strokeWidth = 2.dp
+                    color = accent
                 )
             } else {
                 // The arrow remains visible while pulling. It flips only when the
@@ -1511,9 +1511,91 @@ fun CircularProgressIndicator(
         )
     }
 }
+/**
+ * Shared D.S Music loading treatment. All indeterminate loading states use this
+ * compact orbit ring with a muted track, soft surface and center point.
+ */
 @Composable
-fun LoadingIndicator(modifier: Modifier = Modifier, color: Color = DsmusicTheme.colorScheme.primary, containerColor: Color = Color.Transparent) {
-    CircularProgressIndicator(modifier = modifier, color = color)
+fun LoadingIndicator(
+    modifier: Modifier = Modifier.size(32.dp),
+    color: Color = DsmusicTheme.colorScheme.primary,
+    containerColor: Color = Color.Transparent
+) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(CircleShape)
+                .background(
+                    if (containerColor != Color.Transparent) containerColor
+                    else color.copy(alpha = 0.055f)
+                )
+        )
+        CircularProgressIndicator(
+            modifier = Modifier.fillMaxSize().padding(2.dp),
+            color = color,
+            trackColor = color.copy(alpha = 0.22f),
+            strokeWidth = 2.6.dp
+        )
+        Box(
+            modifier = Modifier
+                .size(4.dp)
+                .clip(CircleShape)
+                .background(color.copy(alpha = 0.88f))
+        )
+    }
+}
+
+/**
+ * Reusable empty-state for network-backed content that failed specifically because
+ * the device has no validated internet connection.
+ */
+@Composable
+fun NoInternetState(
+    modifier: Modifier = Modifier.fillMaxSize(),
+    onRetry: (() -> Unit)? = null,
+    compact: Boolean = false,
+    title: String = "No internet connection",
+    message: String = "Connect to Wi-Fi or mobile data, then try again."
+) {
+    Column(
+        modifier = modifier.padding(if (compact) 12.dp else 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(if (compact) 44.dp else 64.dp)
+                .clip(CircleShape)
+                .background(DsmusicTheme.colorScheme.primary.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.CloudOff,
+                contentDescription = null,
+                modifier = Modifier.size(if (compact) 23.dp else 32.dp),
+                tint = DsmusicTheme.colorScheme.primary
+            )
+        }
+        Text(
+            text = title,
+            style = if (compact) DsmusicTheme.typography.titleSmall else DsmusicTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = DsmusicTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = message,
+            style = DsmusicTheme.typography.bodyMedium,
+            color = DsmusicTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        if (onRetry != null) {
+            TextButton(onClick = onRetry) {
+                Text("Try again")
+            }
+        }
+    }
 }
 @Composable
 fun CircularWavyProgressIndicator(progress: Float, modifier: Modifier = Modifier, colors: Pair<Color, Color> = WavyProgressIndicatorDefaults.colors()) {
