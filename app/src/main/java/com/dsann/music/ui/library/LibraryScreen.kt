@@ -214,6 +214,8 @@ fun LibraryScreen(
     val fragmentManager = remember(fragmentActivity) { fragmentActivity?.supportFragmentManager }
 
     val isPlayerExpanded by viewModel.isPlayerExpanded.collectAsStateWithLifecycle()
+    val playerExpansionFraction by viewModel.playerExpansionFraction.collectAsStateWithLifecycle()
+    val isPlayerBackActive = isPlayerExpanded || playerExpansionFraction > 0.01f
     val scope = rememberCoroutineScope()
 
     var activeTab by rememberSaveable { mutableStateOf("Playlists") }
@@ -322,7 +324,11 @@ fun LibraryScreen(
     // Library sections are local UI state rather than separate NavController destinations.
     // Consume Back here so it returns to the Library landing page.
     BackHandler(
-        enabled = activeTab != "Playlists" || showAccountScreen || showHistoryScreen || showCreditsForSong != null
+        // Let the player consume Back first. Keep the current Library subsection intact
+        // until the full player has completely collapsed.
+        enabled = !isPlayerBackActive && (
+            activeTab != "Playlists" || showAccountScreen || showHistoryScreen || showCreditsForSong != null
+        )
     ) {
         when {
             showCreditsForSong != null -> showCreditsForSong = null
