@@ -1821,6 +1821,154 @@ private data class ExploreTrackMenuItem(
     val action: () -> Unit
 )
 
+/**
+ * Local-file action sheet. It uses the same quick-action layout as downloaded tracks,
+ * but deliberately omits online/social actions and never offers to delete the source file.
+ */
+@Composable
+fun LocalSongActionsBottomSheet(
+    song: SongItem,
+    localQueue: List<SongItem>,
+    selectedSongIndex: Int,
+    playerSharedViewModel: PlayerSharedViewModel,
+    onDismissRequest: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val modalGeometry = rememberDsmusicModalSheetGeometry()
+    var showInfo by remember(song.id) { mutableStateOf(false) }
+    var hasDownloadedOpus by remember(song.id, song.path) { mutableStateOf(false) }
+    val conversionScope = rememberCoroutineScope()
+    val convertingKeys by com.dsann.music.util.OpusToMp3Converter.convertingKeys
+        .collectAsStateWithLifecycle(emptySet())
+    val isConvertingToMp3 = remember(song.id, song.path, convertingKeys) {
+        com.dsann.music.util.OpusToMp3Converter.conversionKeys(song).any { it in convertingKeys }
+    }
+
+    LaunchedEffect(song.id, song.path) {
+        hasDownloadedOpus = withContext(Dispatchers.IO) {
+            SongDownloader.findDownloadedOpusUri(context, song) != null
+        }
+    }
+
+    val actionListener = remember(song.id, playerSharedViewModel, localQueue, selectedSongIndex) {
+        object : SongActionsBottomSheet.ActionListener {
+            override fun onPlayNext(songItem: SongItem) {
+                playerSharedViewModel.addToQueueNext(songItem)
+            }
+
+            override fun onAddToQueue(songItem: SongItem) {
+                playerSharedViewModel.addToQueue(songItem)
+            }
+
+            override fun onDelete(songItem: SongItem) = Unit
+            override fun onEdit(songItem: SongItem) = Unit
+
+            override fun onPlay(songItem: SongItem) {
+                if (selectedSongIndex in localQueue.indices &&
+                    localQueue[selectedSongIndex].id == songItem.id
+                ) {
+                    playerSharedViewModel.setSongList(localQueue)
+                    playerSharedViewModel.playSongAtIndex(selectedSongIndex)
+                } else {
+                    playerSharedViewModel.playSong(songItem)
+                }
+            }
+
+            override fun onFavorite(songItem: SongItem, isFav: Boolean) = Unit
+            override fun onShare(songItem: SongItem) = Unit
+        }
+    }
+
+    val convertToMp3: () -> Unit = {
+        if (hasDownloadedOpus && !isConvertingToMp3) {
+            conversionScope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    com.dsann.music.util.OpusToMp3Converter.convert(
+                        context.applicationContext,
+                        song
+                    )
+                }
+                if (result.success) {
+                    hasDownloadedOpus = false
+                    SongDownloader.refreshDownloadedStatus(context, song)
+                }
+                com.dsann.music.ui.SnackbarController.showMessage(
+                    result.message,
+                    iconResId = if (result.success) R.drawable.ic_downloaded else null
+                )
+            }
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        sheetState = sheetState,
+        sheetMaxWidth = if (isLandscape) modalGeometry.width else Dp.Unspecified,
+        centeredLandscape = true,
+        centerOffsetX = modalGeometry.centerOffsetX,
+        containerColor = DsmusicTheme.colorScheme.surfaceContainerHigh,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp, start = 14.dp, end = 14.dp, top = 4.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            ExploreActionSheetHeader(
+                thumbnailUrl = song.getAlbumArtUri()?.toString(),
+                title = song.title,
+                subtitle = song.artist,
+                trailingContent = {
+                    DsmusicIconButton(onClick = onDismissRequest) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "Close",
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+            )
+            HorizontalDivider(color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            if (showInfo) {
+                DsmusicTextButton(
+                    onClick = { showInfo = false },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Back to song actions")
+                }
+                InfoContent(song)
+            } else {
+                OptionsContent(
+                    song = song,
+                    isFavorite = false,
+                    onFavoriteChange = {},
+                    actionListener = actionListener,
+                    onAddToPlaylist = {},
+                    showAddToQueue = true,
+                    onDismiss = onDismissRequest,
+                    showDelete = false,
+                    hasDownloadedOpus = hasDownloadedOpus,
+                    isConvertingToMp3 = isConvertingToMp3,
+                    onConvertToMp3 = convertToMp3,
+                    showLikeAndShare = false,
+                    showAddToPlaylist = false,
+                    localSongMode = true,
+                    showInfoAction = true,
+                    onShowInfoAction = { showInfo = true }
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun OnlineSongBottomSheet(
     song: OnlineSong,
