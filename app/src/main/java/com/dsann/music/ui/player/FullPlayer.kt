@@ -1396,10 +1396,12 @@ fun FullPlayer(
                         )
                         "repeat" -> PillChip(
                             style = playerButtonStyle,
-                            icon = if (repeatMode == PlayerSharedViewModel.REPEAT_INFINITY) {
-                                painterResource(id = R.drawable.ic_repeat_infinity)
-                            } else {
-                                Icons.Rounded.Repeat
+                            icon = when (repeatMode) {
+                                PlayerSharedViewModel.REPEAT_ONCE ->
+                                    painterResource(id = R.drawable.ic_repeat_one)
+                                PlayerSharedViewModel.REPEAT_INFINITY ->
+                                    painterResource(id = R.drawable.ic_repeat_infinity)
+                                else -> Icons.Rounded.Repeat
                             },
                             label = when (repeatMode) {
                                 PlayerSharedViewModel.REPEAT_ONCE -> "Repeat once"
