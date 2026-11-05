@@ -1544,8 +1544,8 @@ fun PlayerBottomSheetCompose(
                 color = Color.Transparent,
                 showBorder = false
             ) {
-                // The collapsed mini player stays visually transparent. Fade the full
-                // player surface in on its own draw layer so animation frames do not
+                // Keep the areas outside the mini-player capsule transparent while the capsule
+                // itself retains its solid surface. Fade the full-player background on its own draw layer.
                 // invalidate this entire composition tree.
                 Box(
                     modifier = Modifier
@@ -1590,7 +1590,7 @@ fun PlayerBottomSheetCompose(
                                 dragModifier = verticalDragModifier,
                                 miniPlayerHeight = miniPlayerHeight,
                                 miniPlayerWidthFraction = miniPlayerWidthFraction,
-                                miniPlayerBackgroundColor = Color.Transparent,
+                                miniPlayerBackgroundColor = dynamicBgColor,
                                 miniPlayerShape = miniPlayerShape,
                                 miniPlayerElevation = miniPlayerElevation,
                                 miniSwipeModifier = miniSwipeGestureModifier,
