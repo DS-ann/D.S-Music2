@@ -245,6 +245,8 @@ class MainActivity : AppCompatActivity() {
                 val configuration = androidx.compose.ui.platform.LocalConfiguration.current
                 // Match Prism's wide-window breakpoint: phones in landscape and tablets use a side rail.
                 val useNavigationRail = configuration.screenWidthDp >= 600
+                val isLandscapeLayout = configuration.orientation ==
+                    android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
                 Scaffold(
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -790,12 +792,14 @@ class MainActivity : AppCompatActivity() {
                             activity = this@MainActivity,
                             viewModel = playerViewModel,
                             bottomNavigationVisible = showBottomBar && !useNavigationRail,
+                            navigationRailInset = if (useNavigationRail && isLandscapeLayout) railInset else 0.dp,
                             modifier = Modifier.layout { measurable, constraints ->
-                                // Keep the rail inset stable during the sheet animation.
-                                // The full player overlays it, so only one discrete remeasure is
-                                // needed when the player enters or leaves its expanded state.
+                                // Portrait retains its existing rail inset behavior. In landscape,
+                                // keep the player host full-width and morph only the collapsed capsule
+                                // into the rail-excluded pane to prevent a final width/position snap.
                                 val startInsetPx = if (
-                                    useNavigationRail && railInset > 0.dp && !isPlayerBackActive
+                                    useNavigationRail && !isLandscapeLayout &&
+                                    railInset > 0.dp && !isPlayerBackActive
                                 ) railInset.roundToPx().coerceAtLeast(0) else 0
                                 val childMaxWidth = (constraints.maxWidth - startInsetPx).coerceAtLeast(0)
                                 val childMinWidth = (constraints.minWidth - startInsetPx)
