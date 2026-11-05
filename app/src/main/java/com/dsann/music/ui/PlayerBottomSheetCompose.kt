@@ -501,14 +501,6 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
             }
         }
 
-        // Register after the full player and every screen underneath it have composed.
-        // The latest enabled Compose BackHandler wins, so the player must be last here.
-        androidx.activity.compose.BackHandler(
-            enabled = currentSheetContentState == PlayerSheetState.EXPANDED &&
-                !isLyricsModeEnabled && !isQueueExpanded
-        ) {
-            collapsePlayerFully()
-        }
     }
 }
 
@@ -2248,6 +2240,15 @@ fun PlayerBottomSheetCompose(
                     }
                 }
             }
+        }
+
+        // Register after the full player and every screen underneath it have composed.
+        // The latest enabled Compose BackHandler wins, so the player must be last here.
+        androidx.activity.compose.BackHandler(
+            enabled = currentSheetContentState == PlayerSheetState.EXPANDED &&
+                !isLyricsModeEnabled && !isQueueExpanded
+        ) {
+            collapsePlayerFully()
         }
     }
 }
