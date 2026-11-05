@@ -786,6 +786,9 @@ object SongDownloader {
                 throw IOException("Could not publish the downloaded audio to the music library")
             }
             rememberDownloadedSong(context, videoId, outputFile)
+            // The source is now a completed, published download. Cancellation during the
+            // optional MP3 conversion must not delete this valid Opus original.
+            task.outputFile = null
 
             // The selected MP3 format is fulfilled by converting the tagged Opus source locally.
             // Conversion failure does not discard the valid Opus download; the manual three-dot
