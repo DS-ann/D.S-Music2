@@ -355,7 +355,7 @@ fun BottomSheetScaffoldContent(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                ExpressiveTabSwitcher(selectedTab) { selectedTab = it }
+                ExpressiveTabSwitcher(selectedTab, onTabSelected = { selectedTab = it })
             } else {
                 // LANDSCAPE: Side-by-Side Split View
                 Row(
@@ -380,7 +380,7 @@ fun BottomSheetScaffoldContent(
                         
                         Spacer(modifier = Modifier.height(24.dp))
                         
-                        ExpressiveTabSwitcher(selectedTab) { selectedTab = it }
+                        ExpressiveTabSwitcher(selectedTab, onTabSelected = { selectedTab = it })
                     }
 
                     // Right Pane (Scrollable content)

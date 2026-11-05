@@ -429,8 +429,8 @@ internal fun CollectionActionRow(
     subtitle: String,
     icon: @Composable () -> Unit,
     enabled: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
     Row(
         modifier = modifier
