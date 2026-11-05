@@ -282,9 +282,10 @@ internal object OpusToMp3Converter {
         ) {
             throw IllegalStateException("The MP3 album tag could not be verified")
         }
-        if (!artworkBytes.isNullOrEmpty()) {
+        val expectedArtwork = artworkBytes
+        if (expectedArtwork != null && expectedArtwork.isNotEmpty()) {
             val persisted = writtenTag.artworkList.any { artwork ->
-                runCatching { artwork.binaryData?.contentEquals(artworkBytes) == true }.getOrDefault(false)
+                runCatching { artwork.binaryData?.contentEquals(expectedArtwork) == true }.getOrDefault(false)
             }
             if (!persisted) throw IllegalStateException("The MP3 cover artwork could not be verified")
         }
