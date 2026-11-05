@@ -1504,10 +1504,9 @@ fun FullPlayer(
                     contentAlignment = Alignment.Center
                 ) {
                     if (uiState.isLoading) {
-                        com.dsann.music.ui.theme.CircularProgressIndicator(
+                        com.dsann.music.ui.theme.LoadingIndicator(
                             modifier = Modifier.size(30.dp),
-                            color = centerIconColor,
-                            strokeWidth = 2.5.dp
+                            color = centerIconColor
                         )
                     } else {
                         Icon(
