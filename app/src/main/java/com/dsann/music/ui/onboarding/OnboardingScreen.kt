@@ -51,7 +51,8 @@ package com.dsann.music.ui.onboarding
     import androidx.compose.material.icons.rounded.Check
     import androidx.compose.material.icons.rounded.CheckCircle
     import androidx.compose.material.icons.rounded.DarkMode
-    import androidx.compose.material.icons.rounded.GraphicEq
+    import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.GraphicEq
     import androidx.compose.material.icons.rounded.Headphones
     import androidx.compose.material.icons.rounded.Home
     import androidx.compose.material.icons.rounded.LibraryMusic
@@ -86,7 +87,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
     import androidx.compose.ui.Alignment
     import androidx.compose.ui.Modifier
     import androidx.compose.ui.draw.clip
-    import androidx.compose.ui.draw.border
+    import androidx.compose.foundation.border
     import androidx.compose.ui.draw.rotate
     import androidx.compose.ui.draw.shadow
     import androidx.compose.ui.graphics.Brush
@@ -258,6 +259,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
         pageOffsetProvider: () -> Float,
         heroIcon: ImageVector,
         heroTag: String,
+        pageNumber: Int,
         imageUrl: String? = null,
         content: @Composable () -> Unit
     ) {
@@ -305,6 +307,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
             OnboardingHeroArtwork(
                 icon = heroIcon,
                 tag = heroTag,
+                pageNumber = pageNumber,
                 imageUrl = imageUrl,
                 pageOffsetProvider = pageOffsetProvider,
                 modifier = Modifier
@@ -329,6 +332,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
     private fun OnboardingHeroArtwork(
         icon: ImageVector,
         tag: String,
+        pageNumber: Int,
         imageUrl: String?,
         pageOffsetProvider: () -> Float,
         modifier: Modifier = Modifier
@@ -407,7 +411,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Text(
-                        text = "01 / 08",
+                        text = "${pageNumber.toString().padStart(2, '0')} / 08",
                         style = DsmusicTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp,
@@ -550,6 +554,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
             heroIcon = Icons.Rounded.MusicNote,
+            pageNumber = 1,
             heroTag = "A FRESH WAY TO LISTEN"
         ) {
             Text(
@@ -591,10 +596,11 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
             heroIcon = Icons.Rounded.LibraryMusic,
+            pageNumber = 2,
             heroTag = "STREAM AND PLAY LOCAL"
         ) {
             Text(
-                text = "Your\nComplete\nEcosystem.",
+                text = "All your music.\nOne place.",
                 style = DsmusicTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black,
                 fontSize = 36.sp,
@@ -632,6 +638,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
             heroIcon = Icons.Rounded.GraphicEq,
+            pageNumber = 3,
             heroTag = "SEARCH · LYRICS · OFFLINE"
         ) {
             Column(
@@ -704,10 +711,11 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
             heroIcon = Icons.Rounded.Palette,
+            pageNumber = 6,
             heroTag = "COLOURS THAT FEEL RIGHT"
         ) {
             Text(
-                text = "Style it\nyour way.",
+                text = "Make it\nfeel like yours.",
                 style = DsmusicTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black,
                 fontSize = 36.sp,
@@ -788,10 +796,11 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
             heroIcon = Icons.Rounded.Tune,
+            pageNumber = 7,
             heroTag = "A NAVIGATION STYLE YOU LIKE"
         ) {
             Text(
-                text = "Navigate\nSeamlessly.",
+                text = "Navigation,\nyour way.",
                 style = DsmusicTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black,
                 fontSize = 36.sp,
@@ -932,10 +941,11 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
             heroIcon = Icons.Rounded.FolderOpen,
+            pageNumber = 5,
             heroTag = "YOUR DEVICE, YOUR LIBRARY"
         ) {
             Text(
-                text = "Enable\nPermissions.",
+                text = "Bring your\nmusic library in.",
                 style = DsmusicTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black,
                 fontSize = 36.sp,
@@ -1097,6 +1107,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
             heroIcon = Icons.Rounded.AccountCircle,
+            pageNumber = 4,
             heroTag = "SYNC YOUR MUSIC ACCOUNT",
             imageUrl = if (isLoggedIn) userProfileUrl else null
         ) {
@@ -1139,7 +1150,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                     Spacer(modifier = Modifier.height(120.dp))
                 } else {
                     Text(
-                        text = "Sign In &\nSync.",
+                        text = "Connect once.\nStay in sync.",
                         style = DsmusicTheme.typography.displayMedium,
                         fontWeight = FontWeight.Black,
                         fontSize = 36.sp,
@@ -1237,6 +1248,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
             heroIcon = Icons.Rounded.Headphones,
+            pageNumber = 8,
             heroTag = "READY WHEN YOU ARE",
             imageUrl = if (isLoggedIn) userProfileUrl else null
         ) {
@@ -1284,7 +1296,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                 Spacer(modifier = Modifier.height(20.dp))
     
                 Text(
-                    text = "Ready to\nFlow.",
+                    text = "You're all set.\nPress play.",
                     style = DsmusicTheme.typography.displayMedium,
                     fontWeight = FontWeight.Black,
                     fontSize = 36.sp,
