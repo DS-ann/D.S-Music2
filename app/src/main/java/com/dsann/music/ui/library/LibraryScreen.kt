@@ -54,6 +54,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -117,14 +118,11 @@ import com.dsann.music.ui.theme.Scaffold
 import com.dsann.music.ui.theme.SnackbarHost
 import com.dsann.music.ui.theme.SnackbarHostState
 import com.dsann.music.ui.theme.Surface
-import com.dsann.music.ui.theme.SwipeToDismissBox
-import com.dsann.music.ui.theme.SwipeToDismissBoxValue
 import com.dsann.music.ui.theme.Text
 import com.dsann.music.ui.theme.TextButton
 import com.dsann.music.ui.theme.PullToRefreshBox
 import com.dsann.music.ui.theme.rememberPullToRefreshState
 import com.dsann.music.ui.theme.rememberModalBottomSheetState
-import com.dsann.music.ui.theme.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -240,9 +238,9 @@ fun LibraryScreen(
     }
     var isRefreshing by remember { mutableStateOf(false) }
 
-    var showAccountScreen by remember { mutableStateOf(false) }
-    var showHistoryScreen by remember { mutableStateOf(false) }
-    var isCacheScreenOpen by remember { mutableStateOf(false) }
+    var showAccountScreen by rememberSaveable { mutableStateOf(false) }
+    var showHistoryScreen by rememberSaveable { mutableStateOf(false) }
+    var isCacheScreenOpen by rememberSaveable { mutableStateOf(false) }
     val hideLibraryChrome = activeTab == "Downloaded songs" || isCacheScreenOpen
 
     val accountViewModel = remember(fragmentActivity) {
@@ -254,7 +252,7 @@ fun LibraryScreen(
 
     // Library's local tabs are pages too: swap them only at zero opacity so the
     // outgoing and incoming LazyColumn/grid trees are never animated together.
-    var renderedLibraryTab by remember { mutableStateOf(activeTab) }
+    var renderedLibraryTab by rememberSaveable { mutableStateOf(activeTab) }
     val libraryTabOpacity = remember {
         androidx.compose.animation.core.Animatable(1f)
     }
@@ -673,14 +671,16 @@ fun LibraryScreen(
                                 isRefreshing = false
                             }
                         }
-                        var isSelectingDownloads by remember { mutableStateOf(false) }
-                        var selectedDownloadIds by remember { mutableStateOf(setOf<Long>()) }
+                        var isSelectingDownloads by rememberSaveable { mutableStateOf(false) }
+                        var selectedDownloadIds by rememberSaveable { mutableStateOf(setOf<Long>()) }
                         var downloadSelectionMenuExpanded by remember { mutableStateOf(false) }
                         var downloadOptionsExpanded by remember { mutableStateOf(false) }
                         var downloadSortMenuExpanded by remember { mutableStateOf(false) }
                         var downloadSortAscending by rememberSaveable { mutableStateOf(true) }
                         var isDownloadSearchVisible by rememberSaveable { mutableStateOf(false) }
                         var downloadSearchQuery by rememberSaveable { mutableStateOf("") }
+                        // Share one scroll state across portrait and landscape layouts.
+                        val downloadListState = rememberLazyListState()
 
                         val pullToRefreshState = rememberPullToRefreshState()
                         PullToRefreshBox(
@@ -1118,125 +1118,49 @@ itemsIndexed(
                                             } else if (item is SongItem) {
                                                 val isPlaying = currentSong?.id == item.id
                                                 val isFav = favoriteIds.contains(item.id)
-
                                                 val localIndex = index
                                                 val count = sortedAndGrouped.size.coerceAtLeast(1)
-
-                                                // SwipeToDismissBox implementation
-                                                val dismissState = rememberSwipeToDismissBoxState(
-                                                    confirmValueChange = { dismissValue ->
-                                                        if (isSelectingDownloads) false else when (dismissValue) {
-                                                            SwipeToDismissBoxValue.StartToEnd -> {
-                                                                viewModel.addToQueueNext(item)
-                                                                scope.launch {
-                                                                    com.dsann.music.ui.SnackbarController.showMessage("Playing next: ${item.title}")
-                                                                }
-                                                                false
+                                                SongListItem(
+                                                    song = item,
+                                                    isPlaying = isPlaying,
+                                                    isFavorite = isFav,
+                                                    localIndex = localIndex,
+                                                    localCount = count,
+                                                    selectionMode = isSelectingDownloads,
+                                                    isSelected = item.id in selectedDownloadIds,
+                                                    onClick = {
+                                                        if (isSelectingDownloads) {
+                                                            selectedDownloadIds = if (item.id in selectedDownloadIds) {
+                                                                selectedDownloadIds - item.id
+                                                            } else {
+                                                                selectedDownloadIds + item.id
                                                             }
-                                                            SwipeToDismissBoxValue.EndToStart -> {
-                                                                viewModel.addToQueue(item)
-                                                                scope.launch {
-                                                                    com.dsann.music.ui.SnackbarController.showMessage("Added to queue: ${item.title}")
-                                                                }
-                                                                false
-                                                            }
-                                                            else -> false
-                                                        }
-                                                    }
-                                                )
-
-                                                SwipeToDismissBox(
-                                                    state = dismissState,
-                                                    backgroundContent = {
-                                                        val color = when (dismissState.dismissDirection) {
-                                                            SwipeToDismissBoxValue.StartToEnd -> DsmusicTheme.colorScheme.primaryContainer
-                                                            SwipeToDismissBoxValue.EndToStart -> DsmusicTheme.colorScheme.secondaryContainer
-                                                            else -> Color.Transparent
-                                                        }
-                                                        val icon = when (dismissState.dismissDirection) {
-                                                            SwipeToDismissBoxValue.StartToEnd -> Icons.Rounded.SkipNext
-                                                            SwipeToDismissBoxValue.EndToStart -> Icons.AutoMirrored.Rounded.QueueMusic
-                                                            else -> null
-                                                        }
-                                                        val alignment = when (dismissState.dismissDirection) {
-                                                            SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
-                                                            SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
-                                                            else -> Alignment.Center
-                                                        }
-                                                        val topRadius = if (localIndex == 0) 24.dp else 4.dp
-                                                        val bottomRadius = if (localIndex == count - 1) 24.dp else 4.dp
-                                                        val backgroundShape = RoundedCornerShape(
-                                                            topStart = topRadius, topEnd = topRadius,
-                                                            bottomStart = bottomRadius, bottomEnd = bottomRadius
-                                                        )
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .fillMaxSize()
-                                                                .padding(horizontal = 8.dp, vertical = 1.dp)
-                                                                .clip(backgroundShape)
-                                                                .background(color.copy(alpha = dismissState.progress.coerceIn(0f, 1f))),
-                                                            contentAlignment = alignment
-                                                        ) {
-                                                            if (icon != null) {
-                                                                Icon(
-                                                                    imageVector = icon,
-                                                                    contentDescription = null,
-                                                                    modifier = Modifier
-                                                                        .padding(horizontal = 24.dp)
-                                                                        .graphicsLayer {
-                                                                            val p = dismissState.progress
-                                                                            scaleX = (p * 1.2f).coerceIn(0.6f, 1.1f)
-                                                                            scaleY = (p * 1.2f).coerceIn(0.6f, 1.1f)
-                                                                            alpha = p.coerceIn(0.3f, 1.0f)
-                                                                        },
-                                                                    tint = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) {
-                                                                        DsmusicTheme.colorScheme.onPrimaryContainer
-                                                                    } else {
-                                                                        DsmusicTheme.colorScheme.onSecondaryContainer
-                                                                    }
-                                                                )
-                                                            }
+                                                        } else {
+                                                            // Open the Explore-style action sheet for a downloaded track.
+                                                            // Seed the queue first so Play follows this playlist's sort order.
+                                                            viewModel.setSongList(
+                                                                sortedAndGrouped.filterIsInstance<SongItem>()
+                                                            )
+                                                            selectedDownloadedSongForMenu = item
                                                         }
                                                     },
-                                                    content = {
-                                                        SongListItem(
-                                                            song = item,
-                                                            isPlaying = isPlaying,
-                                                            isFavorite = isFav,
-                                                            localIndex = localIndex,
-                                                            localCount = count,
-                                                            selectionMode = isSelectingDownloads,
-                                                            isSelected = item.id in selectedDownloadIds,
-                                                            onClick = {
-                                                                if (isSelectingDownloads) {
-                                                                    selectedDownloadIds = if (item.id in selectedDownloadIds) {
-                                                                        selectedDownloadIds - item.id
-                                                                    } else {
-                                                                        selectedDownloadIds + item.id
-                                                                    }
-                                                                } else {
-                                                                    // Play clicked song, set the entire filtered songs list as queue
-                                                                    viewModel.setSongList(sortedAndGrouped.filterIsInstance<SongItem>())
-                                                                    viewModel.playSong(item)
-                                                                }
-                                                            },
-                                                            onLongClick = {
-                                                                if (isSelectingDownloads) {
-                                                                    selectedDownloadIds = if (item.id in selectedDownloadIds) {
-                                                                        selectedDownloadIds - item.id
-                                                                    } else {
-                                                                        selectedDownloadIds + item.id
-                                                                    }
-                                                                } else {
-                                                                    selectedDownloadedSongForMenu = item
-                                                                }
+                                                    onLongClick = {
+                                                        if (isSelectingDownloads) {
+                                                            selectedDownloadIds = if (item.id in selectedDownloadIds) {
+                                                                selectedDownloadIds - item.id
+                                                            } else {
+                                                                selectedDownloadIds + item.id
                                                             }
-                                                        )
+                                                        } else {
+                                                            viewModel.setSongList(
+                                                                sortedAndGrouped.filterIsInstance<SongItem>()
+                                                            )
+                                                            selectedDownloadedSongForMenu = item
+                                                        }
                                                     }
                                                 )
                                             }
                                         }
-                                    
                                     }
                                     if (isLandscapeLayout) {
                                         Row(
@@ -1260,6 +1184,8 @@ itemsIndexed(
                                                     .background(DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                                             )
                                             LazyColumn(
+                                                state = downloadListState,
+                                                userScrollEnabled = true,
                                                 modifier = Modifier.weight(0.58f).fillMaxHeight(),
                                                 contentPadding = PaddingValues(
                                                     start = 8.dp,
@@ -1274,6 +1200,8 @@ itemsIndexed(
                                         }
                                     } else {
                                         LazyColumn(
+                                            state = downloadListState,
+                                            userScrollEnabled = true,
                                             modifier = Modifier.fillMaxSize().weight(1f),
                                             contentPadding = PaddingValues(
                                                 start = 0.dp,
