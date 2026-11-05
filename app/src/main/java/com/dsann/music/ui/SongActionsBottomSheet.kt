@@ -9,6 +9,8 @@ import com.dsann.music.ui.theme.DsmusicButton
 import com.dsann.music.ui.theme.DsmusicOutlinedButton
 import com.dsann.music.ui.theme.DsmusicTextButton
 import com.dsann.music.ui.theme.DsmusicIconButton
+import com.dsann.music.ui.theme.HorizontalDivider
+import com.dsann.music.ui.explore.ExploreActionSheetHeader
 import com.dsann.music.ui.theme.DsmusicFilterChip
 import com.dsann.music.ui.theme.DsmusicSwitchControl
 import android.annotation.SuppressLint
@@ -148,6 +150,7 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
     private var showAddToQueue: Boolean = true
     private var showRemoveFromQueue: Boolean = false
     private var showDelete: Boolean = true
+    private var queueSongMode: Boolean = false
 
     interface ActionListener {
         fun onPlayNext(song: SongItem)
@@ -165,7 +168,8 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
             song: SongItem,
             showAddToQueue: Boolean = true,
             showRemoveFromQueue: Boolean = false,
-            showDelete: Boolean = true
+            showDelete: Boolean = true,
+            queueSongMode: Boolean = false
         ): SongActionsBottomSheet {
             val fragment = SongActionsBottomSheet()
             val args = Bundle()
@@ -173,6 +177,7 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
             args.putBoolean("showAddToQueue", showAddToQueue)
             args.putBoolean("showRemoveFromQueue", showRemoveFromQueue)
             args.putBoolean("showDelete", showDelete)
+            args.putBoolean("queueSongMode", queueSongMode)
             fragment.arguments = args
             return fragment
         }
@@ -190,6 +195,7 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
         showAddToQueue = arguments?.getBoolean("showAddToQueue", true) ?: true
         showRemoveFromQueue = arguments?.getBoolean("showRemoveFromQueue", false) ?: false
         showDelete = arguments?.getBoolean("showDelete", true) ?: true
+        queueSongMode = arguments?.getBoolean("queueSongMode", false) ?: false
         viewModel = ViewModelProvider(requireActivity())[PlayerSharedViewModel::class.java]
     }
 
@@ -230,6 +236,7 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
                         showAddToQueue = showAddToQueue,
                         showRemoveFromQueue = showRemoveFromQueue,
                         showDelete = showDelete,
+                        queueSongMode = queueSongMode,
                         onDismiss = { dismiss() }
                     )
                 }
@@ -249,6 +256,7 @@ fun BottomSheetScaffoldContent(
     showAddToQueue: Boolean = true,
     showRemoveFromQueue: Boolean = false,
     showDelete: Boolean = true,
+    queueSongMode: Boolean = false,
     onDismiss: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(BottomSheetTab.OPTIONS) }
@@ -277,8 +285,8 @@ fun BottomSheetScaffoldContent(
         com.dsann.music.util.OpusToMp3Converter.conversionKeys(target).any { it in convertingKeys }
     } == true
 
-    LaunchedEffect(song?.id, song?.videoId, song?.path, completedDownloads.contains(song?.videoId), isConvertingToMp3) {
-        hasDownloadedOpus = song?.let { target ->
+    LaunchedEffect(queueSongMode, song?.id, song?.videoId, song?.path, completedDownloads.contains(song?.videoId), isConvertingToMp3) {
+        hasDownloadedOpus = if (queueSongMode) false else song?.let { target ->
             withContext(Dispatchers.IO) {
                 com.dsann.music.util.SongDownloader.findDownloadedOpusUri(context, target) != null
             }
@@ -322,8 +330,8 @@ fun BottomSheetScaffoldContent(
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(song) {
-        if (song != null) {
+    LaunchedEffect(song, queueSongMode) {
+        if (song != null && !queueSongMode) {
             withContext(Dispatchers.IO) {
                 val embedded = song.getEmbeddedPicture(context)
                 val model = embedded ?: song.getAlbumArtUri()
@@ -403,7 +411,58 @@ fun BottomSheetScaffoldContent(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            if (!isLandscape) {
+            if (queueSongMode) {
+                // Queue actions use the same compact identity header and quick-action
+                // structure as the downloaded-song sheet, without online/social actions.
+                ExploreActionSheetHeader(
+                    thumbnailUrl = song?.getAlbumArtUri()?.toString(),
+                    title = song?.title.orEmpty(),
+                    subtitle = song?.artist.orEmpty(),
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingContent = {
+                        DsmusicIconButton(onClick = onDismiss) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = "Close",
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                )
+
+                HorizontalDivider(
+                    color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
+
+                if (selectedTab == BottomSheetTab.INFO) {
+                    DsmusicTextButton(
+                        onClick = { selectedTab = BottomSheetTab.OPTIONS },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Back to song actions")
+                    }
+                    InfoContent(song)
+                } else {
+                    OptionsContent(
+                        song = song,
+                        isFavorite = false,
+                        onFavoriteChange = {},
+                        actionListener = actionListener,
+                        onAddToPlaylist = {},
+                        showAddToQueue = false,
+                        onDismiss = onDismiss,
+                        showDelete = false,
+                        showRemoveFromQueue = true,
+                        hasDownloadedOpus = false,
+                        isConvertingToMp3 = false,
+                        showLikeAndShare = false,
+                        showAddToPlaylist = false,
+                        localSongMode = true,
+                        showInfoAction = true,
+                        onShowInfoAction = { selectedTab = BottomSheetTab.INFO }
+                    )
+                }
+            } else if (!isLandscape) {
                 // PORTRAIT: Standard Vertical Layout
                 HeaderSection(song, albumArtBitmap, onEdit = handleEditSong)
 
