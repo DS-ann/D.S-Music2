@@ -661,9 +661,19 @@ private fun ProvidersSelector(
                     else -> provider
                 }
 
+                val lyricTypeLabel = when {
+                    result?.isWordByWord == true -> "Karaoke"
+                    result?.isSynced == true -> "Synced"
+                    result?.hasLyrics() == true -> "Plain"
+                    else -> null
+                }
                 val supportingText = when {
                     result == null -> "Not fetched yet · tap to fetch this source"
-                    result.payloadClearedForMemory -> "Lyrics payload released · tap to fetch this source"
+                    result.payloadClearedForMemory -> buildString {
+                        append("Lyrics payload released")
+                        lyricTypeLabel?.let { append(" · "); append(it) }
+                        append(" · tap to fetch this source")
+                    }
                     !result.hasLyrics() -> "No lyrics found · tap to search this source"
                     result.isWordByWord -> "Karaoke (word-by-word)"
                     result.isSynced -> "Synced lyrics"

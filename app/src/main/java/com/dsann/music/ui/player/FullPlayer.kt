@@ -83,6 +83,9 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -438,14 +441,25 @@ private fun PortraitSyncedLyricPreview(
         ?: currentSong?.path?.takeIf { it.isNotBlank() }
         ?: currentSong?.id?.toString()
     val songDurationMs = currentSong?.duration?.takeIf { it > 0L }
-    // Precompute each outgoing line's completion boundary once. Karaoke uses the final
-    // word's end; ordinary synced lyrics use the next line's start timestamp.
+    // Precompute each line's switch boundary once. When there is a silent gap,
+    // hold the outgoing line until the midpoint between its last known timing and the
+    // next line's start. Karaoke uses the final timed word; line-only lyrics fall back
+    // to the current line timestamp because their model has no explicit end timestamp.
     val lineCompletionTimes = remember(displayLines) {
         displayLines.mapIndexed { index, line ->
-            line.words.maxOfOrNull { it.absoluteStartTimeMs + it.durationMs }
+            val lastWordEndMs = line.words
+                .maxOfOrNull { it.absoluteStartTimeMs + it.durationMs }
                 ?.takeIf { it > 0L }
-                ?: displayLines.getOrNull(index + 1)?.startTimeMs
-                ?: Long.MAX_VALUE
+            val nextLineStartMs = displayLines.getOrNull(index + 1)?.startTimeMs
+            when {
+                nextLineStartMs == null -> lastWordEndMs ?: Long.MAX_VALUE
+                lastWordEndMs != null && nextLineStartMs > lastWordEndMs ->
+                    lastWordEndMs + (nextLineStartMs - lastWordEndMs) / 2L
+                lastWordEndMs != null -> lastWordEndMs
+                nextLineStartMs > line.startTimeMs ->
+                    line.startTimeMs + (nextLineStartMs - line.startTimeMs) / 2L
+                else -> nextLineStartMs
+            }
         }
     }
     val finalWordEndMs = remember(displayLines) {
@@ -520,17 +534,48 @@ private fun PortraitSyncedLyricPreview(
                 null
             }
         )
-        Text(
-            text = activeLineText.orEmpty(),
-            style = textStyle,
-            color = if (lyricsColorStyle == "Home Studio Gradient") Color.Unspecified else contentColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp)
-        )
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            val textMeasurer = rememberTextMeasurer()
+            val availableWidthPx = with(LocalDensity.current) {
+                maxWidth.roundToPx()
+            }.coerceAtLeast(1)
+            // Measure only when the lyric or available width changes, not on playback
+            // clock polls. Shrink by half-point steps until the complete line fits.
+            val fittedFontSize = remember(
+                activeLineText,
+                availableWidthPx,
+                lyricsColorStyle,
+                contentColor
+            ) {
+                var candidateSize = 16f
+                while (candidateSize > 7f) {
+                    val measured = textMeasurer.measure(
+                        text = activeLineText.orEmpty(),
+                        style = textStyle.copy(fontSize = candidateSize.sp),
+                        constraints = Constraints(maxWidth = availableWidthPx),
+                        softWrap = false,
+                        maxLines = 1,
+                        overflow = TextOverflow.Clip
+                    )
+                    if (!measured.hasVisualOverflow) break
+                    candidateSize -= 0.5f
+                }
+                candidateSize.coerceAtLeast(7f).sp
+            }
+            Text(
+                text = activeLineText.orEmpty(),
+                style = textStyle.copy(fontSize = fittedFontSize),
+                color = if (lyricsColorStyle == "Home Studio Gradient") Color.Unspecified else contentColor,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
