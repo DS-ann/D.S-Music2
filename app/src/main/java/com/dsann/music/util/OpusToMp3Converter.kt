@@ -384,7 +384,7 @@ internal object OpusToMp3Converter {
                         }
                     }
 
-                    fun queueOpusPacket(packet: ByteArray) {
+                    suspend fun queueOpusPacket(packet: ByteArray) {
                         val activeDecoder = decoder
                             ?: throw IllegalStateException("The Opus decoder was not initialized")
                         val durationSamples = opusPacketDurationSamples(packet)
