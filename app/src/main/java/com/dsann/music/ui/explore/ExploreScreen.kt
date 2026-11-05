@@ -214,6 +214,9 @@ fun ExploreScreen(
     val homeSections = uiState.homeSections
     val isLoadingHome = uiState.isLoadingHome
     val homeFeedError = uiState.homeFeedError
+    val homeFeedOfflineError = uiState.homeFeedOfflineError
+    val searchOfflineError = uiState.searchOfflineError
+    val detailOfflineError = uiState.detailOfflineError
     val isLoadingStream = uiState.isLoadingStream
     val currentMood = uiState.currentMood
     val currentOnlineSong = uiState.currentOnlineSong
@@ -238,6 +241,7 @@ fun ExploreScreen(
     }
     val isLoadingGenres = uiState.isLoadingGenres
     val genresError = uiState.genresError
+    val genresOfflineError = uiState.genresOfflineError
     val detailStack = uiState.detailStack
 
     var isSearchActive by rememberSaveable(isSearchDestination) {
@@ -500,7 +504,7 @@ fun ExploreScreen(
             .apply()
     }
 
-    val detailScreenActive = detailStack.isNotEmpty() || isLoadingDetail
+    val detailScreenActive = detailStack.isNotEmpty() || isLoadingDetail || detailOfflineError
 
     val handleDetailBack = remember(viewModel, mainActivity) {
         {
@@ -509,6 +513,8 @@ fun ExploreScreen(
                 // A pending page has not been pushed onto detailStack yet. Cancel it and
                 // reveal the same parent page instead of consuming Back against an empty stack.
                 viewModel.cancelDetailLoad()
+            } else if (currentState.detailOfflineError && currentState.detailStack.isEmpty()) {
+                viewModel.clearError()
             } else {
                 val currentStackSize = currentState.detailStack.size
                 val isLastDetail = currentStackSize <= 1
@@ -594,6 +600,7 @@ fun ExploreScreen(
             "home" to 0,
             "account" to 1,
             "loading" to 2,
+            "offline" to 2,
             "album" to 3,
             "playlist" to 3,
             "artist" to 3,
@@ -603,8 +610,9 @@ fun ExploreScreen(
     }
 
     val currentScreen =
-        remember(detailStack, isLoadingDetail, isAccountVisible, showCreditsForSong) {
+        remember(detailStack, isLoadingDetail, detailOfflineError, isAccountVisible, showCreditsForSong) {
             when {
+                detailOfflineError -> "offline"
                 isLoadingDetail -> "loading"
                 showCreditsForSong != null -> "credits"
                 isAccountVisible -> "account"
@@ -744,6 +752,11 @@ fun ExploreScreen(
                                     }
 
                                     "loading" -> DetailScreenSkeleton()
+
+                                    "offline" -> com.dsann.music.ui.theme.NoInternetState(
+                                        modifier = Modifier.fillMaxSize(),
+                                        onRetry = { viewModel.retryLastDetailLoad() }
+                                    )
 
                                     "album" -> albumDetail?.let { detail ->
                                         AlbumDetailView(
@@ -992,16 +1005,26 @@ fun ExploreScreen(
                                                                             )
                                                                         }
                                                                         genresError != null -> {
-                                                                            Text(
-                                                                                genresError,
-                                                                                style = DsmusicTheme.typography.bodyMedium,
-                                                                                color = DsmusicTheme.colorScheme.onSurfaceVariant,
-                                                                                textAlign = TextAlign.Center
-                                                                            )
-                                                                            DsmusicTextButton(
-                                                                                onClick = { viewModel.loadMoodsAndGenres(forceRefresh = true) }
-                                                                            ) {
-                                                                                Text("Try again")
+                                                                            if (genresOfflineError) {
+                                                                                com.dsann.music.ui.theme.NoInternetState(
+                                                                                    modifier = Modifier.fillMaxWidth(),
+                                                                                    onRetry = {
+                                                                                        viewModel.loadMoodsAndGenres(forceRefresh = true)
+                                                                                    },
+                                                                                    compact = true
+                                                                                )
+                                                                            } else {
+                                                                                Text(
+                                                                                    genresError,
+                                                                                    style = DsmusicTheme.typography.bodyMedium,
+                                                                                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                                                                    textAlign = TextAlign.Center
+                                                                                )
+                                                                                DsmusicTextButton(
+                                                                                    onClick = { viewModel.loadMoodsAndGenres(forceRefresh = true) }
+                                                                                ) {
+                                                                                    Text("Try again")
+                                                                                }
                                                                             }
                                                                         }
                                                                         else -> {
@@ -1469,6 +1492,13 @@ fun ExploreScreen(
                                                     ) { LoadingIndicator() }
                                                 }
 
+                                                searchOfflineError && searchResults.isEmpty() && searchTopResult == null -> {
+                                                    com.dsann.music.ui.theme.NoInternetState(
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        onRetry = { viewModel.search(searchQuery) }
+                                                    )
+                                                }
+
                                                 searchQuery.isNotBlank() && (searchResults.isNotEmpty() || searchTopResult != null) -> {
                                                     val topSongQueue = remember(searchSections, searchTopResult) {
                                                         (searchSections.flatMap { section ->
@@ -1481,6 +1511,17 @@ fun ExploreScreen(
                                                         modifier = Modifier.fillMaxSize().background(Color.Transparent),
                                                         contentPadding = PaddingValues(bottom = 120.dp)
                                                     ) {
+                                                        if (searchOfflineError) {
+                                                            item(key = "search-offline-retry") {
+                                                                com.dsann.music.ui.theme.NoInternetState(
+                                                                    modifier = Modifier.fillMaxWidth(),
+                                                                    onRetry = { viewModel.loadMoreResults() },
+                                                                    compact = true,
+                                                                    title = "Connection interrupted",
+                                                                    message = "Some results could not be loaded."
+                                                                )
+                                                            }
+                                                        }
                                                         if (currentFilter == null) {
                                                             searchTopResult?.let { top ->
                                                                 item(key = "search-top-result") {
@@ -1767,7 +1808,7 @@ fun ExploreScreen(
                                                                     )
                                                                 ) {
 
-                                                                    if (homeFeedError != null) {
+                                                                    if (homeFeedOfflineError) {
                                                                         item(key = "home-network-retry") {
                                                                             Row(
                                                                                 modifier = Modifier
@@ -1933,35 +1974,34 @@ fun ExploreScreen(
                                                             }
 
                                                             homeFeedError != null && homeSections.isEmpty() -> {
-                                                                Box(
-                                                                    modifier = Modifier.fillMaxSize()
-                                                                        .verticalScroll(rememberScrollState()),
-                                                                    contentAlignment = Alignment.Center
-                                                                ) {
-                                                                    Column(
-                                                                        modifier = Modifier.fillMaxWidth().padding(24.dp),
-                                                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                                                if (homeFeedOfflineError) {
+                                                                    com.dsann.music.ui.theme.NoInternetState(
+                                                                        modifier = Modifier.fillMaxSize(),
+                                                                        onRetry = { viewModel.refreshHomeFeed() }
+                                                                    )
+                                                                } else {
+                                                                    Box(
+                                                                        modifier = Modifier.fillMaxSize().padding(24.dp),
+                                                                        contentAlignment = Alignment.Center
                                                                     ) {
-                                                                        Icon(
-                                                                            imageVector = Icons.Rounded.CloudOff,
-                                                                            contentDescription = null,
-                                                                            modifier = Modifier.size(56.dp),
-                                                                            tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f)
-                                                                        )
-                                                                        Text(
-                                                                            "Network not available",
-                                                                            style = DsmusicTheme.typography.titleMedium,
-                                                                            color = DsmusicTheme.colorScheme.onSurface
-                                                                        )
-                                                                        Text(
-                                                                            "Check your internet connection and try again.",
-                                                                            style = DsmusicTheme.typography.bodyMedium,
-                                                                            color = DsmusicTheme.colorScheme.onSurfaceVariant,
-                                                                            textAlign = TextAlign.Center
-                                                                        )
-                                                                        DsmusicOutlinedButton(onClick = { viewModel.refreshHomeFeed() }) {
-                                                                            Text("Refresh")
+                                                                        Column(
+                                                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                                                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                                                                        ) {
+                                                                            Text(
+                                                                                "Couldn't load Explore",
+                                                                                style = DsmusicTheme.typography.titleMedium,
+                                                                                color = DsmusicTheme.colorScheme.onSurface
+                                                                            )
+                                                                            Text(
+                                                                                homeFeedError,
+                                                                                style = DsmusicTheme.typography.bodyMedium,
+                                                                                color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                                                                textAlign = TextAlign.Center
+                                                                            )
+                                                                            DsmusicOutlinedButton(onClick = { viewModel.refreshHomeFeed() }) {
+                                                                                Text("Try again")
+                                                                            }
                                                                         }
                                                                     }
                                                                 }
