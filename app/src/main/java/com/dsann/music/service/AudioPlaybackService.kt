@@ -2971,6 +2971,9 @@ class AudioPlaybackService : MediaSessionService() {
                 .build()
         }
         session.setCustomLayout(buttons)
+        // The MediaSession layout updates lock-screen controls. Rebuild the
+        // notification as well because its custom actions are added separately.
+        refreshMediaNotification()
     }
 
     private val mediaSessionCallback = object : MediaSession.Callback {

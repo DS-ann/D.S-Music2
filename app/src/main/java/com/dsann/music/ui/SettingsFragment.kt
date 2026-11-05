@@ -2960,6 +2960,7 @@ private fun AppearanceScreen(
                 controlShape = miniPlayerControlShape,
                 buttonStyle = playerButtonStyle,
                 buttons = playerButtons,
+                sessionButtons = sessionButtons,
                 artworkScale = playerArtworkScale,
                 buttonsPill = playerButtonsPill
             )
@@ -3498,6 +3499,7 @@ private fun PlayerCustomizationPreview(
     controlShape: String,
     buttonStyle: String,
     buttons: List<String>,
+    sessionButtons: List<String>,
     artworkScale: Float,
     buttonsPill: Boolean
 ) {
@@ -3517,9 +3519,13 @@ private fun PlayerCustomizationPreview(
         "Pill" -> CircleShape
         else -> RoundedCornerShape(22.dp)
     }
-    val actionShape = when (controlShape) {
-        "Circle", "Pill" -> CircleShape
-        "None" -> RoundedCornerShape(3.dp)
+    // The full-player action buttons follow the dedicated Button presentation
+    // setting. The mini-player control shape is a separate preference.
+    val actionShape = when (buttonStyle) {
+        "Round" -> RoundedCornerShape(10.dp)
+        "Pill" -> CircleShape
+        "None" -> RoundedCornerShape(0.dp)
+        "Square" -> RoundedCornerShape(4.dp)
         else -> RoundedCornerShape(10.dp)
     }
     val artworkSize = (if (layout == "Vinyl" || layout == "Cassette") 88.dp else 84.dp) *
@@ -3589,9 +3595,9 @@ private fun PlayerCustomizationPreview(
                         Text(
                             shortLabel,
                             modifier = Modifier.clip(actionShape)
-                                .background(if (buttonStyle == "Minimal") Color.Transparent else accent.copy(alpha = 0.17f))
+                                .background(if (buttonStyle == "None") Color.Transparent else accent.copy(alpha = 0.17f))
                                 .padding(horizontal = 5.dp, vertical = 4.dp),
-                            color = if (buttonStyle == "Minimal") Color.White.copy(alpha = 0.76f) else accent,
+                            color = if (buttonStyle == "None") Color.White.copy(alpha = 0.76f) else accent,
                             style = DsmusicTheme.typography.labelSmall,
                             maxLines = 1
                         )
@@ -3603,6 +3609,111 @@ private fun PlayerCustomizationPreview(
             "$layout layout · $artworkShape artwork · $miniPlayerStyle mini player · $buttonStyle actions",
             style = DsmusicTheme.typography.bodySmall,
             color = DsmusicTheme.colorScheme.onSurfaceVariant
+        )
+
+        // A second preview reflects the exact two actions selected for the
+        // Android media notification and lock-screen MediaSession.
+        val selectedSessionActions = sessionButtons
+            .filter { it in sessionButtonNames.keys }
+            .distinct()
+            .take(2)
+        Column(
+            modifier = Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color(0xFF17212D))
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "NOTIFICATION & LOCK SCREEN",
+                    style = DsmusicTheme.typography.labelLarge,
+                    color = accent,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "${selectedSessionActions.size}/2",
+                    style = DsmusicTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.65f)
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(44.dp).clip(RoundedCornerShape(9.dp))
+                        .background(accent.copy(alpha = 0.20f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("DS", color = accent, fontWeight = FontWeight.Bold)
+                }
+                Column(
+                    modifier = Modifier.weight(1f).padding(start = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text("D.S Music", color = Color.White, style = DsmusicTheme.typography.titleSmall)
+                    Text(
+                        "Now playing · Artist",
+                        color = Color.White.copy(alpha = 0.65f),
+                        style = DsmusicTheme.typography.bodySmall,
+                        maxLines = 1
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                selectedSessionActions.getOrNull(0)?.let { SessionPreviewAction(it, accent) }
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("◀", color = Color.White, style = DsmusicTheme.typography.titleMedium)
+                    Text("Ⅱ", color = Color.White, style = DsmusicTheme.typography.titleMedium)
+                    Text("▶", color = Color.White, style = DsmusicTheme.typography.titleMedium)
+                }
+                selectedSessionActions.getOrNull(1)?.let { SessionPreviewAction(it, accent) }
+            }
+            if (selectedSessionActions.isEmpty()) {
+                Text(
+                    "No additional notification or lock-screen actions selected.",
+                    color = Color.White.copy(alpha = 0.65f),
+                    style = DsmusicTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionPreviewAction(key: String, accent: Color) {
+    val (symbol, label) = when (key) {
+        "like" -> "♥" to "Like"
+        "shuffle" -> "⇄" to "Shuffle"
+        "repeat" -> "↻" to "Repeat"
+        "dislike" -> "⊖" to "Not for me"
+        "back10" -> "−10s" to "Back 10s"
+        "ahead30" -> "+30s" to "Forward 30s"
+        else -> key to key
+    }
+    Column(
+        modifier = Modifier.width(64.dp).clip(RoundedCornerShape(11.dp))
+            .background(accent.copy(alpha = 0.16f))
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(symbol, color = accent, style = DsmusicTheme.typography.titleSmall)
+        Text(
+            label,
+            color = Color.White.copy(alpha = 0.88f),
+            style = DsmusicTheme.typography.labelSmall,
+            maxLines = 1
         )
     }
 }
@@ -3745,7 +3856,7 @@ private fun SessionButtonsSettings(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                "Choose up to two actions for the notification and lock screen, then arrange their order.",
+                "Choose up to two actions for the notification and lock screen. Selecting another action when two are active replaces the second one.",
                 style = DsmusicTheme.typography.bodySmall,
                 color = DsmusicTheme.colorScheme.onSurfaceVariant
             )
@@ -3768,9 +3879,17 @@ private fun SessionButtonsSettings(
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     com.dsann.music.ui.theme.Checkbox(
                         checked = false,
-                        enabled = ordered.size < 2,
                         onCheckedChange = { enabled ->
-                            if (enabled && ordered.size < 2) onSelectionChanged(ordered + key)
+                            if (enabled) {
+                                val nextSelection = if (ordered.size < 2) {
+                                    ordered + key
+                                } else {
+                                    // Keep the first selected action and replace the
+                                    // second slot so a full selector never blocks changes.
+                                    ordered.dropLast(1) + key
+                                }
+                                onSelectionChanged(nextSelection)
+                            }
                         }
                     )
                     Spacer(Modifier.width(10.dp))
