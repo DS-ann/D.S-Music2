@@ -15,6 +15,10 @@ import java.nio.ByteOrder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 data class Mp3ConversionResult(
     val success: Boolean,
@@ -30,7 +34,29 @@ internal object OpusToMp3Converter {
     private const val TAG = "OpusToMp3"
     private const val MAX_COVER_BYTES = 8 * 1024 * 1024
 
+    private val _convertingKeys = MutableStateFlow<Set<String>>(emptySet())
+    val convertingKeys: StateFlow<Set<String>> = _convertingKeys.asStateFlow()
+
+    /** Stable keys let every song-menu variant display the same conversion state. */
+    fun conversionKeys(song: SongItem): Set<String> = buildSet {
+        add("song:${song.id}")
+        song.videoId?.takeIf { it.isNotBlank() }?.let { add("video:$it") }
+    }
+
     suspend fun convert(context: Context, song: SongItem): Mp3ConversionResult {
+        val keys = conversionKeys(song)
+        if (keys.any { it in _convertingKeys.value }) {
+            return Mp3ConversionResult(false, "MP3 conversion is already running")
+        }
+        _convertingKeys.update { it + keys }
+        return try {
+            convertInternal(context, song)
+        } finally {
+            _convertingKeys.update { it - keys }
+        }
+    }
+
+    private suspend fun convertInternal(context: Context, song: SongItem): Mp3ConversionResult {
         val appContext = context.applicationContext
         // Use the exact download-quality preference that selected the source Opus stream.
         NewPipeStreamExtractor.init(appContext)
