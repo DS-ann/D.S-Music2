@@ -395,6 +395,16 @@ fun DsmusicPageHeading(
         title.length >= 15 -> 32.sp
         else -> 37.sp
     }
+    // The responsive title sizes above are design baselines. Derive the active global
+    // font scale from the already-customized headline role before applying those sizes;
+    // otherwise this explicit fontSize/lineHeight override bypasses the app-wide slider.
+    val typography = DsmusicTheme.typography
+    val globalFontScale = (
+        typography.headlineMedium.fontSize.value /
+            Typography.headlineMedium.fontSize.value
+        ).takeIf { it.isFinite() && it > 0f } ?: 1f
+    val scaledTitleSize = titleSize * globalFontScale
+    val scaledTitleLineHeight = titleLineHeight * globalFontScale
     val colorScheme = DsmusicTheme.colorScheme
     val headingShape = RoundedCornerShape(22.dp)
     val headingGradient = remember(colorScheme.primary) {
@@ -419,7 +429,7 @@ fun DsmusicPageHeading(
         Box(
             Modifier
                 .width(4.dp)
-                .height(if (subtitle == null) 42.dp else 48.dp)
+                .height((if (subtitle == null) 42.dp else 48.dp) * globalFontScale)
                 .clip(RoundedCornerShape(4.dp))
                 .background(colorScheme.primary)
         )
@@ -438,9 +448,9 @@ fun DsmusicPageHeading(
             )
             Text(
                 text = title,
-                style = DsmusicTheme.typography.headlineMedium.copy(
-                    fontSize = titleSize,
-                    lineHeight = titleLineHeight,
+                style = typography.headlineMedium.copy(
+                    fontSize = scaledTitleSize,
+                    lineHeight = scaledTitleLineHeight,
                     color = colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.sp
@@ -451,9 +461,8 @@ fun DsmusicPageHeading(
             if (subtitle != null) {
                 Text(
                     text = subtitle,
-                    style = DsmusicTheme.typography.bodyMedium.copy(
-                        color = DsmusicTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 20.sp
+                    style = typography.bodyMedium.copy(
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
                     ),
                     maxLines = 1
                 )
