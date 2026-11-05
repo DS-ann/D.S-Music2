@@ -1539,6 +1539,9 @@ class PlayerSharedViewModel @Inject constructor(
         } else {
             clearRepeatOnceCycle()
         }
+        audioService?.let { service ->
+            service.runWhenPlayerReady { service.refreshNativeQueue() }
+        }
     }
 
     private fun clearRepeatOnceCycle() {
