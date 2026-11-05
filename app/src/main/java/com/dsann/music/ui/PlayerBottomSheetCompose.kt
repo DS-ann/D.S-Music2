@@ -1541,7 +1541,9 @@ fun PlayerBottomSheetCompose(
                 // The player tree stays full-window measured; only the graphics-layer
                 // outline changes during animation.
                 shape = androidx.compose.ui.graphics.RectangleShape,
-                color = dynamicBgColor,
+                color = dynamicBgColor.copy(
+                    alpha = playerContentExpansionFraction.value.coerceIn(0f, 1f)
+                ),
                 showBorder = false
             ) {
                 Box(modifier = Modifier.fillMaxSize().padding(bottom = sheetVisualState.currentBottomPadding.coerceAtLeast(0.dp))) {
@@ -1579,7 +1581,7 @@ fun PlayerBottomSheetCompose(
                                 dragModifier = verticalDragModifier,
                                 miniPlayerHeight = miniPlayerHeight,
                                 miniPlayerWidthFraction = miniPlayerWidthFraction,
-                                miniPlayerBackgroundColor = dynamicBgColor,
+                                miniPlayerBackgroundColor = Color.Transparent,
                                 miniPlayerShape = miniPlayerShape,
                                 miniPlayerElevation = miniPlayerElevation,
                                 miniSwipeModifier = miniSwipeGestureModifier,
@@ -1655,7 +1657,8 @@ fun PlayerBottomSheetCompose(
                                 )
 
                                 // The mini player is centered in the landscape half-width layout.
-                                val xStartPx = (if (isLandscapeWindow) 10.dp else 16.dp).toPx() +
+                                // Keep the shared cover 12dp inside the visible collapsed frame.
+                                val xStartPx = (if (isLandscapeWindow) 18.dp else 24.dp).toPx() +
                                     if (isLandscapeWindow) {
                                         with(density) {
                                             (containerWidthDp * ((1f - miniPlayerWidthFraction) / 2f)).toPx()
