@@ -98,6 +98,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -133,6 +134,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import android.widget.FrameLayout
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 
@@ -238,7 +240,47 @@ fun BottomSheetScaffoldContent(
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val context = LocalContext.current
+    val conversionScope = rememberCoroutineScope()
     val favoritesManager = remember { com.dsann.music.util.FavoritesManager(context) }
+    val completedDownloads by com.dsann.music.util.SongDownloader.downloadedVideoIds
+        .collectAsStateWithLifecycle(emptySet())
+    var hasDownloadedOpus by remember(song?.id) { mutableStateOf(false) }
+    var isConvertingToMp3 by remember(song?.id) { mutableStateOf(false) }
+
+    LaunchedEffect(song?.id, song?.videoId, song?.path, completedDownloads.contains(song?.videoId)) {
+        hasDownloadedOpus = song?.let { target ->
+            withContext(Dispatchers.IO) {
+                com.dsann.music.util.SongDownloader.findDownloadedOpusUri(context, target) != null
+            }
+        } ?: false
+    }
+
+    val convertToMp3: () -> Unit = {
+        val target = song
+        if (target != null && hasDownloadedOpus && !isConvertingToMp3) {
+            conversionScope.launch {
+                isConvertingToMp3 = true
+                val result = try {
+                    withContext(Dispatchers.IO) {
+                        com.dsann.music.util.OpusToMp3Converter.convert(context.applicationContext, target)
+                    }
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    isConvertingToMp3 = false
+                    throw cancelled
+                } catch (error: Exception) {
+                    com.dsann.music.util.Mp3ConversionResult(
+                        success = false,
+                        message = error.message ?: "MP3 conversion failed"
+                    )
+                }
+                isConvertingToMp3 = false
+                SnackbarController.showMessage(
+                    result.message,
+                    iconResId = if (result.success) R.drawable.ic_downloaded else null
+                )
+            }
+        }
+    }
     var isFavorite by remember { mutableStateOf(song?.let { favoritesManager.isFavorite(it.id) } ?: false) }
     var albumArtBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
 
@@ -350,7 +392,10 @@ fun BottomSheetScaffoldContent(
                                 actionListener = actionListener,
                                 onAddToPlaylist = { showAddToPlaylistDialog = true },
                                 showAddToQueue = showAddToQueue,
-                                onDismiss = onDismiss
+                                onDismiss = onDismiss,
+                                hasDownloadedOpus = hasDownloadedOpus,
+                                isConvertingToMp3 = isConvertingToMp3,
+                                onConvertToMp3 = convertToMp3
                             )
                         } else {
                             InfoContent(song)
@@ -418,7 +463,10 @@ fun BottomSheetScaffoldContent(
                                         actionListener = actionListener,
                                         onAddToPlaylist = { showAddToPlaylistDialog = true },
                                         showAddToQueue = showAddToQueue,
-                                        onDismiss = onDismiss
+                                        onDismiss = onDismiss,
+                                        hasDownloadedOpus = hasDownloadedOpus,
+                                        isConvertingToMp3 = isConvertingToMp3,
+                                        onConvertToMp3 = convertToMp3
                                     )
                                 } else {
                                     InfoContent(song)
@@ -520,7 +568,10 @@ fun OptionsContent(
     onAddToPlaylist: () -> Unit,
     showAddToQueue: Boolean = true,
     onDismiss: () -> Unit,
-    showDelete: Boolean = true
+    showDelete: Boolean = true,
+    hasDownloadedOpus: Boolean = false,
+    isConvertingToMp3: Boolean = false,
+    onConvertToMp3: () -> Unit = {}
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -534,6 +585,23 @@ fun OptionsContent(
         ActionButtonRow1(song, isFavorite, onFavoriteChange, actionListener, onDismiss)
         ActionButtonRow2(song, actionListener, onDismiss, showAddToQueue = showAddToQueue)
         DestructiveActionRow(song, actionListener, onAddToPlaylist, onDismiss, showDelete = showDelete)
+        if (hasDownloadedOpus || isConvertingToMp3) {
+            SongActionWideTile(
+                modifier = Modifier.fillMaxWidth(),
+                label = if (isConvertingToMp3) "Converting to MP3…" else "Convert Opus to MP3",
+                containerColor = DsmusicTheme.colorScheme.tertiaryContainer,
+                contentColor = DsmusicTheme.colorScheme.onTertiaryContainer,
+                enabled = !isConvertingToMp3,
+                onClick = onConvertToMp3
+            ) {
+                Icon(
+                    Icons.Rounded.Download,
+                    contentDescription = null,
+                    tint = DsmusicTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.size(21.dp)
+                )
+            }
+        }
     }
 }
 

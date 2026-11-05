@@ -11,6 +11,7 @@ plugins {
 android {
     namespace 'com.dsann.music'
     compileSdk 37
+    ndkVersion "27.2.12479018"
 
     // Fix for "App not installed" errors when sharing debug APKs
     project.ext.set("android.injected.testOnly", "false")
@@ -22,6 +23,14 @@ android {
         targetSdk 37
         versionCode 26
         versionName "1.8.18"
+        externalNativeBuild {
+            cmake {
+                cppFlags "-std=c++17"
+            }
+        }
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
     }
 
     // Produce only the ARM64-v8a APK; do not emit universal or other-ABI APKs.
@@ -38,6 +47,14 @@ android {
         viewBinding true
         buildConfig true
         compose true
+        prefab true
+    }
+
+    externalNativeBuild {
+        cmake {
+            path file("src/main/cpp/CMakeLists.txt")
+            version "3.22.1"
+        }
     }
 
     buildTypes {
@@ -124,6 +141,8 @@ dependencies {
 
     // Source: https://mvnrepository.com/artifact/net.jthink/jaudiotagger
     implementation libs.jaudiotagger
+    // LAME is built for Android API 21+, preserving Android 6 / API 23 support.
+    implementation libs.lame
 
     ksp libs.room.compiler
 

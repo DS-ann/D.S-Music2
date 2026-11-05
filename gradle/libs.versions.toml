@@ -9,6 +9,7 @@ coreSplashscreen = "1.2.0"
 espressoCoreVersion = "3.7.0"
 glide = "5.0.5"
 jaudiotagger = "2.3.14"
+lame = "3.100"
 junit = "4.13.2"
 kotlinStdlib = "2.2.10"
 lifecycleLivedataKtx = "2.10.0"
@@ -45,6 +46,7 @@ core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = 
 espresso-core-v361 = { module = "androidx.test.espresso:espresso-core", version.ref = "espressoCoreVersion" }
 glide = { module = "com.github.bumptech.glide:glide", version.ref = "glide" }
 jaudiotagger = { module = "com.github.Adonai:jaudiotagger", version.ref = "jaudiotagger" }
+lame = { module = "com.fpliu.ndk.pkg.prefab.android.21:lame", version.ref = "lame" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 junit-v121 = { module = "androidx.test.ext:junit", version.ref = "androidxJunit" }
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlinStdlib" }

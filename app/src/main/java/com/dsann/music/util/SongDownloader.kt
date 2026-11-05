@@ -191,6 +191,68 @@ object SongDownloader {
         return null
     }
 
+    /**
+     * Resolve only the app's Ogg Opus download. Do not return an MP3/M4A playback file:
+     * conversion must always read the original Opus bitstream.
+     */
+    fun findDownloadedOpusUri(context: Context, song: SongItem): Uri? {
+        val directPath = song.path?.takeIf {
+            it.isNotBlank() && !it.contains("://") && it.endsWith(".opus", ignoreCase = true)
+        }?.let(::File)?.takeIf { it.isFile && it.length() > 0L }
+        if (directPath != null) return Uri.fromFile(directPath)
+
+        val possibleUris = listOfNotNull(
+            song.path?.takeIf { it.startsWith("content://") || it.startsWith("file://") }
+                ?.let { runCatching { Uri.parse(it) }.getOrNull() },
+            song.contentUri
+        )
+        possibleUris.firstOrNull { uri ->
+            uriExtension(context, uri) == "opus" && isUriReadable(context, uri)
+        }?.let { return it }
+
+        val videoId = song.videoId?.takeIf { it.isNotBlank() } ?: return null
+        val prefs = context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
+        val mapped = prefs.getString("uri_$videoId", null)?.let {
+            runCatching { Uri.parse(it) }.getOrNull()
+        }
+        if (mapped != null && uriExtension(context, mapped) == "opus" && isUriReadable(context, mapped)) {
+            return mapped
+        }
+
+        val baseName = "${cleanTitle(song.title)} - ${cleanArtist(song.artist)}"
+            .replace(Regex("[^a-zA-Z0-9._\\s()\\[\\]-]"), "_")
+        val filename = "$baseName.opus"
+        return (findDsmusicMediaStoreUri(context, filename) ?: findLegacyDownloadedFile(filename))
+            ?.takeIf { isUriReadable(context, it) }
+    }
+
+    /** Resolve an app-published conversion/export by exact display name. */
+    fun findDownloadedExportUri(context: Context, filename: String): Uri? =
+        (findDsmusicMediaStoreUri(context, filename) ?: findLegacyDownloadedFile(filename))
+            ?.takeIf { isUriReadable(context, it) }
+
+    private fun uriExtension(context: Context, uri: Uri): String {
+        if (uri.scheme == "file") {
+            return uri.path?.substringAfterLast('.', "")?.lowercase().orEmpty()
+        }
+        return try {
+            context.contentResolver.query(
+                uri,
+                arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (index >= 0 && cursor.moveToFirst()) {
+                    cursor.getString(index)?.substringAfterLast('.', "")?.lowercase().orEmpty()
+                } else ""
+            } ?: uri.lastPathSegment?.substringAfterLast('.', "")?.lowercase().orEmpty()
+        } catch (_: Exception) {
+            uri.lastPathSegment?.substringAfterLast('.', "")?.lowercase().orEmpty()
+        }
+    }
+
     /** Record the permanent MediaStore URI immediately after the file is published. */
     private fun rememberDownloadedSong(context: Context, videoId: String, outputFile: File) {
         if (videoId.isBlank()) return

@@ -48,7 +48,7 @@ jobs:
           packages: ""
 
       - name: Install Android 17 SDK and Build Tools
-        run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0"
+        run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0" "cmake;3.22.1" "ndk;27.2.12479018"
 
       # Release builds intentionally skip unit-test tasks; assembleRelease still compiles
       # the production source, runs code generation, minification and resource shrinking.
