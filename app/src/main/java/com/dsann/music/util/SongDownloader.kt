@@ -212,11 +212,26 @@ object SongDownloader {
 
         val videoId = song.videoId?.takeIf { it.isNotBlank() } ?: return null
         val prefs = context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
-        val mapped = prefs.getString("uri_$videoId", null)?.let {
+        // Keep an Opus-specific mapping. The generic uri_$videoId entry is shared by the
+        // app's selected download formats and can be replaced by later M4A/MP3 downloads.
+        val mappedOpus = prefs.getString("opus_uri_$videoId", null)?.let {
             runCatching { Uri.parse(it) }.getOrNull()
         }
-        if (mapped != null && uriExtension(context, mapped) == "opus" && isUriReadable(context, mapped)) {
-            return mapped
+        if (mappedOpus != null && uriExtension(context, mappedOpus) == "opus" &&
+            isUriReadable(context, mappedOpus)
+        ) {
+            return mappedOpus
+        }
+        if (mappedOpus != null) prefs.edit().remove("opus_uri_$videoId").apply()
+
+        val genericMapped = prefs.getString("uri_$videoId", null)?.let {
+            runCatching { Uri.parse(it) }.getOrNull()
+        }
+        if (genericMapped != null && uriExtension(context, genericMapped) == "opus" &&
+            isUriReadable(context, genericMapped)
+        ) {
+            prefs.edit().putString("opus_uri_$videoId", genericMapped.toString()).apply()
+            return genericMapped
         }
 
         val baseName = "${cleanTitle(song.title)} - ${cleanArtist(song.artist)}"
@@ -261,11 +276,14 @@ object SongDownloader {
                 Uri.fromFile(outputFile)
             } else null
         if (uri != null) {
-            context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
+            val editor = context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
                 .edit()
                 .putString("uri_$videoId", uri.toString())
                 .putString("name_$videoId", outputFile.name)
-                .apply()
+            if (outputFile.extension.equals("opus", ignoreCase = true)) {
+                editor.putString("opus_uri_$videoId", uri.toString())
+            }
+            editor.apply()
         } else {
             Log.w(TAG, "Download completed but permanent MediaStore URI was not found for $videoId")
         }
