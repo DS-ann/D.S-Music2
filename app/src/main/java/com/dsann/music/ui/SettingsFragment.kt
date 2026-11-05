@@ -1768,12 +1768,10 @@ fun SettingsScreenContent(
         }
     }
 
-    androidx.activity.compose.BackHandler(enabled = canPop || isPlayerBackActive) {
-        if (isPlayerBackActive) {
-            playerSharedViewModel.requestPlayerCollapseFromBack()
-        } else if (canPop) {
-            navController.popBackStack()
-        }
+    // The Activity/player layer owns Back while the full player is visible.
+    // Do not let a Settings subsection consume that same press and pop its route.
+    androidx.activity.compose.BackHandler(enabled = canPop && !isPlayerBackActive) {
+        navController.popBackStack()
     }
 }
 
