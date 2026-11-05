@@ -14,6 +14,7 @@ import com.dsann.music.ui.theme.Icon
 import com.dsann.music.ui.theme.DsmusicTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +58,7 @@ fun ArtworkPager(
     val playerLayout by context
         .getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
         .observeKey("player_layout", "Standard")
+    val embeddedCurrentArtwork by viewModel.currentSongArtwork.collectAsStateWithLifecycle()
     val artworkShape = remember(artworkShapeName, playerLayout) {
         DsmCoverShapes.forPlayerLayout(playerLayout, artworkShapeName)
     }
@@ -142,10 +144,23 @@ fun ArtworkPager(
             val artworkUrl = remember(song.id, song.thumbnailUrl, song.albumId, song.path, videoId) {
                 resolveArtworkUrl(song)
             }
-            val imageRequest = remember(context, artworkUrl, artworkTargetSizePx) {
-                artworkUrl?.let {
+            // Android 6 Coil cannot turn a downloaded audio file URI into its embedded
+            // cover. The ViewModel extracts the file's tagged artwork on IO and publishes
+            // the bytes for the current downloaded track; prefer those bytes to its audio URI.
+            val embeddedArtworkForPage = if (
+                android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M &&
+                song.id == currentSong.id &&
+                song.isDownloadedOffline
+            ) {
+                embeddedCurrentArtwork?.takeIf { it.isNotEmpty() }
+            } else {
+                null
+            }
+            val artworkModel: Any? = embeddedArtworkForPage ?: artworkUrl?.toUri()
+            val imageRequest = remember(context, artworkModel, artworkTargetSizePx) {
+                artworkModel?.let {
                     ImageRequest.Builder(context)
-                        .data(it.toUri())
+                        .data(it)
                         .size(artworkTargetSizePx, artworkTargetSizePx)
                         .precision(Precision.INEXACT)
                         .crossfade(false)
@@ -153,7 +168,7 @@ fun ArtworkPager(
                 }
             }
 
-            var isError by remember(artworkUrl) { mutableStateOf(false) }
+            var isError by remember(artworkUrl, embeddedArtworkForPage) { mutableStateOf(false) }
 
             Box(
                 modifier = Modifier
@@ -241,7 +256,7 @@ fun ArtworkPager(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                if (!artworkUrl.isNullOrEmpty() && !isError) {
+                if (imageRequest != null && !isError) {
                     AsyncImage(
                         model = imageRequest,
                         contentDescription = null,
