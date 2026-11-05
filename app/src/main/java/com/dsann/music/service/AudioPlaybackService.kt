@@ -2908,14 +2908,21 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     private fun sessionButtonIcon(button: String): Int = when (button) {
-        "like" -> if (viewModel?.isCurrentSongFavorite?.value == true) R.drawable.ic_favorite else R.drawable.ic_favorite_border
-        "shuffle" -> R.drawable.ic_shuffle_noti
-        "repeat" -> when (viewModel?.repeatMode?.value ?: PlayerSharedViewModel.REPEAT_OFF) {
-            PlayerSharedViewModel.REPEAT_ONE -> R.drawable.ic_repeat_one_noti
-            PlayerSharedViewModel.REPEAT_ALL -> R.drawable.ic_repeat_noti
-            else -> R.drawable.ic_repeat_noti
+        // Notification/lock-screen actions run in SystemUI, outside the app's theme.
+        // These dedicated monochrome vectors use literal white paths instead of
+        // ?attr/colorOnSurface, which may render as empty icons in notification rows.
+        "like" -> if (viewModel?.isCurrentSongFavorite?.value == true) {
+            R.drawable.ic_notification_like_filled
+        } else {
+            R.drawable.ic_notification_like_outline
         }
-        "dislike" -> R.drawable.ic_thumbdown
+        "shuffle" -> R.drawable.ic_notification_shuffle
+        "repeat" -> when (viewModel?.repeatMode?.value ?: PlayerSharedViewModel.REPEAT_OFF) {
+            PlayerSharedViewModel.REPEAT_ONE -> R.drawable.ic_notification_repeat_one
+            PlayerSharedViewModel.REPEAT_ALL -> R.drawable.ic_notification_repeat
+            else -> R.drawable.ic_notification_repeat
+        }
+        "dislike" -> R.drawable.ic_notification_dislike
         "back10" -> android.R.drawable.ic_media_rew
         "ahead30" -> android.R.drawable.ic_media_ff
         else -> R.drawable.ic_music_note
