@@ -157,140 +157,140 @@ internal object OpusToMp3Converter {
         outputFile: File,
         targetBitrateKbps: Int
     ) {
-                val extractor = MediaExtractor()
-                var decoder: MediaCodec? = null
-                var encoder: NativeMp3Encoder? = null
-                var encoderRate = 0
-                var encoderChannels = 0
-                var audioSamplesWritten = 0L
-        
-                try {
-                    if (sourceUri.scheme == "file") {
-                        extractor.setDataSource(sourceUri.path ?: throw IllegalStateException("Opus file path is empty"))
-                    } else {
-                        extractor.setDataSource(context, sourceUri, null)
-                    }
-        
-                    var audioTrackIndex = -1
-                    var audioFormat: MediaFormat? = null
-                    for (trackIndex in 0 until extractor.trackCount) {
-                        val format = extractor.getTrackFormat(trackIndex)
-                        val mime = format.getString(MediaFormat.KEY_MIME).orEmpty()
-                        if (mime.contains("opus", ignoreCase = true)) {
-                            audioTrackIndex = trackIndex
-                            audioFormat = format
-                            break
-                        }
-                    }
-                    val selectedFormat = audioFormat
-                        ?: throw IllegalStateException("The downloaded file is not a decodable Opus audio stream")
-                    val mime = selectedFormat.getString(MediaFormat.KEY_MIME)
-                        ?: throw IllegalStateException("Opus decoder MIME type is missing")
-                    extractor.selectTrack(audioTrackIndex)
-                    decoder = MediaCodec.createDecoderByType(mime)
-                    decoder.configure(selectedFormat, null, null, 0)
-                    decoder.start()
-        
-                    val fallbackRate = selectedFormat.integerOr(MediaFormat.KEY_SAMPLE_RATE, 48000)
-                    val fallbackChannels = selectedFormat.integerOr(MediaFormat.KEY_CHANNEL_COUNT, 2)
-                    if (fallbackChannels !in 1..2) {
-                        throw IllegalStateException("Only mono and stereo Opus tracks can be converted")
-                    }
-        
-                    FileOutputStream(outputFile).buffered().use { output ->
-                        fun configureEncoder(format: MediaFormat) {
-                            val sampleRate = format.integerOr(MediaFormat.KEY_SAMPLE_RATE, fallbackRate)
-                            val channels = format.integerOr(MediaFormat.KEY_CHANNEL_COUNT, fallbackChannels)
-                            if (channels !in 1..2) {
-                                throw IllegalStateException("The Opus decoder returned more than two audio channels")
-                            }
-                            if (encoder == null || sampleRate != encoderRate || channels != encoderChannels) {
-                                encoder?.let { old ->
-                                    old.flush().takeIf { it.isNotEmpty() }?.let(output::write)
-                                    old.close()
-                                }
-                                encoder = NativeMp3Encoder(sampleRate, channels, targetBitrateKbps)
-                                encoderRate = sampleRate
-                                encoderChannels = channels
-                            }
-                        }
-        
-                        val bufferInfo = MediaCodec.BufferInfo()
-                        var inputEnded = false
-                        var outputEnded = false
-                        while (!outputEnded) {
-                            currentCoroutineContext().ensureActive()
-        
-                            if (!inputEnded) {
-                                val inputIndex = decoder.dequeueInputBuffer(10_000L)
-                                if (inputIndex >= 0) {
-                                    val inputBuffer = decoder.getInputBuffer(inputIndex)
-                                        ?: throw IllegalStateException("Opus decoder input buffer is unavailable")
-                                    inputBuffer.clear()
-                                    val sampleSize = extractor.readSampleData(inputBuffer, 0)
-                                    if (sampleSize < 0) {
-                                        decoder.queueInputBuffer(
-                                            inputIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM
-                                        )
-                                        inputEnded = true
-                                    } else {
-                                        val presentationTimeUs = extractor.sampleTime.coerceAtLeast(0L)
-                                        decoder.queueInputBuffer(inputIndex, 0, sampleSize, presentationTimeUs, 0)
-                                        extractor.advance()
-                                    }
-                                }
-                            }
-        
-                            val outputIndex = decoder.dequeueOutputBuffer(bufferInfo, 10_000L)
-                            when {
-                                outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                                    configureEncoder(decoder.outputFormat)
-                                }
-                                outputIndex == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED ||
-                                    outputIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
-                                outputIndex >= 0 -> {
-                                    if (bufferInfo.size > 0) {
-                                        if (encoder == null) configureEncoder(decoder.outputFormat)
-                                        val pcmBuffer = decoder.getOutputBuffer(outputIndex)
-                                            ?: throw IllegalStateException("Opus decoder output buffer is unavailable")
-                                        val view = pcmBuffer.duplicate().order(ByteOrder.nativeOrder())
-                                        view.position(bufferInfo.offset)
-                                        view.limit(bufferInfo.offset + bufferInfo.size)
-                                        val samplesPerChannel = view.remaining() / (2 * encoderChannels)
-                                        if (samplesPerChannel > 0) {
-                                            val pcm = ShortArray(samplesPerChannel * encoderChannels)
-                                            view.asShortBuffer().get(pcm)
-                                            val encoded = encoder?.encode(pcm)
-                                                ?: throw IllegalStateException("MP3 encoder was not initialized")
-                                            if (encoded.isNotEmpty()) output.write(encoded)
-                                            audioSamplesWritten += samplesPerChannel.toLong()
-                                        }
-                                    }
-        
-                                    if ((bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                                        outputEnded = true
-                                    }
-                                    decoder.releaseOutputBuffer(outputIndex, false)
-                                }
-                            }
-                        }
-        
-                        if (encoder == null || audioSamplesWritten <= 0L) {
-                            throw IllegalStateException("The Opus decoder returned no audio samples")
-                        }
-                        encoder.flush().takeIf { it.isNotEmpty() }?.let(output::write)
-                        output.flush()
-                    }
-        
-                    if (!outputFile.isFile || outputFile.length() <= 1024L) {
-                        throw IllegalStateException("The MP3 encoder produced an incomplete file")
-                    }
-                } finally {
-                    runCatching { decoder?.stop() }
-                    runCatching { decoder?.release() }
-                    runCatching { extractor.release() }
-                    runCatching { encoder?.close() }
+        val extractor = MediaExtractor()
+        var decoder: MediaCodec? = null
+        var encoder: NativeMp3Encoder? = null
+        var encoderRate = 0
+        var encoderChannels = 0
+        var audioSamplesWritten = 0L
+
+        try {
+            if (sourceUri.scheme == "file") {
+                extractor.setDataSource(sourceUri.path ?: throw IllegalStateException("Opus file path is empty"))
+            } else {
+                extractor.setDataSource(context, sourceUri, null)
+            }
+
+            var audioTrackIndex = -1
+            var audioFormat: MediaFormat? = null
+            for (trackIndex in 0 until extractor.trackCount) {
+                val format = extractor.getTrackFormat(trackIndex)
+                val mime = format.getString(MediaFormat.KEY_MIME).orEmpty()
+                if (mime.contains("opus", ignoreCase = true)) {
+                    audioTrackIndex = trackIndex
+                    audioFormat = format
+                    break
                 }
+            }
+            val selectedFormat = audioFormat
+                ?: throw IllegalStateException("The downloaded file is not a decodable Opus audio stream")
+            val mime = selectedFormat.getString(MediaFormat.KEY_MIME)
+                ?: throw IllegalStateException("Opus decoder MIME type is missing")
+            extractor.selectTrack(audioTrackIndex)
+            decoder = MediaCodec.createDecoderByType(mime)
+            decoder.configure(selectedFormat, null, null, 0)
+            decoder.start()
+
+            val fallbackRate = selectedFormat.integerOr(MediaFormat.KEY_SAMPLE_RATE, 48000)
+            val fallbackChannels = selectedFormat.integerOr(MediaFormat.KEY_CHANNEL_COUNT, 2)
+            if (fallbackChannels !in 1..2) {
+                throw IllegalStateException("Only mono and stereo Opus tracks can be converted")
+            }
+
+            FileOutputStream(outputFile).buffered().use { output ->
+                fun configureEncoder(format: MediaFormat) {
+                    val sampleRate = format.integerOr(MediaFormat.KEY_SAMPLE_RATE, fallbackRate)
+                    val channels = format.integerOr(MediaFormat.KEY_CHANNEL_COUNT, fallbackChannels)
+                    if (channels !in 1..2) {
+                        throw IllegalStateException("The Opus decoder returned more than two audio channels")
+                    }
+                    if (encoder == null || sampleRate != encoderRate || channels != encoderChannels) {
+                        encoder?.let { old ->
+                            old.flush().takeIf { it.isNotEmpty() }?.let(output::write)
+                            old.close()
+                        }
+                        encoder = NativeMp3Encoder(sampleRate, channels, targetBitrateKbps)
+                        encoderRate = sampleRate
+                        encoderChannels = channels
+                    }
+                }
+
+                val bufferInfo = MediaCodec.BufferInfo()
+                var inputEnded = false
+                var outputEnded = false
+                while (!outputEnded) {
+                    currentCoroutineContext().ensureActive()
+
+                    if (!inputEnded) {
+                        val inputIndex = decoder.dequeueInputBuffer(10_000L)
+                        if (inputIndex >= 0) {
+                            val inputBuffer = decoder.getInputBuffer(inputIndex)
+                                ?: throw IllegalStateException("Opus decoder input buffer is unavailable")
+                            inputBuffer.clear()
+                            val sampleSize = extractor.readSampleData(inputBuffer, 0)
+                            if (sampleSize < 0) {
+                                decoder.queueInputBuffer(
+                                    inputIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM
+                                )
+                                inputEnded = true
+                            } else {
+                                val presentationTimeUs = extractor.sampleTime.coerceAtLeast(0L)
+                                decoder.queueInputBuffer(inputIndex, 0, sampleSize, presentationTimeUs, 0)
+                                extractor.advance()
+                            }
+                        }
+                    }
+
+                    val outputIndex = decoder.dequeueOutputBuffer(bufferInfo, 10_000L)
+                    when {
+                        outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                            configureEncoder(decoder.outputFormat)
+                        }
+                        outputIndex == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED ||
+                            outputIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
+                        outputIndex >= 0 -> {
+                            if (bufferInfo.size > 0) {
+                                if (encoder == null) configureEncoder(decoder.outputFormat)
+                                val pcmBuffer = decoder.getOutputBuffer(outputIndex)
+                                    ?: throw IllegalStateException("Opus decoder output buffer is unavailable")
+                                val view = pcmBuffer.duplicate().order(ByteOrder.nativeOrder())
+                                view.position(bufferInfo.offset)
+                                view.limit(bufferInfo.offset + bufferInfo.size)
+                                val samplesPerChannel = view.remaining() / (2 * encoderChannels)
+                                if (samplesPerChannel > 0) {
+                                    val pcm = ShortArray(samplesPerChannel * encoderChannels)
+                                    view.asShortBuffer().get(pcm)
+                                    val encoded = encoder?.encode(pcm)
+                                        ?: throw IllegalStateException("MP3 encoder was not initialized")
+                                    if (encoded.isNotEmpty()) output.write(encoded)
+                                    audioSamplesWritten += samplesPerChannel.toLong()
+                                }
+                            }
+
+                            if ((bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                                outputEnded = true
+                            }
+                            decoder.releaseOutputBuffer(outputIndex, false)
+                        }
+                    }
+                }
+
+                if (encoder == null || audioSamplesWritten <= 0L) {
+                    throw IllegalStateException("The Opus decoder returned no audio samples")
+                }
+                encoder.flush().takeIf { it.isNotEmpty() }?.let(output::write)
+                output.flush()
+            }
+
+            if (!outputFile.isFile || outputFile.length() <= 1024L) {
+                throw IllegalStateException("The MP3 encoder produced an incomplete file")
+            }
+        } finally {
+            runCatching { decoder?.stop() }
+            runCatching { decoder?.release() }
+            runCatching { extractor.release() }
+            runCatching { encoder?.close() }
+        }
     }
 
     private suspend fun decodeLegacyOggOpusAndEncodeMp3(
