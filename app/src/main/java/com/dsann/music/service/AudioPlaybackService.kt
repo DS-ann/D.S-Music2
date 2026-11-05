@@ -631,7 +631,9 @@ class AudioPlaybackService : MediaSessionService() {
     private var forceCompatibleFallbackOnNextResolveVideoId: String? = null
     private var playbackRecoveryStage = 0
     private var isRecoveringPlaybackError = false
-    private var isResolvingVideoMode = false
+    @Volatile private var isResolvingVideoMode = false
+    private var videoModeResolutionGeneration = 0L
+    private var videoModeResolutionJob: Job? = null
 
     private lateinit var telemetryManager: com.dsann.music.data.innertube.YouTubeTelemetryManager
 
@@ -3388,52 +3390,96 @@ class AudioPlaybackService : MediaSessionService() {
      */
     fun setVideoMode(enabled: Boolean) {
         val vm = viewModel ?: return
+        if (!isPlayerInitialized) return
+
         val song = vm.currentSong.value ?: return
-        val videoId = song.videoId?.takeIf { it.isNotBlank() } ?: run {
-            com.dsann.music.ui.SnackbarController.showMessage("No online video is available for this track.")
-            return
-        }
-        if (!isPlayerInitialized || isResolvingVideoMode) return
+        val videoId = song.videoId?.takeIf { it.isNotBlank() }
 
         if (!enabled) {
+            // Explicitly switching to audio also invalidates any video lookup still in flight.
+            videoModeResolutionGeneration += 1L
+            videoModeResolutionJob?.cancel()
+            videoModeResolutionJob = null
+            isResolvingVideoMode = false
+
             if (!vm.isVideoMode.value) return
             val position = captureVideoModePosition(vm)
-            val wasPlaying = player.isPlaying
-            // Stop spending bandwidth on the muxed video while the audio-only source is resolved.
+            val wasPlaying = player.isPlaying || player.playWhenReady || vm.isPlaying.value
             player.pause()
             vm.setVideoModeState(false)
-            if (wasPlaying) {
-                loadAndPlay("innertube://$videoId".toUri(), position)
-            } else {
-                loadAudio("innertube://$videoId".toUri(), position)
+            vm.setVideoPlaybackMetadata(null)
+
+            // A local track may have replaced the previous video while its mode was active.
+            // In that case its own media item is already loaded; do not build an innertube URI.
+            if (videoId != null) {
+                if (wasPlaying) {
+                    loadAndPlay("innertube://$videoId".toUri(), position)
+                } else {
+                    loadAudio("innertube://$videoId".toUri(), position)
+                }
+            } else if (wasPlaying) {
+                player.play()
             }
             return
         }
 
-        if (vm.isVideoMode.value) return
+        if (videoId == null) {
+            // Track changes can move from a YouTube song to a local file while video mode
+            // is active. Drop video UI immediately and leave the new audio source untouched.
+            if (vm.isVideoMode.value) {
+                vm.setVideoModeState(false)
+                vm.setVideoPlaybackMetadata(null)
+            }
+            vm.setLoading(false)
+            com.dsann.music.ui.SnackbarController.showMessage(
+                "No online video is available for this track. Switched to audio."
+            )
+            return
+        }
+
+        // Reopening Video for the already-bound track is a no-op. When the queue changes,
+        // activeVideoCacheVideoId still points at the previous track, so a fresh resolve runs.
+        if (vm.isVideoMode.value && activeVideoCacheVideoId == videoId) return
+
+        // Cancel an older track's resolver instead of allowing it to install a stale video
+        // over the song the listener has since selected.
+        videoModeResolutionGeneration += 1L
+        val requestGeneration = videoModeResolutionGeneration
+        videoModeResolutionJob?.cancel()
+
         val songId = song.id
         val position = captureVideoModePosition(vm)
-        val wasPlaying = player.isPlaying
+        val wasPlaying = player.isPlaying || player.playWhenReady || vm.isPlaying.value
         isResolvingVideoMode = true
         vm.setLoading(true)
-        // Pause the current audio stream during extraction to avoid overlapping audio and video
-        // downloads. Its original timestamp and play/pause state are restored on the new source.
+        vm.setVideoPlaybackMetadata(null)
+
+        // The queue has already loaded this new song's audio source. Pause it while looking
+        // for a matching video, then resume that exact audio item if the lookup fails.
         player.pause()
-        serviceScope.launch {
+        videoModeResolutionJob = serviceScope.launch {
             try {
                 val videoOption = withContext(Dispatchers.IO) {
-                    com.dsann.music.data.innertube.NewPipeStreamExtractor.getDataSaverVideoOption(videoId)
+                    com.dsann.music.data.innertube.NewPipeStreamExtractor
+                        .getDataSaverVideoOption(videoId)
                 }
 
-                if (viewModel?.currentSong?.value?.id != songId) {
-                    vm.setLoading(false)
+                val latestSong = viewModel?.currentSong?.value
+                if (
+                    requestGeneration != videoModeResolutionGeneration ||
+                    latestSong?.id != songId ||
+                    latestSong?.videoId != videoId
+                ) {
                     return@launch
                 }
+
                 if (videoOption == null) {
+                    vm.setVideoModeState(false)
+                    vm.setVideoPlaybackMetadata(null)
                     vm.setLoading(false)
                     if (wasPlaying) player.play()
                     com.dsann.music.ui.SnackbarController.showMessage(
-                        "No video available for this track."
+                        "No video available for this track. Switched to audio."
                     )
                     return@launch
                 }
@@ -3443,7 +3489,6 @@ class AudioPlaybackService : MediaSessionService() {
                     add(videoOption.url)
                     videoOption.audioUrl?.takeIf { it.isNotBlank() }?.let(::add)
                 }
-                vm.setVideoModeState(true)
                 vm.setVideoPlaybackMetadata(
                     com.dsann.music.viewmodel.VideoPlaybackMetadata(
                         title = videoOption.videoTitle?.takeIf { it.isNotBlank() } ?: song.title,
@@ -3461,6 +3506,7 @@ class AudioPlaybackService : MediaSessionService() {
                         uploaderUrl = videoOption.videoUploaderUrl
                     )
                 )
+
                 if (videoOption.usesSeparateAudio) {
                     loadVideoWithSeparateAudio(
                         videoUrl = videoOption.url,
@@ -3478,16 +3524,31 @@ class AudioPlaybackService : MediaSessionService() {
                         videoMimeType = videoOption.mimeType
                     )
                 }
+                // Publish Video mode only after the matching video item has been installed.
+                vm.setVideoModeState(true)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
-                vm.setLoading(false)
-                vm.setVideoModeState(false)
-                if (viewModel?.currentSong?.value?.id == songId && wasPlaying) player.play()
-                Log.w(TAG, "Video mode switch failed for $videoId", error)
-                com.dsann.music.ui.SnackbarController.showMessage(
-                    "Could not switch to video. Audio playback remains available."
-                )
+                val latestSong = viewModel?.currentSong?.value
+                if (
+                    requestGeneration == videoModeResolutionGeneration &&
+                    latestSong?.id == songId &&
+                    latestSong?.videoId == videoId
+                ) {
+                    vm.setLoading(false)
+                    vm.setVideoModeState(false)
+                    vm.setVideoPlaybackMetadata(null)
+                    if (wasPlaying) player.play()
+                    Log.w(TAG, "Video mode switch failed for $videoId", error)
+                    com.dsann.music.ui.SnackbarController.showMessage(
+                        "Could not load this video. Switched to audio."
+                    )
+                }
             } finally {
-                isResolvingVideoMode = false
+                if (requestGeneration == videoModeResolutionGeneration) {
+                    isResolvingVideoMode = false
+                    videoModeResolutionJob = null
+                }
             }
         }
     }
