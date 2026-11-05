@@ -3448,7 +3448,8 @@ class AudioPlaybackService : MediaSessionService() {
         videoModeResolutionJob?.cancel()
 
         val songId = song.id
-        val isRebindingTrack = vm.isVideoMode.value && activeVideoCacheVideoId != videoId
+        val isRebindingTrack = vm.isVideoMode.value &&
+            !activeVideoCacheVideoId.isNullOrBlank() && activeVideoCacheVideoId != videoId
         // A queue transition starts the new song at zero; the previous video player's
         // timestamp belongs to another track and must never leak into this video.
         val position = if (isRebindingTrack) 0L else captureVideoModePosition(vm)
