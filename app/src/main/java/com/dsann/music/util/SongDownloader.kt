@@ -166,9 +166,13 @@ object SongDownloader {
         ).all
         return saved.entries.mapNotNull { entry ->
             val key = entry.key
-            if (!key.startsWith("uri_")) return@mapNotNull null
-            val videoId = key.removePrefix("uri_").takeIf { it.isNotBlank() }
-                ?: return@mapNotNull null
+            // The generic playback mapping is uri_<videoId>. Converted exports use
+            // <format>_uri_<videoId> so MP3/M4A/Opus copies retain the same source identity.
+            val videoId = when {
+                key.startsWith("uri_") -> key.removePrefix("uri_")
+                "_uri_" in key -> key.substringAfter("_uri_")
+                else -> ""
+            }.takeIf { it.isNotBlank() } ?: return@mapNotNull null
             val uri = entry.value as? String ?: return@mapNotNull null
             if (uri.isBlank()) null else uri to videoId
         }.toMap()
