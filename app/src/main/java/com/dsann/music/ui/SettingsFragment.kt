@@ -2840,9 +2840,8 @@ private fun ManualSyncRow() {
         },
         trailingContent = {
             if (isSyncing) {
-                CircularProgressIndicator(
+                com.dsann.music.ui.theme.LoadingIndicator(
                     modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp,
                     color = DsmusicTheme.colorScheme.primary
                 )
             } else {
@@ -4568,7 +4567,7 @@ private fun WhatsNewScreen(navController: androidx.navigation.NavController) {
     ) { paddingValues ->
         if (releases == null) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                com.dsann.music.ui.theme.LoadingIndicator()
             }
         } else if (releases!!.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
