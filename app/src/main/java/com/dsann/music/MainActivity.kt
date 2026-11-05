@@ -243,7 +243,7 @@ class MainActivity : AppCompatActivity() {
 
                 var editingSong by remember { mutableStateOf<SongItem?>(null) }
                 val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-                // Match Prism's wide-window breakpoint: phones in landscape and tablets use a side rail.
+                // Use a wide-window breakpoint: phones in landscape and tablets use a side rail.
                 val useNavigationRail = configuration.screenWidthDp >= 600
                 val isLandscapeLayout = configuration.orientation ==
                     android.content.res.Configuration.ORIENTATION_LANDSCAPE
