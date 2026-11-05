@@ -45,16 +45,22 @@ package com.dsann.music.ui.onboarding
     import androidx.compose.foundation.shape.CircleShape
     import androidx.compose.foundation.shape.RoundedCornerShape
     import androidx.compose.material.icons.Icons
+    import androidx.compose.material.icons.rounded.AccountCircle
     import androidx.compose.material.icons.rounded.ArrowBack
     import androidx.compose.material.icons.rounded.ArrowForward
     import androidx.compose.material.icons.rounded.Check
     import androidx.compose.material.icons.rounded.CheckCircle
     import androidx.compose.material.icons.rounded.DarkMode
+    import androidx.compose.material.icons.rounded.GraphicEq
+    import androidx.compose.material.icons.rounded.Headphones
     import androidx.compose.material.icons.rounded.Home
     import androidx.compose.material.icons.rounded.LibraryMusic
     import androidx.compose.material.icons.rounded.LightMode
     import androidx.compose.material.icons.rounded.Notifications
+    import androidx.compose.material.icons.rounded.MusicNote
+    import androidx.compose.material.icons.rounded.Palette
     import androidx.compose.material.icons.rounded.Search
+    import androidx.compose.material.icons.rounded.Tune
     import androidx.compose.material.icons.rounded.Settings
     import com.dsann.music.ui.theme.Card
     import com.dsann.music.ui.theme.CardDefaults
@@ -80,9 +86,13 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
     import androidx.compose.ui.Alignment
     import androidx.compose.ui.Modifier
     import androidx.compose.ui.draw.clip
+    import androidx.compose.ui.draw.border
     import androidx.compose.ui.draw.rotate
     import androidx.compose.ui.draw.shadow
+    import androidx.compose.ui.graphics.Brush
+    import androidx.compose.ui.graphics.Color
     import androidx.compose.ui.graphics.graphicsLayer
+    import androidx.compose.ui.graphics.vector.ImageVector
     import androidx.compose.ui.layout.ContentScale
     import androidx.compose.ui.platform.LocalContext
     import androidx.compose.ui.res.painterResource
@@ -246,59 +256,63 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
     @Composable
     fun ImmersivePageLayout(
         pageOffsetProvider: () -> Float,
-        drawableRes: Int?,
+        heroIcon: ImageVector,
+        heroTag: String,
         imageUrl: String? = null,
-        imageScale: Float = 1f,
-        iconTint: androidx.compose.ui.graphics.Color = DsmusicTheme.colorScheme.onSurface,
         content: @Composable () -> Unit
     ) {
         val configuration = androidx.compose.ui.platform.LocalConfiguration.current
         val screenWidth = configuration.screenWidthDp.dp
-        val horizontalPadding = if (screenWidth < 360.dp) 20.dp else if (screenWidth > 480.dp) 32.dp else 28.dp
-        val verticalPadding = if (screenWidth < 360.dp) 16.dp else if (screenWidth > 480.dp) 24.dp else 20.dp
+        val horizontalPadding = if (screenWidth < 360.dp) 20.dp else if (screenWidth > 480.dp) 32.dp else 26.dp
+        val verticalPadding = if (screenWidth < 360.dp) 12.dp else 16.dp
+        val heroHeight = (screenWidth * 0.76f).coerceIn(224.dp, 304.dp)
 
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Image Canvas (takes all remaining space above text)
-            Box(
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        ) {
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
-                    .padding(horizontal = 24.dp, vertical = 32.dp)
-                    .graphicsLayer {
-                        val offset = pageOffsetProvider()
-                        translationX = offset * 15f
-                        rotationZ = offset * 2f
-                        scaleX = imageScale + kotlin.math.abs(offset * 0.08f)
-                        scaleY = imageScale + kotlin.math.abs(offset * 0.08f)
-                    }
+                    .padding(start = horizontalPadding, end = horizontalPadding, top = 10.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (imageUrl != null) {
-                    coil.compose.AsyncImage(
-                        model = imageUrl,
-                        contentDescription = "Background decoration",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .clip(CircleShape)
-                    )
-                } else if (drawableRes != null) {
-                    Image(
-                        painter = painterResource(id = drawableRes),
-                        contentDescription = "Background decoration",
-                        contentScale = ContentScale.Fit,
-                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(iconTint),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(20.dp))
-                    )
-                } else {
-                    // Fallback / Placeholder surface if drawable is missing
-                    Surface(color = DsmusicTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxSize()) {}
-                }
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(DsmusicTheme.colorScheme.primary)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "D.S MUSIC",
+                    style = DsmusicTheme.typography.labelMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.8.sp,
+                    color = DsmusicTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "YOUR FIRST SETUP",
+                    style = DsmusicTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.1.sp,
+                    color = DsmusicTheme.colorScheme.primary
+                )
             }
-    
-            // Content Area at the bottom
+
+            OnboardingHeroArtwork(
+                icon = heroIcon,
+                tag = heroTag,
+                imageUrl = imageUrl,
+                pageOffsetProvider = pageOffsetProvider,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(heroHeight)
+                    .padding(horizontal = 18.dp, vertical = 10.dp)
+            )
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -310,20 +324,240 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
             }
         }
     }
-    
+
+    @Composable
+    private fun OnboardingHeroArtwork(
+        icon: ImageVector,
+        tag: String,
+        imageUrl: String?,
+        pageOffsetProvider: () -> Float,
+        modifier: Modifier = Modifier
+    ) {
+        val colors = DsmusicTheme.colorScheme
+        val heroShape = RoundedCornerShape(32.dp)
+        val heroBrush = Brush.linearGradient(
+            colors = listOf(
+                colors.surfaceContainerHigh,
+                colors.surfaceContainer,
+                colors.primaryContainer.copy(alpha = 0.72f)
+            )
+        )
+        val equalizerHeights = listOf(10.dp, 19.dp, 28.dp, 16.dp, 24.dp, 12.dp, 20.dp)
+
+        Box(
+            modifier = modifier
+                .clip(heroShape)
+                .background(heroBrush, heroShape)
+                .border(1.dp, colors.outlineVariant.copy(alpha = 0.48f), heroShape)
+                .graphicsLayer {
+                    val offset = pageOffsetProvider()
+                    translationX = offset * 18f
+                    rotationZ = offset * -0.7f
+                    alpha = 1f - kotlin.math.abs(offset * 0.7f)
+                }
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(220.dp)
+                    .align(Alignment.TopEnd)
+                    .graphicsLayer { translationX = 82f; translationY = -92f }
+                    .background(colors.primary.copy(alpha = 0.09f), CircleShape)
+            )
+            Box(
+                modifier = Modifier
+                    .size(144.dp)
+                    .align(Alignment.BottomStart)
+                    .graphicsLayer { translationX = -55f; translationY = 52f }
+                    .border(1.dp, colors.secondary.copy(alpha = 0.18f), CircleShape)
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = colors.surface.copy(alpha = 0.78f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.MusicNote,
+                                contentDescription = null,
+                                tint = colors.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "LISTEN YOUR WAY",
+                                style = DsmusicTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.7.sp,
+                                color = colors.onSurface
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = "01 / 08",
+                        style = DsmusicTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                        color = colors.onSurfaceVariant
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(190.dp)
+                            .border(1.dp, colors.primary.copy(alpha = 0.20f), CircleShape)
+                            .background(colors.primary.copy(alpha = 0.055f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(150.dp)
+                                .border(1.dp, colors.secondary.copy(alpha = 0.22f), CircleShape)
+                                .background(colors.surface.copy(alpha = 0.42f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Surface(
+                                modifier = Modifier
+                                    .size(104.dp)
+                                    .shadow(12.dp, RoundedCornerShape(34.dp)),
+                                shape = RoundedCornerShape(34.dp),
+                                color = colors.primaryContainer
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    if (imageUrl != null) {
+                                        coil.compose.AsyncImage(
+                                            model = imageUrl,
+                                            contentDescription = "Connected account profile",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .clip(RoundedCornerShape(34.dp))
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            tint = colors.onPrimaryContainer,
+                                            modifier = Modifier.size(54.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(start = 2.dp, bottom = 10.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        color = colors.surfaceContainerHighest.copy(alpha = 0.96f)
+                    ) {
+                        Text(
+                            text = "D.S MUSIC",
+                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                            style = DsmusicTheme.typography.labelSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 0.8.sp,
+                            color = colors.onSurface
+                        )
+                    }
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(end = 2.dp, top = 12.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        color = colors.primaryContainer.copy(alpha = 0.96f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.GraphicEq,
+                            contentDescription = null,
+                            tint = colors.onPrimaryContainer,
+                            modifier = Modifier.padding(9.dp).size(20.dp)
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "MADE FOR YOUR MUSIC",
+                            style = DsmusicTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.1.sp,
+                            color = colors.primary
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = tag,
+                            style = DsmusicTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Row(
+                        modifier = Modifier.height(32.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        equalizerHeights.forEachIndexed { index, barHeight ->
+                            Box(
+                                modifier = Modifier
+                                    .width(4.dp)
+                                    .height(barHeight)
+                                    .clip(CircleShape)
+                                    .background(
+                                        when (index % 3) {
+                                            0 -> colors.primary
+                                            1 -> colors.secondary
+                                            else -> colors.tertiary
+                                        }.copy(alpha = 0.88f)
+                                    )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     @Composable
     fun WelcomePage(pageOffsetProvider: () -> Float) {
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
-            drawableRes = R.drawable.ic_applogo,
-            iconTint = DsmusicTheme.colorScheme.onSurface
+            heroIcon = Icons.Rounded.MusicNote,
+            heroTag = "A FRESH WAY TO LISTEN"
         ) {
             Text(
                 text = "Welcome\nto D.S Music.",
                 style = DsmusicTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black,
-                fontSize = 42.sp,
-                lineHeight = 48.sp,
+                fontSize = 36.sp,
+                lineHeight = 42.sp,
                 letterSpacing = (-0.5).sp,
                 color = DsmusicTheme.colorScheme.onBackground,
                 modifier = Modifier.graphicsLayer { 
@@ -334,7 +568,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Lets setup the everything for you",
+                text = "A listening space shaped around you.",
                 style = DsmusicTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Normal,
                 fontSize = 18.sp,
@@ -356,15 +590,15 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
     fun EcosystemPage(pageOffsetProvider: () -> Float) {
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
-            drawableRes = R.drawable.ic_youtube_music,
-            iconTint = DsmusicTheme.colorScheme.onSurface
+            heroIcon = Icons.Rounded.LibraryMusic,
+            heroTag = "STREAM AND PLAY LOCAL"
         ) {
             Text(
                 text = "Your\nComplete\nEcosystem.",
                 style = DsmusicTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black,
-                fontSize = 42.sp,
-                lineHeight = 48.sp,
+                fontSize = 36.sp,
+                lineHeight = 42.sp,
                 letterSpacing = (-0.5).sp,
                 color = DsmusicTheme.colorScheme.primary,
                 modifier = Modifier.graphicsLayer { 
@@ -375,7 +609,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Stream millions of tracks or play your local library, perfectly synced.",
+                text = "Move between streaming, your local library, playlists and saved music in one familiar player.",
                 style = DsmusicTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Normal,
                 fontSize = 18.sp,
@@ -397,8 +631,8 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
     fun FeatureListPage(pageOffsetProvider: () -> Float) {
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
-            drawableRes = R.drawable.ic_lyrics,
-            iconTint = DsmusicTheme.colorScheme.onSurface
+            heroIcon = Icons.Rounded.GraphicEq,
+            heroTag = "SEARCH · LYRICS · OFFLINE"
         ) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -407,8 +641,8 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                     text = "Stream",
                     style = DsmusicTheme.typography.displaySmall,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 32.sp,
-                    lineHeight = 40.sp,
+                    fontSize = 30.sp,
+                    lineHeight = 36.sp,
                     color = DsmusicTheme.colorScheme.secondary,
                     modifier = Modifier.graphicsLayer { 
                         val offset = pageOffsetProvider()
@@ -420,8 +654,8 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                     text = "Discover",
                     style = DsmusicTheme.typography.displaySmall,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 32.sp,
-                    lineHeight = 40.sp,
+                    fontSize = 30.sp,
+                    lineHeight = 36.sp,
                     color = DsmusicTheme.colorScheme.tertiary,
                     modifier = Modifier.graphicsLayer { 
                         val offset = pageOffsetProvider()
@@ -433,8 +667,8 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                     text = "Sing Along.",
                     style = DsmusicTheme.typography.displaySmall,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 32.sp,
-                    lineHeight = 40.sp,
+                    fontSize = 30.sp,
+                    lineHeight = 36.sp,
                     color = DsmusicTheme.colorScheme.onBackground,
                     modifier = Modifier.graphicsLayer { 
                         val offset = pageOffsetProvider()
@@ -469,15 +703,15 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
     ) {
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
-            drawableRes = R.drawable.ic_appearance,
-            iconTint = DsmusicTheme.colorScheme.onSurface
+            heroIcon = Icons.Rounded.Palette,
+            heroTag = "COLOURS THAT FEEL RIGHT"
         ) {
             Text(
                 text = "Style it\nyour way.",
                 style = DsmusicTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black,
-                fontSize = 42.sp,
-                lineHeight = 48.sp,
+                fontSize = 36.sp,
+                lineHeight = 42.sp,
                 letterSpacing = (-0.5).sp,
                 color = DsmusicTheme.colorScheme.onBackground,
                 modifier = Modifier.graphicsLayer { 
@@ -553,15 +787,15 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
     ) {
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
-            drawableRes = R.drawable.ic_settings,
-            iconTint = DsmusicTheme.colorScheme.onSurface
+            heroIcon = Icons.Rounded.Tune,
+            heroTag = "A NAVIGATION STYLE YOU LIKE"
         ) {
             Text(
                 text = "Navigate\nSeamlessly.",
                 style = DsmusicTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black,
-                fontSize = 42.sp,
-                lineHeight = 48.sp,
+                fontSize = 36.sp,
+                lineHeight = 42.sp,
                 letterSpacing = (-0.5).sp,
                 color = DsmusicTheme.colorScheme.onBackground,
                 modifier = Modifier.graphicsLayer { 
@@ -697,15 +931,15 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
     ) {
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
-            drawableRes = R.drawable.ic_folder_open,
-            iconTint = DsmusicTheme.colorScheme.onSurface
+            heroIcon = Icons.Rounded.FolderOpen,
+            heroTag = "YOUR DEVICE, YOUR LIBRARY"
         ) {
             Text(
                 text = "Enable\nPermissions.",
                 style = DsmusicTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black,
-                fontSize = 42.sp,
-                lineHeight = 48.sp,
+                fontSize = 36.sp,
+                lineHeight = 42.sp,
                 letterSpacing = (-0.5).sp,
                 color = DsmusicTheme.colorScheme.onBackground,
                 modifier = Modifier.graphicsLayer { 
@@ -862,9 +1096,9 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
 
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
-            drawableRes = if (isLoggedIn && userProfileUrl != null) null else R.drawable.ic_youtube_music,
-            imageUrl = if (isLoggedIn) userProfileUrl else null,
-            iconTint = DsmusicTheme.colorScheme.onSurface
+            heroIcon = Icons.Rounded.AccountCircle,
+            heroTag = "SYNC YOUR MUSIC ACCOUNT",
+            imageUrl = if (isLoggedIn) userProfileUrl else null
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -876,8 +1110,8 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                         text = "Welcome,\n$userName",
                         style = DsmusicTheme.typography.displayMedium,
                         fontWeight = FontWeight.Black,
-                        fontSize = 42.sp,
-                        lineHeight = 48.sp,
+                        fontSize = 36.sp,
+                        lineHeight = 42.sp,
                         letterSpacing = (-0.5).sp,
                         color = DsmusicTheme.colorScheme.onBackground,
                         modifier = Modifier.graphicsLayer { 
@@ -908,8 +1142,8 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                         text = "Sign In &\nSync.",
                         style = DsmusicTheme.typography.displayMedium,
                         fontWeight = FontWeight.Black,
-                        fontSize = 42.sp,
-                        lineHeight = 48.sp,
+                        fontSize = 36.sp,
+                        lineHeight = 42.sp,
                         letterSpacing = (-0.5).sp,
                         color = DsmusicTheme.colorScheme.onBackground,
                         modifier = Modifier.graphicsLayer { 
@@ -1002,9 +1236,9 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
     
         ImmersivePageLayout(
             pageOffsetProvider = pageOffsetProvider,
-            drawableRes = if (isLoggedIn && userProfileUrl != null) null else R.drawable.ic_applogo,
-            imageUrl = if (isLoggedIn) userProfileUrl else null,
-            iconTint = DsmusicTheme.colorScheme.onSurface
+            heroIcon = Icons.Rounded.Headphones,
+            heroTag = "READY WHEN YOU ARE",
+            imageUrl = if (isLoggedIn) userProfileUrl else null
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -1053,8 +1287,8 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                     text = "Ready to\nFlow.",
                     style = DsmusicTheme.typography.displayMedium,
                     fontWeight = FontWeight.Black,
-                    fontSize = 42.sp,
-                    lineHeight = 48.sp,
+                    fontSize = 36.sp,
+                    lineHeight = 42.sp,
                     letterSpacing = (-0.5).sp,
                     color = DsmusicTheme.colorScheme.onBackground,
                     modifier = Modifier.graphicsLayer { 
@@ -1067,7 +1301,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                 Spacer(modifier = Modifier.height(20.dp))
     
                 Text(
-                    text = "Your library is fully initialized and the engine is primed. It's time to immerse yourself in the ultimate auditory experience.",
+                    text = "Your setup is complete. Explore your music, shape your listening space and pick your next track.",
                     style = DsmusicTheme.typography.bodyLarge,
                     color = DsmusicTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 24.sp,
@@ -1083,7 +1317,6 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
         }
     }
     
-    @OptIn(ExperimentalFoundationApi::class)
     @Composable
     fun SetupBottomBar(
         modifier: Modifier = Modifier,
@@ -1093,146 +1326,136 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
         onBackClicked: () -> Unit,
         onFinishClicked: () -> Unit
     ) {
-        val morphAnimationSpec = tween<Float>(durationMillis = 600, easing = FastOutSlowInEasing)
-        val rotationAnimationSpec = tween<Float>(durationMillis = 900, easing = FastOutSlowInEasing)
-    
-        val targetShapeValues = when (pagerState.currentPage % 3) {
-            0 -> listOf(50f, 50f, 50f, 50f)
-            1 -> listOf(26f, 26f, 26f, 26f)
-            else -> listOf(18f, 50f, 18f, 50f)
-        }
-    
-        val animatedTopStart by animateFloatAsState(targetShapeValues[0], morphAnimationSpec, label = "TopStart")
-        val animatedTopEnd by animateFloatAsState(targetShapeValues[1], morphAnimationSpec, label = "TopEnd")
-        val animatedBottomStart by animateFloatAsState(targetShapeValues[2], morphAnimationSpec, label = "BottomStart")
-        val animatedBottomEnd by animateFloatAsState(targetShapeValues[3], morphAnimationSpec, label = "BottomEnd")
-    
-        val animatedRotation by animateFloatAsState(
-            targetValue = pagerState.currentPage * 360f,
-            animationSpec = rotationAnimationSpec,
-            label = "Rotation"
-        )
-    
-        val shape = RoundedCornerShape(
-            topEnd = 38.dp,
-            topStart = 38.dp,
-            bottomEnd = 0.dp,
-            bottomStart = 0.dp
-        )
-    
+        val colors = DsmusicTheme.colorScheme
+        val isLastPage = pagerState.currentPage == pagerState.pageCount - 1
+        val progressShape = RoundedCornerShape(50)
+        val dockShape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)
+
         Surface(
-            modifier = modifier.shadow(elevation = 8.dp, shape = shape, clip = true),
-            color = DsmusicTheme.colorScheme.surfaceContainer,
-            shape = shape
+            modifier = modifier.shadow(elevation = 14.dp, shape = dockShape, clip = true),
+            color = colors.surfaceContainer,
+            shape = dockShape
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(bottom = 14.dp)
+                    .padding(horizontal = 22.dp, vertical = 14.dp)
             ) {
-                val animatedProgress by animateFloatAsState(
-                    targetValue = (pagerState.currentPage + 1f) / pagerState.pageCount,
-                    animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
-                    label = "progress"
-                )
-                com.dsann.music.ui.theme.LinearProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier.fillMaxWidth().height(3.dp),
-                    color = DsmusicTheme.colorScheme.primary,
-                    trackColor = DsmusicTheme.colorScheme.surfaceVariant
-                )
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    AnimatedContent(
-                        targetState = pagerState.currentPage,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(start = 16.dp),
-                        transitionSpec = {
-                            if (targetState > initialState) {
-                                (slideInVertically { height -> height } + fadeIn()).togetherWith(slideOutVertically { height -> -height } + fadeOut())
-                            } else {
-                                (slideInVertically { height -> -height } + fadeIn()).togetherWith(slideOutVertically { height -> height } + fadeOut())
-                            }.using(SizeTransform(clip = false))
-                        },
-                        label = "StepTextAnimation"
-                    ) { targetPage ->
-                        if (targetPage == 0) {
+                    repeat(pagerState.pageCount) { index ->
+                        val isReached = index <= pagerState.currentPage
+                        Box(
+                            modifier = Modifier
+                                .weight(if (index == pagerState.currentPage) 2f else 1f)
+                                .height(4.dp)
+                                .clip(progressShape)
+                                .background(
+                                    if (isReached) colors.primary
+                                    else colors.outlineVariant.copy(alpha = 0.50f)
+                                )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (pagerState.currentPage == 0) {
+                        Column {
                             Text(
-                                text = "Let's Go!",
-                                style = DsmusicTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = DsmusicTheme.colorScheme.primary,
+                                text = "D.S MUSIC",
+                                style = DsmusicTheme.typography.labelMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 1.6.sp,
+                                color = colors.onSurface
                             )
-                        } else {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                com.dsann.music.ui.theme.IconButton(
-                                    onClick = onBackClicked,
-                                    modifier = Modifier.size(40.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.ArrowBack,
-                                        contentDescription = "Back",
-                                        tint = DsmusicTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "Step $targetPage of ${pagerState.pageCount - 1}",
-                                    style = DsmusicTheme.typography.bodyLarge,
-                                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "WELCOME EXPERIENCE",
+                                style = DsmusicTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Medium,
+                                letterSpacing = 0.8.sp,
+                                color = colors.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        Surface(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(CircleShape)
+                                .clickable(onClick = onBackClicked),
+                            shape = CircleShape,
+                            color = colors.surfaceContainerHigh
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.ArrowBack,
+                                    contentDescription = "Previous step",
+                                    tint = colors.onSurface,
+                                    modifier = Modifier.size(21.dp)
                                 )
                             }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "STEP ${(pagerState.currentPage + 1).toString().padStart(2, '0')}",
+                                style = DsmusicTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.2.sp,
+                                color = colors.primary
+                            )
+                            Text(
+                                text = "OF ${pagerState.pageCount.toString().padStart(2, '0')}",
+                                style = DsmusicTheme.typography.labelSmall,
+                                color = colors.onSurfaceVariant
+                            )
                         }
                     }
-    
-                    val isLastPage = pagerState.currentPage == pagerState.pageCount - 1
-                    val fabAlpha by animateFloatAsState(if (isNextEnabled || isLastPage) 1f else 0.4f, label = "fab_alpha")
-    
-                    AnimatedContent(
-                        targetState = isLastPage,
-                        label = "FabOrExtended",
-                        transitionSpec = {
-                            fadeIn(animationSpec = tween(220, delayMillis = 90)) togetherWith fadeOut(animationSpec = tween(90))
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    Surface(
+                        modifier = Modifier
+                            .height(50.dp)
+                            .clip(RoundedCornerShape(17.dp))
+                            .clickable {
+                                if (isLastPage) onFinishClicked()
+                                else if (isNextEnabled) onNextClicked()
+                            },
+                        shape = RoundedCornerShape(17.dp),
+                        color = when {
+                            isLastPage -> colors.primary
+                            isNextEnabled -> colors.primaryContainer
+                            else -> colors.primaryContainer.copy(alpha = 0.38f)
                         }
-                    ) { isFinish ->
-                        if (isFinish) {
-                            com.dsann.music.ui.theme.ExtendedFloatingActionButton(
-                                onClick = onFinishClicked,
-                                text = { Text("Start Listening") },
-                                icon = { Icon(Icons.Rounded.Check, contentDescription = "Finish") },
-                                containerColor = DsmusicTheme.colorScheme.primaryContainer,
-                                contentColor = DsmusicTheme.colorScheme.onPrimaryContainer,
-                                elevation = FloatingActionButtonDefaults.elevation(0.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 18.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = if (isLastPage) "Start listening" else "Continue",
+                                style = DsmusicTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isLastPage) colors.onPrimary else colors.onPrimaryContainer
                             )
-                        } else {
-                            FloatingActionButton(
-                                onClick = { if (isNextEnabled) onNextClicked() },
-                                shape = RoundedCornerShape(
-                                    topStartPercent = animatedTopStart.toInt(),
-                                    topEndPercent = animatedTopEnd.toInt(),
-                                    bottomStartPercent = animatedBottomStart.toInt(),
-                                    bottomEndPercent = animatedBottomEnd.toInt()
-                                ),
-                                elevation = FloatingActionButtonDefaults.elevation(0.dp),
-                                containerColor = DsmusicTheme.colorScheme.primaryContainer,
-                                contentColor = DsmusicTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier
-                                    .rotate(animatedRotation)
-                                    .graphicsLayer { alpha = fabAlpha }
-                            ) {
-                                Icon(
-                                    Icons.Rounded.ArrowForward,
-                                    contentDescription = "Next",
-                                    modifier = Modifier.rotate(-animatedRotation)
-                                )
-                            }
+                            Spacer(modifier = Modifier.width(9.dp))
+                            Icon(
+                                imageVector = if (isLastPage) Icons.Rounded.Check else Icons.Rounded.ArrowForward,
+                                contentDescription = null,
+                                tint = if (isLastPage) colors.onPrimary else colors.onPrimaryContainer,
+                                modifier = Modifier.size(19.dp)
+                            )
                         }
                     }
                 }
