@@ -381,6 +381,7 @@ internal object Mp4MetadataRemuxer {
             "stco" -> adjustChunkOffsets(payload, oldMoovEnd, delta, false)
             "co64" -> adjustChunkOffsets(payload, oldMoovEnd, delta, true)
             "tfhd" -> adjustTrackFragmentHeader(payload, oldMoovEnd, delta)
+            "tfra" -> adjustTrackFragmentRandomAccess(payload, oldMoovEnd, delta)
             in containerTypes -> {
                 val prefixSize = if (atom.type == "meta") 4 else 0
                 if (payload.size < prefixSize) throw IOException("Truncated MP4 " + atom.type + " container")
@@ -434,6 +435,56 @@ internal object Mp4MetadataRemuxer {
         return output
     }
 
+    /**
+     * Relocate absolute moof offsets in a Track Fragment Random Access atom.
+     * This is nested in mfra for fragmented MP4/M4A files.
+     */
+    private fun adjustTrackFragmentRandomAccess(
+        payload: ByteArray,
+        oldMoovEnd: Long,
+        delta: Long
+    ): ByteArray {
+        if (payload.size < 16) throw IOException("Truncated tfra atom")
+        val version = payload[0].toInt() and 0xFF
+        val timeWidth = if (version == 1) 8 else 4
+        val offsetWidth = timeWidth
+        val lengthFlags = payload[11].toInt() and 0xFF
+        val trafWidth = ((lengthFlags ushr 4) and 0x03) + 1
+        val trunWidth = ((lengthFlags ushr 2) and 0x03) + 1
+        val sampleWidth = (lengthFlags and 0x03) + 1
+        val entryCount = readUInt32(payload, 12)
+        val entryWidth = timeWidth + offsetWidth + trafWidth + trunWidth + sampleWidth
+        if (entryCount > 2_000_000L ||
+            16L + entryCount * entryWidth > payload.size.toLong()
+        ) {
+            throw IOException("Invalid tfra entry table")
+        }
+
+        val output = payload.copyOf()
+        repeat(entryCount.toInt()) { index ->
+            val entryStart = 16 + index * entryWidth
+            val moofOffsetPosition = entryStart + timeWidth
+            val current = if (offsetWidth == 8) {
+                readUInt64(output, moofOffsetPosition)
+            } else {
+                readUInt32(output, moofOffsetPosition)
+            }
+            if (current >= oldMoovEnd) {
+                val relocated = current + delta
+                if (relocated < 0L) throw IOException("tfra moof offset became negative")
+                if (offsetWidth == 8) {
+                    writeUInt64(output, moofOffsetPosition, relocated)
+                } else {
+                    if (relocated > 0xFFFFFFFFL) {
+                        throw IOException("tfra moof offset overflow")
+                    }
+                    writeUInt32(output, moofOffsetPosition, relocated)
+                }
+            }
+        }
+        return output
+    }
+
     private fun adjustSidx(atomBytes: ByteArray, atomOffset: Long, oldMoovEnd: Long, delta: Long): ByteArray {
         val atom = parseSingleAtom(atomBytes)
         if (atom.type != "sidx") return atomBytes
@@ -444,6 +495,9 @@ internal object Mp4MetadataRemuxer {
         val width = if (version == 0) 4 else 8
         if (payload.size < position + width) return atomBytes
         val current = if (width == 4) readUInt32(payload, position) else readUInt64(payload, position)
+        // When sidx itself is after moov, both the index and the referenced
+        // media move by delta, so its relative first_offset must remain unchanged.
+        if (atomOffset >= oldMoovEnd) return atomBytes
         val target = atomOffset + atom.size + current
         if (target < oldMoovEnd) return atomBytes
         val relocated = current + delta

@@ -39,10 +39,11 @@ class LyricsCacheManager(context: Context) {
      */
     fun get(track: TrackMetadata): LyricsResult? {
         val key = track.getCacheKey()
-        memoryCache.get(key)?.let { cached ->
+        memoryCache.get(key)?.let {
             Log.d(TAG, "Memory cache hit")
-            if (normalizeCachedWordTiming(cached)) persistNormalizedCacheEntry(key, cached)
-            return cached
+            // Disk entries are normalized before insertion. Keep memory hits allocation-free
+            // so API 23 playback never reparses full TTML/word-level payloads per track switch.
+            return it
         }
         val legacyKey = track.getLegacyCacheKey()?.takeIf { it != key }
         for (candidateKey in listOfNotNull(key, legacyKey)) {
