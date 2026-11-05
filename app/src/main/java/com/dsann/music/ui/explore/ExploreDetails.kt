@@ -696,17 +696,40 @@ fun AdaptiveDetailContainer(
                         contentAlignment = Alignment.Center
                     ) {
                         val coverSize = minOf(maxWidth * 0.86f, maxHeight * 0.82f, 300.dp)
-                        val coverModifier = Modifier
-                            .size(coverSize)
-                            .clip(if (isCircular) CircleShape else RoundedCornerShape(24.dp))
-                        AsyncImage(
-                            model = rememberExploreImageRequest(thumbnailUrl, 512),
-                            contentDescription = null,
-                            modifier = if (sharedElementKey != null) {
-                                coverModifier.sharedElementIfAvailable("image-$sharedElementKey")
-                            } else coverModifier,
-                            contentScale = ContentScale.Crop
-                        )
+                        val coverShape = if (isCircular) CircleShape else RoundedCornerShape(24.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(coverSize)
+                                .clip(coverShape)
+                        ) {
+                            AsyncImage(
+                                model = rememberExploreImageRequest(thumbnailUrl, 512),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .then(
+                                        if (sharedElementKey != null) {
+                                            Modifier.sharedElementIfAvailable("image-$sharedElementKey")
+                                        } else Modifier
+                                    ),
+                                contentScale = ContentScale.Crop
+                            )
+                            // Match the portrait hero's artwork veil while retaining the
+                            // fixed two-pane landscape header and its metadata/actions.
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.Black.copy(alpha = 0.26f),
+                                                Color.Transparent,
+                                                DsmusicTheme.colorScheme.background.copy(alpha = 0.58f)
+                                            )
+                                        )
+                                    )
+                            )
+                        }
                     }
                     Text(
                         text = title,
