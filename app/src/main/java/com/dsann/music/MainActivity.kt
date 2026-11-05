@@ -34,6 +34,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.layout.Arrangement
@@ -63,8 +64,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.pointer.pointerInput
@@ -702,15 +705,34 @@ class MainActivity : AppCompatActivity() {
                                 "Minimal" -> RoundedCornerShape(0.dp)
                                 else -> RoundedCornerShape(22.dp)
                             }
+                            val railSurface = DsmusicTheme.colorScheme.surfaceContainer
+                            val railBorderBase = if (railSurface.luminance() > 0.5f) {
+                                androidx.compose.ui.graphics.Color.Black
+                            } else {
+                                androidx.compose.ui.graphics.Color.White
+                            }
+                            val railBorder = railBorderBase.copy(
+                                alpha = if (navBarStyle == "Floating") 0.78f else 0.56f
+                            )
                             Column(
                                 modifier = Modifier
                                     .align(Alignment.CenterStart)
                                     .padding(start = railStartPadding)
                                     .width(railWidth)
+                                    .then(
+                                        if (navBarStyle == "Floating") {
+                                            Modifier.shadow(14.dp, railShape, clip = false)
+                                        } else Modifier
+                                    )
                                     .clip(railShape)
                                     .background(
                                         if (navBarStyle == "Minimal") androidx.compose.ui.graphics.Color.Transparent
-                                        else DsmusicTheme.colorScheme.surfaceContainer
+                                        else railSurface
+                                    )
+                                    .border(
+                                        width = if (navBarStyle == "Floating") 0.9.dp else 0.75.dp,
+                                        color = railBorder,
+                                        shape = railShape
                                     )
                                     .padding(
                                         vertical = if (navBarSize == "Compact") 6.dp else 8.dp,
