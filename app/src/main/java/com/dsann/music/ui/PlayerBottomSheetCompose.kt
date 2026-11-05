@@ -377,8 +377,7 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
     miniPlayerBackgroundColor: Color,
     miniPlayerShape: Shape,
     miniPlayerElevation: Dp,
-    miniSwipeModifier: Modifier,
-    miniDragHandler: SheetVerticalDragGestureHandler
+    miniSwipeModifier: Modifier
 ) {
     val currentSong = uiState.currentSong ?: return
     val isPlaying = uiState.isPlaying
@@ -427,11 +426,9 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
             .offset(x = miniPlayerHorizontalOffset)
             .fillMaxWidth(miniPlayerWidthFraction)
             .height(miniPlayerHeight)
+            // The mini-player has one gesture recognizer for every swipe direction.
+            // A second vertical recognizer here competed for the same pointer stream.
             .then(miniSwipeModifier)
-            .playerSheetVerticalDragGesture(
-                enabled = !isSheetExpanded && !isLyricsModeEnabled && !isQueueExpanded,
-                handler = miniDragHandler
-            )
             .graphicsLayer {
                 alpha = (1f - playerContentExpansionFraction.value).coerceIn(0f, 1f)
             }
@@ -1272,14 +1269,6 @@ fun PlayerBottomSheetCompose(
             }
         }
 
-        fun handleMiniSwipeDown() {
-            if (gestureSettings.miniSwipeDown == PlayerGestureAction.STOP) {
-                viewModel.dismissPlayer()
-            } else {
-                performPlayerGesture(gestureSettings.miniSwipeDown)
-            }
-        }
-
         // Keep one animation owner for gesture, tap and Back transitions. The old drag handler
         // and the state observer both animated the same Animatables, sometimes cancelling a
         // collapse before the mini player reached its bottom position.
@@ -1607,8 +1596,11 @@ fun PlayerBottomSheetCompose(
                             performPlayerGesture(gestureSettings.miniSwipeLeft)
                         kotlin.math.abs(dragX) >= kotlin.math.abs(dragY) && dragX > 0 ->
                             performPlayerGesture(gestureSettings.miniSwipeRight)
-                        dragY < 0 -> performPlayerGesture(gestureSettings.miniSwipeUp)
-                        else -> handleMiniSwipeDown()
+                        // Swipe up is the fixed mini-player expand gesture; it is no
+                        // longer a configurable action in Controls & Gestures.
+                        dragY < 0 -> performPlayerGesture(PlayerGestureAction.OPEN)
+                        // Pull down always executes the selected miniSwipeDown action.
+                        else -> performPlayerGesture(gestureSettings.miniSwipeDown)
                     }
                 }
             )
@@ -1713,8 +1705,7 @@ fun PlayerBottomSheetCompose(
                                 miniPlayerBackgroundColor = dynamicBgColor,
                                 miniPlayerShape = miniPlayerShape,
                                 miniPlayerElevation = miniPlayerElevation,
-                                miniSwipeModifier = miniSwipeGestureModifier,
-                                miniDragHandler = sheetVerticalDragGestureHandler
+                                miniSwipeModifier = miniSwipeGestureModifier
                             )
                         }
                     }
