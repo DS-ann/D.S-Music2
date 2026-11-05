@@ -3635,9 +3635,17 @@ class AudioPlaybackService : MediaSessionService() {
                 )
             }
 
-            val compactIndices = intArrayOf(previousIndex, playIndex, nextIndex)
+            // Compact MediaStyle notifications show only these three actions. The
+            // previous implementation always selected Previous/Play/Next, so the two
+            // user-configured actions were invisible unless the notification was expanded.
+            // Keep Play visible and surface the selected actions in the collapsed row.
+            val compactIndices = when (selectedNotificationButtons.size) {
+                0 -> intArrayOf(previousIndex, playIndex, nextIndex)
+                1 -> intArrayOf(0, playIndex, nextIndex)
+                else -> intArrayOf(0, playIndex, nextIndex + 1)
+            }
             val style = androidx.media3.session.MediaStyleNotificationHelper.MediaStyle(mediaSession)
-                .setShowActionsInCompactView(previousIndex, playIndex, nextIndex)
+                .setShowActionsInCompactView(*compactIndices)
             notificationBuilder.setStyle(style)
 
             return compactIndices
