@@ -491,7 +491,7 @@ class PlayerSharedViewModel @Inject constructor(
         .getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
         .getBoolean("autoplay_enabled", true)
 
-    // ── Prism-style player gestures ───────────────────────────────────────────
+    // ── Player gestures ─────────────────────────────────────────────────────
     private val gesturePreferences = application.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
     private val _playerGestureSettings = MutableStateFlow(
         PlayerGestureSettings.fromPreferences(gesturePreferences)
@@ -502,7 +502,7 @@ class PlayerSharedViewModel @Inject constructor(
         val allowed = setOf(
             "cover_swipe_left", "cover_swipe_right", "cover_swipe_up",
             "cover_double_tap", "cover_long_press",
-            "mini_swipe_left", "mini_swipe_right", "mini_swipe_up", "mini_swipe_down"
+            "mini_swipe_left", "mini_swipe_right", "mini_swipe_down"
         )
         if (key !in allowed) return
         gesturePreferences.edit { putString(key, action.name) }
