@@ -4,6 +4,9 @@
 
 package com.dsann.music.ui.library
 
+import com.dsann.music.ui.rememberTaperedSongDividersEnabled
+import com.dsann.music.ui.taperedSongDivider
+
 import com.dsann.music.ui.theme.DsmusicPageHeading
 import com.dsann.music.ui.LocalRootTabActive
 import com.dsann.music.ui.theme.DsmusicCard
@@ -1498,6 +1501,9 @@ fun SongListItem(
     val accent = DsmusicTheme.colorScheme.primary
     val titleColor = DsmusicTheme.colorScheme.onSurface
     val secondaryColor = DsmusicTheme.colorScheme.onSurfaceVariant
+    val taperedDividersEnabled = rememberTaperedSongDividersEnabled()
+    val showTaperedDivider = taperedDividersEnabled &&
+        !isSelected && !isPlaying && localIndex < localCount - 1
 
     Row(
         modifier = Modifier
@@ -1517,6 +1523,10 @@ fun SongListItem(
                     isPlaying -> Modifier.border(1.dp, accent.copy(alpha = 0.48f), shape)
                     else -> Modifier
                 }
+            )
+            .taperedSongDivider(
+                enabled = showTaperedDivider,
+                color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.24f)
             )
             .combinedClickable(
                 onClick = onClick,
@@ -4121,6 +4131,8 @@ private fun CachedSongListItem(
     isFavorite: Boolean,
     isSelecting: Boolean,
     isSelected: Boolean,
+    localIndex: Int,
+    localCount: Int,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
@@ -4130,8 +4142,8 @@ private fun CachedSongListItem(
         song = song,
         isPlaying = isCurrentSong,
         isFavorite = isFavorite,
-        localIndex = 0,
-        localCount = 1,
+        localIndex = localIndex,
+        localCount = localCount,
         onClick = onClick,
         onLongClick = onLongClick,
         selectionMode = isSelecting,
@@ -4657,6 +4669,8 @@ if (filteredCacheEntries.isEmpty()) {
                             isFavorite = favoriteIds.contains(queueSong.id),
                             isSelecting = isSelectingCache,
                             isSelected = isSelected,
+                            localIndex = index,
+                            localCount = filteredCacheEntries.size,
                             onClick = {
                                 if (isSelectingCache) {
                                     toggleCacheSelection(item.songId)

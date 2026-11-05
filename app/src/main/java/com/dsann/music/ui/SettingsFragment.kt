@@ -748,6 +748,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putString("ui_density", safe) }
     }
 
+    private val _taperedSongDividers = MutableStateFlow(
+        prefs.getBoolean(KEY_TAPERED_SONG_DIVIDERS, false)
+    )
+    val taperedSongDividers: StateFlow<Boolean> = _taperedSongDividers.asStateFlow()
+    fun setTaperedSongDividers(enabled: Boolean) {
+        _taperedSongDividers.value = enabled
+        SongRowDividerPreferences.set(context, enabled)
+    }
+
     private val _uiFontFamily = MutableStateFlow(
         when (prefs.getString("ui_font_family", "Roboto") ?: "Roboto") {
             "Cursive" -> "Cursive"
@@ -800,7 +809,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         "scrubber_color", "player_visualizer", "player_button_style", "scrubber_thickness",
         "scrubber_thumb_style", "visualizer_color", "lyrics_text_size", "lyrics_alignment",
         "lyrics_font_family", "lyrics_color_style", "show_synced_lyrics_in_player",
-        "ui_density", "ui_font_family", "ui_font_scale",
+        "ui_density", "ui_font_family", "ui_font_scale", "tapered_song_dividers",
         "ui_font_weight", "ui_letter_spacing", "nav_label_mode", "hide_nav_labels",
         "dynamic_nav_style", "nav_bar_style", "nav_bar_size"
     )
@@ -1307,6 +1316,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     companion object {
         const val PREFS_NAME = "AppSettings"
+        const val KEY_TAPERED_SONG_DIVIDERS = "tapered_song_dividers"
         const val KEY_DARK_MODE = "dark_mode"
         const val KEY_CROSSFADE_ENABLED = "crossfade_enabled"
         const val KEY_CROSSFADE_DURATION = "crossfade_duration"
@@ -1411,6 +1421,7 @@ fun SettingsScreenContent(
     val lyricsFontFamily by viewModel.lyricsFontFamily.collectAsStateWithLifecycle()
     val lyricsColorStyle by viewModel.lyricsColorStyle.collectAsStateWithLifecycle()
     val uiDensity by viewModel.uiDensity.collectAsStateWithLifecycle()
+    val taperedSongDividers by viewModel.taperedSongDividers.collectAsStateWithLifecycle()
     val uiFontFamily by viewModel.uiFontFamily.collectAsStateWithLifecycle()
     val uiFontScale by viewModel.uiFontScale.collectAsStateWithLifecycle()
     val uiFontWeight by viewModel.uiFontWeight.collectAsStateWithLifecycle()
@@ -1668,6 +1679,8 @@ fun SettingsScreenContent(
                 onLyricsColorStyleChange = { viewModel.setLyricsColorStyle(it) },
                 uiDensity = uiDensity,
                 onUiDensityChange = { viewModel.setUiDensity(it) },
+                taperedSongDividers = taperedSongDividers,
+                onTaperedSongDividersChange = { viewModel.setTaperedSongDividers(it) },
                 uiFontFamily = uiFontFamily,
                 onUiFontFamilyChange = { viewModel.setUiFontFamily(it) },
                 uiFontScale = uiFontScale,
@@ -2925,6 +2938,8 @@ private fun AppearanceScreen(
     onLyricsColorStyleChange: (String) -> Unit,
     uiDensity: String,
     onUiDensityChange: (String) -> Unit,
+    taperedSongDividers: Boolean,
+    onTaperedSongDividersChange: (Boolean) -> Unit,
     uiFontFamily: String,
     onUiFontFamilyChange: (String) -> Unit,
     uiFontScale: Float,
@@ -3446,6 +3461,14 @@ private fun AppearanceScreen(
                     selected = uiDensity,
                     options = listOf("Compact", "Comfortable", "Large"),
                     onSelected = onUiDensityChange
+                )
+            })
+            SettingsGroupCard(listOf {
+                ToggleSettingRow(
+                    title = "Tapered song dividers",
+                    description = "Show a fine line between songs only where a row has no border. It tapers to 0 dp at both ends and reaches 1.5 dp at the centre.",
+                    checked = taperedSongDividers,
+                    onCheckedChange = onTaperedSongDividersChange
                 )
             })
 

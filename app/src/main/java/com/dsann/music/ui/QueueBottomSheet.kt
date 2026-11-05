@@ -300,6 +300,7 @@ fun QueueBottomSheetContent(
                                         shapes = shapes,
                                         dragDropState = dragDropState,
                                         index = index,
+                                        showDivider = index < displayedSongs.lastIndex,
                                         onLongClick = { onSongLongClick(song) },
                                         onSwipeRemove = { viewModel.removeFromQueue(song.id) },
                                         onClick = {
@@ -428,6 +429,7 @@ fun QueueBottomSheetContent(
                                             shapes = shapes,
                                             dragDropState = dragDropState,
                                             index = index,
+                                            showDivider = index < displayedSongs.lastIndex,
                                             onLongClick = { onSongLongClick(song) },
                                             onSwipeRemove = { viewModel.removeFromQueue(song.id) },
                                             onClick = {
@@ -454,6 +456,7 @@ fun QueueListItem(
     shapes: ListItemShapes,
     dragDropState: DragDropState? = null,
     index: Int = -1,
+    showDivider: Boolean = true,
     onLongClick: () -> Unit = {},
     onSwipeRemove: () -> Unit = {},
     @SuppressLint("ModifierParameter") modifier: Modifier = Modifier,
@@ -462,6 +465,7 @@ fun QueueListItem(
     val latestIndex = rememberUpdatedState(index)
     val latestSwipeRemove = rememberUpdatedState(onSwipeRemove)
     val swipeThresholdPx = with(LocalDensity.current) { 88.dp.toPx() }
+    val taperedDividersEnabled = rememberTaperedSongDividersEnabled()
 
     Row(
         modifier = modifier
@@ -485,6 +489,10 @@ fun QueueListItem(
             .background(
                 if (isPlaying) DsmusicTheme.colorScheme.primary.copy(alpha = 0.18f)
                 else Color.Transparent
+            )
+            .taperedSongDivider(
+                enabled = taperedDividersEnabled && showDivider,
+                color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.24f)
             )
             .padding(start = 12.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically

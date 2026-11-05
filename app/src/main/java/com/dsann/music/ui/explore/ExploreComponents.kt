@@ -1,6 +1,9 @@
 @file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 package com.dsann.music.ui.explore
 
+import com.dsann.music.ui.rememberTaperedSongDividersEnabled
+import com.dsann.music.ui.taperedSongDivider
+
 
 import com.dsann.music.ui.theme.DsmusicCard
 import com.dsann.music.ui.theme.DsmusicSurface
@@ -370,6 +373,8 @@ fun SearchResultItem(
         is SearchItem.Playlist -> item.playlist.playlistId
     }
     val imageShape = if (isCircle) CircleShape else RoundedCornerShape(4.dp) // Match YT Music sharp rounded corner
+    val taperedDividersEnabled = rememberTaperedSongDividersEnabled()
+    val isSongItem = item is SearchItem.Song
     // Most Explore/history/detail rows do not need press-time prefetch. Avoid installing
     // an always-listening pointer coroutine for those rows, especially on API 23.
     val touchDownModifier = if (onTouchDown != null) {
@@ -393,6 +398,10 @@ fun SearchResultItem(
             .padding(horizontal = 8.dp, vertical = 2.dp) // Perfect gap between items
             .clip(containerShape)
             .background(backgroundColor)
+            .taperedSongDivider(
+                enabled = taperedDividersEnabled && isSongItem,
+                color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.24f)
+            )
             .then(touchDownModifier)
             .combinedClickable(
                 onClick = onClick,
@@ -1425,10 +1434,11 @@ fun HomeSectionRow(
                                     modifier = Modifier.width(songColumnWidth),
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    songChunk.forEach { item ->
+                                    songChunk.forEachIndexed { songIndex, item ->
                                         HomeSongListItem(
                                             song = item.song,
                                             isPlaying = isPlaybackActive && item.song.videoId == currentOnlineSong?.videoId,
+                                            showDivider = songIndex < songChunk.lastIndex,
                                             onTouchDown = { onSongTouchDown(item.song) },
                                             onClick = { onSongClick(item.song) },
                                             onMenuClick = { onSongMenuClick(item.song) }
@@ -1630,13 +1640,19 @@ fun HomeCarouselItem(
 fun HomeSongListItem(
     song: OnlineSong,
     isPlaying: Boolean,
+    showDivider: Boolean = true,
     onTouchDown: () -> Unit = {},
     onClick: () -> Unit,
     onMenuClick: () -> Unit
 ) {
+    val taperedDividersEnabled = rememberTaperedSongDividersEnabled()
     Row(
         modifier = Modifier.fillMaxWidth()
             .background(DsmusicTheme.colorScheme.background)
+            .taperedSongDivider(
+                enabled = taperedDividersEnabled && showDivider,
+                color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.24f)
+            )
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
