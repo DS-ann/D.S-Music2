@@ -3778,7 +3778,7 @@ private fun SessionButtonsSettings(
                         color = DsmusicTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            Text("\u0024{ordered.size}/2 selected", color = DsmusicTheme.colorScheme.primary, style = DsmusicTheme.typography.labelSmall)
+            Text(ordered.size.toString() + "/2 selected", color = DsmusicTheme.colorScheme.primary, style = DsmusicTheme.typography.labelSmall)
             if (ordered != listOf("like", "shuffle")) {
                 DsmusicTextButton(
                     onClick = { onSelectionChanged(listOf("like", "shuffle")) }
