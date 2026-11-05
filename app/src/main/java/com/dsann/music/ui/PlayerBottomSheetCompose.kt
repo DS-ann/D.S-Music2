@@ -2730,7 +2730,7 @@ private fun MiniPlayerArtworkProgressOverlay(
                 // Match the standard Line progress thickness. The mini-player's
                 // overlay is expanded by half this width on both sides so the stroke
                 // is split evenly outside and inside the cover's actual perimeter.
-                val strokeWidth = (side * 0.112f).coerceAtLeast(1f)
+                val strokeWidth = (side * (if (centerOnArtworkEdge) 0.112f else 0.056f)).coerceAtLeast(1f)
                 val inset = strokeWidth / 2f
                 val outlineSize = Size(
                     (size.width - strokeWidth).coerceAtLeast(1f),
