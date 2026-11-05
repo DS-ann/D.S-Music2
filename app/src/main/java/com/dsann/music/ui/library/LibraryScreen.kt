@@ -56,7 +56,9 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -143,6 +145,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -628,6 +631,8 @@ fun LibraryScreen(
                         var isSelectingDownloads by remember { mutableStateOf(false) }
                         var selectedDownloadIds by remember { mutableStateOf(setOf<Long>()) }
                         var downloadSelectionMenuExpanded by remember { mutableStateOf(false) }
+                        val isLandscapeLibraryLayout =
+                            LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
                         val pullToRefreshState = rememberPullToRefreshState()
                         PullToRefreshBox(
@@ -885,14 +890,30 @@ fun LibraryScreen(
                                         )
                                     }
                                 } else {
-                                    LazyColumn(
+                                    LazyVerticalGrid(
+                                        columns = if (isLandscapeLibraryLayout) {
+                                            GridCells.Adaptive(minSize = 260.dp)
+                                        } else {
+                                            GridCells.Fixed(1)
+                                        },
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .weight(1f),
-                                        contentPadding = PaddingValues(bottom = 160.dp),
-                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        contentPadding = PaddingValues(
+                                            horizontal = if (isLandscapeLibraryLayout) 12.dp else 0.dp,
+                                            bottom = 160.dp
+                                        ),
+                                        horizontalArrangement = Arrangement.spacedBy(
+                                            if (isLandscapeLibraryLayout) 12.dp else 0.dp
+                                        ),
+                                        verticalArrangement = Arrangement.spacedBy(
+                                            if (isLandscapeLibraryLayout) 12.dp else 2.dp
+                                        )
                                     ) {
-                                        item(key = "download-playlist-header") {
+                                        item(
+                                            key = "download-playlist-header",
+                                            span = { GridItemSpan(maxLineSpan) }
+                                        ) {
                                             val headerSong = filteredSongs.firstOrNull()
                                             if (headerSong != null) {
                                                 Column(
@@ -977,6 +998,9 @@ fun LibraryScreen(
                                             },
                                             contentType = { _, item ->
                                                 if (item is SongItem) "downloaded-song" else "section-header"
+                                            },
+                                            span = { _, item ->
+                                                GridItemSpan(if (item is String) maxLineSpan else 1)
                                             }
                                         ) { index, item ->
                                             if (item is String) {
@@ -3792,6 +3816,8 @@ private fun StreamCacheTabContent(
     val scope = rememberCoroutineScope()
     val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
     val rootTabActive = LocalRootTabActive.current
+    val isLandscapeLibraryLayout =
+        LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     // Poll the on-disk Media3 cache only while Library is the foreground root tab.
     // This keeps its cached screen ready without a 10-second background wakeup loop.
@@ -3854,15 +3880,31 @@ private fun StreamCacheTabContent(
         viewModel.playSongAtIndex(0)
     }
 
-    LazyColumn(
+    LazyVerticalGrid(
+        columns = if (isLandscapeLibraryLayout) {
+            GridCells.Adaptive(minSize = 260.dp)
+        } else {
+            GridCells.Fixed(1)
+        },
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        contentPadding = PaddingValues(
+            horizontal = if (isLandscapeLibraryLayout) 12.dp else 16.dp,
+            vertical = 16.dp
+        ),
+        horizontalArrangement = Arrangement.spacedBy(
+            if (isLandscapeLibraryLayout) 12.dp else 0.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(
+            if (isLandscapeLibraryLayout) 12.dp else 4.dp
+        )
     ) {
         // YouTube-style playlist header: cover art, playlist identity, song count, and
         // dedicated Play all / Shuffle actions before the track list.
         if (cacheEntries.isNotEmpty()) {
-            item(key = "cache-playlist-header") {
+            item(
+                key = "cache-playlist-header",
+                span = { GridItemSpan(maxLineSpan) }
+            ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -4030,7 +4072,10 @@ private fun StreamCacheTabContent(
                 }
             }
         } else {
-            item(key = "cache-playlist-empty-header") {
+            item(
+                key = "cache-playlist-empty-header",
+                span = { GridItemSpan(maxLineSpan) }
+            ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -4046,7 +4091,10 @@ private fun StreamCacheTabContent(
         }
 
         if (cacheEntries.isEmpty()) {
-            item(key = "cache-playlist-empty") {
+            item(
+                key = "cache-playlist-empty",
+                span = { GridItemSpan(maxLineSpan) }
+            ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -4067,7 +4115,11 @@ private fun StreamCacheTabContent(
                 }
             }
         } else {
-            itemsIndexed(cacheEntries, key = { _, item -> item.songId }) { index, item ->
+            gridItemsIndexed(
+                items = cacheEntries,
+                key = { _, item -> item.songId },
+                span = { _, _ -> GridItemSpan(1) }
+            ) { index, item ->
                 val artwork = AudioPlaybackService.getCachedMediaArtworkFile(context, item.songId)
                 val queueSong = cacheQueue.getOrNull(index)
                 val isCurrentSong = currentSong?.isCachedTrack == true &&
