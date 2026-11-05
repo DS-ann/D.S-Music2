@@ -1233,6 +1233,7 @@ class AudioPlaybackService : MediaSessionService() {
         serviceScope.launch {
             vm.repeatMode.collect {
                 updateMediaSessionCustomLayout()
+                if (isPlayerInitialized) updateWidgetState(player.isPlaying)
             }
         }
         serviceScope.launch {
@@ -2783,6 +2784,14 @@ class AudioPlaybackService : MediaSessionService() {
         )
     }
 
+    private fun currentWidgetRepeatIconResource(): Int = when (
+        viewModel?.repeatMode?.value ?: PlayerSharedViewModel.REPEAT_OFF
+    ) {
+        PlayerSharedViewModel.REPEAT_ONCE -> R.drawable.ic_repeat_one
+        PlayerSharedViewModel.REPEAT_INFINITY -> R.drawable.ic_repeat_infinity
+        else -> R.drawable.ic_repeat
+    }
+
     fun updateWidgetState(isPlaying: Boolean) {
         val activeSong = viewModel?.currentSong?.value ?: widgetRestoredSong
         val playerHasItem = player.currentMediaItem != null
@@ -2819,7 +2828,8 @@ class AudioPlaybackService : MediaSessionService() {
             isPlaying,
             position.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
             duration.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-            currentWidgetLyricText(position)
+            currentWidgetLyricText(position),
+            currentWidgetRepeatIconResource()
         )
     }
 
