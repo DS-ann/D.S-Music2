@@ -416,7 +416,7 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
             .align(Alignment.TopCenter)
             .fillMaxWidth(miniPlayerWidthFraction)
             .height(miniPlayerHeight)
-            .padding(horizontal = 12.dp * miniPlayerWidthFraction)
+            .padding(horizontal = 24.dp * miniPlayerWidthFraction)
             .then(miniSwipeModifier)
             .playerSheetVerticalDragGesture(
                 enabled = !isSheetExpanded && !isLyricsModeEnabled && !isQueueExpanded,
