@@ -601,6 +601,7 @@ object SongDownloader {
                 val conversion = OpusToMp3Converter.convert(context, song)
                 automaticMp3Conversion = conversion
                 if (!conversion.success) {
+                    _downloadedVideoIds.update { it - videoId }
                     cancelNotification(context, notificationId)
                     withContext(Dispatchers.Main) {
                         com.dsann.music.ui.SnackbarController.showMessage(
@@ -893,8 +894,16 @@ object SongDownloader {
                 }
             }
 
-            _downloadedVideoIds.update { it + videoId }
-            showFinishedNotification(context, metadataTitle, metadataArtist, notificationId)
+            val selectedFormatCompleted = !convertToMp3AfterDownload ||
+                automaticMp3Conversion?.success == true
+            _downloadedVideoIds.update { current ->
+                if (selectedFormatCompleted) current + videoId else current - videoId
+            }
+            if (selectedFormatCompleted) {
+                showFinishedNotification(context, metadataTitle, metadataArtist, notificationId)
+            } else {
+                cancelNotification(context, notificationId)
+            }
             _downloadProgress.value += (videoId to 100)
 
             withContext(Dispatchers.Main) {
