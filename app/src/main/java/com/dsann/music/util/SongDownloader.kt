@@ -379,9 +379,12 @@ object SongDownloader {
         val downloadsRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         val isInsideDsmusicDownloads = sourceFile?.let { candidate ->
             val candidatePath = runCatching { candidate.canonicalPath }.getOrNull()
+            val musicRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
             val allowedDirectories = listOf(
                 File(downloadsRoot, "D.S Music"),
-                File(downloadsRoot, "SpatialFlow")
+                File(downloadsRoot, "SpatialFlow"),
+                File(musicRoot, "D.S Music"),
+                File(musicRoot, "SpatialFlow")
             )
             candidatePath != null && candidate.name.equals(expectedName, ignoreCase = true) &&
                 allowedDirectories.any { directory ->
