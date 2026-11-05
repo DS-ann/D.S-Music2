@@ -298,7 +298,7 @@ internal fun WavySliderWithLabels(
     scrubberStyle: String = "Waveform",
     scrubberColor: String = "Accent",
     playerTimes: String = "Both",
-    scrubberThickness: Float = 1f,
+    scrubberThickness: Float = 1.5f,
     scrubberThumbStyle: String = "Auto",
     coverDerivedColor: Color = dynamicAccentColor,
     modifier: Modifier = Modifier
