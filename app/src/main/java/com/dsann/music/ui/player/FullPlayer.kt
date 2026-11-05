@@ -1678,7 +1678,8 @@ fun FullPlayer(
             playerBackgroundColor = uiState.playerBackgroundColor,
             dynamicAccentColor = dynamicAccentColor,
             isDark = isDark,
-            onSongLongClick = { song -> showQueueSongActions(context, song, viewModel) }
+            onSongLongClick = { song -> showQueueSongActions(context, song, viewModel) },
+            onRemoveFromQueue = { song -> viewModel.removeFromQueue(song.id) }
         )
 
         // --- Standalone Sleep Timer Bottom Sheet ---

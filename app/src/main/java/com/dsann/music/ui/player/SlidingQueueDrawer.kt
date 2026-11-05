@@ -54,6 +54,7 @@ fun SlidingQueueDrawer(
     dynamicAccentColor: Color,
     isDark: Boolean,
     onSongLongClick: (SongItem) -> Unit,
+    onRemoveFromQueue: (SongItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
@@ -286,12 +287,12 @@ fun SlidingQueueDrawer(
                     ) { index, song ->
                         val isPlaying = (index == currentSongIndex)
                         val shapes = ListItemDefaults.segmentedShapes(index = index, count = songList.size)
-                        val isDragging = index == dragDropState.currentIndexOfDraggedItem
+                        val isDragging = song.id == dragDropState.draggedItemKey
                         val displacement = if (isDragging) dragDropState.elementDisplacement ?: 0f else 0f
 
                         Box(
                             modifier = Modifier
-                                .animateItem()
+                                .then(if (isDragging) Modifier else Modifier.animateItem())
                                 .zIndex(if (isDragging) 1f else 0f)
                                 .graphicsLayer {
                                     translationY = displacement
@@ -309,6 +310,7 @@ fun SlidingQueueDrawer(
                                 dragDropState = if (isQueueExpanded) dragDropState else null,
                                 index = index,
                                 onLongClick = { onSongLongClick(song) },
+                                onSwipeRemove = { onRemoveFromQueue(song) },
                                 onClick = { onPlaySongAtIndex(index) }
                             )
                         }

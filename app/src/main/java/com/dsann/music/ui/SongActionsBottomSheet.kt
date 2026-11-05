@@ -146,6 +146,8 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
     private var song: SongItem? = null
     private var actionListener: ActionListener? = null
     private var showAddToQueue: Boolean = true
+    private var showRemoveFromQueue: Boolean = false
+    private var showDelete: Boolean = true
 
     interface ActionListener {
         fun onPlayNext(song: SongItem)
@@ -161,12 +163,16 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
         @JvmStatic
         fun newInstance(
             song: SongItem,
-            showAddToQueue: Boolean = true
+            showAddToQueue: Boolean = true,
+            showRemoveFromQueue: Boolean = false,
+            showDelete: Boolean = true
         ): SongActionsBottomSheet {
             val fragment = SongActionsBottomSheet()
             val args = Bundle()
             args.putSerializable("song", song)
             args.putBoolean("showAddToQueue", showAddToQueue)
+            args.putBoolean("showRemoveFromQueue", showRemoveFromQueue)
+            args.putBoolean("showDelete", showDelete)
             fragment.arguments = args
             return fragment
         }
@@ -182,6 +188,8 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
         super.onCreate(savedInstanceState)
         song = arguments?.getSerializable("song") as? SongItem
         showAddToQueue = arguments?.getBoolean("showAddToQueue", true) ?: true
+        showRemoveFromQueue = arguments?.getBoolean("showRemoveFromQueue", false) ?: false
+        showDelete = arguments?.getBoolean("showDelete", true) ?: true
         viewModel = ViewModelProvider(requireActivity())[PlayerSharedViewModel::class.java]
     }
 
@@ -220,6 +228,8 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
                         actionListener = actionListener,
                         viewModel = viewModel,
                         showAddToQueue = showAddToQueue,
+                        showRemoveFromQueue = showRemoveFromQueue,
+                        showDelete = showDelete,
                         onDismiss = { dismiss() }
                     )
                 }
@@ -237,6 +247,8 @@ fun BottomSheetScaffoldContent(
     actionListener: SongActionsBottomSheet.ActionListener?,
     viewModel: PlayerSharedViewModel,
     showAddToQueue: Boolean = true,
+    showRemoveFromQueue: Boolean = false,
+    showDelete: Boolean = true,
     onDismiss: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(BottomSheetTab.OPTIONS) }
@@ -420,6 +432,8 @@ fun BottomSheetScaffoldContent(
                                 actionListener = actionListener,
                                 onAddToPlaylist = { showAddToPlaylistDialog = true },
                                 showAddToQueue = showAddToQueue,
+                                showRemoveFromQueue = showRemoveFromQueue,
+                                showDelete = showDelete,
                                 onDismiss = onDismiss,
                                 hasDownloadedOpus = hasDownloadedOpus,
                                 isConvertingToMp3 = isConvertingToMp3,
@@ -488,6 +502,8 @@ fun BottomSheetScaffoldContent(
                                         actionListener = actionListener,
                                         onAddToPlaylist = { showAddToPlaylistDialog = true },
                                         showAddToQueue = showAddToQueue,
+                                        showRemoveFromQueue = showRemoveFromQueue,
+                                        showDelete = showDelete,
                                         onDismiss = onDismiss,
                                         hasDownloadedOpus = hasDownloadedOpus,
                                         isConvertingToMp3 = isConvertingToMp3,
@@ -594,6 +610,7 @@ fun OptionsContent(
     showAddToQueue: Boolean = true,
     onDismiss: () -> Unit,
     showDelete: Boolean = true,
+    showRemoveFromQueue: Boolean = false,
     hasDownloadedOpus: Boolean = false,
     isConvertingToMp3: Boolean = false,
     onConvertToMp3: () -> Unit = {},
@@ -619,6 +636,26 @@ fun OptionsContent(
             onDeleteDownloaded = onDeleteDownloaded
         )
         DestructiveActionRow(song, actionListener, onAddToPlaylist, onDismiss, showDelete = showDelete)
+        if (showRemoveFromQueue) {
+            SongActionWideTile(
+                modifier = Modifier.fillMaxWidth(),
+                label = "Remove from queue",
+                containerColor = DsmusicTheme.colorScheme.errorContainer,
+                contentColor = DsmusicTheme.colorScheme.onErrorContainer,
+                enabled = song != null,
+                onClick = {
+                    song?.let { actionListener?.onDelete(it) }
+                    onDismiss()
+                }
+            ) {
+                Icon(
+                    Icons.Rounded.DeleteOutline,
+                    contentDescription = null,
+                    tint = DsmusicTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.size(21.dp)
+                )
+            }
+        }
         if (hasDownloadedOpus || isConvertingToMp3) {
             SongActionWideTile(
                 modifier = Modifier.fillMaxWidth(),

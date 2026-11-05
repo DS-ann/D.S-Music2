@@ -21,6 +21,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -78,6 +79,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -276,12 +278,12 @@ fun QueueBottomSheetContent(
                                 val isPlaying = (index == currentSongIndex)
                                 val shapes = ListItemDefaults.segmentedShapes(index = index, count = displayedSongs.size)
                                 
-                                val isDragging = index == dragDropState.currentIndexOfDraggedItem
+                                val isDragging = song.id == dragDropState.draggedItemKey
                                 val displacement = if (isDragging) dragDropState.elementDisplacement ?: 0f else 0f
 
                                 Box(
                                     modifier = Modifier
-                                        .animateItem()
+                                        .then(if (isDragging) Modifier else Modifier.animateItem())
                                         .zIndex(if (isDragging) 1f else 0f)
                                         .graphicsLayer {
                                             translationY = displacement
@@ -299,6 +301,7 @@ fun QueueBottomSheetContent(
                                         dragDropState = dragDropState,
                                         index = index,
                                         onLongClick = { onSongLongClick(song) },
+                                        onSwipeRemove = { viewModel.removeFromQueue(song.id) },
                                         onClick = {
                                             viewModel.playSongAtIndex(index)
                                         }
@@ -408,7 +411,7 @@ fun QueueBottomSheetContent(
 
                                     Box(
                                         modifier = Modifier
-                                            .animateItem()
+                                            .then(if (isDragging) Modifier else Modifier.animateItem())
                                             .zIndex(if (isDragging) 1f else 0f)
                                             .graphicsLayer {
                                                 translationY = displacement
@@ -426,6 +429,7 @@ fun QueueBottomSheetContent(
                                             dragDropState = dragDropState,
                                             index = index,
                                             onLongClick = { onSongLongClick(song) },
+                                            onSwipeRemove = { viewModel.removeFromQueue(song.id) },
                                             onClick = {
                                                 viewModel.playSongAtIndex(index)
                                             }
@@ -451,16 +455,32 @@ fun QueueListItem(
     dragDropState: DragDropState? = null,
     index: Int = -1,
     onLongClick: () -> Unit = {},
+    onSwipeRemove: () -> Unit = {},
     @SuppressLint("ModifierParameter") modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    // The row may move to another index while this pointerInput remains active.
-    // Keep the latest index without restarting the gesture detector.
     val latestIndex = rememberUpdatedState(index)
+    val latestSwipeRemove = rememberUpdatedState(onSwipeRemove)
+    val swipeThresholdPx = with(LocalDensity.current) { 88.dp.toPx() }
 
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .pointerInput(song.id, swipeThresholdPx) {
+                var horizontalTravel = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { horizontalTravel = 0f },
+                    onHorizontalDrag = { change, dragAmount ->
+                        horizontalTravel += dragAmount
+                        change.consume()
+                    },
+                    onDragEnd = {
+                        if (abs(horizontalTravel) >= swipeThresholdPx) latestSwipeRemove.value()
+                        horizontalTravel = 0f
+                    },
+                    onDragCancel = { horizontalTravel = 0f }
+                )
+            }
             .clip(shapes.shape)
             .background(
                 if (isPlaying) DsmusicTheme.colorScheme.primary.copy(alpha = 0.18f)
@@ -612,18 +632,21 @@ class DragDropState(
     var currentIndexOfDraggedItem by mutableStateOf<Int?>(null)
     private var autoScrollJob: Job? = null
     private var autoScrollDeltaPx: Float = 0f
+    private var pendingMoveTargetIndex: Int? = null
+
+    val draggedItemKey: Any?
+        get() = initiallyDraggedElement?.key
 
     val elementDisplacement: Float?
-        get() = currentIndexOfDraggedItem?.let { currentIndex ->
+        get() = initiallyDraggedElement?.let { anchor ->
             lazyListState.layoutInfo.visibleItemsInfo
-                .firstOrNull { it.index == currentIndex }
-                ?.let { item ->
-                    (initiallyDraggedElement?.offset ?: 0).toFloat() + draggedDistance - item.offset
-                }
+                .firstOrNull { it.key == anchor.key }
+                ?.let { item -> anchor.offset.toFloat() + draggedDistance - item.offset }
         }
 
     fun onDragStart(offset: Offset) {
         stopAutoScroll()
+        pendingMoveTargetIndex = null
         draggedDistance = 0f
         initiallyDraggedElement = null
         currentIndexOfDraggedItem = null
@@ -638,6 +661,7 @@ class DragDropState(
     /** Start from the exact LazyColumn row that owns the drag handle. */
     fun onDragStartAtIndex(index: Int) {
         stopAutoScroll()
+        pendingMoveTargetIndex = null
         draggedDistance = 0f
         val item = lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
         initiallyDraggedElement = item
@@ -647,6 +671,7 @@ class DragDropState(
     fun onDragInterrupted() {
         initiallyDraggedElement = null
         currentIndexOfDraggedItem = null
+        pendingMoveTargetIndex = null
         draggedDistance = 0f
         stopAutoScroll()
     }
@@ -658,15 +683,22 @@ class DragDropState(
      */
     private fun moveDraggedItemToPointer() {
         val anchor = initiallyDraggedElement ?: return
-        val fromIndex = currentIndexOfDraggedItem ?: return
+        val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
+        val draggedItem = visibleItems.firstOrNull { it.key == anchor.key } ?: return
+        val fromIndex = draggedItem.index
+        currentIndexOfDraggedItem = fromIndex
+        val pendingTarget = pendingMoveTargetIndex
+        if (pendingTarget != null) {
+            if (fromIndex != pendingTarget) return
+            pendingMoveTargetIndex = null
+        }
         val currentCenter = anchor.offset + draggedDistance + anchor.size / 2f
-        val targetItem = lazyListState.layoutInfo.visibleItemsInfo.minByOrNull { item ->
+        val targetItem = visibleItems.minByOrNull { item ->
             kotlin.math.abs((item.offset + item.size / 2f) - currentCenter)
         } ?: return
-
         if (targetItem.index != fromIndex) {
+            pendingMoveTargetIndex = targetItem.index
             onMove(fromIndex, targetItem.index)
-            currentIndexOfDraggedItem = targetItem.index
         }
     }
 
@@ -793,7 +825,7 @@ fun showQueueSongActions(
     val fragmentManager = activity.supportFragmentManager
     if (fragmentManager.isStateSaved) return
 
-    val sheet = SongActionsBottomSheet.newInstance(song, showAddToQueue = false)
+    val sheet = SongActionsBottomSheet.newInstance(song, showAddToQueue = false, showRemoveFromQueue = true, showDelete = false)
     sheet.setActionListener(object : SongActionsBottomSheet.ActionListener {
         override fun onPlay(song: SongItem) {
             viewModel.playSong(song)
@@ -804,7 +836,7 @@ fun showQueueSongActions(
         }
 
         override fun onAddToQueue(song: SongItem) = Unit
-        override fun onDelete(song: SongItem) = Unit
+        override fun onDelete(song: SongItem) { viewModel.removeFromQueue(song.id) }
         override fun onEdit(song: SongItem) = Unit
 
         override fun onFavorite(song: SongItem, isFav: Boolean) {

@@ -1886,6 +1886,19 @@ class PlayerSharedViewModel @Inject constructor(
         audioService?.refreshNativeQueue()
     }
 
+    fun removeFromQueue(songId: Long) {
+        val currentQueue = _songList.value
+        val removeIndex = currentQueue.indexOfFirst { it.id == songId }
+        if (removeIndex < 0) return
+        val updatedQueue = currentQueue.toMutableList().apply { removeAt(removeIndex) }
+        _songList.value = updatedQueue
+        _currentSongIndex.value = _currentSong.value?.let { active ->
+            updatedQueue.indexOfFirst { it.id == active.id }
+        } ?: -1
+        audioService?.refreshNativeQueue()
+        savePlaybackState()
+    }
+
     fun addToQueue(song: SongItem) {
         val newList = ArrayList(_songList.value)
         if (newList.none { it.id == song.id }) {
