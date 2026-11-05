@@ -438,11 +438,28 @@ private fun PortraitSyncedLyricPreview(
         ?: currentSong?.path?.takeIf { it.isNotBlank() }
         ?: currentSong?.id?.toString()
     val songDurationMs = currentSong?.duration?.takeIf { it > 0L }
+    // Precompute each outgoing line's completion boundary once. Karaoke uses the final
+    // word's end; ordinary synced lyrics use the next line's start timestamp.
+    val lineCompletionTimes = remember(displayLines) {
+        displayLines.mapIndexed { index, line ->
+            line.words.maxOfOrNull { it.absoluteStartTimeMs + it.durationMs }
+                ?.takeIf { it > 0L }
+                ?: displayLines.getOrNull(index + 1)?.startTimeMs
+                ?: Long.MAX_VALUE
+        }
+    }
+    val finalWordEndMs = remember(displayLines) {
+        displayLines.lastOrNull()?.words
+            ?.maxOfOrNull { it.absoluteStartTimeMs + it.durationMs }
+            ?.takeIf { it > 0L }
+    }
 
     val activeLineText by produceState<String?>(
         initialValue = null,
         songKey,
         displayLines,
+        lineCompletionTimes,
+        finalWordEndMs,
         songDurationMs,
         isPlaying,
         currentPositionProvider
@@ -452,41 +469,31 @@ private fun PortraitSyncedLyricPreview(
             return@produceState
         }
 
+        // Retain the active index across clock polls. Re-scan only after a backwards seek.
+        var targetIndex = -1
+        var previousPositionMs = -1L
         while (true) {
             val positionMs = currentPositionProvider().coerceAtLeast(0).toLong()
-            val finalLine = displayLines.last()
-            val finalWordEndMs = finalLine.words
-                .maxOfOrNull { it.absoluteStartTimeMs + it.durationMs }
-                ?.takeIf { it > 0L }
             val hasPassedFinalLine =
                 (songDurationMs != null && positionMs >= songDurationMs) ||
                     (finalWordEndMs != null && positionMs > finalWordEndMs + 1000L)
 
-            val activeIndex = if (
-                positionMs < displayLines.first().startTimeMs || hasPassedFinalLine
-            ) {
-                -1
+            if (positionMs < displayLines.first().startTimeMs || hasPassedFinalLine) {
+                targetIndex = -1
             } else {
-                var targetIndex = 0
-                var lineIndex = 0
-                while (lineIndex < displayLines.lastIndex) {
-                    val line = displayLines[lineIndex]
-                    val nextLine = displayLines[lineIndex + 1]
-                    val finalWordEnd = line.words
-                        .maxOfOrNull { it.absoluteStartTimeMs + it.durationMs }
-                        ?.takeIf { it > 0L }
-                    val completionTime = finalWordEnd ?: nextLine.startTimeMs
-                    if (positionMs >= completionTime) {
-                        targetIndex = lineIndex + 1
-                        lineIndex = targetIndex
-                    } else {
-                        break
-                    }
+                if (targetIndex < 0 || positionMs < previousPositionMs) {
+                    targetIndex = 0
                 }
-                targetIndex
+                while (
+                    targetIndex < displayLines.lastIndex &&
+                    positionMs >= lineCompletionTimes[targetIndex]
+                ) {
+                    targetIndex += 1
+                }
             }
+            previousPositionMs = positionMs
 
-            val nextText = displayLines.getOrNull(activeIndex)?.content?.trim()
+            val nextText = displayLines.getOrNull(targetIndex)?.content?.trim()
                 ?.takeIf { it.isNotEmpty() }
             if (value != nextText) value = nextText
 
