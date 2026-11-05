@@ -1214,6 +1214,77 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /**
+     * A track menu can lack both album browse ID and album title. Resolve the selected
+     * track through YouTube Music search before declaring album navigation unavailable.
+     */
+    fun loadAlbumForSong(title: String, artistName: String) {
+        val cleanTitle = title.trim()
+        val cleanArtist = artistName.trim()
+        if (cleanTitle.isBlank()) {
+            _uiState.update { it.copy(error = "Song information unavailable") }
+            return
+        }
+
+        detailLoadGeneration += 1L
+        val requestId = detailLoadGeneration
+        detailLoadJob?.cancel()
+        detailLoadJob = null
+        artistResolveJob?.cancel()
+        _uiState.update { it.copy(isLoadingDetail = true, error = null) }
+
+        artistResolveJob = viewModelScope.launch {
+            try {
+                val query = listOf(cleanTitle, cleanArtist)
+                    .filter { it.isNotBlank() && !it.equals("Unknown Artist", ignoreCase = true) }
+                    .joinToString(" ")
+                val result = YouTubeMusic.search(query, SearchFilter.SONGS)
+                if (requestId != detailLoadGeneration) return@launch
+
+                val candidates = result.getOrNull()?.items
+                    ?.filterIsInstance<SearchItem.Song>()
+                    ?.map { it.song }
+                    .orEmpty()
+                val exactMatch = candidates.firstOrNull { candidate ->
+                    candidate.title.trim().equals(cleanTitle, ignoreCase = true) &&
+                        (cleanArtist.isBlank() ||
+                            candidate.artist.contains(cleanArtist, ignoreCase = true) ||
+                            cleanArtist.contains(candidate.artist, ignoreCase = true))
+                } ?: candidates.firstOrNull {
+                    it.title.trim().equals(cleanTitle, ignoreCase = true)
+                } ?: candidates.firstOrNull()
+
+                artistResolveJob = null
+                when {
+                    exactMatch == null -> _uiState.update {
+                        it.copy(
+                            isLoadingDetail = false,
+                            error = result.exceptionOrNull()?.message
+                                ?: "Could not find the album for \"$cleanTitle\""
+                        )
+                    }
+                    !exactMatch.albumId.isNullOrBlank() -> loadAlbum(exactMatch.albumId)
+                    !exactMatch.albumName.isNullOrBlank() ->
+                        loadAlbumByName(exactMatch.albumName, exactMatch.artist)
+                    else -> _uiState.update {
+                        it.copy(isLoadingDetail = false, error = "Album information is unavailable for this song")
+                    }
+                }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                if (requestId == detailLoadGeneration) {
+                    artistResolveJob = null
+                    _uiState.update {
+                        it.copy(
+                            isLoadingDetail = false,
+                            error = error.message ?: "Could not resolve this song's album"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     fun loadArtistByName(name: String, fallbackThumbnailUrl: String? = null) {
         val cleanName = name.trim()
         if (cleanName.isBlank() || cleanName.equals("Unknown Artist", ignoreCase = true)) return
