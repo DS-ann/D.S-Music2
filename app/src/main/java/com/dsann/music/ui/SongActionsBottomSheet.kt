@@ -187,6 +187,11 @@ class SongActionsBottomSheet : BottomSheetDialogFragment() {
             com.google.android.material.R.id.design_bottom_sheet
         ) ?: return
 
+        // Let the Compose surface provide the only visible sheet edge. Material's
+        // default shape drawable adds a pale outline around the whole dialog.
+        sheetDialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        sheetContainer.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+
         // The queue action sheet should open as a complete action panel, not
         // stop at Material's default peek/half-expanded position.
         sheetContainer.post {
@@ -357,13 +362,14 @@ fun BottomSheetScaffoldContent(
 
                 ExpressiveTabSwitcher(selectedTab, onTabSelected = { selectedTab = it })
             } else {
-                // LANDSCAPE: Side-by-Side Split View
+                // LANDSCAPE: keep identity separate and give the tab selector
+                // the wider content pane. A switcher in the 40% identity pane made
+                // the OPTIONS and INFO labels collide on compact landscape phones.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalAlignment = Alignment.Top
                 ) {
-                    // Left Pane (Fixed identity & Switcher)
                     Column(
                         modifier = Modifier.weight(0.4f),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -377,40 +383,46 @@ fun BottomSheetScaffoldContent(
                             },
                             isLandscape = true
                         )
-                        
-                        Spacer(modifier = Modifier.height(24.dp))
-                        
-                        ExpressiveTabSwitcher(selectedTab, onTabSelected = { selectedTab = it })
                     }
 
-                    // Right Pane (Scrollable content)
-                    Box(
-                        modifier = Modifier
-                            .weight(0.6f)
-                            .heightIn(max = 300.dp)
-                            .verticalScroll(rememberScrollState())
+                    Column(
+                        modifier = Modifier.weight(0.6f),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        AnimatedContent(
-                            targetState = selectedTab,
-                            transitionSpec = {
-                                val direction = if (targetState == BottomSheetTab.INFO) 1 else -1
-                                (slideInHorizontally { direction * it } + fadeIn()) togetherWith
-                                (slideOutHorizontally { -direction * it } + fadeOut())
-                            },
-                            label = "TabTransition"
-                        ) { tab ->
-                            if (tab == BottomSheetTab.OPTIONS) {
-                                OptionsContent(
-                                song = song,
-                                isFavorite = isFavorite,
-                                onFavoriteChange = { isFavorite = it },
-                                actionListener = actionListener,
-                                onAddToPlaylist = { showAddToPlaylistDialog = true },
-                                showAddToQueue = showAddToQueue,
-                                onDismiss = onDismiss
-                            )
-                            } else {
-                                InfoContent(song)
+                        ExpressiveTabSwitcher(
+                            selectedTab,
+                            onTabSelected = { selectedTab = it },
+                            compact = true
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 300.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            AnimatedContent(
+                                targetState = selectedTab,
+                                transitionSpec = {
+                                    val direction = if (targetState == BottomSheetTab.INFO) 1 else -1
+                                    (slideInHorizontally { direction * it } + fadeIn()) togetherWith
+                                    (slideOutHorizontally { -direction * it } + fadeOut())
+                                },
+                                label = "TabTransition"
+                            ) { tab ->
+                                if (tab == BottomSheetTab.OPTIONS) {
+                                    OptionsContent(
+                                        song = song,
+                                        isFavorite = isFavorite,
+                                        onFavoriteChange = { isFavorite = it },
+                                        actionListener = actionListener,
+                                        onAddToPlaylist = { showAddToPlaylistDialog = true },
+                                        showAddToQueue = showAddToQueue,
+                                        onDismiss = onDismiss
+                                    )
+                                } else {
+                                    InfoContent(song)
+                                }
                             }
                         }
                     }
@@ -720,7 +732,8 @@ fun HeaderSection(
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             DsmusicSurface(
                 shape = DsmusicTheme.shapes.large,
-                color = DsmusicTheme.colorScheme.surfaceVariant
+                color = DsmusicTheme.colorScheme.surfaceVariant,
+                showBorder = false
             ) {
                 if (bitmap != null) {
                     Image(bitmap.asImageBitmap(), null, Modifier.size(84.dp), contentScale = ContentScale.Crop)
@@ -771,7 +784,8 @@ fun HeaderSection(
                 DsmusicSurface(
                     shape = RoundedCornerShape(16.dp),
                     color = DsmusicTheme.colorScheme.surfaceVariant,
-                    tonalElevation = 2.dp
+                    tonalElevation = 2.dp,
+                    showBorder = false
                 ) {
                     if (bitmap != null) {
                         Image(bitmap.asImageBitmap(), null, Modifier.size(112.dp), contentScale = ContentScale.Crop)
@@ -1009,7 +1023,8 @@ fun ActionButtonRow2(
 fun ExpressiveTabSwitcher(
     selectedTab: BottomSheetTab,
     onTabSelected: (BottomSheetTab) -> Unit,
-    modifier: Modifier = Modifier.fillMaxWidth()
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    compact: Boolean = false
 ) {
     BoxWithConstraints(
         modifier = modifier
@@ -1047,18 +1062,18 @@ fun ExpressiveTabSwitcher(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(if (compact) 3.dp else 6.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Menu,
                         contentDescription = null,
                         tint = if (selectedTab == BottomSheetTab.OPTIONS) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(if (compact) 14.dp else 18.dp)
                     )
                     Text(
                         text = "OPTIONS",
                         color = if (selectedTab == BottomSheetTab.OPTIONS) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp,
+                        fontSize = if (compact) 10.sp else 12.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = GoogleSansFlex,
                         maxLines = 1,
@@ -1077,18 +1092,18 @@ fun ExpressiveTabSwitcher(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(if (compact) 3.dp else 6.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Info,
                         contentDescription = null,
                         tint = if (selectedTab == BottomSheetTab.INFO) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(if (compact) 14.dp else 18.dp)
                     )
                     Text(
                         text = "INFO",
                         color = if (selectedTab == BottomSheetTab.INFO) DsmusicTheme.colorScheme.onPrimary else DsmusicTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp,
+                        fontSize = if (compact) 10.sp else 12.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = GoogleSansFlex,
                         maxLines = 1,
