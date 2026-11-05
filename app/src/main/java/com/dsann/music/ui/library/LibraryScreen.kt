@@ -905,7 +905,7 @@ fun LibraryScreen(
                                         ) {
                                             LibraryGradientPlaylistHero(
                                                 title = "Downloads",
-                                                subtitle = "\${sourceSongs.size} songs · D.S Music",
+                                                subtitle = sourceSongs.size.toString() + " songs · D.S Music",
                                                 status = "Saved on this device",
                                                 artwork = filteredSongs.firstOrNull()?.let {
                                                     it.getAlbumArtUri() ?: R.drawable.ic_music_note
@@ -968,7 +968,7 @@ fun LibraryScreen(
                                         ) {
                                             itemsIndexed(
                                                 landscapeDownloadSongs,
-                                                key = { _, song -> "landscape-downloaded:\${song.id}" }
+                                                key = { _, song -> "landscape-downloaded:" + song.id }
                                             ) { index, item ->
                                                 val isPlaying = currentSong?.id == item.id
                                                 val isFav = favoriteIds.contains(item.id)
@@ -2566,7 +2566,7 @@ private fun LocalPlaylistDetailsScreen(
                         }
                         LibraryGradientPlaylistHero(
                             title = playlist.title,
-                            subtitle = "\${songs.size} songs · On this device",
+                            subtitle = songs.size.toString() + " songs · On this device",
                             status = "Saved in D.S Music",
                             artwork = artworkUrl,
                             modifier = Modifier.fillMaxWidth()
@@ -2668,7 +2668,7 @@ private fun LocalPlaylistDetailsScreen(
                         item(key = "playlist-details-header") {
                             LibraryGradientPlaylistHero(
                                 title = playlist.title,
-                                subtitle = "\${songs.size} songs · On this device",
+                                subtitle = songs.size.toString() + " songs · On this device",
                                 status = "Saved in D.S Music",
                                 artwork = artworkUrl,
                                 modifier = Modifier
@@ -4180,7 +4180,7 @@ private fun CachedSongListItem(
         },
         supportingContent = {
             Text(
-                if (isCurrentSong) "\${item.artist} · Now playing" else item.artist,
+                if (isCurrentSong) item.artist + " · Now playing" else item.artist,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = DsmusicTheme.colorScheme.onSurfaceVariant
@@ -4357,7 +4357,7 @@ private fun StreamCacheTabContent(
         selectedCacheSongIds = emptySet()
         isSelectingCache = false
         com.dsann.music.ui.SnackbarController.showMessage(
-            "Added \${selectedCacheQueue.size} cached songs to play next"
+            "Added " + selectedCacheQueue.size + " cached songs to play next"
         )
     }
 
@@ -4368,7 +4368,7 @@ private fun StreamCacheTabContent(
         selectedCacheSongIds = emptySet()
         isSelectingCache = false
         com.dsann.music.ui.SnackbarController.showMessage(
-            "Added \${selectedCacheQueue.size} cached songs to queue"
+            "Added " + selectedCacheQueue.size + " cached songs to queue"
         )
     }
 
@@ -4474,7 +4474,7 @@ private fun StreamCacheTabContent(
             ) {
                 LibraryGradientPlaylistHero(
                     title = "Cache",
-                    subtitle = "\${cacheEntries.size} songs · Offline media",
+                    subtitle = cacheEntries.size.toString() + " songs · Offline media",
                     status = "Available offline",
                     artwork = cacheEntries.firstOrNull()?.let {
                         AudioPlaybackService.getCachedMediaArtworkFile(context, it.songId)
@@ -4558,7 +4558,7 @@ private fun StreamCacheTabContent(
             item(key = "cache-playlist-header") {
                 LibraryGradientPlaylistHero(
                     title = "Cache",
-                    subtitle = "\${cacheEntries.size} songs · D.S Music",
+                    subtitle = cacheEntries.size.toString() + " songs · D.S Music",
                     status = "Available offline",
                     artwork = cacheEntries.firstOrNull()?.let {
                         AudioPlaybackService.getCachedMediaArtworkFile(context, it.songId)
