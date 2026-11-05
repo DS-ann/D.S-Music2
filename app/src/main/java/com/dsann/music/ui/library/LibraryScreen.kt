@@ -64,6 +64,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import com.dsann.music.ui.theme.DropdownMenu
@@ -900,7 +901,9 @@ fun LibraryScreen(
                                             .fillMaxSize()
                                             .weight(1f),
                                         contentPadding = PaddingValues(
-                                            horizontal = if (isLandscapeLibraryLayout) 12.dp else 0.dp,
+                                            start = if (isLandscapeLibraryLayout) 12.dp else 0.dp,
+                                            top = 0.dp,
+                                            end = if (isLandscapeLibraryLayout) 12.dp else 0.dp,
                                             bottom = 160.dp
                                         ),
                                         horizontalArrangement = Arrangement.spacedBy(
@@ -1718,6 +1721,83 @@ private fun libraryCardGradient(title: String): List<Color> {
     return palettes[Math.floorMod(title.hashCode(), palettes.size)]
 }
 
+
+@Composable
+private fun LibraryGradientPlaylistHero(
+    title: String,
+    subtitle: String,
+    status: String,
+    artwork: Any?,
+    modifier: Modifier = Modifier,
+    actions: @Composable () -> Unit
+) {
+    val context = LocalContext.current
+    val palette = remember(title) { libraryCardGradient(title) }
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(188.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Brush.linearGradient(palette))
+        ) {
+            if (artwork != null) {
+                AsyncImage(
+                    model = libraryArtworkRequestBuilder(context, artwork).crossfade(false).build(),
+                    contentDescription = "$title artwork",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.PlaylistPlay,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.92f),
+                        modifier = Modifier.size(68.dp)
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.08f),
+                                palette[0].copy(alpha = 0.18f),
+                                palette[1].copy(alpha = 0.46f),
+                                DsmusicTheme.colorScheme.background.copy(alpha = 0.78f)
+                            )
+                        )
+                    )
+            )
+        }
+        Text(
+            title,
+            style = DsmusicTheme.typography.titleLarge,
+            fontWeight = FontWeight.ExtraBold,
+            color = DsmusicTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            subtitle,
+            style = DsmusicTheme.typography.bodyMedium,
+            color = DsmusicTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            status,
+            style = DsmusicTheme.typography.labelMedium,
+            color = DsmusicTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold
+        )
+        actions()
+    }
+}
+
 @Composable
 private fun DsmusicLibraryListTile(
     title: String,
@@ -2132,6 +2212,138 @@ private fun PlaylistsTabContent(
     }
 }
 
+
+@Composable
+private fun LocalPlaylistSongsList(
+    playlist: PlaylistEntity,
+    songs: List<SongItem>,
+    viewModel: PlayerSharedViewModel,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(top = 14.dp, bottom = 40.dp)
+    ) {
+        item(key = "playlist-songs-heading") {
+            Text(
+                "Songs",
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                style = DsmusicTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = DsmusicTheme.colorScheme.onSurface
+            )
+        }
+        if (songs.isEmpty()) {
+            item(key = "playlist-empty") {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(180.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("This playlist is empty", color = DsmusicTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        } else {
+            items(songs, key = { it.id }) { song ->
+                LocalPlaylistSongRow(
+                    playlist = playlist,
+                    songs = songs,
+                    song = song,
+                    viewModel = viewModel,
+                    onDismiss = onDismiss
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocalPlaylistSongRow(
+    playlist: PlaylistEntity,
+    songs: List<SongItem>,
+    song: SongItem,
+    viewModel: PlayerSharedViewModel,
+    onDismiss: () -> Unit
+) {
+    DsmusicSurface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(14.dp)),
+        shape = RoundedCornerShape(14.dp),
+        color = DsmusicTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    viewModel.setSongList(songs)
+                    viewModel.playSong(song)
+                    onDismiss()
+                }
+                .padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(DsmusicTheme.colorScheme.surfaceContainerHigh),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!song.thumbnailUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = libraryArtworkRequestBuilder(
+                            LocalContext.current,
+                            song.thumbnailUrl
+                        ).crossfade(false).build(),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        Icons.Rounded.MusicNote,
+                        null,
+                        tint = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    song.title,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = DsmusicTheme.colorScheme.onSurface
+                )
+                Text(
+                    song.artist,
+                    style = DsmusicTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            DsmusicIconButton(
+                onClick = {
+                    viewModel.removeSongFromLocalPlaylist(
+                        playlist.id,
+                        song.videoId ?: song.id.toString()
+                    )
+                }
+            ) {
+                Icon(
+                    Icons.Rounded.Close,
+                    contentDescription = "Remove song",
+                    tint = DsmusicTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun LocalPlaylistDetailsScreen(
     playlist: PlaylistEntity,
@@ -2143,6 +2355,8 @@ private fun LocalPlaylistDetailsScreen(
     val songs = remember(songsEntity) { songsEntity.map { it.toSongItem() } }
     val artworkUrl = playlist.thumbnailUrl?.takeIf { it.isNotBlank() }
         ?: songs.firstOrNull { !it.thumbnailUrl.isNullOrBlank() }?.thumbnailUrl
+    val isLandscapeLayout =
+        LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     var artworkColor by remember(playlist.id) { mutableStateOf(Color(0xFF26364C)) }
     LaunchedEffect(playlist.id, artworkUrl) {
@@ -2184,7 +2398,7 @@ private fun LocalPlaylistDetailsScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(440.dp)
+                    .height(if (isLandscapeLayout) 520.dp else 440.dp)
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
@@ -2195,225 +2409,215 @@ private fun LocalPlaylistDetailsScreen(
                         )
                     )
             )
-            Column(modifier = Modifier.fillMaxSize()) {
-                // Only the playlist name stays pinned. Artwork, controls and songs scroll below it.
+            if (isLandscapeLayout) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxSize(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    DsmusicIconButton(onClick = onDismiss) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Back to Library",
-                            tint = DsmusicTheme.colorScheme.onSurface
-                        )
-                    }
-                    Text(
-                        playlist.title,
-                        modifier = Modifier.weight(1f),
-                        style = DsmusicTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = DsmusicTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    DsmusicIconButton(
-                        onClick = {
-                            viewModel.deleteLocalPlaylist(playlist.id)
-                            onDismiss()
-                        }
+                    Column(
+                        modifier = Modifier
+                            .weight(0.42f)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState())
+                            .padding(start = 16.dp, top = 10.dp, end = 14.dp, bottom = 18.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(
-                            Icons.Rounded.Delete,
-                            contentDescription = "Delete playlist",
-                            tint = DsmusicTheme.colorScheme.error
-                        )
-                    }
-                }
-
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentPadding = PaddingValues(bottom = 40.dp)
-                ) {
-                    item(key = "playlist-details-header", contentType = "playlist-header") {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(196.dp)
-                                    .clip(RoundedCornerShape(22.dp))
-                                    .background(DsmusicTheme.colorScheme.surfaceContainerHigh),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (!artworkUrl.isNullOrBlank()) {
-                                    AsyncImage(
-                                        model = libraryArtworkRequestBuilder(context, artworkUrl)
-                                            .crossfade(false)
-                                            .build(),
-                                        contentDescription = "Playlist artwork",
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                } else {
-                                    Icon(
-                                        Icons.AutoMirrored.Rounded.PlaylistPlay,
-                                        contentDescription = null,
-                                        tint = DsmusicTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(72.dp)
-                                    )
-                                }
+                            DsmusicIconButton(onClick = onDismiss) {
+                                Icon(
+                                    Icons.AutoMirrored.Rounded.ArrowBack,
+                                    contentDescription = "Back to Library"
+                                )
                             }
-                            Spacer(Modifier.height(18.dp))
-                            Text(
-                                "${songs.size} songs • On this device",
-                                style = DsmusicTheme.typography.bodyMedium,
-                                color = DsmusicTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                            if (songs.isNotEmpty()) {
-                                Spacer(Modifier.height(18.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    DsmusicButton(
-                                        onClick = {
+                            Spacer(Modifier.weight(1f))
+                            DsmusicIconButton(
+                                onClick = {
+                                    viewModel.deleteLocalPlaylist(playlist.id)
+                                    onDismiss()
+                                }
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Delete,
+                                    contentDescription = "Delete playlist",
+                                    tint = DsmusicTheme.colorScheme.error
+                                )
+                            }
+                        }
+                        LibraryGradientPlaylistHero(
+                            title = playlist.title,
+                            subtitle = "\${songs.size} songs · On this device",
+                            status = "Saved in D.S Music",
+                            artwork = artworkUrl,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                DsmusicButton(
+                                    onClick = {
+                                        if (songs.isNotEmpty()) {
                                             viewModel.setSongList(songs)
                                             viewModel.playSong(songs.first())
                                             onDismiss()
-                                        },
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Icon(Icons.Rounded.PlayArrow, null)
-                                        Spacer(Modifier.width(8.dp))
-                                        Text("Play All")
-                                    }
-                                    DsmusicOutlinedButton(
-                                        onClick = {
+                                        }
+                                    },
+                                    enabled = songs.isNotEmpty(),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Rounded.PlayArrow, null)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Play All")
+                                }
+                                DsmusicOutlinedButton(
+                                    onClick = {
+                                        if (songs.isNotEmpty()) {
                                             val shuffled = songs.shuffled()
                                             viewModel.setSongList(shuffled)
                                             viewModel.playSong(shuffled.first())
                                             onDismiss()
-                                        },
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Icon(Icons.Rounded.Shuffle, null)
-                                        Spacer(Modifier.width(8.dp))
-                                        Text("Shuffle")
-                                    }
+                                        }
+                                    },
+                                    enabled = songs.isNotEmpty(),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Rounded.Shuffle, null)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Shuffle")
                                 }
                             }
                         }
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "Songs",
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                            style = DsmusicTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = DsmusicTheme.colorScheme.onSurface
-                        )
                     }
-
-                    if (songs.isEmpty()) {
-                        item(key = "playlist-empty", contentType = "empty") {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().height(180.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "This playlist is empty",
-                                    color = DsmusicTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(1.dp)
+                            .background(DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    )
+                    LocalPlaylistSongsList(
+                        playlist = playlist,
+                        songs = songs,
+                        viewModel = viewModel,
+                        onDismiss = onDismiss,
+                        modifier = Modifier.weight(0.58f).fillMaxHeight()
+                    )
+                }
+            } else {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        DsmusicIconButton(onClick = onDismiss) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = "Back to Library",
+                                tint = DsmusicTheme.colorScheme.onSurface
+                            )
                         }
-                    } else {
-                        items(
-                            items = songs,
-                            key = { it.id },
-                            contentType = { "playlist-song" }
-                        ) { song ->
-                            DsmusicSurface(
+                        Text(
+                            playlist.title,
+                            modifier = Modifier.weight(1f),
+                            style = DsmusicTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = DsmusicTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        DsmusicIconButton(
+                            onClick = {
+                                viewModel.deleteLocalPlaylist(playlist.id)
+                                onDismiss()
+                            }
+                        ) {
+                            Icon(
+                                Icons.Rounded.Delete,
+                                contentDescription = "Delete playlist",
+                                tint = DsmusicTheme.colorScheme.error
+                            )
+                        }
+                    }
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 40.dp)
+                    ) {
+                        item(key = "playlist-details-header") {
+                            LibraryGradientPlaylistHero(
+                                title = playlist.title,
+                                subtitle = "\${songs.size} songs · On this device",
+                                status = "Saved in D.S Music",
+                                artwork = artworkUrl,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 4.dp)
-                                    .clip(RoundedCornerShape(14.dp)),
-                                shape = RoundedCornerShape(14.dp),
-                                color = DsmusicTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f)
+                                    .padding(horizontal = 24.dp, vertical = 12.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            viewModel.setSongList(songs)
-                                            viewModel.playSong(song)
-                                            onDismiss()
-                                        }
-                                        .padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(50.dp)
-                                            .clip(RoundedCornerShape(9.dp))
-                                            .background(DsmusicTheme.colorScheme.surfaceContainerHigh),
-                                        contentAlignment = Alignment.Center
+                                if (songs.isNotEmpty()) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
-                                        if (!song.thumbnailUrl.isNullOrBlank()) {
-                                            AsyncImage(
-                                                model = libraryArtworkRequestBuilder(LocalContext.current, song.thumbnailUrl).crossfade(false).build(),
-                                                contentDescription = null,
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        } else {
-                                            Icon(
-                                                Icons.Rounded.MusicNote,
-                                                null,
-                                                tint = DsmusicTheme.colorScheme.onSurfaceVariant
-                                            )
+                                        DsmusicButton(
+                                            onClick = {
+                                                viewModel.setSongList(songs)
+                                                viewModel.playSong(songs.first())
+                                                onDismiss()
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(Icons.Rounded.PlayArrow, null)
+                                            Spacer(Modifier.width(8.dp))
+                                            Text("Play All")
                                         }
-                                    }
-                                    Spacer(Modifier.width(12.dp))
-                                    Column(Modifier.weight(1f)) {
-                                        Text(
-                                            song.title,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            color = DsmusicTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            song.artist,
-                                            style = DsmusicTheme.typography.bodySmall,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            color = DsmusicTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    DsmusicIconButton(
-                                        onClick = {
-                                            viewModel.removeSongFromLocalPlaylist(
-                                                playlist.id,
-                                                song.videoId ?: song.id.toString()
-                                            )
+                                        DsmusicOutlinedButton(
+                                            onClick = {
+                                                val shuffled = songs.shuffled()
+                                                viewModel.setSongList(shuffled)
+                                                viewModel.playSong(shuffled.first())
+                                                onDismiss()
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(Icons.Rounded.Shuffle, null)
+                                            Spacer(Modifier.width(8.dp))
+                                            Text("Shuffle")
                                         }
-                                    ) {
-                                        Icon(
-                                            Icons.Rounded.Close,
-                                            contentDescription = "Remove song",
-                                            tint = DsmusicTheme.colorScheme.onSurfaceVariant
-                                        )
                                     }
                                 }
+                            }
+                        }
+                        item(key = "playlist-songs-heading") {
+                            Text(
+                                "Songs",
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                                style = DsmusicTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = DsmusicTheme.colorScheme.onSurface
+                            )
+                        }
+                        if (songs.isEmpty()) {
+                            item(key = "playlist-empty") {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().height(180.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("This playlist is empty", color = DsmusicTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        } else {
+                            items(songs, key = { it.id }) { song ->
+                                LocalPlaylistSongRow(
+                                    playlist = playlist,
+                                    songs = songs,
+                                    song = song,
+                                    viewModel = viewModel,
+                                    onDismiss = onDismiss
+                                )
                             }
                         }
                     }
@@ -3888,8 +4092,10 @@ private fun StreamCacheTabContent(
         },
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
-            horizontal = if (isLandscapeLibraryLayout) 12.dp else 16.dp,
-            vertical = 16.dp
+            start = if (isLandscapeLibraryLayout) 12.dp else 16.dp,
+            top = 16.dp,
+            end = if (isLandscapeLibraryLayout) 12.dp else 16.dp,
+            bottom = 16.dp
         ),
         horizontalArrangement = Arrangement.spacedBy(
             if (isLandscapeLibraryLayout) 12.dp else 0.dp
