@@ -615,7 +615,12 @@ fun OptionsContent(
     isConvertingToMp3: Boolean = false,
     onConvertToMp3: () -> Unit = {},
     downloadedSongMode: Boolean = false,
-    onDeleteDownloaded: () -> Unit = {}
+    onDeleteDownloaded: () -> Unit = {},
+    showLikeAndShare: Boolean = true,
+    showAddToPlaylist: Boolean = true,
+    localSongMode: Boolean = false,
+    showInfoAction: Boolean = false,
+    onShowInfoAction: () -> Unit = {}
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -626,16 +631,42 @@ fun OptionsContent(
             ),
             color = DsmusicTheme.colorScheme.onSurfaceVariant
         )
-        ActionButtonRow1(song, isFavorite, onFavoriteChange, actionListener, onDismiss)
+        ActionButtonRow1(
+            song,
+            isFavorite,
+            onFavoriteChange,
+            actionListener,
+            onDismiss,
+            showLikeAndShare = showLikeAndShare
+        )
         ActionButtonRow2(
             song,
             actionListener,
             onDismiss,
             showAddToQueue = showAddToQueue,
             downloadedSongMode = downloadedSongMode,
-            onDeleteDownloaded = onDeleteDownloaded
+            onDeleteDownloaded = onDeleteDownloaded,
+            localSongMode = localSongMode
         )
-        DestructiveActionRow(song, actionListener, onAddToPlaylist, onDismiss, showDelete = showDelete)
+        if (showAddToPlaylist) {
+            DestructiveActionRow(song, actionListener, onAddToPlaylist, onDismiss, showDelete = showDelete)
+        }
+        if (showInfoAction) {
+            SongActionWideTile(
+                modifier = Modifier.fillMaxWidth(),
+                label = "Info",
+                containerColor = DsmusicTheme.colorScheme.surfaceVariant,
+                contentColor = DsmusicTheme.colorScheme.onSurface,
+                onClick = onShowInfoAction
+            ) {
+                Icon(
+                    Icons.Rounded.Info,
+                    contentDescription = null,
+                    tint = DsmusicTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(21.dp)
+                )
+            }
+        }
         if (showRemoveFromQueue) {
             SongActionWideTile(
                 modifier = Modifier.fillMaxWidth(),
@@ -1214,7 +1245,8 @@ fun ActionButtonRow1(
     isFavorite: Boolean,
     onFavoriteChange: (Boolean) -> Unit,
     actionListener: SongActionsBottomSheet.ActionListener?,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    showLikeAndShare: Boolean = true
 ) {
     var favorite by remember(song?.id, isFavorite) { mutableStateOf(isFavorite) }
 
@@ -1223,7 +1255,7 @@ fun ActionButtonRow1(
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         SongActionTile(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(if (showLikeAndShare) 1f else 3f),
             label = "Play",
             containerColor = DsmusicTheme.colorScheme.primaryContainer,
             contentColor = DsmusicTheme.colorScheme.onPrimaryContainer,
@@ -1239,7 +1271,7 @@ fun ActionButtonRow1(
                 modifier = Modifier.size(24.dp)
             )
         }
-        SongActionTile(
+        if (showLikeAndShare) SongActionTile(
             modifier = Modifier.weight(1f),
             label = if (favorite) "Liked" else "Like",
             containerColor = DsmusicTheme.colorScheme.secondaryContainer,
@@ -1257,7 +1289,7 @@ fun ActionButtonRow1(
                 modifier = Modifier.size(23.dp)
             )
         }
-        SongActionTile(
+        if (showLikeAndShare) SongActionTile(
             modifier = Modifier.weight(1f),
             label = "Share",
             containerColor = DsmusicTheme.colorScheme.tertiaryContainer,
@@ -1281,11 +1313,12 @@ fun ActionButtonRow2(
     onDismiss: () -> Unit,
     showAddToQueue: Boolean = true,
     downloadedSongMode: Boolean = false,
-    onDeleteDownloaded: () -> Unit = {}
+    onDeleteDownloaded: () -> Unit = {},
+    localSongMode: Boolean = false
 ) {
     val context = LocalContext.current
     val videoId = song?.videoId
-    val isOnline = !videoId.isNullOrBlank()
+    val isOnline = !localSongMode && !videoId.isNullOrBlank()
     val activeDownloadIds by com.dsann.music.util.SongDownloader.activeDownloadIds.collectAsStateWithLifecycle()
     val downloadedVideoIds by com.dsann.music.util.SongDownloader.downloadedVideoIds.collectAsStateWithLifecycle()
     val convertingKeys by com.dsann.music.util.OpusToMp3Converter.convertingKeys
@@ -1338,7 +1371,7 @@ fun ActionButtonRow2(
                 modifier = Modifier.size(23.dp)
             )
         }
-        SongActionTile(
+        if (!localSongMode) SongActionTile(
             modifier = Modifier.weight(1f),
             label = when {
                 downloadedSongMode -> "Delete"
