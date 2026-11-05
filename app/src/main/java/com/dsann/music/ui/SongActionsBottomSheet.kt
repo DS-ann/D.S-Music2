@@ -1323,8 +1323,10 @@ fun ActionButtonRow2(
     val downloadedVideoIds by com.dsann.music.util.SongDownloader.downloadedVideoIds.collectAsStateWithLifecycle()
     val convertingKeys by com.dsann.music.util.OpusToMp3Converter.convertingKeys
         .collectAsStateWithLifecycle(emptySet())
-    LaunchedEffect(videoId, song?.title, song?.artist) {
-        song?.let { com.dsann.music.util.SongDownloader.refreshDownloadedStatus(context, it) }
+    LaunchedEffect(localSongMode, videoId, song?.title, song?.artist) {
+        if (!localSongMode) {
+            song?.let { com.dsann.music.util.SongDownloader.refreshDownloadedStatus(context, it) }
+        }
     }
     val isDownloading = videoId?.let { it in activeDownloadIds } == true
     val isDownloaded = videoId?.let { it in downloadedVideoIds } == true
