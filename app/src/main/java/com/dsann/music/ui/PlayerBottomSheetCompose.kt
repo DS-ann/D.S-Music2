@@ -1625,7 +1625,23 @@ fun PlayerBottomSheetCompose(
                 // Keep the areas outside the mini-player capsule transparent while the capsule
                 // itself retains its solid surface. Fade the full-player background on its own draw layer.
                 // invalidate this entire composition tree.
-                if (!isLandscapeWindow || showLandscapePlayerBackdrop) {
+                if (isLandscapeWindow) {
+                    // Paint the backdrop with color alpha directly instead of a full-window
+                    // alpha layer. At the collapsed endpoint this leaves both side gutters
+                    // completely untouched, while still fading the backdrop in on expansion.
+                    if (showLandscapePlayerBackdrop) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    dynamicBgColor.copy(
+                                        alpha = playerContentExpansionFraction.value.coerceIn(0f, 1f)
+                                    )
+                                )
+                        )
+                    }
+                } else {
+                    // Preserve the existing portrait transition exactly.
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
