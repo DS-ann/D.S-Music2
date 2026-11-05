@@ -25,8 +25,8 @@ import java.util.concurrent.TimeUnit
 /**
  * Downloads YouTube audio without leaving a single long, open-ended googlevideo GET running.
  *
- * Some googlevideo stream responses are throttled close to real-time playback speed. Prism
- * avoids that by translating large reads into 1 MiB ranged POST requests and prefetching the
+ * Some googlevideo stream responses are throttled close to real-time playback speed. The
+ * range-prefetch approach translates large reads into 1 MiB ranged POST requests and prefetches the
  * next range while the current response is consumed. The original stream is downloaded
  * byte-for-byte; this does not change the selected format or bitrate.
  */
