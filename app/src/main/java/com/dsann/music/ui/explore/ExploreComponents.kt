@@ -2087,45 +2087,51 @@ fun OnlineSongBottomSheet(
                 emptyList()
             }
 
-            val baseMenuItems = listOf(
-                ExploreTrackMenuItem(
-                    title = "Start mix",
-                    subtitle = "Radio based on this track",
-                    icon = Icons.Rounded.Radio
-                ) {
-                    exploreViewModel.startRadio(song)
-                    com.dsann.music.ui.SnackbarController.showMessage("Starting mix based on ${song.title}")
-                    onDismissRequest()
-                }
-            ) + albumMenuItems + artistMenuItems + listOf(
-                ExploreTrackMenuItem(
-                    title = "View song credits",
-                    subtitle = "Writers and contributors",
-                    icon = Icons.Rounded.Groups
-                ) {
-                    onViewCreditsClick(song)
-                    onDismissRequest()
-                },
-                ExploreTrackMenuItem(
-                    title = if (isPinned) "Unpin from Speed dial" else "Pin to Speed dial",
-                    subtitle = if (isPinned) "Remove from quick access" else "Keep this track close",
-                    icon = Icons.Rounded.PushPin
-                ) {
-                    exploreViewModel.pinToSpeedDial(song)
-                    val msg = if (isPinned) "Song removed from Speed Dial!" else "Song pinned to Speed Dial!"
-                    com.dsann.music.ui.SnackbarController.showMessage(msg)
-                    onDismissRequest()
-                },
-                ExploreTrackMenuItem(
-                    title = "Not interested",
-                    subtitle = "See fewer similar tracks",
-                    icon = Icons.Rounded.Block
-                ) {
-                    exploreViewModel.setNotInterested(song)
-                    com.dsann.music.ui.SnackbarController.showMessage("We will suggest fewer songs like this")
-                    onDismissRequest()
-                }
-            )
+            val hasOnlineTrack = downloadedSong == null || !downloadedSong.videoId.isNullOrBlank()
+            val onlineOnlyItems = if (hasOnlineTrack) {
+                listOf(
+                    ExploreTrackMenuItem(
+                        title = "Start mix",
+                        subtitle = "Radio based on this track",
+                        icon = Icons.Rounded.Radio
+                    ) {
+                        exploreViewModel.startRadio(song)
+                        com.dsann.music.ui.SnackbarController.showMessage("Starting mix based on ${song.title}")
+                        onDismissRequest()
+                    }
+                ) + listOf(
+                    ExploreTrackMenuItem(
+                        title = "View song credits",
+                        subtitle = "Writers and contributors",
+                        icon = Icons.Rounded.Groups
+                    ) {
+                        onViewCreditsClick(song)
+                        onDismissRequest()
+                    },
+                    ExploreTrackMenuItem(
+                        title = if (isPinned) "Unpin from Speed dial" else "Pin to Speed dial",
+                        subtitle = if (isPinned) "Remove from quick access" else "Keep this track close",
+                        icon = Icons.Rounded.PushPin
+                    ) {
+                        exploreViewModel.pinToSpeedDial(song)
+                        val msg = if (isPinned) "Song removed from Speed Dial!" else "Song pinned to Speed Dial!"
+                        com.dsann.music.ui.SnackbarController.showMessage(msg)
+                        onDismissRequest()
+                    },
+                    ExploreTrackMenuItem(
+                        title = "Not interested",
+                        subtitle = "See fewer similar tracks",
+                        icon = Icons.Rounded.Block
+                    ) {
+                        exploreViewModel.setNotInterested(song)
+                        com.dsann.music.ui.SnackbarController.showMessage("We will suggest fewer songs like this")
+                        onDismissRequest()
+                    }
+                )
+            } else {
+                emptyList()
+            }
+            val baseMenuItems = onlineOnlyItems + albumMenuItems + artistMenuItems
             val trackMenuItems = if (downloadedSong != null) {
                 baseMenuItems + ExploreTrackMenuItem(
                     title = "Info",

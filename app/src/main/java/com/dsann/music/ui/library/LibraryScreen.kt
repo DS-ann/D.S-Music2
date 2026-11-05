@@ -1423,7 +1423,7 @@ itemsIndexed(
                         songToAddPlaylist = selectedSong
                         showAddToPlaylistDialog = true
                     },
-                    onViewCreditsClick = {},
+                    onViewCreditsClick = { creditSong -> showCreditsForSong = creditSong },
                     onNavigateToExplore = { onNavigateToExplore() }
                 )
             } else {
