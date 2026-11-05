@@ -70,6 +70,37 @@ class AdvancedLyricsParserTest {
     }
 
     @Test
+    fun missingSemanticWordEndsUseTheNextWordOrLineBoundary() {
+        assertEquals(
+            350L,
+            LrcParser.inferKaraokeWordDurationMs(
+                wordStartMs = 1000L,
+                explicitEndMs = null,
+                nextWordStartMs = 1350L,
+                nextLineStartMs = 2400L
+            )
+        )
+        assertEquals(
+            900L,
+            LrcParser.inferKaraokeWordDurationMs(
+                wordStartMs = 1500L,
+                explicitEndMs = null,
+                nextWordStartMs = null,
+                nextLineStartMs = 2400L
+            )
+        )
+        assertEquals(
+            500L,
+            LrcParser.inferKaraokeWordDurationMs(
+                wordStartMs = 1000L,
+                explicitEndMs = 1500L,
+                nextWordStartMs = 1800L,
+                nextLineStartMs = 2500L
+            )
+        )
+    }
+
+    @Test
     fun differentUnicodeTitlesGetDifferentCacheKeys() {
         val first = TrackMetadata(cleanedTitle = "गीत", cleanedArtist = "कलाकार", durationMs = 123000L)
         val second = TrackMetadata(cleanedTitle = "रात", cleanedArtist = "कलाकार", durationMs = 123000L)

@@ -39,9 +39,10 @@ class LyricsCacheManager(context: Context) {
      */
     fun get(track: TrackMetadata): LyricsResult? {
         val key = track.getCacheKey()
-        memoryCache.get(key)?.let {
+        memoryCache.get(key)?.let { cached ->
             Log.d(TAG, "Memory cache hit")
-            return it
+            if (normalizeCachedWordTiming(cached)) persistNormalizedCacheEntry(key, cached)
+            return cached
         }
         val legacyKey = track.getLegacyCacheKey()?.takeIf { it != key }
         for (candidateKey in listOfNotNull(key, legacyKey)) {
@@ -49,18 +50,11 @@ class LyricsCacheManager(context: Context) {
             try {
                 val result = gson.fromJson(json, LyricsResult::class.java)
                 if (result != null && result.hasLyrics()) {
-                    val timed = result.syncedLyrics
-                    if (!timed.isNullOrBlank() && LyricsResult.looksSynchronized(timed)) {
-                        result.isSynced = true
-                        if (!result.isWordByWord) {
-                            result.isWordByWord = LrcParser.parse(timed).any {
-                                it.isWordByWord && it.words.isNotEmpty()
-                            }
-                        }
-                    }
+                    val timingFlagsChanged = normalizeCachedWordTiming(result)
                     memoryCache.put(key, result)
-                    if (candidateKey != key) {
-                        prefs.edit { putString(key, json); remove(candidateKey) }
+                    if (candidateKey != key || timingFlagsChanged) {
+                        persistNormalizedCacheEntry(key, result)
+                        if (candidateKey != key) prefs.edit { remove(candidateKey) }
                     }
                     return result
                 }
@@ -71,6 +65,32 @@ class LyricsCacheManager(context: Context) {
             }
         }
         return null
+    }
+
+    /**
+     * Reparse every cached synchronized payload with the current parsers. Earlier
+     * builds marked every TTML span as karaoke even when it had no word timestamps;
+     * trusting that persisted Boolean would keep the bad timing after the parser fix.
+     */
+    private fun normalizeCachedWordTiming(result: LyricsResult): Boolean {
+        val timed = result.syncedLyrics?.takeIf { it.isNotBlank() } ?: return false
+        if (!LyricsResult.looksSynchronized(timed)) return false
+
+        val parsedLines = LrcParser.parse(timed)
+        val normalizedSynced = result.isSynced || parsedLines.isNotEmpty()
+        val normalizedWordByWord = parsedLines.any { it.isWordByWord && it.words.isNotEmpty() }
+        val changed = result.isSynced != normalizedSynced || result.isWordByWord != normalizedWordByWord
+        result.isSynced = normalizedSynced
+        result.isWordByWord = normalizedWordByWord
+        return changed
+    }
+
+    private fun persistNormalizedCacheEntry(key: String, result: LyricsResult) {
+        runCatching {
+            prefs.edit { putString(key, gson.toJson(result)) }
+        }.onFailure {
+            Log.w(TAG, "Could not persist normalized lyric timing flags: " + it.message)
+        }
     }
 
     fun hasCachedLyrics(track: TrackMetadata): Boolean = get(track)?.hasLyrics() == true

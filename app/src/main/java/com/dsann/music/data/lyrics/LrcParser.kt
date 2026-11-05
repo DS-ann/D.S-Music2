@@ -51,29 +51,40 @@ object LrcParser {
 
         val parsedLines = mutableListOf<LyricLine>()
         if (semanticLyrics is SemanticLyrics.SyncedLyrics) {
-            for (line in semanticLyrics.text) {
-                val words = line.words?.map { word ->
+            val semanticLines = semanticLyrics.text
+            semanticLines.forEachIndexed { lineIndex, line ->
+                val sourceWords = line.words.orEmpty()
+                val nextLineStart = semanticLines.getOrNull(lineIndex + 1)?.start?.toLong()
+                val words = sourceWords.mapIndexed { wordIndex, word ->
                     val wordText = if (word.charRange.first in 0 until line.text.length &&
                         word.charRange.last in 0 until line.text.length &&
-                        word.charRange.first <= word.charRange.last) {
+                        word.charRange.first <= word.charRange.last
+                    ) {
                         line.text.substring(word.charRange)
                     } else {
                         ""
                     }
-                                        val duration = (word.endInclusive?.toLong()?.minus(word.begin.toLong()))?.coerceAtLeast(0L) ?: 0L
+                    val startMs = word.begin.toLong()
+                    val explicitEndMs = word.endInclusive?.toLong()
+                    val nextWordStartMs = sourceWords.getOrNull(wordIndex + 1)?.begin?.toLong()
                     LyricWord(
                         text = wordText,
-                        absoluteStartTimeMs = word.begin.toLong(),
-                        durationMs = duration,
+                        absoluteStartTimeMs = startMs,
+                        durationMs = inferKaraokeWordDurationMs(
+                            wordStartMs = startMs,
+                            explicitEndMs = explicitEndMs,
+                            nextWordStartMs = nextWordStartMs,
+                            nextLineStartMs = nextLineStart
+                        ),
                         charRange = word.charRange
                     )
-                } ?: emptyList()
+                }
 
                 val isRightAligned = line.text.startsWith("[Singer 2", ignoreCase = true) ||
-                        line.text.startsWith("[Artist 2", ignoreCase = true) ||
-                        line.text.startsWith("(Singer 2", ignoreCase = true) ||
-                        line.text.startsWith("(Artist 2", ignoreCase = true) ||
-                        line.text.startsWith("[Duet 2", ignoreCase = true)
+                    line.text.startsWith("[Artist 2", ignoreCase = true) ||
+                    line.text.startsWith("(Singer 2", ignoreCase = true) ||
+                    line.text.startsWith("(Artist 2", ignoreCase = true) ||
+                    line.text.startsWith("[Duet 2", ignoreCase = true)
 
                 parsedLines.add(
                     LyricLine(
@@ -114,6 +125,27 @@ object LrcParser {
 
         // Insert interlude markers for instrumental gaps
         return insertInterludes(normalizedLines)
+    }
+
+    /**
+     * Semantic LRC words occasionally carry only a start timestamp. Use the next
+     * word or next line boundary as the end instead of rendering that word in a
+     * single frame. A short fallback is reserved for a final word with no boundary.
+     */
+    internal fun inferKaraokeWordDurationMs(
+        wordStartMs: Long,
+        explicitEndMs: Long?,
+        nextWordStartMs: Long?,
+        nextLineStartMs: Long?,
+        fallbackDurationMs: Long = 300L
+    ): Long {
+        val explicitDuration = explicitEndMs
+            ?.minus(wordStartMs)
+            ?.takeIf { it > 0L }
+        val inferredEnd = nextWordStartMs?.takeIf { it > wordStartMs }
+            ?: nextLineStartMs?.takeIf { it > wordStartMs }
+        val inferredDuration = inferredEnd?.minus(wordStartMs)
+        return (explicitDuration ?: inferredDuration ?: fallbackDurationMs).coerceAtLeast(50L)
     }
 
     private fun normalizeLineSpacing(line: LyricLine): LyricLine {
