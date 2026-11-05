@@ -301,6 +301,7 @@ internal fun WavySliderWithLabels(
     scrubberThickness: Float = 1.5f,
     scrubberThumbStyle: String = "Auto",
     coverDerivedColor: Color = dynamicAccentColor,
+    backgroundSurfaceColor: Color = Color.Black,
     modifier: Modifier = Modifier
 ) {
     var isScrubbing by remember { mutableStateOf(false) }
@@ -358,11 +359,23 @@ internal fun WavySliderWithLabels(
             .fillMaxWidth()
             .padding(horizontal = 8.dp)
     ) {
-        val activeColor = when (scrubberColor) {
+        val contrastTrackColor = if (
+            androidx.core.graphics.ColorUtils.calculateLuminance(backgroundSurfaceColor.toArgb()) > 0.5
+        ) Color(0xFF1C1B1F) else Color.White
+        val requestedActiveColor = when (scrubberColor) {
             "White" -> Color.White
             "Cover" -> coverDerivedColor
             else -> dynamicAccentColor
         }
+        // Keep user-selected scrubber colours whenever they remain legible. Fall back
+        // to a neutral light/dark colour only when the selected colour blends into the
+        // actual player surface.
+        val activeColor = if (
+            androidx.core.graphics.ColorUtils.calculateContrast(
+                requestedActiveColor.toArgb(),
+                backgroundSurfaceColor.toArgb()
+            ) >= 3.0
+        ) requestedActiveColor else contrastTrackColor
         val thickness = when (scrubberStyle) {
             "Hairline" -> 2.dp
             "Bold" -> 6.dp
@@ -382,8 +395,8 @@ internal fun WavySliderWithLabels(
             },
             enabled = safeDur != null,
             activeTrackColor = activeColor,
-            inactiveTrackColor = contentColor.copy(alpha = if (isDark) 0.08f else 0.06f),
-            thumbColor = contentColor,
+            inactiveTrackColor = contrastTrackColor.copy(alpha = 0.40f),
+            thumbColor = contrastTrackColor,
             isPlaying = isPlaying && isPlayerVisible,
             trackHeight = thickness,
             thumbRadius = when (scrubberThumbStyle) {
