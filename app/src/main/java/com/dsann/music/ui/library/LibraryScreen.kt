@@ -2058,23 +2058,13 @@ private fun PlaylistsTabContent(
                 .fillMaxSize()
                 .background(DsmusicTheme.colorScheme.background)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                DsmusicIconButton(onClick = { showCachePlaylist = false }) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back to playlists")
-                }
-                Text("Cache", style = DsmusicTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            }
             StreamCacheTabContent(
                 context = context,
                 viewModel = viewModel,
                 exploreViewModel = exploreViewModel,
                 lyricsCache = lyricsCache,
                 onSongLongClick = onCachedSongLongClick,
+                onBack = { showCachePlaylist = false },
                 modifier = Modifier.weight(1f).fillMaxWidth()
             )
         }
@@ -4158,6 +4148,7 @@ private fun StreamCacheTabContent(
     exploreViewModel: ExploreViewModel?,
     lyricsCache: LyricsCacheManager,
     onSongLongClick: (CachedSongEntry) -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var cacheEntries by remember { mutableStateOf(emptyList<CachedSongEntry>()) }
@@ -4353,10 +4344,13 @@ private fun StreamCacheTabContent(
 
     Column(modifier = modifier.fillMaxSize()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            DsmusicIconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back to playlists")
+            }
+            Column(modifier = Modifier.weight(1f).padding(start = 4.dp)) {
                 Text(
                     "Cache",
                     style = DsmusicTheme.typography.titleMedium,
