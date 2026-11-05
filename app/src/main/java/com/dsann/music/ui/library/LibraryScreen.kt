@@ -634,6 +634,7 @@ fun LibraryScreen(
                         var downloadSelectionMenuExpanded by remember { mutableStateOf(false) }
                         var downloadOptionsExpanded by remember { mutableStateOf(false) }
                         var isDownloadSearchVisible by rememberSaveable { mutableStateOf(false) }
+                        var downloadSearchQuery by rememberSaveable { mutableStateOf("") }
 
                         val pullToRefreshState = rememberPullToRefreshState()
                         PullToRefreshBox(
@@ -662,10 +663,10 @@ fun LibraryScreen(
                                 val filteredSongs by produceState(
                                     initialValue = emptyList<SongItem>(),
                                     sourceSongs,
-                                    searchQuery
+                                    downloadSearchQuery
                                 ) {
-                                    if (searchQuery.isNotBlank()) delay(120L)
-                                    val query = searchQuery.trim()
+                                    if (downloadSearchQuery.isNotBlank()) delay(120L)
+                                    val query = downloadSearchQuery.trim()
                                     value = withContext(Dispatchers.Default) {
                                         if (query.isEmpty()) sourceSongs else sourceSongs.filter {
                                             it.title.contains(query, ignoreCase = true) ||
@@ -829,7 +830,7 @@ fun LibraryScreen(
                                                 text = { Text(if (isDownloadSearchVisible) "Hide search" else "Search") },
                                                 onClick = {
                                                     isDownloadSearchVisible = !isDownloadSearchVisible
-                                                    if (!isDownloadSearchVisible) searchQuery = ""
+                                                    if (!isDownloadSearchVisible) downloadSearchQuery = ""
                                                     downloadOptionsExpanded = false
                                                 }
                                             )
@@ -876,7 +877,7 @@ fun LibraryScreen(
                                             modifier = Modifier.size(20.dp)
                                         )
                                         Box(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                                            if (searchQuery.isEmpty()) {
+                                            if (downloadSearchQuery.isEmpty()) {
                                                 Text(
                                                     "Search downloads…",
                                                     style = DsmusicTheme.typography.bodyMedium,
@@ -884,8 +885,8 @@ fun LibraryScreen(
                                                 )
                                             }
                                             BasicTextField(
-                                                value = searchQuery,
-                                                onValueChange = { searchQuery = it },
+                                                value = downloadSearchQuery,
+                                                onValueChange = { downloadSearchQuery = it },
                                                 singleLine = true,
                                                 textStyle = DsmusicTheme.typography.bodyMedium.copy(
                                                     color = DsmusicTheme.colorScheme.onSurface
@@ -894,7 +895,7 @@ fun LibraryScreen(
                                             )
                                         }
                                         DsmusicIconButton(onClick = {
-                                            searchQuery = ""
+                                            downloadSearchQuery = ""
                                             isDownloadSearchVisible = false
                                         }) {
                                             Icon(Icons.Rounded.Close, contentDescription = "Close search")
@@ -917,7 +918,7 @@ fun LibraryScreen(
                                     ) {
                                         Text(
                                             when {
-                                                searchQuery.isNotEmpty() -> "No matching songs found"
+                                                downloadSearchQuery.isNotEmpty() -> "No matching songs found"
                                                 activeTab == "Downloaded songs" -> "No downloaded songs yet. Downloaded tracks will appear here."
                                                 else -> "Scan device files to load songs"
                                             },
@@ -4517,7 +4518,7 @@ private fun StreamCacheTabContent(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp).copy(bottom = 160.dp),
+                contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 160.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 itemsIndexed(filteredCacheEntries, key = { _, item -> item.songId }) { index, item ->
