@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -79,19 +80,35 @@ private fun contrastRatio(first: Color, second: Color): Float {
 private fun readableAccent(
     accent: Color,
     background: Color,
-    lighten: Boolean
+    lighten: Boolean,
+    minimumContrast: Float = 4.5f
 ): Color {
-    if (contrastRatio(accent, background) >= 4.5f) return accent
+    if (contrastRatio(accent, background) >= minimumContrast) return accent
     val target = if (lighten) Color.White else Color.Black
     var low = 0f
     var high = 1f
-    repeat(20) {
+    repeat(22) {
         val middle = (low + high) / 2f
         val candidate = mixColor(accent, target, middle)
-        if (contrastRatio(candidate, background) >= 4.5f) high = middle
+        if (contrastRatio(candidate, background) >= minimumContrast) high = middle
         else low = middle
     }
     return mixColor(accent, target, high)
+}
+
+private fun relatedAccent(accent: Color, hueOffset: Float): Color {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(accent.toArgb(), hsv)
+    hsv[0] = (hsv[0] + hueOffset + 360f) % 360f
+    // Keep the secondary and tertiary colours in the same visual family,
+    // while allowing a restrained hue shift even for muted custom accents.
+    hsv[1] = if (hsv[1] >= 0.12f) max(hsv[1], 0.42f).coerceAtMost(0.82f) else 0.18f
+    hsv[2] = hsv[2].coerceIn(0.55f, 0.96f)
+    return Color(android.graphics.Color.HSVToColor(hsv))
+}
+
+private fun accentContainer(baseSurface: Color, accent: Color, darkTheme: Boolean): Color {
+    return mixColor(baseSurface, accent, if (darkTheme) 0.30f else 0.17f)
 }
 
 private fun readableOnColor(background: Color): Color {
@@ -151,34 +168,83 @@ fun DsmusicAppTheme(
         }
     }
 
-    val readablePrimary = remember(darkTheme, amoledEnabled, accent) {
-        val contrastSurface = if (darkTheme) Color(0xFF1B2947) else Color.White
-        readableAccent(accent, contrastSurface, lighten = darkTheme)
+    val surfaceForContrast = if (darkTheme) Color(0xFF0D1126) else Color.White
+    val readablePrimary = remember(darkTheme, accent) {
+        readableAccent(accent, surfaceForContrast, lighten = darkTheme)
     }
     val onReadablePrimary = remember(readablePrimary) { readableOnColor(readablePrimary) }
 
-    val colorScheme = remember(darkTheme, amoledEnabled, readablePrimary, onReadablePrimary) {
+    val colorScheme = remember(darkTheme, amoledEnabled, accent, readablePrimary, onReadablePrimary) {
+        val secondaryCandidate = relatedAccent(accent, 32f)
+        val tertiaryCandidate = relatedAccent(accent, -32f)
+        val surfaceContainerBase = if (darkTheme) {
+            if (amoledEnabled) Color(0xFF080A0F) else Color(0xFF121A31)
+        } else {
+            Color(0xFFE5EBF3)
+        }
+        val secondarySurfaceBase = if (darkTheme) Color(0xFF101827) else Color(0xFFF0F3F8)
+        val neutralOutline = if (darkTheme) Color(0xFF9AAAC2) else Color(0xFF687990)
+        val neutralOutlineVariant = if (darkTheme) Color(0xFF8294AF) else Color(0xFF93A2B6)
+
+        val primaryContainer = accentContainer(surfaceContainerBase, accent, darkTheme)
+        val secondary = readableAccent(
+            secondaryCandidate,
+            surfaceForContrast,
+            lighten = darkTheme
+        )
+        val tertiary = readableAccent(
+            tertiaryCandidate,
+            surfaceForContrast,
+            lighten = darkTheme
+        )
+        val secondaryContainer = accentContainer(secondarySurfaceBase, secondaryCandidate, darkTheme)
+        val tertiaryContainer = accentContainer(secondarySurfaceBase, tertiaryCandidate, darkTheme)
+        val outline = readableAccent(
+            mixColor(relatedAccent(accent, 18f), neutralOutline, 0.42f),
+            surfaceForContrast,
+            lighten = darkTheme,
+            minimumContrast = 3f
+        )
+        val outlineVariant = readableAccent(
+            mixColor(relatedAccent(accent, -18f), neutralOutlineVariant, 0.58f),
+            if (darkTheme) Color(0xFF0B0F20) else Color(0xFFF7F9FC),
+            lighten = darkTheme,
+            minimumContrast = 3f
+        )
+        val surfaceVariant = mixColor(
+            if (darkTheme) Color(0xFF192540) else Color(0xFFE5EBF3),
+            secondaryCandidate,
+            0.09f
+        )
+        val primaryInverse = readableAccent(
+            accent,
+            if (darkTheme) Color(0xFFE9EDF5) else Color(0xFF182131),
+            lighten = !darkTheme
+        )
+
         if (darkTheme) {
             val base = DsmusicColorScheme(
                 primary = readablePrimary,
                 onPrimary = onReadablePrimary,
-                primaryContainer = readablePrimary.copy(alpha = 0.19f),
-                onPrimaryContainer = Color(0xFFE6EDFF),
-                secondary = Color(0xFFB8C6DE),
-                onSecondary = Color(0xFF172131),
-                secondaryContainer = Color(0xFF27364A),
-                onSecondaryContainer = Color(0xFFDCE6F7),
-                tertiary = Color(0xFF8CC9D8),
-                onTertiary = Color(0xFF0B2228),
+                primaryContainer = primaryContainer,
+                onPrimaryContainer = readableOnColor(primaryContainer),
+                secondary = secondary,
+                onSecondary = readableOnColor(secondary),
+                secondaryContainer = secondaryContainer,
+                onSecondaryContainer = readableOnColor(secondaryContainer),
+                tertiary = tertiary,
+                onTertiary = readableOnColor(tertiary),
+                tertiaryContainer = tertiaryContainer,
+                onTertiaryContainer = readableOnColor(tertiaryContainer),
                 background = Color(0xFF080B1B),
                 onBackground = Color(0xFFE9EDF5),
                 surface = Color(0xFF0D1126),
                 onSurface = Color(0xFFE9EDF5),
-                surfaceVariant = Color(0xFF192540),
-                onSurfaceVariant = Color(0xFFB7C3D5),
+                surfaceVariant = surfaceVariant,
+                onSurfaceVariant = Color(0xFFCAD5E5),
                 surfaceTint = readablePrimary,
-                outline = Color(0xFFA4B7D3),
-                outlineVariant = Color(0xFF657B99),
+                outline = outline,
+                outlineVariant = outlineVariant,
                 error = Color(0xFFFF8C91),
                 onError = Color(0xFF2B080D),
                 errorContainer = Color(0xFF5B2028),
@@ -186,8 +252,9 @@ fun DsmusicAppTheme(
                 surfaceContainerLowest = Color(0xFF070A16),
                 surfaceContainerLow = Color(0xFF0B0F20),
                 surfaceContainer = Color(0xFF0D1126),
-                surfaceContainerHigh = Color(0xFF121A31),
-                surfaceContainerHighest = Color(0xFF1B2947)
+                surfaceContainerHigh = if (amoledEnabled) Color(0xFF080A0F) else Color(0xFF121A31),
+                surfaceContainerHighest = if (amoledEnabled) Color(0xFF111722) else Color(0xFF1B2947),
+                inversePrimary = primaryInverse
             )
             if (amoledEnabled) {
                 base.copy(
@@ -195,32 +262,32 @@ fun DsmusicAppTheme(
                     surface = Color.Black,
                     surfaceContainerLowest = Color.Black,
                     surfaceContainerLow = Color.Black,
-                    surfaceContainer = Color.Black,
-                    surfaceContainerHigh = Color(0xFF080A0F),
-                    surfaceContainerHighest = Color(0xFF111722)
+                    surfaceContainer = Color.Black
                 )
             } else base
         } else {
             DsmusicColorScheme(
                 primary = readablePrimary,
                 onPrimary = onReadablePrimary,
-                primaryContainer = readablePrimary.copy(alpha = 0.18f),
-                onPrimaryContainer = Color(0xFF17233A),
-                secondary = Color(0xFF536783),
-                onSecondary = Color.White,
-                secondaryContainer = Color(0xFFDCE5F2),
-                onSecondaryContainer = Color(0xFF202D40),
-                tertiary = Color(0xFF397E91),
-                onTertiary = Color.White,
+                primaryContainer = primaryContainer,
+                onPrimaryContainer = readableOnColor(primaryContainer),
+                secondary = secondary,
+                onSecondary = readableOnColor(secondary),
+                secondaryContainer = secondaryContainer,
+                onSecondaryContainer = readableOnColor(secondaryContainer),
+                tertiary = tertiary,
+                onTertiary = readableOnColor(tertiary),
+                tertiaryContainer = tertiaryContainer,
+                onTertiaryContainer = readableOnColor(tertiaryContainer),
                 background = Color(0xFFF3F6FA),
                 onBackground = Color(0xFF182131),
-                surface = Color(0xFFFFFFFF),
+                surface = Color.White,
                 onSurface = Color(0xFF182131),
-                surfaceVariant = Color(0xFFE5EBF3),
-                onSurfaceVariant = Color(0xFF536176),
+                surfaceVariant = surfaceVariant,
+                onSurfaceVariant = Color(0xFF46566B),
                 surfaceTint = readablePrimary,
-                outline = Color(0xFF596A82),
-                outlineVariant = Color(0xFF8798AF),
+                outline = outline,
+                outlineVariant = outlineVariant,
                 error = Color(0xFFB32635),
                 onError = Color.White,
                 errorContainer = Color(0xFFF9DADD),
@@ -229,7 +296,8 @@ fun DsmusicAppTheme(
                 surfaceContainerLow = Color(0xFFF7F9FC),
                 surfaceContainer = Color(0xFFEFF3F8),
                 surfaceContainerHigh = Color(0xFFE5EBF3),
-                surfaceContainerHighest = Color(0xFFDCE4EF)
+                surfaceContainerHighest = Color(0xFFDCE4EF),
+                inversePrimary = primaryInverse
             )
         }
     }

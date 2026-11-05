@@ -387,8 +387,8 @@ object SliderDefaults {
 
 object SwitchDefaults {
     @Composable fun colors(
-        checkedThumbColor: Color = DsmusicTheme.colorScheme.onPrimary,
-        checkedTrackColor: Color = DsmusicTheme.colorScheme.primary,
+        checkedThumbColor: Color = DsmusicTheme.colorScheme.onPrimaryContainer,
+        checkedTrackColor: Color = DsmusicTheme.colorScheme.primaryContainer,
         uncheckedThumbColor: Color = DsmusicTheme.colorScheme.onSurfaceVariant,
         uncheckedTrackColor: Color = DsmusicTheme.colorScheme.surfaceVariant,
         disabledCheckedTrackColor: Color = checkedTrackColor.copy(alpha = 0.3f),
@@ -748,7 +748,7 @@ fun Checkbox(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: 
     val scheme = DsmusicTheme.colorScheme
     Box(
         modifier = modifier.size(24.dp).clip(RoundedCornerShape(5.dp))
-            .background(if (checked) scheme.primary else Color.Transparent)
+            .background(if (checked) scheme.primaryContainer else Color.Transparent)
             .border(1.6.dp, if (checked) scheme.primary else scheme.outline, RoundedCornerShape(5.dp))
             .clickable(enabled = enabled && onCheckedChange != null) { onCheckedChange?.invoke(!checked) },
         contentAlignment = Alignment.Center
@@ -759,7 +759,7 @@ fun Checkbox(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: 
                 lineTo(size.width * 0.42f, size.height * 0.76f)
                 lineTo(size.width * 0.84f, size.height * 0.24f)
             }
-            drawPath(path, scheme.onPrimary, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+            drawPath(path, scheme.onPrimaryContainer, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
         }
     }
 }

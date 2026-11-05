@@ -51,6 +51,8 @@ fun DsmusicNavigationBar(
 ) {
     val surface = DsmusicTheme.colorScheme.surfaceContainer
     val selectedColor = DsmusicTheme.colorScheme.primary
+    val selectedContainer = DsmusicTheme.colorScheme.primaryContainer
+    val selectedIconOnContainer = DsmusicTheme.colorScheme.onPrimaryContainer
     val inactiveColor = DsmusicTheme.colorScheme.onSurfaceVariant
 
     val dockShape = when (barStyle) {
@@ -90,6 +92,7 @@ fun DsmusicNavigationBar(
             destinations.forEach { destination ->
                 val selected = currentRoute == destination.route
                 val tint = if (selected) selectedColor else inactiveColor
+                val iconTint = if (selected && barStyle != "Minimal") selectedIconOnContainer else tint
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -104,7 +107,7 @@ fun DsmusicNavigationBar(
                             .size(width = 52.dp, height = iconSlotHeight)
                             .clip(RoundedCornerShape(12.dp))
                             .background(
-                                if (selected && barStyle != "Minimal") selectedColor.copy(alpha = 0.5f)
+                                if (selected && barStyle != "Minimal") selectedContainer
                                 else Color.Transparent
                             ),
                         contentAlignment = Alignment.Center
@@ -112,7 +115,7 @@ fun DsmusicNavigationBar(
                         Image(
                             painter = painterResource(destination.iconResId),
                             contentDescription = destination.label,
-                            colorFilter = ColorFilter.tint(tint),
+                            colorFilter = ColorFilter.tint(iconTint),
                             modifier = Modifier.size(iconSize)
                         )
                     }

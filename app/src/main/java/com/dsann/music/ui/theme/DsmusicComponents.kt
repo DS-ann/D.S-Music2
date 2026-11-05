@@ -114,11 +114,13 @@ fun DsmusicListItem(
     val itemShape = shapes ?: DsmusicTheme.shapes.medium
     val scheme = DsmusicTheme.colorScheme
     val itemBackground = when {
+        colors == null && selected -> scheme.primaryContainer
         colors == null -> scheme.surfaceContainerLow
         selected -> colors.selectedContainerColor
         else -> colors.containerColor
     }
-    val itemBorder = scheme.outlineVariant.copy(alpha = 0.9f)
+    val itemBorder = if (selected) scheme.primary.copy(alpha = 0.82f)
+        else scheme.outlineVariant.copy(alpha = 0.9f)
     Row(
         modifier = modifier.fillMaxWidth().clip(itemShape)
             .background(itemBackground)
@@ -137,6 +139,7 @@ fun DsmusicListItem(
     ) {
         leadingContent?.let {
             val leadingColor = when {
+                colors == null && selected -> scheme.onPrimaryContainer
                 colors == null -> scheme.onSurfaceVariant
                 selected -> colors.selectedLeadingContentColor
                 else -> colors.leadingIconColor
@@ -147,10 +150,17 @@ fun DsmusicListItem(
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             overlineContent?.let {
-                CompositionLocalProvider(LocalDsmusicContentColor provides scheme.onSurfaceVariant) { it() }
+                CompositionLocalProvider(
+                    LocalDsmusicContentColor provides if (selected && colors == null) {
+                        scheme.onPrimaryContainer.copy(alpha = 0.82f)
+                    } else {
+                        scheme.onSurfaceVariant
+                    }
+                ) { it() }
             }
             CompositionLocalProvider(
                 LocalDsmusicContentColor provides when {
+                    colors == null && selected -> scheme.onPrimaryContainer
                     colors == null -> scheme.onSurface
                     selected -> colors.selectedContentColor
                     else -> colors.headlineColor
@@ -163,12 +173,16 @@ fun DsmusicListItem(
             }
             supportingContent?.let {
                 CompositionLocalProvider(
-                    LocalDsmusicContentColor provides (colors?.supportingContentColor ?: scheme.onSurfaceVariant)
+                    LocalDsmusicContentColor provides (
+                        if (selected && colors == null) scheme.onPrimaryContainer.copy(alpha = 0.82f)
+                        else colors?.supportingContentColor ?: scheme.onSurfaceVariant
+                    )
                 ) { it() }
             }
         }
         trailingContent?.let {
             val trailingColor = when {
+                colors == null && selected -> scheme.onPrimaryContainer
                 colors == null -> scheme.onSurfaceVariant
                 selected -> colors.selectedTrailingContentColor
                 else -> colors.trailingIconColor
@@ -314,12 +328,12 @@ fun DsmusicFilterChip(
     val scheme = DsmusicTheme.colorScheme
     val background = when {
         !enabled -> colors?.disabledContainerColor ?: scheme.surfaceVariant
-        selected -> colors?.containerColor ?: scheme.primary
+        selected -> colors?.containerColor ?: scheme.primaryContainer
         else -> scheme.surfaceContainerLow
     }
     val foreground = when {
         !enabled -> colors?.disabledContentColor ?: scheme.onSurfaceVariant
-        selected -> colors?.contentColor ?: scheme.onPrimary
+        selected -> colors?.contentColor ?: scheme.onPrimaryContainer
         else -> scheme.onSurfaceVariant
     }
     Row(
@@ -353,18 +367,18 @@ fun DsmusicSwitchControl(
 ) {
     val scheme = DsmusicTheme.colorScheme
     val trackColor = when {
-        checked && enabled -> colors?.checkedTrackColor ?: scheme.primary
+        checked && enabled -> colors?.checkedTrackColor ?: scheme.primaryContainer
         checked -> colors?.disabledCheckedTrackColor ?: scheme.surfaceVariant
         else -> colors?.uncheckedTrackColor ?: scheme.surfaceVariant
     }
     val thumbColor = when {
-        checked && enabled -> colors?.checkedThumbColor ?: scheme.onPrimary
+        checked && enabled -> colors?.checkedThumbColor ?: scheme.onPrimaryContainer
         else -> colors?.uncheckedThumbColor ?: scheme.onSurfaceVariant
     }
     Box(
         modifier = modifier.size(width = 44.dp, height = 26.dp).clip(CircleShape)
             .background(trackColor)
-            .border(1.dp, if (checked && enabled) trackColor else scheme.outlineVariant, CircleShape)
+            .border(1.dp, if (checked && enabled) scheme.primary else scheme.outlineVariant, CircleShape)
             .clickable(enabled = enabled && onCheckedChange != null) { onCheckedChange?.invoke(!checked) }
             .padding(horizontal = 3.dp),
         contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
