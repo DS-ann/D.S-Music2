@@ -2880,14 +2880,13 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     private val supportedSessionButtons = listOf("like", "shuffle", "repeat", "dislike", "back10", "ahead30")
-    private val defaultSessionButtons = listOf("like", "shuffle", "repeat", "back10", "ahead30")
+    private val defaultSessionButtons = listOf("like", "shuffle")
 
     private fun configuredSessionButtons(): List<String> {
         val preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val raw = preferences.getString("session_buttons", null)
-        val parsed = raw?.split(",")?.map { it.trim().lowercase() }
-            ?.filter { it in supportedSessionButtons }?.distinct().orEmpty()
-        return (parsed + defaultSessionButtons.filter { it !in parsed }).take(6)
+        val raw = preferences.getString("session_buttons", null) ?: return defaultSessionButtons
+        return raw.split(",").map { it.trim().lowercase() }
+            .filter { it in supportedSessionButtons }.distinct().take(2)
     }
 
     private fun sessionButtonCommand(button: String): SessionCommand =
