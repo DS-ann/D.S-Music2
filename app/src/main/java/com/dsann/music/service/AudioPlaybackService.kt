@@ -2920,7 +2920,11 @@ class AudioPlaybackService : MediaSessionService() {
     private fun sessionButtonLabel(button: String): String = when (button) {
         "like" -> "Like"
         "shuffle" -> "Shuffle"
-        "repeat" -> "Repeat"
+        "repeat" -> when (viewModel?.repeatMode?.value ?: PlayerSharedViewModel.REPEAT_OFF) {
+            PlayerSharedViewModel.REPEAT_ONCE -> "Repeat once"
+            PlayerSharedViewModel.REPEAT_INFINITY -> "Repeat infinity"
+            else -> "No repeat"
+        }
         "dislike" -> "Not for me"
         "back10" -> "Back 10 seconds"
         "ahead30" -> "Forward 30 seconds"
