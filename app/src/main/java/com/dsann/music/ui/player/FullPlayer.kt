@@ -441,10 +441,10 @@ private fun PortraitSyncedLyricPreview(
         ?: currentSong?.path?.takeIf { it.isNotBlank() }
         ?: currentSong?.id?.toString()
     val songDurationMs = currentSong?.duration?.takeIf { it > 0L }
-    // Precompute each line's switch boundary once. When there is a silent gap,
-    // hold the outgoing line until the midpoint between its last known timing and the
-    // next line's start. Karaoke uses the final timed word; line-only lyrics fall back
-    // to the current line timestamp because their model has no explicit end timestamp.
+    // Precompute each line's switch boundary once. When the outgoing line has a
+    // known final word and there is a silent gap before the next line, transition at
+    // the midpoint of that gap. Plain line-synced LRC has no explicit line-end time,
+    // so it continues to use the next line's timestamp rather than inventing a gap.
     val lineCompletionTimes = remember(displayLines) {
         displayLines.mapIndexed { index, line ->
             val lastWordEndMs = line.words
@@ -456,8 +456,6 @@ private fun PortraitSyncedLyricPreview(
                 lastWordEndMs != null && nextLineStartMs > lastWordEndMs ->
                     lastWordEndMs + (nextLineStartMs - lastWordEndMs) / 2L
                 lastWordEndMs != null -> lastWordEndMs
-                nextLineStartMs > line.startTimeMs ->
-                    line.startTimeMs + (nextLineStartMs - line.startTimeMs) / 2L
                 else -> nextLineStartMs
             }
         }
