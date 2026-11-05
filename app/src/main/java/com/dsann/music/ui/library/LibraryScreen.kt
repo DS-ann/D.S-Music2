@@ -1,4 +1,6 @@
-@file:Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS",
+@file:Suppress("NULLABILITY_MISMATCH_
+    val isLandscapeLayout = LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPEBASED_ON_JAVA_ANNOTATIONS",
     "TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS"
 )
 
@@ -632,6 +634,8 @@ fun LibraryScreen(
                     }
                     "Downloaded songs" -> {
                         // Scan Local Files helper
+                        val isLandscapeLayout = LocalConfiguration.current.orientation ==
+                            android.content.res.Configuration.ORIENTATION_LANDSCAPE
                         val onRefreshAction = {
                             scope.launch {
                                 isRefreshing = true
@@ -770,6 +774,87 @@ fun LibraryScreen(
                                             SortOrder.DURATION -> filteredSongs.sortedWith(compareByDescending { it.duration })
                                         }
                                         sorted.map { it as Any }
+                                    }
+                                }
+
+                                val downloadPlaylistHero: @Composable () -> Unit = {
+                                    val headerSong = filteredSongs.firstOrNull()
+                                    if (headerSong != null) {
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                                            ) {
+                                                AsyncImage(
+                                                    model = libraryArtworkRequestBuilder(
+                                                        context,
+                                                        headerSong.getAlbumArtUri() ?: R.drawable.ic_music_note
+                                                    ).crossfade(false).build(),
+                                                    contentDescription = "Downloads playlist artwork",
+                                                    modifier = Modifier
+                                                        .size(if (isLandscapeLayout) 180.dp else 216.dp)
+                                                        .clip(RoundedCornerShape(18.dp)),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                                Text(
+                                                    "Downloads",
+                                                    style = DsmusicTheme.typography.headlineMedium,
+                                                    fontWeight = FontWeight.ExtraBold
+                                                )
+                                                Text(
+                                                    "D.S Music · ${sourceSongs.size} songs",
+                                                    style = DsmusicTheme.typography.bodyMedium,
+                                                    color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                Text(
+                                                    "Saved on this device",
+                                                    style = DsmusicTheme.typography.labelMedium,
+                                                    color = DsmusicTheme.colorScheme.primary
+                                                )
+                                            }
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                            ) {
+                                                DsmusicButton(
+                                                    onClick = {
+                                                        val playlist = sortedAndGrouped.filterIsInstance<SongItem>()
+                                                        if (playlist.isNotEmpty()) {
+                                                            viewModel.setShuffleEnabled(false)
+                                                            viewModel.setSongList(playlist)
+                                                            viewModel.playSongAtIndex(0)
+                                                        }
+                                                    },
+                                                    enabled = sortedAndGrouped.isNotEmpty(),
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                                                    Spacer(Modifier.width(8.dp))
+                                                    Text("Play all")
+                                                }
+                                                DsmusicOutlinedButton(
+                                                    onClick = {
+                                                        val playlist = sortedAndGrouped.filterIsInstance<SongItem>().shuffled()
+                                                        if (playlist.isNotEmpty()) {
+                                                            viewModel.setShuffleEnabled(true)
+                                                            viewModel.setSongList(playlist)
+                                                            viewModel.playSongAtIndex(0)
+                                                        }
+                                                    },
+                                                    enabled = sortedAndGrouped.isNotEmpty(),
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Icon(Icons.Rounded.Shuffle, contentDescription = null)
+                                                    Spacer(Modifier.width(8.dp))
+                                                    Text("Shuffle")
+                                                }
+                                            }
+                                            com.dsann.music.ui.theme.HorizontalDivider()
+                                        }
                                     }
                                 }
 
@@ -943,97 +1028,12 @@ fun LibraryScreen(
                                     // Downloads is a compact continuous track list in both orientations. Use a LazyColumn
                                     // rather than a one-column LazyVerticalGrid so vertical drags
                                     // that begin on a song row stay with the scrolling list.
-                                    LazyColumn(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .weight(1f),
-                                        contentPadding = PaddingValues(
-                                            start = 0.dp,
-                                            top = 0.dp,
-                                            end = 0.dp,
-                                            bottom = 160.dp
-                                        ),
-                                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                                    ) {
+                                    val downloadListContent: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
+
                                         item(key = "download-playlist-header") {
-                                            val headerSong = filteredSongs.firstOrNull()
-                                            if (headerSong != null) {
-                                                Column(
-                                                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                                                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                                                ) {
-                                                    Column(
-                                                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                                                    ) {
-                                                        AsyncImage(
-                                                            model = libraryArtworkRequestBuilder(
-                                                                context,
-                                                                headerSong.getAlbumArtUri() ?: R.drawable.ic_music_note
-                                                            ).crossfade(false).build(),
-                                                            contentDescription = "Downloads playlist artwork",
-                                                            modifier = Modifier.size(216.dp).clip(RoundedCornerShape(18.dp)),
-                                                            contentScale = ContentScale.Crop
-                                                        )
-                                                        Text(
-                                                            "Downloads",
-                                                            style = DsmusicTheme.typography.headlineMedium,
-                                                            fontWeight = FontWeight.ExtraBold
-                                                        )
-                                                        Text(
-                                                            "D.S Music · ${sourceSongs.size} songs",
-                                                            style = DsmusicTheme.typography.bodyMedium,
-                                                            color = DsmusicTheme.colorScheme.onSurfaceVariant
-                                                        )
-                                                        Text(
-                                                            "Saved on this device",
-                                                            style = DsmusicTheme.typography.labelMedium,
-                                                            color = DsmusicTheme.colorScheme.primary
-                                                        )
-                                                    }
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                                    ) {
-                                                        DsmusicButton(
-                                                            onClick = {
-                                                                val playlist = sortedAndGrouped.filterIsInstance<SongItem>()
-                                                                if (playlist.isNotEmpty()) {
-                                                                    viewModel.setShuffleEnabled(false)
-                                                                    viewModel.setSongList(playlist)
-                                                                    viewModel.playSongAtIndex(0)
-                                                                }
-                                                            },
-                                                            enabled = sortedAndGrouped.isNotEmpty(),
-                                                            modifier = Modifier.weight(1f)
-                                                        ) {
-                                                            Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                                                            Spacer(Modifier.width(8.dp))
-                                                            Text("Play all")
-                                                        }
-                                                        DsmusicOutlinedButton(
-                                                            onClick = {
-                                                                val playlist = sortedAndGrouped.filterIsInstance<SongItem>().shuffled()
-                                                                if (playlist.isNotEmpty()) {
-                                                                    viewModel.setShuffleEnabled(true)
-                                                                    viewModel.setSongList(playlist)
-                                                                    viewModel.playSongAtIndex(0)
-                                                                }
-                                                            },
-                                                            enabled = sortedAndGrouped.isNotEmpty(),
-                                                            modifier = Modifier.weight(1f)
-                                                        ) {
-                                                            Icon(Icons.Rounded.Shuffle, contentDescription = null)
-                                                            Spacer(Modifier.width(8.dp))
-                                                            Text("Shuffle")
-                                                        }
-                                                    }
-                                                    com.dsann.music.ui.theme.HorizontalDivider()
-                                                }
-                                            }
-                                        }
-                                        itemsIndexed(
+    if (!isLandscapeLayout) downloadPlaylistHero()
+}
+itemsIndexed(
                                             items = sortedAndGrouped,
                                             key = { _, item ->
                                                 if (item is SongItem) "downloaded-song:${item.id}"
@@ -1234,6 +1234,55 @@ fun LibraryScreen(
                                                     }
                                                 )
                                             }
+                                        }
+                                    
+                                    }
+                                    if (isLandscapeLayout) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().weight(1f),
+                                            verticalAlignment = Alignment.Top
+                                        ) {
+                                            Column(
+                                                modifier = Modifier
+                                                    .weight(0.42f)
+                                                    .fillMaxHeight()
+                                                    .verticalScroll(rememberScrollState())
+                                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally
+                                            ) {
+                                                downloadPlaylistHero()
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxHeight()
+                                                    .width(1.dp)
+                                                    .background(DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                                            )
+                                            LazyColumn(
+                                                modifier = Modifier.weight(0.58f).fillMaxHeight(),
+                                                contentPadding = PaddingValues(
+                                                    start = 8.dp,
+                                                    top = 12.dp,
+                                                    end = 8.dp,
+                                                    bottom = 160.dp
+                                                ),
+                                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                                            ) {
+                                                downloadListContent()
+                                            }
+                                        }
+                                    } else {
+                                        LazyColumn(
+                                            modifier = Modifier.fillMaxSize().weight(1f),
+                                            contentPadding = PaddingValues(
+                                                start = 0.dp,
+                                                top = 0.dp,
+                                                end = 0.dp,
+                                                bottom = 160.dp
+                                            ),
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            downloadListContent()
                                         }
                                     }
                                 }
@@ -4406,6 +4455,22 @@ private fun StreamCacheTabContent(
         }
     }
 
+    val cachePlaylistHero: @Composable () -> Unit = {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+            LibraryGradientPlaylistHero(
+                title = "Cache",
+                subtitle = filteredCacheEntries.size.toString() + " songs · D.S Music",
+                status = "Available offline",
+                artwork = filteredCacheEntries.firstOrNull()?.let {
+                    AudioPlaybackService.getCachedMediaArtworkFile(context, it.songId)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                actions = playlistActions
+            )
+            com.dsann.music.ui.theme.HorizontalDivider()
+        }
+    }
+
     Column(modifier = modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
@@ -4532,27 +4597,12 @@ private fun StreamCacheTabContent(
             selectionControls(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            contentPadding = PaddingValues(start = 0.dp, top = 16.dp, end = 0.dp, bottom = 160.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
+        val cacheListContent: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
+
             item(key = "cache-playlist-header") {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    LibraryGradientPlaylistHero(
-                        title = "Cache",
-                        subtitle = filteredCacheEntries.size.toString() + " songs · D.S Music",
-                        status = "Available offline",
-                        artwork = filteredCacheEntries.firstOrNull()?.let {
-                            AudioPlaybackService.getCachedMediaArtworkFile(context, it.songId)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        actions = playlistActions
-                    )
-                    com.dsann.music.ui.theme.HorizontalDivider()
-                }
-            }
-            if (filteredCacheEntries.isEmpty()) {
+    if (!isLandscapeLayout) cachePlaylistHero()
+}
+if (filteredCacheEntries.isEmpty()) {
                 item(key = "cache-playlist-empty") {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp),
@@ -4607,6 +4657,53 @@ private fun StreamCacheTabContent(
                         )
                     }
                 }
+            }
+        
+        }
+        if (isLandscapeLayout) {
+            Row(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(0.42f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    cachePlaylistHero()
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(1.dp)
+                        .background(DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                )
+                LazyColumn(
+                    modifier = Modifier.weight(0.58f).fillMaxHeight(),
+                    contentPadding = PaddingValues(start = 8.dp, top = 12.dp, end = 8.dp, bottom = 160.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    item(key = "cache-playlist-songs-heading") {
+                        Text(
+                            "Songs",
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            style = DsmusicTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    cacheListContent()
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentPadding = PaddingValues(start = 0.dp, top = 16.dp, end = 0.dp, bottom = 160.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                cacheListContent()
             }
         }
     }
