@@ -825,7 +825,7 @@ fun showQueueSongActions(
     val fragmentManager = activity.supportFragmentManager
     if (fragmentManager.isStateSaved) return
 
-    val sheet = SongActionsBottomSheet.newInstance(song, showAddToQueue = false, showRemoveFromQueue = true, showDelete = false)
+    val sheet = SongActionsBottomSheet.newInstance(song, showAddToQueue = false, showRemoveFromQueue = true, showDelete = false, queueSongMode = true)
     sheet.setActionListener(object : SongActionsBottomSheet.ActionListener {
         override fun onPlay(song: SongItem) {
             viewModel.playSong(song)
