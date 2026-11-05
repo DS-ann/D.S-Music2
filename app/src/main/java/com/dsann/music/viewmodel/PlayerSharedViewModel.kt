@@ -522,6 +522,14 @@ class PlayerSharedViewModel @Inject constructor(
     private val AUTOPLAY_REFILL_THRESHOLD = 20
     private val AUTOPLAY_REFILL_BATCH_SIZE = 20
 
+    /**
+     * Returns null only when the queue has no online-backed track to seed autoplay.
+     * Cached/downloaded songs retain their videoId as source metadata while their
+     * offline flags and contentUri continue to determine how they are played.
+     */
+    fun getAutoplaySeedVideoId(): String? =
+        _songList.value.lastOrNull { !it.videoId.isNullOrBlank() }?.videoId
+
     private var autoplayFetchJob: Job? = null
     private val autoplayFetchedVideoIds = mutableSetOf<String>()
 
@@ -546,8 +554,7 @@ class PlayerSharedViewModel @Inject constructor(
 
         // Start recommendations from the end of the existing queue, not the currently
         // playing item. This avoids re-requesting the same radio list on every refill.
-        val seedVideoId = songs.lastOrNull { !it.videoId.isNullOrBlank() }?.videoId
-            ?: return
+        val seedVideoId = getAutoplaySeedVideoId() ?: return
         prefetchAutoplayRecommendations(seedVideoId, AUTOPLAY_REFILL_BATCH_SIZE)
     }
 
@@ -1668,7 +1675,9 @@ class PlayerSharedViewModel @Inject constructor(
         if (songs.isNotEmpty()) {
             bgScope.launch(Dispatchers.IO) {
                 songs.take(3).forEach { song ->
-                    song.videoId?.let { YouTubeMusic.prefetchStream(it) }
+                    if (!song.isCachedTrack && !song.isDownloadedOffline) {
+                        song.videoId?.let { YouTubeMusic.prefetchStream(it) }
+                    }
                 }
             }
         }
@@ -1705,7 +1714,11 @@ class PlayerSharedViewModel @Inject constructor(
         val song = songs[index]
 
         // Force innertube:// scheme for ALL YouTube Music songs to guarantee fresh stream resolution
-        if (!song.videoId.isNullOrEmpty()) {
+        if (
+            !song.videoId.isNullOrEmpty() &&
+            !song.isCachedTrack &&
+            !song.isDownloadedOffline
+        ) {
             song.contentUri = "innertube://${song.videoId}".toUri()
             Log.d(TAG, "Injected lazy resolver URI for: ${song.title}")
         }
@@ -1858,15 +1871,19 @@ class PlayerSharedViewModel @Inject constructor(
             pauseAudio()
             setCurrentPosition(0)
         } else if (isAutoplayEnabled()) {
-            val sourceVideoId = _currentSong.value?.videoId
-            if (sourceVideoId.isNullOrBlank()) {
+            val currentSongId = _currentSong.value?.id
+            // The last item can be a locally served copy. Check the entire queue for
+            // an online-backed source instead of rejecting autoplay on that item's ID.
+            val sourceVideoId = getAutoplaySeedVideoId()
+            if (sourceVideoId.isNullOrBlank() || currentSongId == null) {
+                // A queue with no online-backed entries is genuinely local-only.
                 audioService?.pause()
             } else {
                 val job = prefetchAutoplayRecommendations(sourceVideoId)
                 if (job == null) {
                     // A previous/completed fetch can mean the queue already has recommendations.
                     // Recheck before interpreting a null job as an empty queue.
-                    val alreadyQueuedIndex = if (_currentSong.value?.videoId == sourceVideoId) {
+                    val alreadyQueuedIndex = if (_currentSong.value?.id == currentSongId) {
                         getNextSongIndex()
                     } else {
                         -1
@@ -1876,9 +1893,9 @@ class PlayerSharedViewModel @Inject constructor(
                 } else {
                     viewModelScope.launch {
                         job.join()
-                        // Never let a slow response start recommendations for a track the
-                        // listener has already changed manually.
-                        if (_currentSong.value?.videoId != sourceVideoId) return@launch
+                        // Track identity, not videoId, guards against a manual change when
+                        // the currently playing cache/download copy has no resolver URI.
+                        if (_currentSong.value?.id != currentSongId) return@launch
                         val appendedIndex = getNextSongIndex()
                         if (appendedIndex >= 0) {
                             playSongAtIndex(appendedIndex)
@@ -1956,7 +1973,9 @@ class PlayerSharedViewModel @Inject constructor(
         if (nextIdx >= 0) {
             val songs = _songList.value
             if (nextIdx < songs.size) {
-                songs[nextIdx].videoId?.let { YouTubeMusic.prefetchStream(it) }
+                songs[nextIdx].takeIf {
+                    !it.isCachedTrack && !it.isDownloadedOffline
+                }?.videoId?.let { YouTubeMusic.prefetchStream(it) }
             }
         }
     }
@@ -1969,7 +1988,9 @@ class PlayerSharedViewModel @Inject constructor(
     fun specPrefetch(song: SongItem) {
         specJob?.cancel()
         specJob = bgScope.launch(Dispatchers.IO) {
-            song.videoId?.let { YouTubeMusic.prefetchStream(it) }
+            if (!song.isCachedTrack && !song.isDownloadedOffline) {
+                song.videoId?.let { YouTubeMusic.prefetchStream(it) }
+            }
         }
     }
 

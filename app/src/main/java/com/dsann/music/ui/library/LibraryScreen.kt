@@ -3901,6 +3901,8 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
                 }
             }.toTypedArray()
             val prefs = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+            val downloadedVideoIdsByUri =
+                com.dsann.music.util.SongDownloader.getDownloadedVideoIdsByUri(context)
             val hiddenFolders = (prefs.getString("hidden_folders", "") ?: "").split("||").filter { it.isNotEmpty() }
             val ignoreShort = prefs.getBoolean("ignore_short_audio", false)
             val minDurationMs = if (ignoreShort) prefs.getFloat("ignore_short_audio_duration", 30f).toLong() * 1000L else 0L
@@ -4005,6 +4007,11 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
                         ).apply {
                             mediaStoreRelativePath = relativePath
                             this.albumName = albumName
+                            val sourceVideoId = downloadedVideoIdsByUri[mediaUri.toString()]
+                            if (!sourceVideoId.isNullOrBlank()) {
+                                videoId = sourceVideoId
+                                isDownloadedOffline = true
+                            }
                             // Prefer the embedded cover from the M4A file to a missing/stale
                             // MediaStore album-art row. This is a normal file URI, not the M4A URI.
                             thumbnailUrl = embeddedMetadata?.artworkUri
@@ -4249,7 +4256,7 @@ private fun StreamCacheTabContent(
                 item.durationMs,
                 System.currentTimeMillis()
             ).apply {
-                videoId = null
+                videoId = item.videoId.takeIf { it.isNotBlank() }
                 isCachedTrack = true
                 isDownloadedOffline = false
                 contentUri = android.net.Uri.parse(item.cachedUri)

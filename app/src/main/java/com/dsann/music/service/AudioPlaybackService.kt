@@ -1576,12 +1576,11 @@ class AudioPlaybackService : MediaSessionService() {
         if (nextIndex < 0 || nextIndex >= songs.size) {
             // Keep the existing radio extension, but respect the listener's Autoplay setting.
             if (!isAutoplayEnabled()) return
-            val currentSong = vm.currentSong.value
-            if (currentSong != null && !currentSong.videoId.isNullOrEmpty()) {
+            val sourceVideoId = vm.getAutoplaySeedVideoId()
+            if (!sourceVideoId.isNullOrBlank()) {
                 // Use the same de-duplicated request the end-of-queue transition awaits.
-                // This fills recommendations before the last track finishes without issuing
-                // a second independent request when STATE_ENDED arrives.
-                vm.prefetchAutoplayRecommendations(currentSong.videoId!!)
+                // The last queue item may be a local copy of an online-backed track.
+                vm.prefetchAutoplayRecommendations(sourceVideoId)
             }
             return
         }
@@ -1594,7 +1593,11 @@ class AudioPlaybackService : MediaSessionService() {
             
             // 1. Check dynamic cache & resolve if online source
             val targetVideoId = nextSong.videoId
-            if (!targetVideoId.isNullOrEmpty()) {
+            if (
+                !nextSong.isCachedTrack &&
+                !nextSong.isDownloadedOffline &&
+                !targetVideoId.isNullOrEmpty()
+            ) {
                 val resolvedUrl = withContext(Dispatchers.IO) {
                     YouTubeMusic.getStreamUrl(targetVideoId).getOrNull()
                 }

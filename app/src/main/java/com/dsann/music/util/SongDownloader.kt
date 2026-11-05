@@ -156,6 +156,25 @@ object SongDownloader {
     private const val PREF_DOWNLOADED_TRACK_URIS = "spatialflow_downloaded_track_uris"
 
     /**
+     * Resolve the original online video IDs for D.S Music downloaded MediaStore URIs.
+     * This is metadata only: callers continue to play the exact local URI.
+     */
+    fun getDownloadedVideoIdsByUri(context: Context): Map<String, String> {
+        val saved = context.getSharedPreferences(
+            PREF_DOWNLOADED_TRACK_URIS,
+            Context.MODE_PRIVATE
+        ).all
+        return saved.entries.mapNotNull { entry ->
+            val key = entry.key
+            if (!key.startsWith("uri_")) return@mapNotNull null
+            val videoId = key.removePrefix("uri_").takeIf { it.isNotBlank() }
+                ?: return@mapNotNull null
+            val uri = entry.value as? String ?: return@mapNotNull null
+            if (uri.isBlank()) null else uri to videoId
+        }.toMap()
+    }
+
+    /**
      * Resolve an app-downloaded audio file before trying Media3's online stream resolver.
      * Video-ID mappings are preferred; title/artist filenames and the legacy D.S Music folder
      * provide a migration path for downloads created before mappings were recorded.
