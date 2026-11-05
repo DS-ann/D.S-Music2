@@ -2435,9 +2435,15 @@ private fun MiniPlayerContentInternal(
                         tint = contentColor,
                         modifier = Modifier.size(24.dp)
                     )
+                } else if (controlIconSet == "Seek") {
+                    MiniPlayerSeekGlyph(
+                        isForward = false,
+                        tint = contentColor,
+                        modifier = Modifier.size(26.dp)
+                    )
                 } else {
                     Icon(
-                        imageVector = if (controlIconSet == "Seek") Icons.Rounded.FastRewind else Icons.Rounded.ChevronLeft,
+                        imageVector = Icons.Rounded.ChevronLeft,
                         contentDescription = "Previous",
                         tint = contentColor,
                         modifier = Modifier.size(24.dp)
@@ -2464,6 +2470,26 @@ private fun MiniPlayerContentInternal(
                         tint = contentColor,
                         modifier = Modifier.size(20.dp)
                     )
+                } else if (controlIconSet == "Seek") {
+                    Box(
+                        modifier = Modifier.size(26.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                            drawCircle(
+                                color = contentColor,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                    width = 1.8.dp.toPx()
+                                )
+                            )
+                        }
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = "Play/Pause",
+                            tint = contentColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 } else {
                     Icon(
                         imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
@@ -2485,15 +2511,59 @@ private fun MiniPlayerContentInternal(
                         tint = contentColor,
                         modifier = Modifier.size(24.dp)
                     )
+                } else if (controlIconSet == "Seek") {
+                    MiniPlayerSeekGlyph(
+                        isForward = true,
+                        tint = contentColor,
+                        modifier = Modifier.size(26.dp)
+                    )
                 } else {
                     Icon(
-                        imageVector = if (controlIconSet == "Seek") Icons.Rounded.FastForward else Icons.Rounded.ChevronRight,
+                        imageVector = Icons.Rounded.ChevronRight,
                         contentDescription = "Next",
                         tint = contentColor,
                         modifier = Modifier.size(24.dp)
                     )
                 }
             }
+        }
+    }
+}
+
+
+@Composable
+private fun MiniPlayerSeekGlyph(
+    isForward: Boolean,
+    tint: Color,
+    modifier: Modifier = Modifier
+) {
+    // Double outlined chevrons distinguish fast-seek controls from Classic's
+    // single skip triangle plus track bar. Keep this vector-drawn for API 23.
+    androidx.compose.foundation.Canvas(modifier = modifier) {
+        val centerY = size.height / 2f
+        val halfHeight = size.height * 0.29f
+        val halfWidth = size.width * 0.20f
+        val strokeWidth = 2.4.dp.toPx()
+        val cap = androidx.compose.ui.graphics.StrokeCap.Round
+        val centers = listOf(size.width * 0.32f, size.width * 0.68f)
+
+        centers.forEach { centerX ->
+            val outerX = if (isForward) centerX - halfWidth else centerX + halfWidth
+            val innerX = if (isForward) centerX + halfWidth else centerX - halfWidth
+            drawLine(
+                color = tint,
+                start = androidx.compose.ui.geometry.Offset(outerX, centerY - halfHeight),
+                end = androidx.compose.ui.geometry.Offset(innerX, centerY),
+                strokeWidth = strokeWidth,
+                cap = cap
+            )
+            drawLine(
+                color = tint,
+                start = androidx.compose.ui.geometry.Offset(innerX, centerY),
+                end = androidx.compose.ui.geometry.Offset(outerX, centerY + halfHeight),
+                strokeWidth = strokeWidth,
+                cap = cap
+            )
         }
     }
 }
