@@ -140,7 +140,7 @@ private fun PlayerVisualizer(
     androidx.compose.foundation.Canvas(
         modifier = Modifier.fillMaxWidth().height(
             when (style) {
-                "Ring" -> 36.dp
+                "Oval" -> 36.dp
                 "Bars" -> 24.dp
                 else -> 30.dp
             }
@@ -228,50 +228,74 @@ private fun PlayerVisualizer(
                 }
             }
 
-            // A compact circular spectrum: fine radial ticks plus two rotating arcs.
-            "Ring" -> {
-                val outerRadius = size.height * 0.43f
-                drawCircle(
-                    color.copy(alpha = 0.12f),
-                    radius = outerRadius,
-                    center = center,
+            // A wide elliptical spectrum: radial perimeter ticks and two moving oval arcs.
+            "Oval" -> {
+                val outerRadiusX = size.width * 0.46f
+                val outerRadiusY = size.height * 0.31f
+                val ovalTopLeft = androidx.compose.ui.geometry.Offset(
+                    center.x - outerRadiusX,
+                    center.y - outerRadiusY
+                )
+                val ovalSize = androidx.compose.ui.geometry.Size(
+                    outerRadiusX * 2f,
+                    outerRadiusY * 2f
+                )
+                drawOval(
+                    color = color.copy(alpha = 0.14f),
+                    topLeft = ovalTopLeft,
+                    size = ovalSize,
                     style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
                 )
 
-                val tickCount = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 18 else 36
+                val tickCount = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 22 else 44
                 repeat(tickCount) { index ->
                     val angle = index * (6.2831855f / tickCount) - 1.5707963f
+                    val cosine = kotlin.math.cos(angle)
+                    val sine = kotlin.math.sin(angle)
                     val level = kotlin.math.abs(
                         kotlin.math.sin(index * 0.52f + phaseAngle * 1.35f)
                     )
                     val activity = if (isPlaying) 0.25f + level * 0.75f else 0.18f
-                    val innerRadius = size.height * 0.34f
-                    val tickLength = size.height * (0.035f + activity * 0.075f)
-                    val start = androidx.compose.ui.geometry.Offset(
-                        center.x + kotlin.math.cos(angle) * innerRadius,
-                        center.y + kotlin.math.sin(angle) * innerRadius
+                    val tickLength = size.height * (0.075f + activity * 0.13f)
+
+                    // The normal of an ellipse is not the same as its radial vector.
+                    // Normalize the gradient so each tick sits cleanly on the long oval.
+                    val normalX = cosine / (outerRadiusX * outerRadiusX)
+                    val normalY = sine / (outerRadiusY * outerRadiusY)
+                    val normalLength = kotlin.math.sqrt(normalX * normalX + normalY * normalY)
+                        .coerceAtLeast(0.0001f)
+                    val normal = androidx.compose.ui.geometry.Offset(
+                        normalX / normalLength,
+                        normalY / normalLength
                     )
-                    val end = androidx.compose.ui.geometry.Offset(
-                        center.x + kotlin.math.cos(angle) * (innerRadius + tickLength),
-                        center.y + kotlin.math.sin(angle) * (innerRadius + tickLength)
+                    val perimeter = androidx.compose.ui.geometry.Offset(
+                        center.x + outerRadiusX * cosine,
+                        center.y + outerRadiusY * sine
                     )
+                    val inner = perimeter - normal * (tickLength * 0.72f)
+                    val outer = perimeter + normal * (tickLength * 0.28f)
                     drawLine(
-                        spectrumColor(index / (tickCount - 1).toFloat()).copy(alpha = 0.32f + activity * 0.55f),
-                        start = start,
-                        end = end,
-                        strokeWidth = 1.2.dp.toPx(),
+                        color = spectrumColor(index / (tickCount - 1).toFloat())
+                            .copy(alpha = 0.32f + activity * 0.55f),
+                        start = inner,
+                        end = outer,
+                        strokeWidth = 1.25.dp.toPx(),
                         cap = androidx.compose.ui.graphics.StrokeCap.Round
                     )
                 }
 
-                val arcRadius = size.height * 0.23f
-                val arcSize = androidx.compose.ui.geometry.Size(arcRadius * 2f, arcRadius * 2f)
+                val arcRadiusX = outerRadiusX * 0.66f
+                val arcRadiusY = outerRadiusY * 0.66f
                 val arcTopLeft = androidx.compose.ui.geometry.Offset(
-                    center.x - arcRadius,
-                    center.y - arcRadius
+                    center.x - arcRadiusX,
+                    center.y - arcRadiusY
+                )
+                val arcSize = androidx.compose.ui.geometry.Size(
+                    arcRadiusX * 2f,
+                    arcRadiusY * 2f
                 )
                 drawArc(
-                    color = spectrumColor(0.28f).copy(alpha = if (isPlaying) 0.82f else 0.30f),
+                    color = spectrumColor(0.28f).copy(alpha = if (isPlaying) 0.84f else 0.30f),
                     startAngle = -105f + phaseValue * 82f,
                     sweepAngle = 126f + kotlin.math.sin(phaseAngle) * 16f,
                     useCenter = false,
@@ -283,7 +307,7 @@ private fun PlayerVisualizer(
                     )
                 )
                 drawArc(
-                    color = spectrumColor(0.76f).copy(alpha = 0.38f),
+                    color = spectrumColor(0.76f).copy(alpha = 0.42f),
                     startAngle = 72f - phaseValue * 58f,
                     sweepAngle = 68f + kotlin.math.sin(phaseAngle + 1.2f) * 12f,
                     useCenter = false,
@@ -295,7 +319,7 @@ private fun PlayerVisualizer(
                     )
                 )
                 drawCircle(
-                    color.copy(alpha = if (isPlaying) 0.95f else 0.45f),
+                    color = color.copy(alpha = if (isPlaying) 0.95f else 0.45f),
                     radius = 1.7.dp.toPx(),
                     center = center
                 )
@@ -541,8 +565,8 @@ fun FullPlayerScreen(
     val visualizerColor by customizeViewModel.visualizerColor.collectAsStateWithLifecycle()
     val lyricsColorStyle by customizeViewModel.lyricsColorStyle.collectAsStateWithLifecycle()
 
-    // The saved Lyrics layout controls appearance only. Opening the mini player must
-    // always show the normal player; lyrics are entered through the explicit Lyrics action.
+    // Legacy layout values are normalized to Standard; lyrics are entered only through
+    // the explicit Lyrics action, never by opening the mini player.
 
     // Handle back button when lyrics mode is enabled
     BackHandler(enabled = isLyricsModeEnabled) {
@@ -669,7 +693,7 @@ fun FullPlayer(
     playerBackgroundStyle: String = "Artwork",
     playerButtonStyle: String = "Pill",
     lyricsColorStyle: String = "Home Studio Gradient",
-    scrubberThickness: Float = 1f,
+    scrubberThickness: Float = 1.5f,
     scrubberThumbStyle: String = "Auto",
     visualizerColor: String = "Accent",
     onProviderSelected: (String) -> Unit,
@@ -876,8 +900,6 @@ fun FullPlayer(
         // The artwork preference scales only the floating cover layer. The reserved
         // artwork slot remains constant so title, slider and transport controls do not move.
         val artScale = when (playerLayout) {
-            "Cover" -> 0.98f
-            "Minimal" -> 0.68f
             "Vinyl", "Cassette" -> 0.82f
             else -> 0.9f
         }
@@ -1039,6 +1061,10 @@ fun FullPlayer(
             )
 
             Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 12.dp))
+            // Reallocate one quarter of the title/visualizer-to-action gap above the
+            // title group. The total weighted space stays constant, so action buttons
+            // retain their exact vertical position while the group moves down.
+            Spacer(modifier = Modifier.weight(0.75f, fill = true))
 
             // Keep title and artist centered on the player, independently of the trailing info control.
             Box(
@@ -1154,11 +1180,9 @@ fun FullPlayer(
                 Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 10.dp))
             }
 
-            // Move three quarters of the flexible gap above the action controls.
-            // Together with the 1f spacer below the transport controls, this keeps
-            // the queue opener at the same position while reducing the remaining
-            // controls-to-opener gap to exactly one quarter of its previous size.
-            Spacer(modifier = Modifier.weight(3f, fill = true))
+            // The matching 0.75f spacer above the title keeps the action row fixed.
+            // The remaining gap below the visualizer is therefore 25% smaller.
+            Spacer(modifier = Modifier.weight(2.25f, fill = true))
 
             // Reorderable action chips. The selected order is saved by Customize.
             Row(
@@ -1194,10 +1218,9 @@ fun FullPlayer(
                 val isDownloading = realDownloadProgress != null ||
                     com.dsann.music.util.SongDownloader.isDownloading(songForActions?.videoId)
 
-                val orderedButtons = if (playerLayout == "Minimal") playerButtons.take(3) else playerButtons
+                val orderedButtons = playerButtons
                 // Video is a playback-mode control. Keep it visible while video is active,
-                // and keep it available in Minimal mode even when it is outside the first three
-                // user-selected actions.
+                // even when it is outside the user-selected action order.
                 val showVideoSwitch = isVideoMode || !songForActions?.videoId.isNullOrBlank()
                 val playerButtonsWithVideo = if (
                     showVideoSwitch && "video" !in orderedButtons
