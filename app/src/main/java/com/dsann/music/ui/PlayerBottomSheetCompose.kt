@@ -970,6 +970,8 @@ fun PlayerBottomSheetCompose(
                                 uploader = selectedOption.videoUploader?.takeIf { it.isNotBlank() }
                                     ?: currentSong?.artist.orEmpty(),
                                 durationMs = selectedOption.durationMs,
+                                contentLengthBytes = selectedOption.contentLengthBytes,
+                                bitrateBps = selectedOption.bitrateBps,
                                 resolution = selectedOption.label,
                                 mimeType = selectedOption.mimeType,
                                 description = selectedOption.videoDescription,
@@ -2034,6 +2036,8 @@ fun PlayerBottomSheetCompose(
                                                                         ?: currentSong?.artist.orEmpty(),
                                                                     durationMs = option.durationMs.takeIf { it > 0L }
                                                                         ?: videoPlaybackMetadata?.durationMs ?: 0L,
+                                                                    contentLengthBytes = option.contentLengthBytes,
+                                                                    bitrateBps = option.bitrateBps,
                                                                     resolution = option.label,
                                                                     mimeType = option.mimeType,
                                                                     description = option.videoDescription ?: videoPlaybackMetadata?.description,
