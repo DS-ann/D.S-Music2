@@ -85,7 +85,8 @@ data class CachedMediaMetadata(
     val videoId: String = "",
     val mimeType: String = "",
     val albumName: String = "",
-    val thumbnailUrl: String = ""
+    val thumbnailUrl: String = "",
+    val cachedAtMs: Long = 0L
 )
 
 data class CachedAudioFacts(
@@ -320,6 +321,9 @@ class AudioPlaybackService : MediaSessionService() {
                 .put("mimeType", mimeType.ifBlank { previousMetadata?.mimeType.orEmpty() })
                 .put("albumName", albumName.ifBlank { previousMetadata?.albumName.orEmpty() })
                 .put("thumbnailUrl", thumbnailUrl.ifBlank { previousMetadata?.thumbnailUrl.orEmpty() })
+                // Preserve the original cache timestamp when metadata is refreshed later.
+                .put("cachedAtMs", previousMetadata?.cachedAtMs?.takeIf { it > 0L }
+                    ?: System.currentTimeMillis())
                 .toString()
             context.getSharedPreferences(PREF_MEDIA_CACHE_METADATA, Context.MODE_PRIVATE)
                 .edit().putString(digestKey, payload).apply()
@@ -341,7 +345,8 @@ class AudioPlaybackService : MediaSessionService() {
                     videoId = json.optString("videoId", ""),
                     mimeType = json.optString("mimeType", ""),
                     albumName = json.optString("albumName", ""),
-                    thumbnailUrl = json.optString("thumbnailUrl", "")
+                    thumbnailUrl = json.optString("thumbnailUrl", ""),
+                    cachedAtMs = json.optLong("cachedAtMs", 0L)
                 )
             } catch (_: Exception) {
                 null
