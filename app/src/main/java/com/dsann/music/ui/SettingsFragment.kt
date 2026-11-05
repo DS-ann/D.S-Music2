@@ -2993,12 +2993,14 @@ private fun AppearanceScreen(
                 buttonsPill = playerButtonsPill
             )
 
-            SavedLooksEditor(
-                looks = savedLooks,
-                onSave = onSaveLook,
-                onApply = onApplyLook,
-                onDelete = onDeleteLook
-            )
+            SettingsAccordionSection("Your Looks") {
+                SavedLooksEditor(
+                    looks = savedLooks,
+                    onSave = onSaveLook,
+                    onApply = onApplyLook,
+                    onDelete = onDeleteLook
+                )
+            }
 
             SettingsAccordionSection("Theme") {
             SettingsGroupCard(buildList {
@@ -3806,7 +3808,6 @@ private fun SavedLooksEditor(
         modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("Your Looks", style = DsmusicTheme.typography.titleLarge, color = textColor)
         Text(
             "Save the complete visual setup — colors, player, lyrics, typography and navigation — then switch between looks in one tap.",
             style = DsmusicTheme.typography.bodySmall,
