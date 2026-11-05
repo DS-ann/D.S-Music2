@@ -26,11 +26,13 @@ data class Mp3ConversionResult(
  */
 internal object OpusToMp3Converter {
     private const val TAG = "OpusToMp3"
-    private const val MP3_BITRATE_KBPS = 192
     private const val MAX_COVER_BYTES = 8 * 1024 * 1024
 
     suspend fun convert(context: Context, song: SongItem): Mp3ConversionResult {
         val appContext = context.applicationContext
+        // Use the exact download-quality preference that selected the source Opus stream.
+        NewPipeStreamExtractor.init(appContext)
+        val targetBitrateKbps = NewPipeStreamExtractor.getDownloadTargetBitrateKbps()
         var outputFile: File? = null
         var published = false
         try {
@@ -64,7 +66,7 @@ internal object OpusToMp3Converter {
                 throw IllegalStateException("Could not replace the unfinished MP3 output")
             }
 
-            decodeOpusAndEncodeMp3(appContext, sourceUri, outputFile)
+            decodeOpusAndEncodeMp3(appContext, sourceUri, outputFile, targetBitrateKbps)
             currentCoroutineContext().ensureActive()
             writeAndVerifyId3(
                 file = outputFile,
@@ -83,7 +85,10 @@ internal object OpusToMp3Converter {
                 throw IllegalStateException("MP3 was encoded but the music library could not verify it")
             }
             published = true
-            return Mp3ConversionResult(true, "Saved MP3 with embedded metadata: $outputName")
+            return Mp3ConversionResult(
+                true,
+                "Saved ${targetBitrateKbps} kbps MP3 with embedded metadata: $outputName"
+            )
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
@@ -102,7 +107,12 @@ internal object OpusToMp3Converter {
         }
     }
 
-    private suspend fun decodeOpusAndEncodeMp3(context: Context, sourceUri: Uri, outputFile: File) {
+    private suspend fun decodeOpusAndEncodeMp3(
+        context: Context,
+        sourceUri: Uri,
+        outputFile: File,
+        targetBitrateKbps: Int
+    ) {
         val extractor = MediaExtractor()
         var decoder: MediaCodec? = null
         var encoder: NativeMp3Encoder? = null
@@ -155,7 +165,7 @@ internal object OpusToMp3Converter {
                             old.flush().takeIf { it.isNotEmpty() }?.let(output::write)
                             old.close()
                         }
-                        encoder = NativeMp3Encoder(sampleRate, channels, MP3_BITRATE_KBPS)
+                        encoder = NativeMp3Encoder(sampleRate, channels, targetBitrateKbps)
                         encoderRate = sampleRate
                         encoderChannels = channels
                     }
