@@ -607,6 +607,7 @@ fun LibraryScreen(
                         nestedScrollConnection,
                         viewModel,
                         playlistsAsList,
+                        isPlayerBackActive = isPlayerBackActive,
                         onCachedSongLongClick = openCachedSongMenu,
                         onOpenDownloads = {
                             activeTab = "Downloaded songs"
@@ -1301,6 +1302,7 @@ itemsIndexed(
                         nestedScrollConnection,
                         viewModel,
                         playlistsAsList,
+                        isPlayerBackActive = isPlayerBackActive,
                         onCachedSongLongClick = openCachedSongMenu,
                         onOpenDownloads = {
                             activeTab = "Downloaded songs"
@@ -2069,6 +2071,7 @@ private fun PlaylistsTabContent(
     nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection,
     viewModel: PlayerSharedViewModel,
     showAsList: Boolean = false,
+    isPlayerBackActive: Boolean = false,
     onCachedSongLongClick: (CachedSongEntry) -> Unit,
     onOpenDownloads: () -> Unit
 ) {
@@ -4231,6 +4234,8 @@ private fun StreamCacheTabContent(
     val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
     val favoriteIds by viewModel.favoriteSongIds.collectAsStateWithLifecycle(emptySet())
     val rootTabActive = LocalRootTabActive.current
+    val isLandscapeLayout = LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     // Poll only while the Library root tab is active. Cache stays in the root content
     // viewport, above the persistent navigation and mini-player overlays.
