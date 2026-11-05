@@ -29,6 +29,9 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
     private val _offlineError = MutableStateFlow(false)
     val offlineError = _offlineError.asStateFlow()
 
+    private val _historyOfflineError = MutableStateFlow(false)
+    val historyOfflineError = _historyOfflineError.asStateFlow()
+
     private val _playlists = MutableStateFlow<List<OnlinePlaylist>>(emptyList())
     val playlists = _playlists.asStateFlow()
 
@@ -91,6 +94,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         }
 
         _offlineError.value = false
+        _historyOfflineError.value = false
         viewModelScope.launch {
             _isLoading.value = true
             var hasSuccessfulRequest = false
@@ -143,8 +147,13 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
                 // Load History
                 YouTubeMusic.history().onSuccess { items ->
                     _history.value = items
+                    _historyOfflineError.value = false
                     hasSuccessfulRequest = true
                 }.onFailure {
+                    _historyOfflineError.value = NetworkFailureClassifier.isNoInternetFailure(
+                        it,
+                        context
+                    )
                     recordFailure(it)
                     android.util.Log.w("AccountViewModel", "Failed to load listening history", it)
                 }
@@ -226,6 +235,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         AccountManager.logout(getApplication())
         _userProfile.value = null
         _offlineError.value = false
+        _historyOfflineError.value = false
         _playlists.value = emptyList()
         _artists.value = emptyList()
         _albums.value = emptyList()
