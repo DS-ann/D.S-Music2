@@ -298,7 +298,7 @@ fun OnlineCollectionActionsBottomSheet(
                     modifier = Modifier.weight(1f),
                     title = "Next",
                     icon = Icons.Default.PlayArrow,
-                    enabled = !isWorking
+                    enabled = !isWorking && !noInternetError
                 ) {
                     runTrackAction { songs ->
                         songs.asReversed().forEach { song ->
