@@ -2351,8 +2351,13 @@ private fun MiniPlayerContentInternal(
         "Rounded" -> 56.dp
         else -> 48.dp
     }
+    // Scale every clickable action surface to two-thirds of its previous size.
+    // Keep the icon glyphs and the 4 dp inter-button spacing unchanged.
     fun controlModifier(width: Dp): Modifier =
-        Modifier.size(width = width, height = 48.dp).then(controlBackground)
+        Modifier.size(
+            width = width * (2f / 3f),
+            height = 48.dp * (2f / 3f)
+        ).then(controlBackground)
     val compactLandscape = LocalConfiguration.current.orientation ==
         android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val artworkSize = if (compactLandscape) 48.dp else 60.dp
