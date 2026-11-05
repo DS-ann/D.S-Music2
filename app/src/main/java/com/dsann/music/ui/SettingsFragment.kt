@@ -4674,20 +4674,12 @@ private fun AboutScreen(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Hero App Logo (Elegant Box)
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .background(DsmusicTheme.colorScheme.primaryContainer, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_applogo),
-                    contentDescription = null,
-                    tint = DsmusicTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(72.dp)
-                )
-            }
+            Icon(
+                painter = painterResource(R.drawable.ic_applogo),
+                contentDescription = null,
+                tint = androidx.compose.ui.graphics.Color.Unspecified,
+                modifier = Modifier.size(120.dp)
+            )
             
             Spacer(modifier = Modifier.height(24.dp))
             
@@ -5438,7 +5430,7 @@ private fun AppLogoSection(isLandscape: Boolean) {
         Icon(
             painter = painterResource(R.drawable.ic_applogo),
             contentDescription = null,
-            tint = DsmusicTheme.colorScheme.primary,
+            tint = androidx.compose.ui.graphics.Color.Unspecified,
             modifier = Modifier.size(iconSize)
         )
         Text(
