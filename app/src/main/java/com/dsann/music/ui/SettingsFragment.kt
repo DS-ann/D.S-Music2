@@ -4601,21 +4601,62 @@ private fun AudioFormatRow(
 
 @Composable
 private fun WhatsNewScreen(navController: androidx.navigation.NavController) {
-    val releases by androidx.compose.runtime.produceState<List<com.dsann.music.update.GitHubReleaseClient.ReleaseInfo>?>(initialValue = null) {
-        withContext(Dispatchers.IO) {
+    val context = LocalContext.current
+    var retryKey by remember { mutableStateOf(0) }
+    val releaseLoad by androidx.compose.runtime.produceState<
+        Triple<List<com.dsann.music.update.GitHubReleaseClient.ReleaseInfo>, Boolean, String?>?
+    >(initialValue = null, retryKey) {
+        value = withContext(Dispatchers.IO) {
             val client = com.dsann.music.update.GitHubReleaseClient("DS-ann", "D.S-Music2")
-            value = client.getAllReleases()
+            val loadedReleases = client.getAllReleases()
+            val requestError = client.lastError
+            Triple(
+                loadedReleases,
+                com.dsann.music.util.NetworkFailureClassifier.isNoInternetFailure(
+                    requestError,
+                    context
+                ),
+                requestError?.message
+            )
         }
     }
+    val releases = releaseLoad?.first.orEmpty()
 
     Scaffold(
         topBar = { SettingsDetailTopBar("What's New") { navController.popBackStack() } }
     ) { paddingValues ->
-        if (releases == null) {
+        if (releaseLoad == null) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                 com.dsann.music.ui.theme.LoadingIndicator()
             }
-        } else if (releases!!.isEmpty()) {
+        } else if (releaseLoad?.second == true) {
+            com.dsann.music.ui.theme.NoInternetState(
+                modifier = Modifier.fillMaxSize().padding(paddingValues),
+                onRetry = { retryKey++ },
+                message = "Release notes couldn't be loaded. Check your connection and retry."
+            )
+        } else if (!releaseLoad?.third.isNullOrBlank()) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(paddingValues).padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        "Couldn't load release notes",
+                        style = DsmusicTheme.typography.titleMedium
+                    )
+                    Text(
+                        releaseLoad?.third.orEmpty(),
+                        style = DsmusicTheme.typography.bodyMedium,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
+                    DsmusicTextButton(onClick = { retryKey++ }) { Text("Try again") }
+                }
+            }
+        } else if (releases.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                 Text("No releases found.", style = DsmusicTheme.typography.bodyLarge)
             }
