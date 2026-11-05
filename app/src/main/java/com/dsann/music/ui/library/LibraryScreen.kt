@@ -180,7 +180,7 @@ import com.dsann.music.service.CachedMediaMetadata
 import com.dsann.music.util.SongDownloader
 import com.dsann.music.model.toSongItem
 import com.dsann.music.ui.CreateLocalPlaylistDialog
-import com.dsann.music.ui.LocalPlaylistPickerDialog
+import com.dsann.music.ui.YouTubeMusicPlaylistPickerDialog
 import com.dsann.music.ui.SongActionsBottomSheet
 import com.dsann.music.ui.explore.AccountScreen
 import com.dsann.music.ui.explore.OnlineSongBottomSheet
@@ -317,9 +317,7 @@ fun LibraryScreen(
     var selectedCachedSongForMenu by remember { mutableStateOf<CachedSongEntry?>(null) }
     var songToAddPlaylist by remember { mutableStateOf<SongItem?>(null) }
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
-    var showCreatePlaylistDialog by remember { mutableStateOf(false) }
-    var showCreditsForSong by remember { mutableStateOf<OnlineSong?>(null) }
-    val localPlaylists by viewModel.localPlaylistsFlow.collectAsStateWithLifecycle(emptyList())
+    var showCreditsForSong by remember { mutableStateOf<OnlineSong?>(null)}
 
     // Library sections are local UI state rather than separate NavController destinations.
     // Consume Back here so it returns to the Library landing page.
@@ -1433,35 +1431,19 @@ itemsIndexed(
         }
 
         if (showAddToPlaylistDialog && songToAddPlaylist != null) {
-            LocalPlaylistPickerDialog(
-                playlists = localPlaylists,
-                onCreateNew = {
-                    showCreatePlaylistDialog = true
-                    showAddToPlaylistDialog = false
-                },
-                onPlaylistSelected = { playlist ->
-                    viewModel.addSongToLocalPlaylist(playlist.id, songToAddPlaylist!!)
+            val videoId = songToAddPlaylist?.videoId?.takeIf { it.isNotBlank() }
+            YouTubeMusicPlaylistPickerDialog(
+                videoIds = listOfNotNull(videoId),
+                onPlaylistAdded = { playlistTitle ->
                     showAddToPlaylistDialog = false
                     songToAddPlaylist = null
-                    com.dsann.music.ui.SnackbarController.showMessage("Added to playlist: ${playlist.title}")
+                    com.dsann.music.ui.SnackbarController.showMessage(
+                        "Added to YouTube Music playlist: $playlistTitle"
+                    )
                 },
                 onDismiss = {
                     showAddToPlaylistDialog = false
                     songToAddPlaylist = null
-                }
-            )
-        }
-
-        if (showCreatePlaylistDialog) {
-            CreateLocalPlaylistDialog(
-                onConfirm = { name ->
-                    viewModel.createLocalPlaylist(name)
-                    showCreatePlaylistDialog = false
-                    showAddToPlaylistDialog = true
-                },
-                onDismiss = {
-                    showCreatePlaylistDialog = false
-                    showAddToPlaylistDialog = true
                 }
             )
         }
