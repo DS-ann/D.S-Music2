@@ -568,32 +568,11 @@ object SongDownloader {
         var automaticMp3Conversion: Mp3ConversionResult? = null
 
         try {
-            // Do not let a stale player UI state launch a duplicate download. This check runs
-            // inside the IO download job, never on the main thread.
-            if (isSongDownloaded(context, song)) {
-                _downloadedVideoIds.update { it + videoId }
-                cancelNotification(context, notificationId)
-                withContext(Dispatchers.Main) {
-                    com.dsann.music.ui.SnackbarController.showMessage(
-                        "Already downloaded: $cleanTitleStr",
-                        iconResId = R.drawable.ic_downloaded
-                    )
-                }
-                return
-            }
-
-            updateNotification(context, cleanTitleStr, 0, notificationId, videoId)
-
-            // Reuse a playback cache entry only when its actual MIME type matches the
-            // selected download container and its target bitrate is unchanged. This keeps an
-            // Opus stream distinct from the per-track M4A playback fallback.
             val settings = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
             val selectedDownloadFormat = NewPipeStreamExtractor.normalizeDownloadAudioFormat(
                 settings.getString("download_audio_format", "m4a")
             )
-            // MP3 downloads are sourced from Opus at the selected quality, then encoded locally.
-            // Keep the original tagged Opus file so the three-dot manual conversion action remains
-            // available as a retry/export option.
+            // MP3 is always sourced from Opus and encoded locally at the selected download bitrate.
             val convertToMp3AfterDownload = selectedDownloadFormat == "mp3"
             val downloadSourceFormat = if (convertToMp3AfterDownload) "opus" else selectedDownloadFormat
             val playbackBitrate = NewPipeStreamExtractor.normalizeAudioQuality(
@@ -602,9 +581,52 @@ object SongDownloader {
             val downloadBitrate = NewPipeStreamExtractor.normalizeAudioQuality(
                 settings.getString("download_bitrate", "256 kbps")
             )
+
+            // Check the selected output format, not whether any other format was downloaded.
+            if (isSongDownloaded(context, song)) {
+                _downloadedVideoIds.update { it + videoId }
+                cancelNotification(context, notificationId)
+                withContext(Dispatchers.Main) {
+                    com.dsann.music.ui.SnackbarController.showMessage(
+                        "Already downloaded in $selectedDownloadFormat: $cleanTitleStr",
+                        iconResId = R.drawable.ic_downloaded
+                    )
+                }
+                return
+            }
+
+            // Reuse an existing Opus source when MP3 is selected later; do not download it again.
+            if (convertToMp3AfterDownload && findDownloadedOpusUri(context, song) != null) {
+                updateNotification(context, cleanTitleStr, 75, notificationId, videoId)
+                val conversion = OpusToMp3Converter.convert(context, song)
+                automaticMp3Conversion = conversion
+                if (!conversion.success) {
+                    cancelNotification(context, notificationId)
+                    withContext(Dispatchers.Main) {
+                        com.dsann.music.ui.SnackbarController.showMessage(
+                            "MP3 conversion failed: ${conversion.message}. The Opus original was kept; retry from the three-dot menu."
+                        )
+                    }
+                    return
+                }
+                _downloadedVideoIds.update { it + videoId }
+                _downloadProgress.value += (videoId to 100)
+                showFinishedNotification(context, cleanTitleStr, cleanArtistStr, notificationId)
+                withContext(Dispatchers.Main) {
+                    com.dsann.music.ui.SnackbarController.showMessage(
+                        conversion.message,
+                        iconResId = R.drawable.ic_downloaded
+                    )
+                }
+                return
+            }
+
+            updateNotification(context, cleanTitleStr, 0, notificationId, videoId)
+
+            // Reuse a playback cache entry only when its actual MIME type matches the selected
+            // source container and its target bitrate is unchanged. This keeps Opus distinct
+            // from the per-track M4A playback fallback.
             // Cache entries may contain Opus or the per-track M4A playback fallback.
-            // Reuse one only when its actual MIME type matches the chosen download format
-            // and the target bitrate is unchanged.
             val cachedCandidate = if (playbackBitrate == downloadBitrate) {
                 findCachedStream(context, song.id.toString())
             } else {
