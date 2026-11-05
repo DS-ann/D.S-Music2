@@ -396,8 +396,14 @@ fun BottomSheetScaffoldContent(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 12.dp, bottom = 16.dp)
-                .then(if (isLandscape) Modifier.padding(start = 88.dp, end = 20.dp) else Modifier.padding(horizontal = 20.dp)),
+                .padding(top = if (queueSongMode) 4.dp else 12.dp, bottom = 16.dp)
+                .then(
+                    if (isLandscape && !queueSongMode) {
+                        Modifier.padding(start = 88.dp, end = 20.dp)
+                    } else {
+                        Modifier.padding(horizontal = if (queueSongMode) 14.dp else 20.dp)
+                    }
+                ),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Expressive Handle
@@ -409,7 +415,7 @@ fun BottomSheetScaffoldContent(
                     .background(DsmusicTheme.colorScheme.outlineVariant)
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(if (queueSongMode) 4.dp else 24.dp))
 
             if (queueSongMode) {
                 // Queue actions use the same compact identity header and quick-action
