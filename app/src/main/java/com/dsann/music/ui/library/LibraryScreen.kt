@@ -2050,36 +2050,32 @@ private fun PlaylistsTabContent(
     }
 
     if (showCachePlaylist) {
-        Dialog(
-            onDismissRequest = { showCachePlaylist = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
+        // Keep Cache inside the root Library content instead of a fullscreen Dialog.
+        // Dialog windows sit above MainActivity's persistent navigation and mini-player overlays.
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(DsmusicTheme.colorScheme.background)
         ) {
-            Column(
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(DsmusicTheme.colorScheme.background)
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    DsmusicIconButton(onClick = { showCachePlaylist = false }) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back to playlists")
-                    }
-                    Text("Cache", style = DsmusicTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                DsmusicIconButton(onClick = { showCachePlaylist = false }) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back to playlists")
                 }
-                StreamCacheTabContent(
-                    context = context,
-                    viewModel = viewModel,
-                    exploreViewModel = exploreViewModel,
-                    lyricsCache = lyricsCache,
-                    onSongLongClick = onCachedSongLongClick,
-                    modifier = Modifier.weight(1f).fillMaxWidth()
-                )
+                Text("Cache", style = DsmusicTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
+            StreamCacheTabContent(
+                context = context,
+                viewModel = viewModel,
+                exploreViewModel = exploreViewModel,
+                lyricsCache = lyricsCache,
+                onSongLongClick = onCachedSongLongClick,
+                modifier = Modifier.weight(1f).fillMaxWidth()
+            )
         }
     } else {
         Column(
