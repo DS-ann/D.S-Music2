@@ -164,7 +164,8 @@ private class PlayerSheetAnimatedFrameShape(
     private val progress: Float,
     private val miniWidthFraction: Float,
     private val miniHeightPx: Float,
-    private val miniCornerRadiusPx: Float
+    private val miniCornerRadiusPx: Float,
+    private val miniCenterOffsetPx: Float
 ) : Shape {
     override fun createOutline(
         size: Size,
@@ -175,7 +176,10 @@ private class PlayerSheetAnimatedFrameShape(
         val frameWidth = size.width *
             (miniWidthFraction + (1f - miniWidthFraction) * fraction)
         val frameHeight = miniHeightPx + (size.height - miniHeightPx) * fraction
-        val left = (size.width - frameWidth) / 2f
+        // The rail occupies space only at the collapsed endpoint. Move the mini frame
+        // toward the content pane as it collapses; the expanded player remains full-width.
+        val left = (size.width - frameWidth) / 2f +
+            miniCenterOffsetPx * (1f - fraction)
         val radius = miniCornerRadiusPx * (1f - fraction)
         return Outline.Rounded(
             RoundRect(
@@ -369,6 +373,7 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
     dragModifier: Modifier,
     miniPlayerHeight: Dp,
     miniPlayerWidthFraction: Float,
+    miniPlayerHorizontalOffset: Dp,
     miniPlayerBackgroundColor: Color,
     miniPlayerShape: Shape,
     miniPlayerElevation: Dp,
@@ -419,6 +424,7 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
     Box(
         modifier = Modifier
             .align(Alignment.TopCenter)
+            .offset(x = miniPlayerHorizontalOffset)
             .fillMaxWidth(miniPlayerWidthFraction)
             .height(miniPlayerHeight)
             .then(miniSwipeModifier)
@@ -871,6 +877,7 @@ fun PlayerBottomSheetCompose(
     activity: MainActivity,
     viewModel: PlayerSharedViewModel,
     bottomNavigationVisible: Boolean = false,
+    navigationRailInset: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -1510,8 +1517,24 @@ fun PlayerBottomSheetCompose(
             else -> 22.dp
         }
 
-        // The mini panel starts inset by 12dp on both sides, then expands to full width.
-        val miniPlayerWidthFraction = if (isLandscapeWindow) 0.5f else 1f
+        // Keep the player host full-width throughout the transition. In landscape,
+        // reserve the rail only for the collapsed capsule and animate its center and
+        // width into the content pane instead of remeasuring the host at the endpoint.
+        val effectiveMiniRailInset = if (isLandscapeWindow) {
+            navigationRailInset.coerceAtLeast(0.dp).coerceAtMost(containerWidthDp)
+        } else {
+            0.dp
+        }
+        val miniPlayerHorizontalOffset = effectiveMiniRailInset / 2f
+        val miniPlayerWidthFraction = if (isLandscapeWindow) {
+            val paneWidthFraction = (
+                (containerWidthDp - effectiveMiniRailInset) / containerWidthDp.coerceAtLeast(1.dp)
+            ).coerceIn(0f, 1f)
+            0.5f * paneWidthFraction
+        } else {
+            1f
+        }
+        val miniPlayerHorizontalOffsetPx = with(density) { miniPlayerHorizontalOffset.toPx() }
         val miniFrameWidthFraction = remember(containerWidthDp, density, miniPlayerWidthFraction) {
             with(density) {
                 val fullWidthPx = containerWidthDp.toPx().coerceAtLeast(1f)
@@ -1611,7 +1634,8 @@ fun PlayerBottomSheetCompose(
                             progress = progress,
                             miniWidthFraction = miniFrameWidthFraction,
                             miniHeightPx = with(density) { miniPlayerHeight.toPx() },
-                            miniCornerRadiusPx = miniPlayerCornerRadiusPx
+                            miniCornerRadiusPx = miniPlayerCornerRadiusPx,
+                            miniCenterOffsetPx = miniPlayerHorizontalOffsetPx
                         )
                         clip = true
                     },
@@ -1686,6 +1710,7 @@ fun PlayerBottomSheetCompose(
                                 dragModifier = verticalDragModifier,
                                 miniPlayerHeight = miniPlayerHeight,
                                 miniPlayerWidthFraction = miniPlayerWidthFraction,
+                                miniPlayerHorizontalOffset = miniPlayerHorizontalOffset,
                                 miniPlayerBackgroundColor = dynamicBgColor,
                                 miniPlayerShape = miniPlayerShape,
                                 miniPlayerElevation = miniPlayerElevation,
@@ -1770,7 +1795,8 @@ fun PlayerBottomSheetCompose(
                                 val xStartPx = with(density) {
                                     miniArtworkContentInset.toPx() +
                                         if (isLandscapeWindow) {
-                                            (containerWidthDp * ((1f - miniPlayerWidthFraction) / 2f)).toPx()
+                                            (containerWidthDp * ((1f - miniPlayerWidthFraction) / 2f)).toPx() +
+                                                miniPlayerHorizontalOffsetPx
                                         } else {
                                             0f
                                         }
