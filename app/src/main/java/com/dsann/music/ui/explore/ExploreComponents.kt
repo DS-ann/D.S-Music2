@@ -2058,10 +2058,13 @@ fun OnlineSongBottomSheet(
                             onDismissRequest()
                         }
                         !song.albumName.isNullOrBlank() -> {
-                            exploreViewModel.loadAlbumByName(song.albumName, song.artist)
+                            exploreViewModel.loadAlbumByName(song.albumName.orEmpty(), song.artist)
                             onDismissRequest()
                         }
-                        else -> com.dsann.music.ui.SnackbarController.showMessage("Album information unavailable")
+                        else -> {
+                            exploreViewModel.loadAlbumForSong(song.title, song.artist)
+                            onDismissRequest()
+                        }
                     }
                 }
             ) + artistMenuItems + listOf(
