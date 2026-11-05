@@ -443,6 +443,7 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
                 currentSong = currentSong,
                 isPlaying = isPlaying,
                 accentColor = baseAccentColor,
+                miniPlayerBackgroundColor = miniPlayerBackgroundColor,
                 showLegacyCompactArtwork = showLegacyCompactArtwork,
                 expansionFraction = playerContentExpansionFraction,
                 onClick = {
@@ -2078,6 +2079,7 @@ fun PlayerBottomSheetCompose(
                             MiniPlayerArtworkProgressOverlay(
                                 viewModel = viewModel,
                                 accentColor = baseAccentColor,
+                                backgroundColor = dynamicBgColor,
                                 expansionFraction = playerContentExpansionFraction,
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -2196,6 +2198,7 @@ private fun MiniPlayerContentInternal(
     currentSong: SongItem,
     isPlaying: Boolean,
     accentColor: Color,
+    miniPlayerBackgroundColor: Color,
     showLegacyCompactArtwork: Boolean,
     expansionFraction: Animatable<Float, AnimationVector1D>,
     onClick: () -> Unit,
@@ -2211,18 +2214,33 @@ private fun MiniPlayerContentInternal(
     val controlIconSet by miniPlayerPreferences.observeKey("mini_player_control_icons", "Classic")
     val artworkShapeName by miniPlayerPreferences.observeKey("player_artwork_shape", "Rounded")
     val artworkLayout by miniPlayerPreferences.observeKey("player_layout", "Standard")
+    val embeddedCurrentArtwork by viewModel.currentSongArtwork.collectAsStateWithLifecycle()
     val miniArtworkShape = remember(artworkShapeName, artworkLayout) {
         DsmCoverShapes.forPlayerLayout(artworkLayout, artworkShapeName)
     }
-    val miniArtworkModel = remember(
-        currentSong.id, currentSong.thumbnailUrl, currentSong.videoId,
-        currentSong.albumId, currentSong.path
+    val legacyDownloadedArtwork = if (
+        android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M &&
+        currentSong.isDownloadedOffline
     ) {
-        currentSong.thumbnailUrl?.takeIf { it.isNotBlank() }
-            ?.let { SongItem.enhanceThumbnailUrl(it) }
+        embeddedCurrentArtwork?.takeIf { it.isNotEmpty() }
+    } else {
+        null
+    }
+    val miniArtworkModel: Any? = remember(
+        currentSong.id, currentSong.thumbnailUrl, currentSong.videoId,
+        currentSong.albumId, currentSong.path, currentSong.isDownloadedOffline,
+        legacyDownloadedArtwork
+    ) {
+        legacyDownloadedArtwork
+            ?: currentSong.thumbnailUrl?.takeIf { it.isNotBlank() }
+                ?.let { SongItem.enhanceThumbnailUrl(it) }
             ?: currentSong.videoId?.takeIf { it.isNotBlank() }
                 ?.let { "https://img.youtube.com/vi/$it/hqdefault.jpg" }
-            ?: currentSong.getAlbumArtUri()?.toString()
+            ?: if (
+                currentSong.isDownloadedOffline &&
+                android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M &&
+                currentSong.albumId <= 0L
+            ) null else currentSong.getAlbumArtUri()?.toString()
     }
     val miniArtworkRequest = remember(context, miniArtworkModel) {
         miniArtworkModel?.let { model ->
@@ -2309,6 +2327,7 @@ private fun MiniPlayerContentInternal(
                 MiniPlayerArtworkProgressOverlay(
                     viewModel = viewModel,
                     accentColor = accentColor,
+                    backgroundColor = miniPlayerBackgroundColor,
                     expansionFraction = expansionFraction,
                     modifier = Modifier.size(48.dp)
                 )
@@ -2424,6 +2443,7 @@ private fun MiniPlayerContentInternal(
 private fun MiniPlayerArtworkProgressOverlay(
     viewModel: PlayerSharedViewModel,
     accentColor: Color,
+    backgroundColor: Color,
     expansionFraction: Animatable<Float, AnimationVector1D>,
     modifier: Modifier = Modifier
 ) {
@@ -2455,6 +2475,16 @@ private fun MiniPlayerArtworkProgressOverlay(
         initialValue = viewModel.currentPosition.value
     )
     val duration by viewModel.duration.collectAsStateWithLifecycle()
+    val contrastProgressColor = if (
+        androidx.core.graphics.ColorUtils.calculateLuminance(backgroundColor.toArgb()) > 0.5
+    ) Color(0xFF1C1B1F) else Color.White
+    val visibleAccentColor = if (
+        androidx.core.graphics.ColorUtils.calculateContrast(
+            accentColor.toArgb(),
+            backgroundColor.toArgb()
+        ) >= 3.0
+    ) accentColor else contrastProgressColor
+    val progressTrackColor = contrastProgressColor.copy(alpha = 0.46f)
 
     // The frame timestamp is read inside Canvas so only the artwork-progress drawing
     // invalidates at display refresh, not the entire mini-player composition.
@@ -2491,7 +2521,7 @@ private fun MiniPlayerArtworkProgressOverlay(
                     cap = androidx.compose.ui.graphics.StrokeCap.Round
                 )
                 drawArc(
-                    color = accentColor.copy(alpha = 0.28f),
+                    color = progressTrackColor,
                     startAngle = -90f,
                     sweepAngle = 360f,
                     useCenter = false,
@@ -2501,7 +2531,7 @@ private fun MiniPlayerArtworkProgressOverlay(
                 )
                 if (progress > 0f) {
                     drawArc(
-                        color = accentColor,
+                        color = visibleAccentColor,
                         startAngle = -90f,
                         sweepAngle = 360f * progress,
                         useCenter = false,
@@ -2517,7 +2547,7 @@ private fun MiniPlayerArtworkProgressOverlay(
                 val y = size.height * 0.91f
                 val thickness = (side * 0.028f).coerceAtLeast(1f)
                 drawLine(
-                    color = accentColor.copy(alpha = 0.28f),
+                    color = progressTrackColor,
                     start = androidx.compose.ui.geometry.Offset(startX, y),
                     end = androidx.compose.ui.geometry.Offset(endX, y),
                     strokeWidth = thickness,
@@ -2525,7 +2555,7 @@ private fun MiniPlayerArtworkProgressOverlay(
                 )
                 if (progress > 0f) {
                     drawLine(
-                        color = accentColor,
+                        color = visibleAccentColor,
                         start = androidx.compose.ui.geometry.Offset(startX, y),
                         end = androidx.compose.ui.geometry.Offset(startX + (endX - startX) * progress, y),
                         strokeWidth = thickness,
@@ -2540,8 +2570,8 @@ private fun MiniPlayerArtworkProgressOverlay(
                     drawRect(
                         brush = androidx.compose.ui.graphics.Brush.verticalGradient(
                             colors = listOf(
-                                accentColor.copy(alpha = 0.10f),
-                                accentColor.copy(alpha = 0.48f)
+                                visibleAccentColor.copy(alpha = 0.16f),
+                                visibleAccentColor.copy(alpha = 0.58f)
                             ),
                             startY = top,
                             endY = size.height
@@ -2550,7 +2580,7 @@ private fun MiniPlayerArtworkProgressOverlay(
                         size = androidx.compose.ui.geometry.Size(size.width, fillHeight)
                     )
                     drawLine(
-                        color = accentColor.copy(alpha = 0.9f),
+                        color = visibleAccentColor,
                         start = androidx.compose.ui.geometry.Offset(0f, top),
                         end = androidx.compose.ui.geometry.Offset(size.width, top),
                         strokeWidth = (side * 0.018f).coerceAtLeast(1f)
