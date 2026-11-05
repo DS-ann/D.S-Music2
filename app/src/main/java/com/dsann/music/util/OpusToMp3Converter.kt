@@ -85,6 +85,7 @@ internal object OpusToMp3Converter {
             if (SongDownloader.findDownloadedExportUri(appContext, outputName) == null) {
                 throw IllegalStateException("MP3 was encoded but the music library could not verify it")
             }
+            SongDownloader.rememberDownloadedExport(appContext, song, outputFile)
             published = true
             return Mp3ConversionResult(
                 true,
