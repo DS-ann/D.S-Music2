@@ -632,8 +632,8 @@ fun LibraryScreen(
                         var isSelectingDownloads by remember { mutableStateOf(false) }
                         var selectedDownloadIds by remember { mutableStateOf(setOf<Long>()) }
                         var downloadSelectionMenuExpanded by remember { mutableStateOf(false) }
-                        val isLandscapeLibraryLayout =
-                            LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                        var downloadOptionsExpanded by remember { mutableStateOf(false) }
+                        var isDownloadSearchVisible by rememberSaveable { mutableStateOf(false) }
 
                         val pullToRefreshState = rememberPullToRefreshState()
                         PullToRefreshBox(
@@ -643,87 +643,6 @@ fun LibraryScreen(
                             modifier = Modifier.fillMaxSize()
                         ) {
                             Column(modifier = Modifier.fillMaxSize()) {
-                                // Search Bar
-                                Row(
-                                    modifier = Modifier.fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 6.dp)
-                                        .clip(CircleShape)
-                                        .background(DsmusicTheme.colorScheme.surfaceContainerLow)
-                                        .border(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.42f), CircleShape)
-                                        .padding(horizontal = 15.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.Search,
-                                        contentDescription = "Search local songs",
-                                        tint = DsmusicTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(21.dp)
-                                    )
-                                    Box(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                                        if (searchQuery.isEmpty()) {
-                                            Text(
-                                                "Search local songs...",
-                                                style = DsmusicTheme.typography.bodyMedium,
-                                                color = DsmusicTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                        BasicTextField(
-                                            value = searchQuery,
-                                            onValueChange = { searchQuery = it },
-                                            singleLine = true,
-                                            textStyle = DsmusicTheme.typography.bodyMedium.copy(
-                                                color = DsmusicTheme.colorScheme.onSurface
-                                            ),
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
-                                    if (searchQuery.isNotEmpty()) {
-                                        Box(
-                                            modifier = Modifier.size(28.dp).clip(CircleShape)
-                                                .clickable { searchQuery = "" },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                Icons.Rounded.Clear,
-                                                contentDescription = "Clear search",
-                                                tint = DsmusicTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // Sorting chips
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState())
-                                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    SortOrder.entries.forEach { order ->
-                                        val isSel = sortOrder == order
-                                        Box(
-                                            modifier = Modifier.clip(RoundedCornerShape(9.dp))
-                                                .background(
-                                                    if (isSel) DsmusicTheme.colorScheme.primaryContainer
-                                                    else DsmusicTheme.colorScheme.surfaceContainerLow
-                                                )
-                                                .clickable { sortOrder = order }
-                                                .padding(horizontal = 13.dp, vertical = 9.dp)
-                                        ) {
-                                            BasicText(
-                                                text = order.name.replace("_", " "),
-                                                style = DsmusicTheme.typography.labelMedium.copy(
-                                                    color = if (isSel) DsmusicTheme.colorScheme.onPrimaryContainer
-                                                        else DsmusicTheme.colorScheme.onSurfaceVariant,
-                                                    fontWeight = FontWeight.SemiBold
-                                                )
-                                            )
-                                        }
-                                    }
-                                }
-
                                 Spacer(modifier = Modifier.height(6.dp))
 
                                 // Keep this folder scoped to files saved by D.S Music's downloader.
@@ -843,7 +762,147 @@ fun LibraryScreen(
                                     }
                                 }
 
-                                if (sourceSongs.isNotEmpty() && !isLandscapeLibraryLayout) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            "Downloads",
+                                            style = DsmusicTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            "${filteredSongs.size} songs",
+                                            style = DsmusicTheme.typography.bodySmall,
+                                            color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Box {
+                                        DsmusicIconButton(onClick = { downloadOptionsExpanded = true }) {
+                                            Icon(Icons.Rounded.MoreVert, contentDescription = "Download options")
+                                        }
+                                        DropdownMenu(
+                                            expanded = downloadOptionsExpanded,
+                                            onDismissRequest = { downloadOptionsExpanded = false }
+                                        ) {
+                                            Text(
+                                                "SORT BY",
+                                                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 7.dp),
+                                                style = DsmusicTheme.typography.labelSmall,
+                                                color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            SortOrder.entries.forEach { order ->
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Text(
+                                                            when (order) {
+                                                                SortOrder.A_Z -> "Title (A–Z)"
+                                                                SortOrder.DATE_ADDED -> "Date added"
+                                                                SortOrder.ARTIST -> "Artist"
+                                                                SortOrder.DURATION -> "Duration"
+                                                            }
+                                                        )
+                                                    },
+                                                    onClick = {
+                                                        sortOrder = order
+                                                        downloadOptionsExpanded = false
+                                                    },
+                                                    trailingIcon = {
+                                                        if (sortOrder == order) Icon(
+                                                            Icons.Rounded.Check,
+                                                            contentDescription = "Selected",
+                                                            tint = DsmusicTheme.colorScheme.primary
+                                                        )
+                                                    }
+                                                )
+                                            }
+                                            com.dsann.music.ui.theme.HorizontalDivider()
+                                            DropdownMenuItem(
+                                                text = { Text("Select songs") },
+                                                onClick = {
+                                                    isSelectingDownloads = true
+                                                    downloadOptionsExpanded = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text(if (isDownloadSearchVisible) "Hide search" else "Search") },
+                                                onClick = {
+                                                    isDownloadSearchVisible = !isDownloadSearchVisible
+                                                    if (!isDownloadSearchVisible) searchQuery = ""
+                                                    downloadOptionsExpanded = false
+                                                }
+                                            )
+                                            com.dsann.music.ui.theme.HorizontalDivider()
+                                            DropdownMenuItem(
+                                                text = { Text("Play all") },
+                                                enabled = filteredSongs.isNotEmpty(),
+                                                onClick = {
+                                                    viewModel.setShuffleEnabled(false)
+                                                    viewModel.setSongList(filteredSongs)
+                                                    viewModel.playSongAtIndex(0)
+                                                    downloadOptionsExpanded = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Shuffle") },
+                                                enabled = filteredSongs.isNotEmpty(),
+                                                onClick = {
+                                                    val playlist = filteredSongs.shuffled()
+                                                    viewModel.setShuffleEnabled(true)
+                                                    viewModel.setSongList(playlist)
+                                                    viewModel.playSongAtIndex(0)
+                                                    downloadOptionsExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (isDownloadSearchVisible) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                                            .clip(CircleShape)
+                                            .background(DsmusicTheme.colorScheme.surfaceContainerLow)
+                                            .border(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.42f), CircleShape)
+                                            .padding(horizontal = 14.dp, vertical = 9.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.Search,
+                                            contentDescription = "Search downloads",
+                                            tint = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Box(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                                            if (searchQuery.isEmpty()) {
+                                                Text(
+                                                    "Search downloads…",
+                                                    style = DsmusicTheme.typography.bodyMedium,
+                                                    color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                            BasicTextField(
+                                                value = searchQuery,
+                                                onValueChange = { searchQuery = it },
+                                                singleLine = true,
+                                                textStyle = DsmusicTheme.typography.bodyMedium.copy(
+                                                    color = DsmusicTheme.colorScheme.onSurface
+                                                ),
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                        DsmusicIconButton(onClick = {
+                                            searchQuery = ""
+                                            isDownloadSearchVisible = false
+                                        }) {
+                                            Icon(Icons.Rounded.Close, contentDescription = "Close search")
+                                        }
+                                    }
+                                }
+
+                                if (sourceSongs.isNotEmpty() && isSelectingDownloads) {
                                     downloadSelectionControls(
                                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
                                     )
@@ -865,127 +924,8 @@ fun LibraryScreen(
                                             color = DsmusicTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
-                                } else if (isLandscapeLibraryLayout) {
-                                    val landscapeDownloadSongs = sortedAndGrouped.filterIsInstance<SongItem>()
-                                    Row(
-                                        modifier = Modifier.fillMaxSize(),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(
-                                            modifier = Modifier
-                                                .weight(0.40f)
-                                                .fillMaxHeight()
-                                                .verticalScroll(rememberScrollState())
-                                                .padding(start = 12.dp, top = 10.dp, end = 12.dp, bottom = 14.dp)
-                                        ) {
-                                            LibraryGradientPlaylistHero(
-                                                title = "Downloads",
-                                                subtitle = sourceSongs.size.toString() + " songs · D.S Music",
-                                                status = "Saved on this device",
-                                                artwork = filteredSongs.firstOrNull()?.let {
-                                                    it.getAlbumArtUri() ?: R.drawable.ic_music_note
-                                                },
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                ) {
-                                                    DsmusicButton(
-                                                        onClick = {
-                                                            if (filteredSongs.isNotEmpty()) {
-                                                                viewModel.setShuffleEnabled(false)
-                                                                viewModel.setSongList(filteredSongs)
-                                                                viewModel.playSongAtIndex(0)
-                                                            }
-                                                        },
-                                                        enabled = filteredSongs.isNotEmpty(),
-                                                        modifier = Modifier.weight(1f)
-                                                    ) {
-                                                        Icon(Icons.Rounded.PlayArrow, null)
-                                                        Spacer(Modifier.width(6.dp))
-                                                        Text("Play all")
-                                                    }
-                                                    DsmusicOutlinedButton(
-                                                        onClick = {
-                                                            val playlist = filteredSongs.shuffled()
-                                                            if (playlist.isNotEmpty()) {
-                                                                viewModel.setShuffleEnabled(true)
-                                                                viewModel.setSongList(playlist)
-                                                                viewModel.playSongAtIndex(0)
-                                                            }
-                                                        },
-                                                        enabled = filteredSongs.isNotEmpty(),
-                                                        modifier = Modifier.weight(1f)
-                                                    ) {
-                                                        Icon(Icons.Rounded.Shuffle, null)
-                                                        Spacer(Modifier.width(6.dp))
-                                                        Text("Shuffle")
-                                                    }
-                                                }
-                                                downloadSelectionControls(Modifier.fillMaxWidth())
-                                            }
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxHeight()
-                                                .width(1.dp)
-                                                .background(DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.38f))
-                                        )
-                                        LazyColumn(
-                                            modifier = Modifier.weight(0.60f).fillMaxHeight(),
-                                            contentPadding = PaddingValues(
-                                                start = 10.dp,
-                                                top = 8.dp,
-                                                end = 12.dp,
-                                                bottom = 160.dp
-                                            ),
-                                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                                        ) {
-                                            itemsIndexed(
-                                                landscapeDownloadSongs,
-                                                key = { _, song -> "landscape-downloaded:" + song.id }
-                                            ) { index, item ->
-                                                val isPlaying = currentSong?.id == item.id
-                                                val isFav = favoriteIds.contains(item.id)
-                                                SongListItem(
-                                                    song = item,
-                                                    isPlaying = isPlaying,
-                                                    isFavorite = isFav,
-                                                    localIndex = index,
-                                                    localCount = landscapeDownloadSongs.size,
-                                                    selectionMode = isSelectingDownloads,
-                                                    isSelected = item.id in selectedDownloadIds,
-                                                    onClick = {
-                                                        if (isSelectingDownloads) {
-                                                            selectedDownloadIds = if (item.id in selectedDownloadIds) {
-                                                                selectedDownloadIds - item.id
-                                                            } else {
-                                                                selectedDownloadIds + item.id
-                                                            }
-                                                        } else {
-                                                            viewModel.setSongList(filteredSongs)
-                                                            viewModel.playSong(item)
-                                                        }
-                                                    },
-                                                    onLongClick = {
-                                                        if (isSelectingDownloads) {
-                                                            selectedDownloadIds = if (item.id in selectedDownloadIds) {
-                                                                selectedDownloadIds - item.id
-                                                            } else {
-                                                                selectedDownloadIds + item.id
-                                                            }
-                                                        } else {
-                                                            isSelectingDownloads = true
-                                                            selectedDownloadIds = setOf(item.id)
-                                                        }
-                                                    }
-                                                )
-                                            }
-                                        }
-                                    }
                                 } else {
-                                    // Downloads is a single playlist in portrait. Use a LazyColumn
+                                    // Downloads is a compact continuous track list in both orientations. Use a LazyColumn
                                     // rather than a one-column LazyVerticalGrid so vertical drags
                                     // that begin on a song row stay with the scrolling list.
                                     LazyColumn(
@@ -1000,83 +940,6 @@ fun LibraryScreen(
                                         ),
                                         verticalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
-                                        item(key = "download-playlist-header") {
-                                            val headerSong = filteredSongs.firstOrNull()
-                                            if (headerSong != null) {
-                                                Column(
-                                                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                                                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                                                ) {
-                                                    Column(
-                                                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                                                    ) {
-                                                        AsyncImage(
-                                                            model = libraryArtworkRequestBuilder(
-                                                                context,
-                                                                headerSong.getAlbumArtUri() ?: R.drawable.ic_music_note
-                                                            ).crossfade(false).build(),
-                                                            contentDescription = "Downloads playlist artwork",
-                                                            modifier = Modifier.size(216.dp).clip(RoundedCornerShape(18.dp)),
-                                                            contentScale = ContentScale.Crop
-                                                        )
-                                                        Text(
-                                                            "Downloads",
-                                                            style = DsmusicTheme.typography.headlineMedium,
-                                                            fontWeight = FontWeight.ExtraBold
-                                                        )
-                                                        Text(
-                                                            "D.S Music · ${sourceSongs.size} songs",
-                                                            style = DsmusicTheme.typography.bodyMedium,
-                                                            color = DsmusicTheme.colorScheme.onSurfaceVariant
-                                                        )
-                                                        Text(
-                                                            "Saved on this device",
-                                                            style = DsmusicTheme.typography.labelMedium,
-                                                            color = DsmusicTheme.colorScheme.primary
-                                                        )
-                                                    }
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                                    ) {
-                                                        DsmusicButton(
-                                                            onClick = {
-                                                                if (filteredSongs.isNotEmpty()) {
-                                                                    viewModel.setShuffleEnabled(false)
-                                                                    viewModel.setSongList(filteredSongs)
-                                                                    viewModel.playSongAtIndex(0)
-                                                                }
-                                                            },
-                                                            enabled = filteredSongs.isNotEmpty(),
-                                                            modifier = Modifier.weight(1f)
-                                                        ) {
-                                                            Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                                                            Spacer(Modifier.width(8.dp))
-                                                            Text("Play all")
-                                                        }
-                                                        DsmusicOutlinedButton(
-                                                            onClick = {
-                                                                val playlist = filteredSongs.shuffled()
-                                                                if (playlist.isNotEmpty()) {
-                                                                    viewModel.setShuffleEnabled(true)
-                                                                    viewModel.setSongList(playlist)
-                                                                    viewModel.playSongAtIndex(0)
-                                                                }
-                                                            },
-                                                            enabled = filteredSongs.isNotEmpty(),
-                                                            modifier = Modifier.weight(1f)
-                                                        ) {
-                                                            Icon(Icons.Rounded.Shuffle, contentDescription = null)
-                                                            Spacer(Modifier.width(8.dp))
-                                                            Text("Shuffle")
-                                                        }
-                                                    }
-                                                    com.dsann.music.ui.theme.HorizontalDivider()
-                                                }
-                                            }
-                                        }
                                         itemsIndexed(
                                             items = sortedAndGrouped,
                                             key = { _, item ->
@@ -1820,16 +1683,7 @@ private fun DownloadsSelectionControls(
     onDone: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (!isSelecting) {
-        Row(
-            modifier = modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            DsmusicTextButton(onClick = onStartSelection) {
-                Text("Select songs")
-            }
-        }
-    } else {
+    if (isSelecting) {
         Row(
             modifier = modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
