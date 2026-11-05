@@ -3067,6 +3067,17 @@ private fun AppearanceScreen(
 
             
             }
+            SettingsAccordionSection("Artwork shape") {
+                SettingsGroupCard(listOf {
+                    SettingsChoiceRow(
+                        title = "Cover shape",
+                        description = "Choose the full-player song cover outline. The selected shape updates the shared artwork immediately.",
+                        selected = playerArtworkShape,
+                        options = listOf("Rounded", "Square", "Circle", "Squircle", "Flower", "Cookie", "Arch", "Slanted"),
+                        onSelected = onPlayerArtworkShapeChange
+                    )
+                })
+            }
             SettingsAccordionSection("Player buttons") {
             SettingsGroupCard(listOf(
                 {
@@ -3279,15 +3290,6 @@ private fun AppearanceScreen(
                         onSelected = onMiniPlayerProgressStyleChange
                     )
                 },
-                {
-                    SettingsChoiceRow(
-                        title = "Player artwork shape",
-                        description = "Rounded, square, circular, squircle, flower, cookie, arch or slanted album artwork.",
-                        selected = playerArtworkShape,
-                        options = listOf("Rounded", "Square", "Circle", "Squircle", "Flower", "Cookie", "Arch", "Slanted"),
-                        onSelected = onPlayerArtworkShapeChange
-                    )
-                }
             ))
 
             
