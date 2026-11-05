@@ -70,6 +70,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dsann.music.model.SongItem
+import com.dsann.music.ui.explore.LocalSongActionsBottomSheet
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -111,6 +112,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var sortOrder by rememberSaveable { mutableStateOf(SortOrder.A_Z) }
     var isScanning by remember { mutableStateOf(false) }
+    var selectedLocalSongForMenu by remember { mutableStateOf<SongItem?>(null) }
 
     LaunchedEffect(storageRootPath) {
         if (currentFolderPath != storageRootPath &&
@@ -499,11 +501,21 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                             viewModel.setSongList(visibleSongsInView)
                             viewModel.playSongAtIndex(index)
                         },
-                        onLongClick = { },
+                        onLongClick = { selectedLocalSongForMenu = song },
                         artworkRequestSizePx = 60
                     )
                 }
             }
         }
+    }
+
+    selectedLocalSongForMenu?.let { selectedSong ->
+        LocalSongActionsBottomSheet(
+            song = selectedSong,
+            localQueue = visibleSongsInView,
+            selectedSongIndex = visibleSongsInView.indexOfFirst { it.id == selectedSong.id },
+            playerSharedViewModel = viewModel,
+            onDismissRequest = { selectedLocalSongForMenu = null }
+        )
     }
 }
