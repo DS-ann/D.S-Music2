@@ -95,7 +95,7 @@ object AdvancedLyricsParser {
             }
 
             if (tokens.isEmpty()) return@forEach
-            val words = buildWords(tokens)
+            val words = buildWords(tokens, lineStart + lineDuration)
             val text = words.joinToString("") { it.text }.trim()
             if (text.isBlank() || isCreditLine(text)) return@forEach
             // QQ/KuGou may include a title/artist card before the first real lyric line.
@@ -141,8 +141,8 @@ object AdvancedLyricsParser {
                 val background = syllable.string("isBackground")?.equals("true", true) == true
                 if (background) backgroundTokens += token else mainTokens += token
             }
-            val words = buildWords(mainTokens)
-            val bgWordsRaw = buildWords(backgroundTokens)
+            val words = buildWords(mainTokens, start + duration)
+            val bgWordsRaw = buildWords(backgroundTokens, start + duration)
             val fallbackText = line.string("text")?.trim().orEmpty()
             val text = if (words.isNotEmpty()) words.joinToString("") { it.text }.trim() else fallbackText
             if (text.isBlank()) return@forEach
@@ -168,36 +168,59 @@ object AdvancedLyricsParser {
     }
 
     /** Preserve timed segments even when a lyric line contains no spaces. */
-    private fun buildWords(tokens: List<TimedToken>): List<LyricWord> {
+    private fun buildWords(tokens: List<TimedToken>, fallbackEndMs: Long): List<LyricWord> {
+        val decoded = tokens.mapNotNull { token ->
+            decodeEntities(token.text).takeIf { it.isNotEmpty() }?.let { it to token }
+        }
         val output = mutableListOf<LyricWord>()
         var cursor = 0
-        tokens.forEach { token ->
-            val text = decodeEntities(token.text)
-            if (text.isEmpty()) return@forEach
+        decoded.forEachIndexed { index, (text, token) ->
             val start = cursor
             cursor += text.length
+            val nextStart = decoded.getOrNull(index + 1)?.second?.startMs
+            val inferredDuration = when {
+                nextStart != null && nextStart > token.startMs -> nextStart - token.startMs
+                fallbackEndMs > token.startMs -> fallbackEndMs - token.startMs
+                else -> 300L
+            }
             output += LyricWord(
                 text = text,
                 absoluteStartTimeMs = token.startMs.coerceAtLeast(0L),
-                durationMs = token.durationMs.coerceAtLeast(0L),
+                durationMs = (token.durationMs.takeIf { it > 0L } ?: inferredDuration).coerceAtLeast(50L),
                 charRange = start..(cursor - 1)
             )
         }
         return output
     }
 
-    /** Recalculate character ranges after line-level trim and remove timings beyond visible text. */
+    /** Recalculate ranges against the trimmed visible text, including leading/trailing token spaces. */
     private fun alignWordRanges(words: List<LyricWord>, lineText: String): List<LyricWord> {
+        if (words.isEmpty() || lineText.isEmpty()) return emptyList()
+        val joined = words.joinToString("") { it.text }
+        val visibleStart = joined.indexOfFirst { !it.isWhitespace() }.coerceAtLeast(0)
+        val visibleEnd = joined.indexOfLast { !it.isWhitespace() } + 1
         val out = mutableListOf<LyricWord>()
-        var cursor = 0
+        var sourceCursor = 0
+        var outputCursor = 0
         words.forEach { word ->
-            if (cursor >= lineText.length) return@forEach
-            val visible = word.text.take(lineText.length - cursor)
-            if (visible.isEmpty()) return@forEach
-            out += word.copy(text = visible, charRange = cursor..(cursor + visible.length - 1))
-            cursor += visible.length
+            val sourceEnd = sourceCursor + word.text.length
+            val overlapStart = maxOf(sourceCursor, visibleStart)
+            val overlapEnd = minOf(sourceEnd, visibleEnd)
+            if (overlapStart < overlapEnd) {
+                val from = overlapStart - sourceCursor
+                val until = overlapEnd - sourceCursor
+                val visible = word.text.substring(from, until)
+                out += word.copy(
+                    text = visible,
+                    charRange = outputCursor..(outputCursor + visible.length - 1)
+                )
+                outputCursor += visible.length
+            }
+            sourceCursor = sourceEnd
         }
-        return out
+        // Guard against a malformed provider payload whose token text does not reproduce
+        // the line string. In that case, keep no partial karaoke ranges.
+        return out.takeIf { outputCursor == lineText.length }.orEmpty()
     }
 
     private fun addInterludes(input: List<LyricLine>): List<LyricLine> {

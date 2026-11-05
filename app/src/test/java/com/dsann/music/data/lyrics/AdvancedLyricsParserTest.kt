@@ -86,4 +86,41 @@ class AdvancedLyricsParserTest {
         assertEquals(null, nonLatinArtist.getLegacyCacheKey())
         assertNotEquals(null, asciiTrack.getLegacyCacheKey())
     }
+    @Test
+    fun ttmlWithoutWordTimestampsRemainsLineSynced() {
+        val lines = TtmlParser.parse(
+            """<tt><body><div><p begin="1s" end="3s"><span>Hello </span><span>world</span></p></div></body></tt>"""
+        )
+        assertEquals(1, lines.size)
+        assertEquals("Hello world", lines.single().content)
+        assertFalse(lines.single().isWordByWord)
+        assertTrue(lines.single().words.isEmpty())
+    }
+
+    @Test
+    fun ttmlStartOnlyWordsUseNextTimestampAndParagraphEnd() {
+        val lines = TtmlParser.parse(
+            """<tt><body><div><p begin="1s" end="3s"><span begin="1s">Hello </span><span begin="1.8s">world</span></p></div></body></tt>"""
+        )
+        val line = lines.single()
+        assertTrue(line.isWordByWord)
+        assertEquals("Hello world", line.content)
+        assertEquals(800L, line.words[0].durationMs)
+        assertEquals(1200L, line.words[1].durationMs)
+        assertEquals(0, line.words[0].charRange.first)
+        assertEquals(4, line.words[0].charRange.last)
+        assertEquals(6, line.words[1].charRange.first)
+        assertEquals(10, line.words[1].charRange.last)
+    }
+
+    @Test
+    fun qrcCharacterRangesExcludeLeadingAndTrailingTokenWhitespace() {
+        val line = LrcParser.parse("[1000,2000] (1000,300)Hello (1300,400) world ").single()
+        assertEquals("Hello world", line.content)
+        assertEquals(0, line.words.first().charRange.first)
+        assertEquals(4, line.words.first().charRange.last)
+        assertEquals(6, line.words.last().charRange.first)
+        assertEquals(10, line.words.last().charRange.last)
+    }
+
 }

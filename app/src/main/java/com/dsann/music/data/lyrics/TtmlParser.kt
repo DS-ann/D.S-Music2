@@ -54,7 +54,7 @@ object TtmlParser {
                     else -> lineStartMs + 5000L
                 }
 
-                val words = mutableListOf<LyricWord>()
+                val pendingWords = mutableListOf<PendingTimedWord>()
                 val lineSb = StringBuilder()
 
                 val isLineBg = getAttributeAny(pElement, "role", "ttm:role")?.lowercase()?.let {
@@ -64,11 +64,16 @@ object TtmlParser {
                 val agentAttr = getAttributeAny(pElement, "agent", "ttm:agent")?.trim()
 
                 val childNodes = pElement.childNodes
-                val hasSpanChildren = pElement.getElementsByTagName("span").length > 0
+                val hasSpanChildren = pElement.getElementsByTagNameNS("*", "span").length > 0 ||
+                    pElement.getElementsByTagName("span").length > 0
                 var hasPendingSpace = false
 
                 if (hasSpanChildren && childNodes.length > 0) {
-                    fun processSpanElement(span: Element, parentIsBg: Boolean) {
+                    fun processSpanElement(
+                        span: Element,
+                        parentIsBg: Boolean,
+                        inheritedTiming: TtmlSpanTiming
+                    ) {
                         val roleAttr = getAttributeAny(span, "role", "ttm:role")?.lowercase()
                         val isSpanBg = parentIsBg || roleAttr == "x-bg" || roleAttr == "background"
 
@@ -76,48 +81,50 @@ object TtmlParser {
                         val cleanWordText = rawWordText.trim()
                         if (cleanWordText.isEmpty()) return
 
-                        val wordBegin = getAttributeAny(span, "begin", "ttm:begin")
-                        val wordEnd = getAttributeAny(span, "end", "ttm:end")
-                        val wordDur = getAttributeAny(span, "dur", "ttm:dur")
+                        val wordBegin = getAttributeAny(span, "begin", "ttm:begin") ?: inheritedTiming.begin
+                        val wordEnd = getAttributeAny(span, "end", "ttm:end") ?: inheritedTiming.end
+                        val wordDur = getAttributeAny(span, "dur", "ttm:dur") ?: inheritedTiming.duration
+                        val hasOwnOrInheritedTiming =
+                            wordBegin != null || wordEnd != null || wordDur != null
 
                         val startsWithSpace = rawWordText.startsWith(" ") || rawWordText.startsWith("\n")
                         val endsWithSpace = rawWordText.endsWith(" ") || rawWordText.endsWith("\n")
 
                         if (lineSb.isNotEmpty() && !lineSb.endsWith(" ")) {
-                            if (hasPendingSpace || startsWithSpace) {
-                                lineSb.append(" ")
-                            }
+                            if (hasPendingSpace || startsWithSpace) lineSb.append(" ")
                         }
 
                         val startChar = lineSb.length
                         lineSb.append(cleanWordText)
                         val endChar = (lineSb.length - 1).coerceAtLeast(startChar)
 
-                        val rawWordStart = if (wordBegin != null) parseRawTime(wordBegin) else lineStartMs
-                        val rawWordEnd = when {
-                            wordEnd != null -> parseRawTime(wordEnd)
-                            wordDur != null -> rawWordStart + parseRawTime(wordDur)
-                            else -> rawWordStart + 300L
-                        }
-
-                        val wordStartMs = normalizeChildTime(rawWordStart, lineStartMs, lineEndMs, lineStartMs)
-                        val wordEndMs = normalizeChildTime(rawWordEnd, lineStartMs, lineEndMs, lineEndMs).coerceAtLeast(wordStartMs)
-                        val duration = (wordEndMs - wordStartMs).coerceAtLeast(50L)
-
-                        words.add(
-                            LyricWord(
+                        // Untimed spans contribute text but are not falsely advertised as
+                        // karaoke words. For a start-only span, its end is resolved from the
+                        // next timed span or the paragraph end below.
+                        if (hasOwnOrInheritedTiming) {
+                            pendingWords += PendingTimedWord(
                                 text = cleanWordText,
-                                absoluteStartTimeMs = wordStartMs,
-                                durationMs = duration,
+                                rawStartMs = wordBegin?.let(::parseRawTime) ?: lineStartMs,
+                                rawEndMs = when {
+                                    wordEnd != null -> parseRawTime(wordEnd)
+                                    wordDur != null -> {
+                                        val rawStart = wordBegin?.let(::parseRawTime) ?: lineStartMs
+                                        rawStart + parseRawTime(wordDur)
+                                    }
+                                    else -> null
+                                },
                                 charRange = startChar..endChar,
                                 isBackground = isSpanBg
                             )
-                        )
-
+                        }
                         hasPendingSpace = endsWithSpace
                     }
 
-                    fun traverseNode(node: Node, isBg: Boolean) {
+                    fun traverseNode(
+                        node: Node,
+                        isBg: Boolean,
+                        inheritedTiming: TtmlSpanTiming
+                    ) {
                         if (node.nodeType == Node.TEXT_NODE) {
                             val valText = node.nodeValue ?: ""
                             if (valText.contains(" ") || valText.contains("\n") || valText.contains("\t")) {
@@ -129,32 +136,51 @@ object TtmlParser {
                             if (localName.endsWith("span", ignoreCase = true)) {
                                 val roleAttr = getAttributeAny(elem, "role", "ttm:role")?.lowercase()
                                 val isSpanBg = isBg || roleAttr == "x-bg" || roleAttr == "background"
-                                val childSpans = elem.getElementsByTagName("span")
-                                if (childSpans.length > 0) {
+                                val effectiveTiming = TtmlSpanTiming(
+                                    begin = getAttributeAny(elem, "begin", "ttm:begin") ?: inheritedTiming.begin,
+                                    end = getAttributeAny(elem, "end", "ttm:end") ?: inheritedTiming.end,
+                                    duration = getAttributeAny(elem, "dur", "ttm:dur") ?: inheritedTiming.duration
+                                )
+                                val descendants = elem.getElementsByTagNameNS("*", "span").length +
+                                    elem.getElementsByTagName("span").length
+                                if (descendants > 0) {
                                     val children = elem.childNodes
                                     for (c in 0 until children.length) {
-                                        traverseNode(children.item(c), isSpanBg)
+                                        traverseNode(children.item(c), isSpanBg, effectiveTiming)
                                     }
                                 } else {
-                                    processSpanElement(elem, isSpanBg)
+                                    processSpanElement(elem, isSpanBg, inheritedTiming)
                                 }
                             } else {
                                 val children = elem.childNodes
                                 for (c in 0 until children.length) {
-                                    traverseNode(children.item(c), isBg)
+                                    traverseNode(children.item(c), isBg, inheritedTiming)
                                 }
                             }
                         }
                     }
 
                     for (j in 0 until childNodes.length) {
-                        traverseNode(childNodes.item(j), isLineBg)
+                        traverseNode(childNodes.item(j), isLineBg, TtmlSpanTiming())
                     }
                 } else {
                     lineSb.append(pElement.textContent ?: "")
                 }
 
-                val contentText = lineSb.toString().trim()
+                val rawContent = lineSb.toString()
+                val contentText = rawContent.trim()
+                val trimStart = rawContent.indexOfFirst { !it.isWhitespace() }.coerceAtLeast(0)
+                val words = buildTimedWords(
+                    pending = pendingWords,
+                    lineStartMs = lineStartMs,
+                    lineEndMs = lineEndMs,
+                    trimStart = trimStart,
+                    visibleLength = contentText.length
+                )
+                val hasCompleteWordTiming = words.isNotEmpty() &&
+                    coversVisibleCharacters(contentText, words)
+                val displayWords = if (hasCompleteWordTiming) words else emptyList()
+
                 if (contentText.isNotEmpty()) {
                     val prevLine = lines.lastOrNull()
                     val isRecent = prevLine != null && (lineStartMs - prevLine.startTimeMs) < 4000L
@@ -169,7 +195,7 @@ object TtmlParser {
 
                     if (isLineBg && prevLine != null && isRecent && prevLine.backgroundContent == null) {
                         // Merge background vocals into overlapping preceding line
-                        val bgWords = if (words.isNotEmpty()) words else {
+                        val bgWords = if (displayWords.isNotEmpty()) displayWords else {
                             listOf(LyricWord(text = contentText, absoluteStartTimeMs = lineStartMs, durationMs = 2500L, charRange = 0..contentText.lastIndex.coerceAtLeast(0), isBackground = true))
                         }
                         lines[lines.lastIndex] = prevLine.copy(
@@ -182,8 +208,8 @@ object TtmlParser {
                                 startTimeMs = lineStartMs,
                                 content = contentText,
                                 isInterlude = false,
-                                isWordByWord = words.isNotEmpty(),
-                                words = words,
+                                isWordByWord = hasCompleteWordTiming,
+                                words = displayWords,
                                 isBackground = isLineBg,
                                 agent = agentAttr,
                                 isRightAligned = isRightAligned
@@ -262,7 +288,7 @@ object TtmlParser {
                 val isLineBg = roleAttr == "x-bg" || roleAttr == "background"
                 val agentAttr = pAttrs["agent"]?.trim()
 
-                val words = mutableListOf<LyricWord>()
+                val pendingWords = mutableListOf<PendingTimedWord>()
                 val lineSb = StringBuilder()
 
                 val spanMatches = spanPattern.findAll(pInner).toList()
@@ -275,43 +301,48 @@ object TtmlParser {
 
                         val spanRole = spanAttrs["role"]?.lowercase()
                         val isSpanBg = isLineBg || spanRole == "x-bg" || spanRole == "background"
-
                         val wordBegin = spanAttrs["begin"]
                         val wordEnd = spanAttrs["end"]
                         val wordDur = spanAttrs["dur"]
+                        val hasWordTiming = wordBegin != null || wordEnd != null || wordDur != null
 
-                        if (lineSb.isNotEmpty() && !lineSb.endsWith(" ")) {
-                            lineSb.append(" ")
-                        }
-
+                        if (lineSb.isNotEmpty() && !lineSb.endsWith(" ")) lineSb.append(" ")
                         val startChar = lineSb.length
                         lineSb.append(cleanText)
                         val endChar = (lineSb.length - 1).coerceAtLeast(startChar)
 
-                        val rawWordStart = if (wordBegin != null) parseRawTime(wordBegin) else lineStartMs
-                        val rawWordEnd = when {
-                            wordEnd != null -> parseRawTime(wordEnd)
-                            wordDur != null -> rawWordStart + parseRawTime(wordDur)
-                            else -> rawWordStart + 300L
-                        }
-
-                        val wordStartMs = normalizeChildTime(rawWordStart, lineStartMs, lineEndMs, lineStartMs)
-                        val wordEndMs = normalizeChildTime(rawWordEnd, lineStartMs, lineEndMs, lineEndMs).coerceAtLeast(wordStartMs)
-                        val duration = (wordEndMs - wordStartMs).coerceAtLeast(50L)
-
-                        words.add(
-                            LyricWord(
+                        if (hasWordTiming) {
+                            val rawWordStart = wordBegin?.let(::parseRawTime) ?: lineStartMs
+                            pendingWords += PendingTimedWord(
                                 text = cleanText,
-                                absoluteStartTimeMs = wordStartMs,
-                                durationMs = duration,
+                                rawStartMs = rawWordStart,
+                                rawEndMs = when {
+                                    wordEnd != null -> parseRawTime(wordEnd)
+                                    wordDur != null -> rawWordStart + parseRawTime(wordDur)
+                                    else -> null
+                                },
                                 charRange = startChar..endChar,
                                 isBackground = isSpanBg
                             )
-                        )
+                        }
                     }
                 } else {
                     lineSb.append(pInner.replace(Regex("<[^>]+>"), "").trim())
                 }
+
+                val rawContent = lineSb.toString()
+                val contentText = rawContent.trim()
+                val trimStart = rawContent.indexOfFirst { !it.isWhitespace() }.coerceAtLeast(0)
+                val words = buildTimedWords(
+                    pending = pendingWords,
+                    lineStartMs = lineStartMs,
+                    lineEndMs = lineEndMs,
+                    trimStart = trimStart,
+                    visibleLength = contentText.length
+                )
+                val hasCompleteWordTiming = words.isNotEmpty() &&
+                    coversVisibleCharacters(contentText, words)
+                val displayWords = if (hasCompleteWordTiming) words else emptyList()
 
                 val contentText = lineSb.toString().trim()
                 if (contentText.isNotEmpty()) {
@@ -327,7 +358,7 @@ object TtmlParser {
                           contentText.startsWith("[Duet 2", ignoreCase = true))
 
                     if (isLineBg && prevLine != null && isRecent && prevLine.backgroundContent == null) {
-                        val bgWords = if (words.isNotEmpty()) words else {
+                        val bgWords = if (displayWords.isNotEmpty()) displayWords else {
                             listOf(LyricWord(text = contentText, absoluteStartTimeMs = lineStartMs, durationMs = 2500L, isBackground = true))
                         }
                         lines[lines.lastIndex] = prevLine.copy(
@@ -340,8 +371,8 @@ object TtmlParser {
                                 startTimeMs = lineStartMs,
                                 content = contentText,
                                 isInterlude = false,
-                                isWordByWord = words.isNotEmpty(),
-                                words = words,
+                                isWordByWord = hasCompleteWordTiming,
+                                words = displayWords,
                                 isBackground = isLineBg,
                                 agent = agentAttr,
                                 isRightAligned = isRightAligned
@@ -356,6 +387,62 @@ object TtmlParser {
             Log.e(TAG, "Regex fallback TTML parsing also failed: ${e.message}")
             emptyList()
         }
+    }
+
+    private data class TtmlSpanTiming(
+        val begin: String? = null,
+        val end: String? = null,
+        val duration: String? = null
+    )
+
+    private data class PendingTimedWord(
+        val text: String,
+        val rawStartMs: Long,
+        val rawEndMs: Long?,
+        val charRange: IntRange,
+        val isBackground: Boolean
+    )
+
+    private fun buildTimedWords(
+        pending: List<PendingTimedWord>,
+        lineStartMs: Long,
+        lineEndMs: Long,
+        trimStart: Int,
+        visibleLength: Int
+    ): List<LyricWord> {
+        if (pending.isEmpty() || visibleLength <= 0) return emptyList()
+        return pending.mapIndexedNotNull { index, item ->
+            val first = (item.charRange.first - trimStart).coerceAtLeast(0)
+            val last = (item.charRange.last - trimStart).coerceAtMost(visibleLength - 1)
+            if (first > last) return@mapIndexedNotNull null
+
+            val startMs = normalizeChildTime(
+                item.rawStartMs, lineStartMs, lineEndMs, lineStartMs
+            )
+            val inferredRawEnd = item.rawEndMs ?: pending.getOrNull(index + 1)
+                ?.rawStartMs ?: lineEndMs
+            val endMs = normalizeChildTime(
+                inferredRawEnd, lineStartMs, lineEndMs, lineEndMs
+            ).coerceAtLeast(startMs)
+            LyricWord(
+                text = item.text,
+                absoluteStartTimeMs = startMs,
+                durationMs = (endMs - startMs).coerceAtLeast(50L),
+                charRange = first..last,
+                isBackground = item.isBackground
+            )
+        }
+    }
+
+    private fun coversVisibleCharacters(text: String, words: List<LyricWord>): Boolean {
+        if (text.isBlank()) return false
+        val covered = BooleanArray(text.length)
+        words.forEach { word ->
+            for (index in word.charRange.first..word.charRange.last) {
+                if (index in covered.indices) covered[index] = true
+            }
+        }
+        return text.indices.all { index -> text[index].isWhitespace() || covered[index] }
     }
 
     private fun getAttributeAny(element: Element, vararg names: String): String? {
@@ -385,7 +472,7 @@ object TtmlParser {
     ): Long {
         if (rawMs < 0) return fallbackMs
         val lineDurationMs = (lineEndMs - lineStartMs).coerceAtLeast(0L)
-        val isProbablyRelative = rawMs < (lineStartMs - 250L) && rawMs <= (lineDurationMs + 1000L)
+        val isProbablyRelative = rawMs < (lineStartMs - 100L) && rawMs <= (lineDurationMs + 1000L)
         val adjustedMs = if (isProbablyRelative) lineStartMs + rawMs else rawMs
         return adjustedMs.coerceIn(lineStartMs.coerceAtLeast(0L), lineEndMs.coerceAtLeast(lineStartMs))
     }

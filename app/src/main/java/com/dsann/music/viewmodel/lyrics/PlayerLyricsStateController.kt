@@ -91,7 +91,7 @@ class PlayerLyricsStateController(private val logTag: String) {
         repository.fetchLyrics(
             song.title,
             song.artist,
-            null,
+            song.albumName,
             song.duration,
             song.path,
             createCallback(
@@ -125,7 +125,7 @@ class PlayerLyricsStateController(private val logTag: String) {
         LyricsRepository.getInstance(context).retryLyrics(
             song.title,
             song.artist,
-            null,
+            song.albumName,
             song.duration,
             song.path,
             createCallback(
@@ -181,7 +181,7 @@ class PlayerLyricsStateController(private val logTag: String) {
         repository.fetchProviderLyrics(
             song.title,
             song.artist,
-            null,
+            song.albumName,
             song.duration,
             song.path,
             providerName,
