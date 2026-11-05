@@ -3437,6 +3437,8 @@ class AudioPlaybackService : MediaSessionService() {
                         title = videoOption.videoTitle?.takeIf { it.isNotBlank() } ?: song.title,
                         uploader = videoOption.videoUploader?.takeIf { it.isNotBlank() } ?: song.artist,
                         durationMs = videoOption.durationMs.takeIf { it > 0L } ?: song.duration,
+                        contentLengthBytes = videoOption.contentLengthBytes,
+                        bitrateBps = videoOption.bitrateBps,
                         resolution = videoOption.label,
                         mimeType = videoOption.mimeType,
                         description = videoOption.videoDescription,
