@@ -1847,6 +1847,7 @@ private fun LibraryGradientPlaylistHero(
     status: String,
     artwork: Any?,
     modifier: Modifier = Modifier,
+    showTitle: Boolean = true,
     actions: @Composable () -> Unit
 ) {
     val context = LocalContext.current
@@ -1891,14 +1892,16 @@ private fun LibraryGradientPlaylistHero(
                     )
             )
         }
-        Text(
-            title,
-            style = DsmusicTheme.typography.titleLarge,
-            fontWeight = FontWeight.ExtraBold,
-            color = DsmusicTheme.colorScheme.onSurface,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
+        if (showTitle) {
+            Text(
+                title,
+                style = DsmusicTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = DsmusicTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
         Text(
             subtitle,
             style = DsmusicTheme.typography.bodyMedium,
@@ -2673,7 +2676,8 @@ private fun LocalPlaylistDetailsScreen(
                                 artwork = artworkUrl,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 24.dp, vertical = 12.dp)
+                                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                                showTitle = false
                             ) {
                                 if (songs.isNotEmpty()) {
                                     Row(
