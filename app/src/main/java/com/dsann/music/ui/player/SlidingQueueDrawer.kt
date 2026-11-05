@@ -397,7 +397,16 @@ fun SlidingQueueDrawer(
                                     ),
                                     label = "LoopCorner"
                                 )
-                                val loopIcon = if (repeatMode == PlayerSharedViewModel.REPEAT_ONE) R.drawable.ic_repeat_one else R.drawable.ic_repeat
+                                val loopIcon = if (repeatMode == PlayerSharedViewModel.REPEAT_INFINITY) {
+                                    R.drawable.ic_repeat_infinity
+                                } else {
+                                    R.drawable.ic_repeat
+                                }
+                                val loopDescription = when (repeatMode) {
+                                    PlayerSharedViewModel.REPEAT_ONCE -> "Repeat once"
+                                    PlayerSharedViewModel.REPEAT_INFINITY -> "Repeat infinity"
+                                    else -> "No repeat"
+                                }
                                 val loopActive = repeatMode != PlayerSharedViewModel.REPEAT_OFF
                                 com.dsann.music.ui.theme.Button(
                                     onClick = {
@@ -419,7 +428,7 @@ fun SlidingQueueDrawer(
                                 ) {
                                     Icon(
                                         painter = painterResource(id = loopIcon),
-                                        contentDescription = "Repeat Mode",
+                                        contentDescription = loopDescription,
                                         modifier = Modifier.size(24.dp)
                                     )
                                 }
