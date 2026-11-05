@@ -974,7 +974,7 @@ fun HomeSectionRow(
                             isFeature = true,
                             onClick = {
                                 when (val it = items[0]) {
-                                    is SearchItem.Song -> onSongMenuClick(it.song)
+                                    is SearchItem.Song -> onSongClick(it.song)
                                     is SearchItem.Album -> onAlbumClick(it.album)
                                     is SearchItem.Artist -> onArtistClick(it.artist)
                                     is SearchItem.Playlist -> onPlaylistClick(it.playlist)
@@ -986,7 +986,7 @@ fun HomeSectionRow(
                         Column(modifier = Modifier.weight(0.75f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             BentoCell(item = items[1], modifier = Modifier.weight(1f).fillMaxWidth(), onClick = {
                                 when (val it = items[1]) {
-                                    is SearchItem.Song -> onSongMenuClick(it.song)
+                                    is SearchItem.Song -> onSongClick(it.song)
                                     is SearchItem.Album -> onAlbumClick(it.album)
                                     is SearchItem.Artist -> onArtistClick(it.artist)
                                     is SearchItem.Playlist -> onPlaylistClick(it.playlist)
@@ -994,7 +994,7 @@ fun HomeSectionRow(
                             }, onLongClick = { openExploreItemMenu(items[1], onSongMenuClick, onCollectionMenuClick) })
                             BentoCell(item = items[2], modifier = Modifier.weight(1f).fillMaxWidth(), onClick = {
                                 when (val it = items[2]) {
-                                    is SearchItem.Song -> onSongMenuClick(it.song)
+                                    is SearchItem.Song -> onSongClick(it.song)
                                     is SearchItem.Album -> onAlbumClick(it.album)
                                     is SearchItem.Artist -> onArtistClick(it.artist)
                                     is SearchItem.Playlist -> onPlaylistClick(it.playlist)
@@ -1006,7 +1006,7 @@ fun HomeSectionRow(
                         // Lower row wide tiles
                         BentoCell(item = items[3], modifier = Modifier.weight(1f).fillMaxHeight(), onClick = {
                             when (val it = items[3]) {
-                                is SearchItem.Song -> onSongMenuClick(it.song)
+                                is SearchItem.Song -> onSongClick(it.song)
                                 is SearchItem.Album -> onAlbumClick(it.album)
                                 is SearchItem.Artist -> onArtistClick(it.artist)
                                 is SearchItem.Playlist -> onPlaylistClick(it.playlist)
@@ -1014,7 +1014,7 @@ fun HomeSectionRow(
                         }, onLongClick = { openExploreItemMenu(items[3], onSongMenuClick, onCollectionMenuClick) })
                         BentoCell(item = items[4], modifier = Modifier.weight(1f).fillMaxHeight(), onClick = {
                             when (val it = items[4]) {
-                                is SearchItem.Song -> onSongMenuClick(it.song)
+                                is SearchItem.Song -> onSongClick(it.song)
                                 is SearchItem.Album -> onAlbumClick(it.album)
                                 is SearchItem.Artist -> onArtistClick(it.artist)
                                 is SearchItem.Playlist -> onPlaylistClick(it.playlist)
@@ -1059,7 +1059,7 @@ fun HomeSectionRow(
                                     onCollectionMenuClick = onCollectionMenuClick,
                                     onClick = {
                                         when (item) {
-                                            is SearchItem.Song -> onSongMenuClick(item.song)
+                                            is SearchItem.Song -> onSongClick(item.song)
                                             is SearchItem.Album -> onAlbumClick(item.album)
                                             is SearchItem.Artist -> onArtistClick(item.artist)
                                             is SearchItem.Playlist -> onPlaylistClick(item.playlist)
