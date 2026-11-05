@@ -69,7 +69,11 @@ fun DsmusicNavigationBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = horizontalInset, vertical = verticalInset)
+            .padding(
+                horizontal = horizontalInset,
+                top = verticalInset,
+                bottom = if (bottomInset > 0.dp) verticalInset else 0.dp
+            )
             .clip(dockShape)
             .background(if (barStyle == "Minimal") Color.Transparent else surface)
     ) {
