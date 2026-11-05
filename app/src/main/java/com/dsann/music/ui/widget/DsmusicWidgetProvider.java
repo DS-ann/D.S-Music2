@@ -83,7 +83,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             providerClass = WidgetLargeProvider.class;
         }
         for (int appWidgetId : appWidgetIds) {
-            updateWidget(context, appWidgetManager, appWidgetId, null, false, 0, 0, null, layoutId, providerClass);
+            updateWidget(context, appWidgetManager, appWidgetId, null, false, 0, 0, null, R.drawable.ic_repeat, layoutId, providerClass);
         }
 
         // onUpdate has no access to the current playback item itself. Ask the running playback
@@ -117,24 +117,29 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
 
     public static void updateAllWidgets(Context context, SongItem currentSong, boolean isPlaying, int position,
             int duration, String currentLyric) {
+        updateAllWidgets(context, currentSong, isPlaying, position, duration, currentLyric, R.drawable.ic_repeat);
+    }
+
+    public static void updateAllWidgets(Context context, SongItem currentSong, boolean isPlaying, int position,
+            int duration, String currentLyric, int repeatIconResId) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
         new Handler(Looper.getMainLooper()).post(() -> {
             // Update Small Widgets
             int[] smallIds = manager.getAppWidgetIds(new ComponentName(context, WidgetSmallProvider.class));
             for (int id : smallIds) {
-                updateWidget(context, manager, id, currentSong, isPlaying, position, duration, currentLyric, R.layout.widget_small, WidgetSmallProvider.class);
+                updateWidget(context, manager, id, currentSong, isPlaying, position, duration, currentLyric, repeatIconResId, R.layout.widget_small, WidgetSmallProvider.class);
             }
 
             // Update Medium Widgets
             int[] mediumIds = manager.getAppWidgetIds(new ComponentName(context, WidgetMediumProvider.class));
             for (int id : mediumIds) {
-                updateWidget(context, manager, id, currentSong, isPlaying, position, duration, currentLyric, R.layout.widget_medium, WidgetMediumProvider.class);
+                updateWidget(context, manager, id, currentSong, isPlaying, position, duration, currentLyric, repeatIconResId, R.layout.widget_medium, WidgetMediumProvider.class);
             }
 
             // Update Large Widgets
             int[] largeIds = manager.getAppWidgetIds(new ComponentName(context, WidgetLargeProvider.class));
             for (int id : largeIds) {
-                updateWidget(context, manager, id, currentSong, isPlaying, position, duration, currentLyric, R.layout.widget_large, WidgetLargeProvider.class);
+                updateWidget(context, manager, id, currentSong, isPlaying, position, duration, currentLyric, repeatIconResId, R.layout.widget_large, WidgetLargeProvider.class);
             }
         });
     }
@@ -268,7 +273,8 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
     }
 
     private static void updateWidget(Context context, AppWidgetManager manager, int id, SongItem song,
-            boolean isPlaying, int position, int duration, String currentLyric, int layoutId, Class<?> providerClass) {
+            boolean isPlaying, int position, int duration, String currentLyric, int repeatIconResId,
+            int layoutId, Class<?> providerClass) {
         try {
             RemoteViews views = hideSkeleton(context, layoutId);
 
@@ -309,6 +315,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                     views.setInt(R.id.widget_prev, "setColorFilter", controlColor);
                     views.setInt(R.id.widget_next, "setColorFilter", controlColor);
                     views.setInt(R.id.widget_favorite, "setColorFilter", controlColor);
+                    views.setImageViewResource(R.id.widget_repeat, repeatIconResId);
                     views.setInt(R.id.widget_repeat, "setColorFilter", controlColor);
 
                     if (duration > 0) {
@@ -366,6 +373,9 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                 if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
                     fallback.setTextViewText(R.id.widget_song_title, song != null ? song.title : "D.S Music");
                     fallback.setTextViewText(R.id.widget_artist_name, song != null ? song.artist : "Select a song");
+                }
+                if (layoutId == R.layout.widget_large) {
+                    fallback.setImageViewResource(R.id.widget_repeat, repeatIconResId);
                 }
                 setupPendingIntents(context, fallback, isPlaying, layoutId, providerClass);
                 manager.updateAppWidget(id, fallback);
