@@ -526,6 +526,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
             it.copy(
                 searchQuery = "",
                 searchResults = emptyList(),
+                searchOfflineError = false,
                 suggestions = emptyList(),
                 suggestionItems = emptyList(),
                 searchTopResult = null,
@@ -1589,14 +1590,14 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     }
     fun popDetailStack() {
         _uiState.update { state ->
-            if (state.detailStack.isEmpty()) return@update state
+            if (state.detailStack.isEmpty()) return@update state.copy(detailOfflineError = false)
             val nextStack = state.detailStack.dropLast(1)
             val popped = state.detailStack.last()
             when (popped) {
-                DetailType.ALBUM -> state.copy(albumDetail = null, detailStack = nextStack)
-                DetailType.PLAYLIST -> state.copy(playlistDetail = null, detailStack = nextStack)
-                DetailType.ARTIST -> state.copy(artistDetail = null, detailStack = nextStack)
-                DetailType.SECTION -> state.copy(sectionDetail = null, detailStack = nextStack)
+                DetailType.ALBUM -> state.copy(albumDetail = null, detailStack = nextStack, detailOfflineError = false)
+                DetailType.PLAYLIST -> state.copy(playlistDetail = null, detailStack = nextStack, detailOfflineError = false)
+                DetailType.ARTIST -> state.copy(artistDetail = null, detailStack = nextStack, detailOfflineError = false)
+                DetailType.SECTION -> state.copy(sectionDetail = null, detailStack = nextStack, detailOfflineError = false)
             }
         }
     }
@@ -1614,7 +1615,9 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 suggestionItems = emptyList(),
                 searchTopResult = null,
                 searchSections = emptyList(),
-                isSearching = false
+                isSearching = false,
+                searchOfflineError = false,
+                detailOfflineError = false
             )
         }
         cameFromLibrary = false
