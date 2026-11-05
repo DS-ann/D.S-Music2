@@ -4100,8 +4100,7 @@ private fun CachedSongListItem(
     isSelecting: Boolean,
     isSelected: Boolean,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onLongClick: () -> Unit
 ) {
     // Cache is a real playlist: reuse the same borderless song-row treatment as Downloads.
     // The standard row only outlines a selected or currently playing track.
@@ -4580,7 +4579,6 @@ private fun StreamCacheTabContent(
                 }
             } else {
                 itemsIndexed(filteredCacheEntries, key = { _, item -> item.songId }) { index, item ->
-                    val artwork = AudioPlaybackService.getCachedMediaArtworkFile(context, item.songId)
                     val queueSong = filteredCacheQueue.getOrNull(index)
                     val isCurrentSong = currentSong?.isCachedTrack == true &&
                         currentSong?.id == queueSong?.id &&
