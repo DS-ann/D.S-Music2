@@ -1541,11 +1541,20 @@ fun PlayerBottomSheetCompose(
                 // The player tree stays full-window measured; only the graphics-layer
                 // outline changes during animation.
                 shape = androidx.compose.ui.graphics.RectangleShape,
-                color = dynamicBgColor.copy(
-                    alpha = playerContentExpansionFraction.value.coerceIn(0f, 1f)
-                ),
+                color = Color.Transparent,
                 showBorder = false
             ) {
+                // The collapsed mini player stays visually transparent. Fade the full
+                // player surface in on its own draw layer so animation frames do not
+                // invalidate this entire composition tree.
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            alpha = playerContentExpansionFraction.value.coerceIn(0f, 1f)
+                        }
+                        .background(dynamicBgColor)
+                )
                 Box(modifier = Modifier.fillMaxSize().padding(bottom = sheetVisualState.currentBottomPadding.coerceAtLeast(0.dp))) {
                     Column(
                         modifier = Modifier
