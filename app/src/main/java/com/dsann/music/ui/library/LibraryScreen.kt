@@ -990,7 +990,7 @@ fun LibraryScreen(
                                                 }
                                             }
                                         }
-                                        itemsIndexed(
+                                        gridItemsIndexed(
                                             items = sortedAndGrouped,
                                             key = { _, item ->
                                                 if (item is SongItem) "downloaded-song:${item.id}"
