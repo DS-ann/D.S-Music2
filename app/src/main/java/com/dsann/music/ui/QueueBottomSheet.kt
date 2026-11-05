@@ -580,7 +580,8 @@ fun QueueSidebarItem(
         shape = RoundedCornerShape(16.dp),
         color = if (isSelected) DsmusicTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f) else Color.Transparent,
         contentColor = if (isSelected) DsmusicTheme.colorScheme.onSecondaryContainer else DsmusicTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        showBorder = false
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
