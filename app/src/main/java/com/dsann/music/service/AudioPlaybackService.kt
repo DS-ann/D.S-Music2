@@ -3450,6 +3450,12 @@ class AudioPlaybackService : MediaSessionService() {
         val songId = song.id
         val position = captureVideoModePosition(vm)
         val wasPlaying = player.isPlaying || player.playWhenReady || vm.isPlaying.value
+        // A new queue item must not keep the previous track's video window alive while
+        // its own stream is resolving. Audio for this track is already loaded underneath.
+        if (vm.isVideoMode.value) {
+            vm.setVideoModeState(false)
+            vm.setVideoPlaybackMetadata(null)
+        }
         isResolvingVideoMode = true
         vm.setLoading(true)
         vm.setVideoPlaybackMetadata(null)
