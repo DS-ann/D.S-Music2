@@ -482,6 +482,7 @@ object SongDownloader {
         val cleanTitleStr = cleanTitle(song.title)
         val cleanArtistStr = cleanArtist(song.artist)
         val coroutineContext = currentCoroutineContext()
+        var automaticMp3Conversion: Mp3ConversionResult? = null
 
         try {
             // Do not let a stale player UI state launch a duplicate download. This check runs
@@ -504,9 +505,14 @@ object SongDownloader {
             // selected download container and its target bitrate is unchanged. This keeps an
             // Opus stream distinct from the per-track M4A playback fallback.
             val settings = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
-            val downloadFormat = NewPipeStreamExtractor.normalizeDownloadAudioFormat(
+            val selectedDownloadFormat = NewPipeStreamExtractor.normalizeDownloadAudioFormat(
                 settings.getString("download_audio_format", "m4a")
             )
+            // MP3 downloads are sourced from Opus at the selected quality, then encoded locally.
+            // Keep the original tagged Opus file so the three-dot manual conversion action remains
+            // available as a retry/export option.
+            val convertToMp3AfterDownload = selectedDownloadFormat == "mp3"
+            val downloadSourceFormat = if (convertToMp3AfterDownload) "opus" else selectedDownloadFormat
             val playbackBitrate = NewPipeStreamExtractor.normalizeAudioQuality(
                 settings.getString("audio_quality", "256 kbps")
             )
@@ -524,7 +530,7 @@ object SongDownloader {
             val cachedStream = cachedCandidate?.takeIf {
                 NewPipeStreamExtractor.matchesAudioFormat(
                     it.mimeType,
-                    preferredFormat = downloadFormat
+                    preferredFormat = downloadSourceFormat
                 )
             }
             coroutineContext.ensureActive()
@@ -559,10 +565,18 @@ object SongDownloader {
             } else {
                 // No cache entry for this track: use the standard online download path.
                 val downloadStream = NewPipeStreamExtractor.getDownloadStreamData(
-                    videoId,
-                    allowFormatChoice = true
+                    videoId = videoId,
+                    allowFormatChoice = !convertToMp3AfterDownload,
+                    preferredFormatOverride = downloadSourceFormat
                 )
                 coroutineContext.ensureActive()
+                if (convertToMp3AfterDownload && !NewPipeStreamExtractor.matchesAudioFormat(
+                        downloadStream?.mimeType,
+                        preferredFormat = "opus"
+                    )
+                ) {
+                    throw IOException("MP3 download requires an Opus source stream, but no compatible Opus stream was returned")
+                }
                 val streamUrl = downloadStream?.url
                 if (streamUrl.isNullOrBlank()) {
                     throw IOException("Failed to extract download URL")
@@ -589,7 +603,7 @@ object SongDownloader {
                     NewPipeStreamExtractor.matchesAudioFormat(downloadStream?.mimeType, preferredFormat = "m4a") -> "m4a"
                     NewPipeStreamExtractor.matchesAudioFormat(downloadStream?.mimeType, preferredFormat = "mp3") -> "mp3"
                     NewPipeStreamExtractor.matchesAudioFormat(downloadStream?.mimeType, preferredFormat = "opus") -> "opus"
-                    else -> downloadFormat
+                    else -> downloadSourceFormat
                 }
 
                 try {
@@ -754,13 +768,38 @@ object SongDownloader {
                 throw IOException("Could not publish the downloaded audio to the music library")
             }
             rememberDownloadedSong(context, videoId, outputFile)
+
+            // The selected MP3 format is fulfilled by converting the tagged Opus source locally.
+            // Conversion failure does not discard the valid Opus download; the manual three-dot
+            // action remains available to retry it.
+            if (convertToMp3AfterDownload) {
+                _downloadProgress.value += (videoId to 95)
+                updateNotification(context, cleanTitleStr, 95, notificationId, videoId)
+                automaticMp3Conversion = OpusToMp3Converter.convert(context, song)
+                if (automaticMp3Conversion?.success != true) {
+                    Log.w(
+                        TAG,
+                        "Opus download succeeded but automatic MP3 conversion failed for $videoId: " +
+                            automaticMp3Conversion?.message
+                    )
+                }
+            }
+
             _downloadedVideoIds.update { it + videoId }
             showFinishedNotification(context, metadataTitle, metadataArtist, notificationId)
             _downloadProgress.value += (videoId to 100)
 
             withContext(Dispatchers.Main) {
+                val automaticConversionMessage = automaticMp3Conversion?.let { result ->
+                    if (result.success) {
+                        result.message
+                    } else {
+                        "Opus downloaded, but automatic MP3 conversion failed: ${result.message}. " +
+                            "Use Convert Opus to MP3 in the three-dot menu to retry."
+                    }
+                }
                 com.dsann.music.ui.SnackbarController.showMessage(
-                    when {
+                    automaticConversionMessage ?: when {
                         cachedStream != null && metadataEmbedded -> "Saved cached audio offline: $cleanTitleStr"
                         cachedStream != null -> "Saved cached audio offline: $cleanTitleStr (metadata tags unavailable)"
                         metadataEmbedded -> "Downloaded with embedded metadata: $cleanTitleStr"
