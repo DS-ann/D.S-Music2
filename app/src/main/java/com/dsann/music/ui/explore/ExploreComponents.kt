@@ -1,6 +1,8 @@
 @file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 package com.dsann.music.ui.explore
 
+import com.dsann.music.ui.YouTubeMusicPlaylistPickerDialog
+
 import com.dsann.music.ui.theme.DsmusicCard
 import com.dsann.music.ui.theme.DsmusicSurface
 import com.dsann.music.ui.theme.DsmusicListItem
@@ -2037,6 +2039,29 @@ fun OnlineSongBottomSheet(
                     )
                 }
 
+            val albumMenuItems = if (
+                !song.albumId.isNullOrBlank() || !song.albumName.isNullOrBlank()
+            ) {
+                listOf(
+                    ExploreTrackMenuItem(
+                        title = "Go to album",
+                        subtitle = "Open album details",
+                        icon = Icons.Rounded.Album
+                    ) {
+                        exploreViewModel.cameFromLibrary = onNavigateToExplore != null
+                        if (!song.albumId.isNullOrBlank()) {
+                            exploreViewModel.loadAlbum(song.albumId)
+                        } else {
+                            exploreViewModel.loadAlbumByName(song.albumName.orEmpty(), song.artist)
+                        }
+                        onDismissRequest()
+                        onNavigateToExplore?.invoke()
+                    }
+                )
+            } else {
+                emptyList()
+            }
+
             val baseMenuItems = listOf(
                 ExploreTrackMenuItem(
                     title = "Start mix",
@@ -2046,24 +2071,8 @@ fun OnlineSongBottomSheet(
                     exploreViewModel.startRadio(song)
                     com.dsann.music.ui.SnackbarController.showMessage("Starting mix based on ${song.title}")
                     onDismissRequest()
-                },
-                ExploreTrackMenuItem(
-                    title = "Go to album",
-                    subtitle = "Open album details",
-                    icon = Icons.Rounded.Album
-                ) {
-                    val albumId = song.albumId
-                    exploreViewModel.cameFromLibrary = onNavigateToExplore != null
-                    when {
-                        !albumId.isNullOrBlank() -> exploreViewModel.loadAlbum(albumId)
-                        !song.albumName.isNullOrBlank() ->
-                            exploreViewModel.loadAlbumByName(song.albumName.orEmpty(), song.artist)
-                        else -> exploreViewModel.loadAlbumForSong(song.title, song.artist)
-                    }
-                    onDismissRequest()
-                    onNavigateToExplore?.invoke()
                 }
-            ) + artistMenuItems + listOf(
+            ) + albumMenuItems + artistMenuItems + listOf(
                 ExploreTrackMenuItem(
                     title = "View song credits",
                     subtitle = "Writers and contributors",
