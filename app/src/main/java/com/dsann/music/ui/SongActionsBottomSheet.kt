@@ -277,6 +277,7 @@ fun BottomSheetScaffoldContent(
                 }
                 isConvertingToMp3 = false
                 if (result.success) {
+                    hasDownloadedOpus = false
                     com.dsann.music.util.SongDownloader.refreshDownloadedStatus(context, target)
                 }
                 SnackbarController.showMessage(
