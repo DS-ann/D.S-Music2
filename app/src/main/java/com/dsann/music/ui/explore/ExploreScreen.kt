@@ -513,7 +513,9 @@ fun ExploreScreen(
                 // A pending page has not been pushed onto detailStack yet. Cancel it and
                 // reveal the same parent page instead of consuming Back against an empty stack.
                 viewModel.cancelDetailLoad()
-            } else if (currentState.detailOfflineError && currentState.detailStack.isEmpty()) {
+            } else if (currentState.detailOfflineError) {
+                // A failed detail request is not pushed onto the stack; Back should
+                // dismiss its offline state and reveal the existing parent page.
                 viewModel.clearError()
             } else {
                 val currentStackSize = currentState.detailStack.size
