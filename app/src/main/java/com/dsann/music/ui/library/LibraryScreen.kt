@@ -840,7 +840,7 @@ fun LibraryScreen(
                                                 enabled = filteredSongs.isNotEmpty(),
                                                 onClick = {
                                                     viewModel.setShuffleEnabled(false)
-                                                    viewModel.setSongList(filteredSongs)
+                                                    viewModel.setSongList(sortedAndGrouped.filterIsInstance<SongItem>())
                                                     viewModel.playSongAtIndex(0)
                                                     downloadOptionsExpanded = false
                                                 }
@@ -849,7 +849,7 @@ fun LibraryScreen(
                                                 text = { Text("Shuffle") },
                                                 enabled = filteredSongs.isNotEmpty(),
                                                 onClick = {
-                                                    val playlist = filteredSongs.shuffled()
+                                                    val playlist = sortedAndGrouped.filterIsInstance<SongItem>().shuffled()
                                                     viewModel.setShuffleEnabled(true)
                                                     viewModel.setSongList(playlist)
                                                     viewModel.playSongAtIndex(0)
@@ -1062,7 +1062,7 @@ fun LibraryScreen(
                                                                     }
                                                                 } else {
                                                                     // Play clicked song, set the entire filtered songs list as queue
-                                                                    viewModel.setSongList(filteredSongs)
+                                                                    viewModel.setSongList(sortedAndGrouped.filterIsInstance<SongItem>())
                                                                     viewModel.playSong(item)
                                                                 }
                                                             },
