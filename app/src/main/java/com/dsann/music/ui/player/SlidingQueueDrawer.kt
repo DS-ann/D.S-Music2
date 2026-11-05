@@ -398,7 +398,7 @@ fun SlidingQueueDrawer(
                                     label = "LoopCorner"
                                 )
                                 val loopIcon = when (repeatMode) {
-                                    PlayerSharedViewModel.REPEAT_ONE -> R.drawable.ic_repeat_one
+                                    PlayerSharedViewModel.REPEAT_ONCE -> R.drawable.ic_repeat_one
                                     PlayerSharedViewModel.REPEAT_INFINITY -> R.drawable.ic_repeat_infinity
                                     else -> R.drawable.ic_repeat
                                 }
