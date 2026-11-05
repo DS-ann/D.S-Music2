@@ -433,7 +433,7 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxSize()
-                .padding(horizontal = 24.dp * miniPlayerWidthFraction)
+                .padding(horizontal = 24.dp)
                 .shadow(miniPlayerElevation, miniPlayerShape)
                 .clip(miniPlayerShape)
                 .background(miniPlayerBackgroundColor, miniPlayerShape)
@@ -1455,8 +1455,10 @@ fun PlayerBottomSheetCompose(
         val miniFrameWidthFraction = remember(containerWidthDp, density, miniPlayerWidthFraction) {
             with(density) {
                 val fullWidthPx = containerWidthDp.toPx().coerceAtLeast(1f)
-                ((fullWidthPx - 24.dp.toPx()).coerceAtLeast(0f) / fullWidthPx) *
-                    miniPlayerWidthFraction
+                (
+                    (fullWidthPx * miniPlayerWidthFraction - 48.dp.toPx())
+                        .coerceAtLeast(0f) / fullWidthPx
+                )
             }
         }
         val miniPlayerCornerRadiusPx = with(density) { miniPlayerCornerRadius.toPx() }
@@ -1674,16 +1676,20 @@ fun PlayerBottomSheetCompose(
                                     artTransitionProgress
                                 )
 
-                                // The mini player is centered in the landscape half-width layout.
-                                // Keep the shared cover 12dp inside the visible collapsed frame.
-                                val xStartPx = (if (isLandscapeWindow) 18.dp else 24.dp).toPx() +
-                                    if (isLandscapeWindow) {
-                                        with(density) {
+                                // Match the shared cover to the actual capsule content origin:
+                                // 24dp capsule inset + 10dp row inset + centered 48dp art slot.
+                                // Landscape centers the half-width capsule in the full player pane.
+                                val miniArtworkSlotWidth = if (isLandscapeWindow) 48.dp else 60.dp
+                                val miniArtworkContentInset =
+                                    24.dp + 10.dp + (miniArtworkSlotWidth - 48.dp) / 2f
+                                val xStartPx = with(density) {
+                                    miniArtworkContentInset.toPx() +
+                                        if (isLandscapeWindow) {
                                             (containerWidthDp * ((1f - miniPlayerWidthFraction) / 2f)).toPx()
+                                        } else {
+                                            0f
                                         }
-                                    } else {
-                                        0f
-                                    }
+                                }
                                 val xEndPx = if (useWidePlayer) {
                                     with(density) {
                                         val queueInset = sharedArtworkQueueInset.value.coerceAtLeast(0.dp)
