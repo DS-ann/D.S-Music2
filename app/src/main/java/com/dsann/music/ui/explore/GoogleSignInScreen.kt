@@ -34,6 +34,8 @@ fun GoogleSignInScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(false) }
+    var noInternetError by remember { mutableStateOf(false) }
+    var signInWebView by remember { mutableStateOf<WebView?>(null) }
 
     Scaffold(
         topBar = {
@@ -56,11 +58,32 @@ fun GoogleSignInScreen(
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
+                        signInWebView = this
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
                         settings.userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                         
                         webViewClient = object : WebViewClient() {
+                            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                                super.onPageStarted(view, url, favicon)
+                                noInternetError = false
+                            }
+
+                            override fun onReceivedError(
+                                view: WebView?,
+                                request: android.webkit.WebResourceRequest?,
+                                error: android.webkit.WebResourceError?
+                            ) {
+                                super.onReceivedError(view, request, error)
+                                if (request?.isForMainFrame == true && error != null &&
+                                    (error.errorCode == WebViewClient.ERROR_HOST_LOOKUP ||
+                                        error.errorCode == WebViewClient.ERROR_CONNECT ||
+                                        error.errorCode == WebViewClient.ERROR_TIMEOUT)
+                                ) {
+                                    noInternetError = true
+                                }
+                            }
+
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 super.onPageFinished(view, url)
                                 val cookieManager = CookieManager.getInstance()
@@ -89,14 +112,26 @@ fun GoogleSignInScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-            if (isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.4f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    com.dsann.music.ui.theme.LoadingIndicator()
+            when {
+                noInternetError -> {
+                    com.dsann.music.ui.theme.NoInternetState(
+                        modifier = Modifier.fillMaxSize(),
+                        onRetry = {
+                            noInternetError = false
+                            signInWebView?.reload()
+                        },
+                        message = "The sign-in page couldn't be reached. Check your connection and retry."
+                    )
+                }
+                isLoading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.4f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        com.dsann.music.ui.theme.LoadingIndicator()
+                    }
                 }
             }
         }
