@@ -1668,6 +1668,7 @@ fun SettingsScreenContent(
                 navBarSize = navBarSize,
                 onNavBarSizeChange = { viewModel.setNavBarSize(it) },
                 playerLayout = playerLayout,
+                onPlayerLayoutChange = { viewModel.setPlayerLayout(it) },
                 playerButtons = playerButtons,
                 onPlayerButtonsChange = { viewModel.setPlayerButtons(it) },
                 onMovePlayerButton = { from, to -> viewModel.movePlayerButton(from, to) },
@@ -2934,6 +2935,7 @@ private fun AppearanceScreen(
     navBarSize: String,
     onNavBarSizeChange: (String) -> Unit,
     playerLayout: String,
+    onPlayerLayoutChange: (String) -> Unit,
     playerButtons: List<String>,
     onPlayerButtonsChange: (List<String>) -> Unit,
     onMovePlayerButton: (Int, Int) -> Unit,
@@ -3067,14 +3069,14 @@ private fun AppearanceScreen(
 
             
             }
-            SettingsAccordionSection("Artwork shape") {
+            SettingsAccordionSection("Player layout") {
                 SettingsGroupCard(listOf {
                     SettingsChoiceRow(
-                        title = "Cover shape",
-                        description = "Choose the full-player song cover outline. The selected shape updates the shared artwork immediately.",
-                        selected = playerArtworkShape,
-                        options = listOf("Rounded", "Square", "Circle", "Squircle", "Flower", "Cookie", "Arch", "Slanted"),
-                        onSelected = onPlayerArtworkShapeChange
+                        title = "Layout preset",
+                        description = "Standard keeps the balanced player; Vinyl and Cassette change the artwork presentation.",
+                        selected = playerLayout,
+                        options = listOf("Standard", "Vinyl", "Cassette"),
+                        onSelected = onPlayerLayoutChange
                     )
                 })
             }
@@ -3290,6 +3292,15 @@ private fun AppearanceScreen(
                         onSelected = onMiniPlayerProgressStyleChange
                     )
                 },
+                {
+                    SettingsChoiceRow(
+                        title = "Player artwork shape",
+                        description = "Rounded, square, circular, squircle, flower, cookie, arch or slanted album artwork.",
+                        selected = playerArtworkShape,
+                        options = listOf("Rounded", "Square", "Circle", "Squircle", "Flower", "Cookie", "Arch", "Slanted"),
+                        onSelected = onPlayerArtworkShapeChange
+                    )
+                }
             ))
 
             
