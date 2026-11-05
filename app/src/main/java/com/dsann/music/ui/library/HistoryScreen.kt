@@ -46,6 +46,7 @@ fun HistoryScreen(
     currentOnlineSong: OnlineSong?,
     isLoadingStream: Boolean,
     isRefreshing: Boolean = false,
+    isOfflineError: Boolean = false,
     onRefresh: () -> Unit = {},
     onBack: () -> Unit,
     onSongClick: (OnlineSong, List<OnlineSong>, Int) -> Unit,
@@ -90,7 +91,12 @@ fun HistoryScreen(
                 )
             }
         ) {
-            if (history.isEmpty()) {
+            if (history.isEmpty() && isOfflineError) {
+                com.dsann.music.ui.theme.NoInternetState(
+                    modifier = Modifier.fillMaxSize(),
+                    onRetry = onRefresh
+                )
+            } else if (history.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
