@@ -1992,106 +1992,45 @@ fun OnlineSongBottomSheet(
 
             HorizontalDivider(color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
-            if (downloadedSong != null) {
-                if (showDownloadedInfo) {
-                    DsmusicTextButton(
-                        onClick = { showDownloadedInfo = false },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Back to song actions")
-                    }
-                    InfoContent(downloadedSong)
-                } else {
-                    OptionsContent(
-                        song = downloadedSong,
-                        isFavorite = isFavorite,
-                        onFavoriteChange = { isFavorite = it },
-                        actionListener = queueStyleListener,
-                        onAddToPlaylist = {
-                            onPlaylistAddClick(downloadedSong)
-                            onDismissRequest()
-                        },
-                        showAddToQueue = true,
-                        onDismiss = onDismissRequest,
-                        showDelete = false,
-                        hasDownloadedOpus = hasDownloadedOpus,
-                        isConvertingToMp3 = isConvertingToMp3,
-                        onConvertToMp3 = convertToMp3,
-                        downloadedSongMode = true,
-                        onDeleteDownloaded = { onDeleteDownloaded?.invoke() }
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "MORE FOR THIS TRACK",
-                        style = DsmusicTheme.typography.labelSmall.copy(
-                            letterSpacing = 1.1.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = DsmusicTheme.colorScheme.onSurfaceVariant
-                    )
-                    DsmusicSurface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = DsmusicTheme.shapes.large,
-                        color = DsmusicTheme.colorScheme.surfaceContainerLow,
-                        onClick = { showDownloadedInfo = true }
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Info,
-                                contentDescription = null,
-                                tint = DsmusicTheme.colorScheme.primary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Info",
-                                    style = DsmusicTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    "Track details and downloaded file information",
-                                    style = DsmusicTheme.typography.bodySmall,
-                                    color = DsmusicTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
+            if (showDownloadedInfo && downloadedSong != null) {
+                DsmusicTextButton(
+                    onClick = { showDownloadedInfo = false },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Back to song actions")
                 }
+                InfoContent(downloadedSong)
             } else {
-            OptionsContent(
-                song = onlineSongItem,
-                isFavorite = isFavorite,
-                onFavoriteChange = { isFavorite = it },
-                actionListener = queueStyleListener,
-                onAddToPlaylist = {
-                    onPlaylistAddClick(onlineSongItem)
-                    onDismissRequest()
-                },
-                showAddToQueue = true,
-                onDismiss = onDismissRequest,
-                showDelete = false,
-                hasDownloadedOpus = hasDownloadedOpus,
-                isConvertingToMp3 = isConvertingToMp3,
-                onConvertToMp3 = convertToMp3
-            )
+                OptionsContent(
+                    song = onlineSongItem,
+                    isFavorite = isFavorite,
+                    onFavoriteChange = { isFavorite = it },
+                    actionListener = queueStyleListener,
+                    onAddToPlaylist = {
+                        onPlaylistAddClick(onlineSongItem)
+                        onDismissRequest()
+                    },
+                    showAddToQueue = true,
+                    onDismiss = onDismissRequest,
+                    showDelete = false,
+                    hasDownloadedOpus = hasDownloadedOpus,
+                    isConvertingToMp3 = isConvertingToMp3,
+                    onConvertToMp3 = convertToMp3,
+                    downloadedSongMode = downloadedSong != null,
+                    onDeleteDownloaded = { onDeleteDownloaded?.invoke() }
+                )
 
-            Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "MORE FOR THIS TRACK",
+                    style = DsmusicTheme.typography.labelSmall.copy(
+                        letterSpacing = 1.1.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
+                )
 
-            Text(
-                "MORE FOR THIS TRACK",
-                style = DsmusicTheme.typography.labelSmall.copy(
-                    letterSpacing = 1.1.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = DsmusicTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(2.dp))
 
             val artistMenuItems = safeArtistRefs
                 .distinctBy { it.id ?: it.name.trim().lowercase() }
@@ -2187,8 +2126,19 @@ fun OnlineSongBottomSheet(
                     onDismissRequest()
                 }
             )
-            val menuItems = if (onRemoveFromCache != null) {
+            val trackMenuItems = if (downloadedSong != null) {
                 baseMenuItems + ExploreTrackMenuItem(
+                    title = "Info",
+                    subtitle = "Track details and downloaded file information",
+                    icon = Icons.Rounded.Info
+                ) {
+                    showDownloadedInfo = true
+                }
+            } else {
+                baseMenuItems
+            }
+            val menuItems = if (onRemoveFromCache != null) {
+                trackMenuItems + ExploreTrackMenuItem(
                     title = "Remove from cache",
                     subtitle = "Delete the offline copy",
                     icon = Icons.Rounded.DeleteOutline
@@ -2197,7 +2147,7 @@ fun OnlineSongBottomSheet(
                     onDismissRequest()
                 }
             } else {
-                baseMenuItems
+                trackMenuItems
             }
 
             // Keep the compact icon/title/subtitle card structure identical to the
