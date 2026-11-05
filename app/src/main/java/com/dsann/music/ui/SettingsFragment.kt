@@ -3528,6 +3528,12 @@ private fun PlayerCustomizationPreview(
         "Square" -> RoundedCornerShape(4.dp)
         else -> RoundedCornerShape(10.dp)
     }
+    val miniPlayerActionShape = when (controlShape) {
+        "Circle", "Pill" -> CircleShape
+        "Rounded" -> RoundedCornerShape(10.dp)
+        "None" -> RoundedCornerShape(0.dp)
+        else -> CircleShape
+    }
     val artworkSize = (if (layout == "Vinyl" || layout == "Cassette") 88.dp else 84.dp) *
         artworkScale.coerceIn(0.65f, 1f)
 
@@ -3571,14 +3577,15 @@ private fun PlayerCustomizationPreview(
                     Box(Modifier.weight(0.58f).height(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.20f)))
                 }
                 Row(
-                    modifier = Modifier
+                    modifier = Modifier.fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
                         .clip(if (buttonsPill) CircleShape else RoundedCornerShape(0.dp))
                         .background(if (buttonsPill) Color.White.copy(alpha = 0.09f) else Color.Transparent)
                         .padding(horizontal = if (buttonsPill) 6.dp else 0.dp, vertical = if (buttonsPill) 4.dp else 0.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    buttons.take(4).forEach { key ->
+                    buttons.forEach { key ->
                         val shortLabel = when (key) {
                             "lyrics" -> "LYR"
                             "video" -> "VID"
@@ -3603,6 +3610,17 @@ private fun PlayerCustomizationPreview(
                         )
                     }
                 }
+            }
+            Box(
+                modifier = Modifier.padding(start = 8.dp).size(36.dp)
+                    .clip(miniPlayerActionShape)
+                    .background(
+                        if (controlShape == "None") Color.Transparent
+                        else accent.copy(alpha = 0.18f)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("▶", color = accent, style = DsmusicTheme.typography.titleMedium)
             }
         }
         Text(
