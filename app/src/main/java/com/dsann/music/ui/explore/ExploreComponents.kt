@@ -1876,7 +1876,7 @@ fun OnlineSongBottomSheet(
         .conversionKeys(onlineSongItem).any { it in convertingKeys }
     var hasDownloadedOpus by remember(song.videoId) { mutableStateOf(false) }
 
-    LaunchedEffect(song.videoId, song.title, song.artist, song.albumName) {
+    LaunchedEffect(song.videoId, song.title, song.artist, song.albumName, isConvertingToMp3) {
         hasDownloadedOpus = withContext(Dispatchers.IO) {
             SongDownloader.findDownloadedOpusUri(context, onlineSongItem) != null
         }
