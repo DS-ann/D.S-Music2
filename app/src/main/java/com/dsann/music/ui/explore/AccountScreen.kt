@@ -138,7 +138,8 @@ fun AccountSettingsSection(
     val isLoggedIn = remember(userProfile) { AccountManager.isLoggedIn(context) }
     val accountName = userProfile?.name ?: AccountManager.getAccountName(context)
     val token = remember { AccountManager.getAuthCookie(context) ?: "No persistent credentials detected" }
-    
+    val offlineError by viewModel.offlineError.collectAsStateWithLifecycle()
+
     var syncEnabled by remember { mutableStateOf(AccountManager.isSyncEnabled(context)) }
     var showTokenAlert by remember { mutableStateOf(false) }
 
@@ -190,6 +191,17 @@ fun AccountSettingsSection(
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
+            }
+        }
+
+        if (offlineError) {
+            item {
+                com.dsann.music.ui.theme.NoInternetState(
+                    modifier = Modifier.fillMaxWidth(),
+                    onRetry = { viewModel.refreshAll() },
+                    compact = true,
+                    message = "Your YouTube Music library couldn't be loaded. Check your connection and retry."
+                )
             }
         }
 
