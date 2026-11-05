@@ -802,43 +802,46 @@ private fun androidx.compose.foundation.layout.BoxScope.VideoOverlayControls(
     qualityEnabled: Boolean,
     onOpenQuality: () -> Unit,
     onToggleFullscreen: () -> Unit,
-    fullscreen: Boolean,
-    artworkScaleFactor: Float
+    fullscreen: Boolean
 ) {
-    val scale = artworkScaleFactor.coerceIn(0.65f, 1f)
-    val controlSize = (48.dp * scale).coerceIn(32.dp, 48.dp)
-    val iconSize = (20.dp * scale).coerceIn(14.dp, 20.dp)
-    Row(
+    // Measure the actual video viewport. The artwork preference is already applied
+    // to the shared cover layer, so scaling controls from that preference made them
+    // stay large when the player was resized into a short landscape window.
+    BoxWithConstraints(
         modifier = Modifier
             .align(Alignment.TopEnd)
-            .padding(12.dp * scale),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(4.dp)
     ) {
-        DsmusicSurface(
-            shape = CircleShape,
-            color = Color.Black.copy(alpha = 0.62f)
+        val controlSize = (minOf(maxWidth, maxHeight) * 0.19f).coerceIn(24.dp, 40.dp)
+        val iconSize = (controlSize * 0.43f).coerceIn(11.dp, 17.dp)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy((controlSize * 0.14f).coerceIn(3.dp, 6.dp)),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            DsmusicIconButton(
-                onClick = onOpenQuality,
-                enabled = qualityEnabled,
-                modifier = Modifier.size(controlSize)
+            DsmusicSurface(
+                modifier = Modifier.size(controlSize),
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = 0.62f),
+                contentColor = Color.White,
+                showBorder = false,
+                onClick = if (qualityEnabled) onOpenQuality else null
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_settings),
-                    contentDescription = "Video quality",
+                    contentDescription = qualityLabel?.let { "Video quality, $it" } ?: "Video quality",
                     tint = Color.White,
-                    modifier = Modifier.size(iconSize)
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(iconSize)
                 )
             }
-        }
-        DsmusicSurface(
-            shape = CircleShape,
-            color = Color.Black.copy(alpha = 0.62f)
-        ) {
-            DsmusicIconButton(
-                onClick = onToggleFullscreen,
-                modifier = Modifier.size(controlSize)
+            DsmusicSurface(
+                modifier = Modifier.size(controlSize),
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = 0.62f),
+                contentColor = Color.White,
+                showBorder = false,
+                onClick = onToggleFullscreen
             ) {
                 Icon(
                     painter = painterResource(
@@ -846,7 +849,9 @@ private fun androidx.compose.foundation.layout.BoxScope.VideoOverlayControls(
                     ),
                     contentDescription = if (fullscreen) "Exit fullscreen" else "Enter fullscreen",
                     tint = Color.White,
-                    modifier = Modifier.size(iconSize)
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(iconSize)
                 )
             }
         }
@@ -897,48 +902,87 @@ fun PlayerBottomSheetCompose(
         var videoQualityOptions by remember {
             mutableStateOf<List<com.dsann.music.data.innertube.VideoStreamOption>>(emptyList())
         }
-        var selectedVideoQuality by remember { mutableStateOf<String?>(null) }
+        var preferredVideoQualityHeight by remember(playerPreferences) {
+            mutableStateOf(playerPreferences.getInt("video_quality_preferred_height", 0))
+        }
+        var selectedVideoQuality by remember(playerPreferences) {
+            mutableStateOf(playerPreferences.getString("video_quality_preferred_label", null))
+        }
         var videoQualityLoading by remember { mutableStateOf(false) }
         var showVideoQualityDialog by remember { mutableStateOf(false) }
         var isVideoFullscreen by remember { mutableStateOf(false) }
 
-        LaunchedEffect(isVideoMode, currentSong?.videoId) {
+        LaunchedEffect(isVideoMode, currentSong?.videoId, audioService) {
             val videoId = currentSong?.videoId
             if (!isVideoMode || videoId.isNullOrBlank()) {
                 videoQualityOptions = emptyList()
-                selectedVideoQuality = null
                 showVideoQualityDialog = false
                 isVideoFullscreen = false
+                // Keep the preferred resolution when audio mode is active. It is a
+                // playback preference and must survive closing/reopening the player.
             } else {
                 videoQualityLoading = true
+                isVideoFullscreen = false
                 try {
                     val options = com.dsann.music.data.innertube.NewPipeStreamExtractor
                         .getVideoStreamOptions(videoId)
+                    if (currentSong?.videoId != videoId || !isVideoMode) return@LaunchedEffect
                     videoQualityOptions = options
-                    val defaultVideoOption = com.dsann.music.data.innertube.NewPipeStreamExtractor
+                    val dataSaverOption = com.dsann.music.data.innertube.NewPipeStreamExtractor
                         .dataSaverVideoOption(options)
-                    selectedVideoQuality = defaultVideoOption?.label
-                    if (isVideoMode && defaultVideoOption != null) {
+                    val preferredOption = if (preferredVideoQualityHeight > 0) {
+                        options.minWithOrNull(
+                            compareBy<com.dsann.music.data.innertube.VideoStreamOption> {
+                                kotlin.math.abs(it.height - preferredVideoQualityHeight)
+                            }.thenBy {
+                                if (it.height > preferredVideoQualityHeight) 1 else 0
+                            }.thenBy {
+                                if (it.usesSeparateAudio) 1 else 0
+                            }
+                        )
+                    } else {
+                        null
+                    }
+                    val selectedOption = preferredOption ?: dataSaverOption
+                    selectedVideoQuality = selectedOption?.label
+                        ?: playerPreferences.getString("video_quality_preferred_label", null)
+
+                    if (selectedOption != null) {
+                        // Reapply an explicitly selected resolution to new tracks and
+                        // when the player composition is recreated. Preserve the current
+                        // playback position through AudioPlaybackService's quality switch.
+                        if (
+                            preferredOption != null &&
+                            preferredOption.url != dataSaverOption?.url
+                        ) {
+                            audioService?.setVideoStreamQuality(
+                                streamUrl = preferredOption.url,
+                                audioUrl = preferredOption.audioUrl,
+                                videoMimeType = preferredOption.mimeType,
+                                audioMimeType = preferredOption.audioMimeType
+                            )
+                        }
                         viewModel.setVideoPlaybackMetadata(
                             com.dsann.music.viewmodel.VideoPlaybackMetadata(
-                                title = defaultVideoOption.videoTitle?.takeIf { it.isNotBlank() }
+                                title = selectedOption.videoTitle?.takeIf { it.isNotBlank() }
                                     ?: currentSong?.title.orEmpty(),
-                                uploader = defaultVideoOption.videoUploader?.takeIf { it.isNotBlank() }
+                                uploader = selectedOption.videoUploader?.takeIf { it.isNotBlank() }
                                     ?: currentSong?.artist.orEmpty(),
-                                durationMs = defaultVideoOption.durationMs,
-                                resolution = defaultVideoOption.label,
-                                mimeType = defaultVideoOption.mimeType,
-                                description = defaultVideoOption.videoDescription,
-                                viewCount = defaultVideoOption.videoViewCount,
-                                likeCount = defaultVideoOption.videoLikeCount,
-                                uploadDate = defaultVideoOption.videoUploadDate,
-                                thumbnailUrl = defaultVideoOption.videoThumbnailUrl,
-                                uploaderUrl = defaultVideoOption.videoUploaderUrl
+                                durationMs = selectedOption.durationMs,
+                                resolution = selectedOption.label,
+                                mimeType = selectedOption.mimeType,
+                                description = selectedOption.videoDescription,
+                                viewCount = selectedOption.videoViewCount,
+                                likeCount = selectedOption.videoLikeCount,
+                                uploadDate = selectedOption.videoUploadDate,
+                                thumbnailUrl = selectedOption.videoThumbnailUrl,
+                                uploaderUrl = selectedOption.videoUploaderUrl
                             )
                         )
                     }
                 } catch (_: Exception) {
                     videoQualityOptions = emptyList()
+                    selectedVideoQuality = playerPreferences.getString("video_quality_preferred_label", null)
                 } finally {
                     videoQualityLoading = false
                 }
@@ -1904,8 +1948,7 @@ fun PlayerBottomSheetCompose(
                                     qualityEnabled = videoQualityOptions.isNotEmpty() && !videoQualityLoading,
                                     onOpenQuality = { showVideoQualityDialog = true },
                                     onToggleFullscreen = { isVideoFullscreen = !isVideoFullscreen },
-                                    fullscreen = false,
-                                    artworkScaleFactor = artworkScaleFactor
+                                    fullscreen = false
                                 )
                             }
 
@@ -1948,8 +1991,7 @@ fun PlayerBottomSheetCompose(
                                             qualityEnabled = videoQualityOptions.isNotEmpty() && !videoQualityLoading,
                                             onOpenQuality = { showVideoQualityDialog = true },
                                             onToggleFullscreen = { isVideoFullscreen = false },
-                                            fullscreen = true,
-                                            artworkScaleFactor = artworkScaleFactor
+                                            fullscreen = true
                                         )
                                     }
                                 }
@@ -1976,6 +2018,11 @@ fun PlayerBottomSheetCompose(
                                                                 audioMimeType = option.audioMimeType
                                                             )
                                                             selectedVideoQuality = option.label
+                                                            preferredVideoQualityHeight = option.height
+                                                            playerPreferences.edit()
+                                                                .putInt("video_quality_preferred_height", option.height)
+                                                                .putString("video_quality_preferred_label", option.label)
+                                                                .apply()
                                                             viewModel.setVideoPlaybackMetadata(
                                                                 com.dsann.music.viewmodel.VideoPlaybackMetadata(
                                                                     title = option.videoTitle?.takeIf { it.isNotBlank() }
