@@ -500,6 +500,15 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
                 )
             }
         }
+
+        // Register after the full player and every screen underneath it have composed.
+        // The latest enabled Compose BackHandler wins, so the player must be last here.
+        androidx.activity.compose.BackHandler(
+            enabled = currentSheetContentState == PlayerSheetState.EXPANDED &&
+                !isLyricsModeEnabled && !isQueueExpanded
+        ) {
+            collapsePlayerFully()
+        }
     }
 }
 
@@ -1380,12 +1389,6 @@ fun PlayerBottomSheetCompose(
 
         val sheetBackProgress = 0f
 
-        androidx.activity.compose.BackHandler(
-            enabled = currentSheetContentState == PlayerSheetState.EXPANDED &&
-                !isLyricsModeEnabled && !isQueueExpanded
-        ) {
-            collapsePlayerFully()
-        }
 
         // Auto-expand/collapse sheet when currentSong is changed / ready
         LaunchedEffect(currentSong, isPlaybackReady) {
