@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.sample
 import com.dsann.music.R
@@ -329,11 +330,27 @@ internal fun WavySliderWithLabels(
         initialValue = currentPositionFlow.value
     )
     val liveProgressEnabled = isPlayerVisible && isPlaying
-    val currentPosition = (
-        if (liveProgressEnabled) currentPositionProvider()
-        else if (isPlayerVisible) observedPosition
-        else currentPositionProvider()
-    ).coerceAtLeast(0)
+    var api23LabelPosition by remember(currentPositionFlow, currentPositionProvider) {
+        mutableIntStateOf(currentPositionProvider().coerceAtLeast(0))
+    }
+    LaunchedEffect(isApi23, isPlayerVisible, isPlaying, currentPositionProvider) {
+        if (!isApi23 || !isPlayerVisible) return@LaunchedEffect
+        if (!isPlaying) {
+            api23LabelPosition = currentPositionProvider().coerceAtLeast(0)
+            return@LaunchedEffect
+        }
+        while (true) {
+            val latestPosition = currentPositionProvider().coerceAtLeast(0)
+            if (api23LabelPosition != latestPosition) api23LabelPosition = latestPosition
+            delay(200L)
+        }
+    }
+    val currentPosition = when {
+        liveProgressEnabled && isApi23 -> api23LabelPosition
+        liveProgressEnabled -> currentPositionProvider()
+        isPlayerVisible -> observedPosition
+        else -> currentPositionProvider()
+    }.coerceAtLeast(0)
     // A missing duration is not a one-millisecond track. Treat progress as unknown/zero
     // until Media3 publishes a valid duration, otherwise any restored position renders full.
     val safeDur = duration.takeIf { it > 0 }?.toFloat()

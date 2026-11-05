@@ -716,7 +716,7 @@ fun SearchBrowseCard(
                 modifier = Modifier.fillMaxSize().clip(if (isArtist) CircleShape else RoundedCornerShape(12.dp)),
                 contentScale = ContentScale.Crop
             )
-            if (!isArtist && onLongClick != null) {
+            if (item is SearchItem.Song && onLongClick != null) {
                 ExploreCoverActionButton(
                     onClick = onLongClick,
                     modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
@@ -824,7 +824,7 @@ fun BentoCell(
                 )
             }
         }
-        if (item !is SearchItem.Artist) {
+        if (item is SearchItem.Song) {
             ExploreCoverActionButton(
                 onClick = onLongClick,
                 modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
@@ -1592,9 +1592,7 @@ fun HomeCarouselItem(
             }
             val onMenuClick: (() -> Unit)? = when (item) {
                 is SearchItem.Song -> onSongMenuClick?.let { callback -> { callback(item.song) } }
-                is SearchItem.Album, is SearchItem.Playlist ->
-                    onCollectionMenuClick?.let { callback -> { callback(item) } }
-                is SearchItem.Artist -> null
+                is SearchItem.Album, is SearchItem.Playlist, is SearchItem.Artist -> null
             }
             if (onMenuClick != null) {
                 ExploreCoverActionButton(

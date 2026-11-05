@@ -4101,10 +4101,9 @@ private suspend fun readCacheTabSnapshot(
 
         // Keep the Cache playlist genuinely offline: omit partial tracks that would have
         // to fall back to the network when tapped.
-        val cachedUri = AudioPlaybackService.getCachedPlaybackUri(
+        val cachedUri = AudioPlaybackService.getCompleteCachedPlaybackUriForKey(
             context,
-            metadata.songId,
-            metadata.videoId
+            key
         )?.toString() ?: return@forEach
 
         val entry = CachedSongEntry(

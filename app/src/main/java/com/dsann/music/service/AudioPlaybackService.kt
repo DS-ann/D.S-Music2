@@ -188,6 +188,22 @@ class AudioPlaybackService : MediaSessionService() {
         }
 
         /**
+         * Validates one already-known cache key without scanning every cached stream.
+         */
+        @JvmStatic
+        @Synchronized
+        fun getCompleteCachedPlaybackUriForKey(context: Context, cacheKey: String): Uri? {
+            if (cacheKey.isBlank()) return null
+            val uri = Uri.parse(cacheKey)
+            if (uri.scheme != "http" && uri.scheme != "https") return null
+            val currentCache = getCache(context.applicationContext)
+            val contentLength = androidx.media3.datasource.cache.ContentMetadata
+                .getContentLength(currentCache.getContentMetadata(cacheKey))
+            if (contentLength <= 0L || !currentCache.isCached(cacheKey, 0L, contentLength)) return null
+            return uri
+        }
+
+        /**
          * Finds a fully cached stream for a track without consulting the user's selected
          * format/bitrate. Returning the exact original URL preserves Media3's cache key, and
          * requiring the full content length prevents an offline tap from silently reaching

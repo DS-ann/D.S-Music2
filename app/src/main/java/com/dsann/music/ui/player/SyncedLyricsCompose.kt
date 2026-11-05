@@ -285,24 +285,47 @@ internal fun SyncedLyricsCompose(
         }
     }
 
-    // Keep each active lyric line centred. Re-key by song as well as line index:
-    // two tracks can begin on the same lyric index, but must not inherit old scroll.
+    // Word highlighting remains driven by activeIndex. The viewport advances only after
+    // the outgoing line completes: final karaoke word end, or next line time for synced lyrics.
+    val scrollTargetIndex by remember(displayItems, lyricClock) {
+        derivedStateOf {
+            if (displayItems.isEmpty()) {
+                -1
+            } else {
+                var targetIndex = displayItems.indexOfFirst { !it.line.isInterlude }
+                var lineIndex = targetIndex
+                val positionMs = lyricClock.intValue.toLong()
+                while (lineIndex >= 0) {
+                    val nextLineIndex = (lineIndex + 1 until displayItems.size)
+                        .firstOrNull { !displayItems[it].line.isInterlude }
+                        ?: break
+                    val line = displayItems[lineIndex].line
+                    val finalWordEnd = line.words
+                        .maxOfOrNull { it.absoluteStartTimeMs + it.durationMs }
+                        ?.takeIf { it > 0L }
+                    val completionTime = finalWordEnd
+                        ?: displayItems[nextLineIndex].line.startTimeMs
+                    if (positionMs >= completionTime) {
+                        targetIndex = nextLineIndex
+                        lineIndex = nextLineIndex
+                    } else break
+                }
+                targetIndex
+            }
+        }
+    }
     val density = LocalDensity.current
-    LaunchedEffect(lyricTrackKey, displayItems, activeIndex, density) {
-        if (activeIndex == 0) {
-            // The first line is a hard anchor. Do not animate from the previous track's
-            // final-line offset or leave that row visible while the list catches up.
+    LaunchedEffect(lyricTrackKey, displayItems, scrollTargetIndex, density) {
+        if (scrollTargetIndex == 0) {
             listState.scrollToItem(0)
-        } else if (activeIndex > 0) {
+        } else if (scrollTargetIndex > 0) {
             performSmoothedScroll(
                 listState,
-                activeIndex,
+                scrollTargetIndex,
                 displayItems,
                 with(density) { 36.dp.roundToPx() }
             )
         } else if (lyricClock.intValue <= (displayItems.firstOrNull()?.line?.startTimeMs ?: 0L)) {
-            // A new song or a seek to its beginning must not inherit the previous
-            // track's old list offset, even when both tracks share the same line index.
             listState.scrollToItem(0)
         }
     }
