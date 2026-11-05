@@ -2110,7 +2110,9 @@ private fun PlaylistsTabContent(
     var showCachePlaylist by remember { mutableStateOf(false) }
     val playlistGridState = rememberLazyGridState()
 
-    BackHandler(enabled = showCachePlaylist) { showCachePlaylist = false }
+    BackHandler(enabled = showCachePlaylist && !isPlayerBackActive) {
+        showCachePlaylist = false
+    }
 
     LaunchedEffect(Unit) { accountViewModel?.refreshAll() }
 
