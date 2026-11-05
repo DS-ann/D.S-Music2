@@ -241,6 +241,55 @@ object SongDownloader {
             ?.takeIf { isUriReadable(context, it) }
     }
 
+    /** Resolve only the currently selected download format, rather than any old format. */
+    fun findDownloadedFormatUri(context: Context, song: SongItem, format: String): Uri? {
+        val extension = NewPipeStreamExtractor.normalizeDownloadAudioFormat(format)
+        val directPath = song.path?.takeIf {
+            it.isNotBlank() && !it.contains("://") &&
+                it.endsWith(".$extension", ignoreCase = true)
+        }?.let(::File)?.takeIf { it.isFile && it.length() > 0L }
+        if (directPath != null) return Uri.fromFile(directPath)
+
+        val possibleUris = listOfNotNull(
+            song.path?.takeIf { it.startsWith("content://") || it.startsWith("file://") }
+                ?.let { runCatching { Uri.parse(it) }.getOrNull() },
+            song.contentUri
+        )
+        possibleUris.firstOrNull { uri ->
+            uriExtension(context, uri) == extension && isUriReadable(context, uri)
+        }?.let { return it }
+
+        val videoId = song.videoId?.takeIf { it.isNotBlank() }
+        if (videoId != null) {
+            val prefs = context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
+            val formatMapped = prefs.getString("${extension}_uri_$videoId", null)?.let {
+                runCatching { Uri.parse(it) }.getOrNull()
+            }
+            if (formatMapped != null && uriExtension(context, formatMapped) == extension &&
+                isUriReadable(context, formatMapped)
+            ) {
+                return formatMapped
+            }
+            if (formatMapped != null) prefs.edit().remove("${extension}_uri_$videoId").apply()
+
+            val genericMapped = prefs.getString("uri_$videoId", null)?.let {
+                runCatching { Uri.parse(it) }.getOrNull()
+            }
+            if (genericMapped != null && uriExtension(context, genericMapped) == extension &&
+                isUriReadable(context, genericMapped)
+            ) {
+                prefs.edit().putString("${extension}_uri_$videoId", genericMapped.toString()).apply()
+                return genericMapped
+            }
+        }
+
+        val baseName = "${cleanTitle(song.title)} - ${cleanArtist(song.artist)}"
+            .replace(Regex("[^a-zA-Z0-9._\\s()\\[\\]-]"), "_")
+        val filename = "$baseName.$extension"
+        return (findDsmusicMediaStoreUri(context, filename) ?: findLegacyDownloadedFile(filename))
+            ?.takeIf { isUriReadable(context, it) }
+    }
+
     /** Resolve an app-published conversion/export by exact display name. */
     fun findDownloadedExportUri(context: Context, filename: String): Uri? =
         (findDsmusicMediaStoreUri(context, filename) ?: findLegacyDownloadedFile(filename))
@@ -280,13 +329,29 @@ object SongDownloader {
                 .edit()
                 .putString("uri_$videoId", uri.toString())
                 .putString("name_$videoId", outputFile.name)
-            if (outputFile.extension.equals("opus", ignoreCase = true)) {
-                editor.putString("opus_uri_$videoId", uri.toString())
-            }
+            editor.putString("${outputFile.extension.lowercase()}_uri_$videoId", uri.toString())
             editor.apply()
         } else {
             Log.w(TAG, "Download completed but permanent MediaStore URI was not found for $videoId")
         }
+    }
+
+    /** Remember a converted/exported format without replacing the generic playback URI. */
+    fun rememberDownloadedExport(context: Context, song: SongItem, outputFile: File) {
+        val videoId = song.videoId?.takeIf { it.isNotBlank() } ?: return
+        val uri = findDsmusicMediaStoreUri(context, outputFile.name)
+            ?: if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && outputFile.isFile) {
+                Uri.fromFile(outputFile)
+            } else null
+        if (uri == null) {
+            Log.w(TAG, "Could not remember converted export ${outputFile.name} for $videoId")
+            return
+        }
+        context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
+            .edit()
+            .putString("${outputFile.extension.lowercase()}_uri_$videoId", uri.toString())
+            .putString("export_name_${outputFile.extension.lowercase()}_$videoId", outputFile.name)
+            .apply()
     }
 
     private fun findDsmusicMediaStoreUri(context: Context, filename: String): Uri? {
@@ -1953,11 +2018,10 @@ object SongDownloader {
 
     fun isSongDownloaded(context: Context, song: SongItem): Boolean {
         if (song.videoId.isNullOrBlank()) return true // Local songs are already available offline
-        return findDownloadedUri(
-            context.applicationContext,
-            song.videoId,
-            song.title,
-            song.artist
-        ) != null
+        val selectedFormat = NewPipeStreamExtractor.normalizeDownloadAudioFormat(
+            context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+                .getString("download_audio_format", "m4a")
+        )
+        return findDownloadedFormatUri(context.applicationContext, song, selectedFormat) != null
     }
 }
