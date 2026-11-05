@@ -96,7 +96,7 @@ fun GoogleSignInScreen(
                         .background(Color.Black.copy(alpha = 0.4f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator()
+                    com.dsann.music.ui.theme.LoadingIndicator()
                 }
             }
         }
