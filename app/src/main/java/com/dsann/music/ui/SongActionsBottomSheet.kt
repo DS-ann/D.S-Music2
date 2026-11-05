@@ -257,7 +257,9 @@ fun BottomSheetScaffoldContent(
 
     val convertToMp3: () -> Unit = {
         val target = song
-        if (target != null && hasDownloadedOpus && !isConvertingToMp3) {
+        // Do not silently swallow a tap just because the asynchronous Opus-file check is stale.
+        // The converter resolves the source itself and returns a useful error when it is absent.
+        if (target != null && !isConvertingToMp3) {
             conversionScope.launch {
                 isConvertingToMp3 = true
                 val result = try {
@@ -585,7 +587,7 @@ fun OptionsContent(
         ActionButtonRow1(song, isFavorite, onFavoriteChange, actionListener, onDismiss)
         ActionButtonRow2(song, actionListener, onDismiss, showAddToQueue = showAddToQueue)
         DestructiveActionRow(song, actionListener, onAddToPlaylist, onDismiss, showDelete = showDelete)
-        if (hasDownloadedOpus || isConvertingToMp3) {
+        if (hasDownloadedOpus || isConvertingToMp3 || !song?.videoId.isNullOrBlank()) {
             SongActionWideTile(
                 modifier = Modifier.fillMaxWidth(),
                 label = if (isConvertingToMp3) "Converting to MP3…" else "Convert Opus to MP3",
