@@ -260,11 +260,10 @@ class MainActivity : AppCompatActivity() {
                         val reportedBottomPadding = WindowInsets.navigationBars
                             .asPaddingValues()
                             .calculateBottomPadding()
-                        val bottomPadding = if (!useNavigationRail) {
-                            reportedBottomPadding.coerceAtLeast(24.dp)
-                        } else {
-                            reportedBottomPadding
-                        }
+                        // Respect the actual system inset. A fixed 24dp minimum left
+                        // an artificial gap below the app dock when Android's navigation bar
+                        // was hidden or the window reported no bottom inset.
+                        val bottomPadding = reportedBottomPadding
                         val navigationBarsHeightPx = with(density) { bottomPadding.toPx() }
                         val configuredNavHeight = when (navBarSize) {
                             "Compact" -> 56.dp
