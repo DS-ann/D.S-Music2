@@ -276,6 +276,9 @@ fun BottomSheetScaffoldContent(
                     )
                 }
                 isConvertingToMp3 = false
+                if (result.success) {
+                    com.dsann.music.util.SongDownloader.refreshDownloadedStatus(context, target)
+                }
                 SnackbarController.showMessage(
                     result.message,
                     iconResId = if (result.success) R.drawable.ic_downloaded else null
