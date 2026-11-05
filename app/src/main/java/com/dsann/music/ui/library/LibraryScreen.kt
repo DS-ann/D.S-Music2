@@ -4441,7 +4441,7 @@ private fun StreamCacheTabContent(
         )
     }
 
-        val playlistActions: @Composable () -> Unit = {
+    val playlistActions: @Composable () -> Unit = {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -4467,7 +4467,7 @@ private fun StreamCacheTabContent(
         }
     }
 
-Column(modifier = modifier.fillMaxSize()) {
+    Column(modifier = modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
