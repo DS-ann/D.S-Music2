@@ -33,13 +33,9 @@ internal object DsmCoverShapes {
     }
 
     fun forPlayerLayout(playerLayout: String, artworkShapeName: String): Shape {
-        // Layout presets may add grooves, tape reels and spacing, but do not override
-        // the independently selected artwork clipping shape.
-        val roundedCorner = when (playerLayout) {
-            "Cover" -> 8.dp
-            "Minimal" -> 18.dp
-            else -> 24.dp
-        }
+        // Vinyl/Cassette artwork treatments never override the independently selected
+        // artwork clipping shape. Legacy Cover/Minimal presets are no longer supported.
+        val roundedCorner = 24.dp
         return of(artworkShapeName, roundedCorner)
     }
 
