@@ -3448,8 +3448,12 @@ class AudioPlaybackService : MediaSessionService() {
         videoModeResolutionJob?.cancel()
 
         val songId = song.id
-        val position = captureVideoModePosition(vm)
-        val wasPlaying = player.isPlaying || player.playWhenReady || vm.isPlaying.value
+        val isRebindingTrack = vm.isVideoMode.value && activeVideoCacheVideoId != videoId
+        // A queue transition starts the new song at zero; the previous video player's
+        // timestamp belongs to another track and must never leak into this video.
+        val position = if (isRebindingTrack) 0L else captureVideoModePosition(vm)
+        val wasPlaying = player.isPlaying || player.playWhenReady ||
+            vm.isPlaying.value || shouldAutoPlay
         // A new queue item must not keep the previous track's video window alive while
         // its own stream is resolving. Audio for this track is already loaded underneath.
         if (vm.isVideoMode.value) {
@@ -3489,6 +3493,12 @@ class AudioPlaybackService : MediaSessionService() {
                     )
                     return@launch
                 }
+
+                // Audio resolution may still be finishing for this exact queue item.
+                // Once a matching video is ready, cancel it so it cannot overwrite the
+                // video MediaItem after the video source has been installed.
+                resolveJob?.cancel()
+                resolveTargetSongId = "video-mode:$videoId:$requestGeneration"
 
                 activeVideoCacheVideoId = videoId
                 activeVideoCacheUris = buildSet {
