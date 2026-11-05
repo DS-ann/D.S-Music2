@@ -749,111 +749,21 @@ fun LibraryScreen(
                                     }
                                 }
 
+                                // Downloads are a single playlist, not an alphabetically sectioned file browser.
+                                // Sorting changes track order while keeping all rows in one continuous queue.
                                 val sortedAndGrouped by produceState<List<Any>>(
                                     initialValue = emptyList(),
                                     filteredSongs,
                                     sortOrder
                                 ) {
                                     value = withContext(Dispatchers.Default) {
-                                        if (filteredSongs.isEmpty()) {
-                                            emptyList()
-                                        } else {
-                                            val sorted = when (sortOrder) {
-                                                SortOrder.A_Z -> filteredSongs.sortedWith(compareBy { it.title.lowercase() })
-                                                SortOrder.DATE_ADDED -> filteredSongs.sortedWith(compareByDescending { it.dateAdded })
-                                                SortOrder.ARTIST -> filteredSongs.sortedWith(compareBy { it.artist.lowercase() })
-                                                SortOrder.DURATION -> filteredSongs.sortedWith(compareByDescending { it.duration })
-                                            }
-
-                                            val groups = LinkedHashMap<String, MutableList<SongItem>>()
-                                            when (sortOrder) {
-                                                SortOrder.A_Z -> {
-                                                    for (song in sorted) {
-                                                        val header = if (song.title.isEmpty()) "#" else {
-                                                            val char = song.title.uppercase().first()
-                                                            if (char.isLetter()) char.toString() else "#"
-                                                        }
-                                                        groups.getOrPut(header) { mutableListOf() }.add(song)
-                                                    }
-                                                }
-                                                SortOrder.DATE_ADDED -> {
-                                                    val nowSeconds = System.currentTimeMillis() / 1000
-                                                    for (song in sorted) {
-                                                        val diff = (nowSeconds - song.dateAdded).coerceAtLeast(0L)
-                                                        val days = diff / (60 * 60 * 24)
-                                                        val header = when {
-                                                            days < 1 -> "Today"
-                                                            days < 2 -> "Yesterday"
-                                                            days < 7 -> "This Week"
-                                                            days < 30 -> "This Month"
-                                                            days < 365 -> "This Year"
-                                                            else -> "Older"
-                                                        }
-                                                        groups.getOrPut(header) { mutableListOf() }.add(song)
-                                                    }
-                                                }
-                                                SortOrder.ARTIST -> {
-                                                    for (song in sorted) {
-                                                        val header = song.artist.ifBlank { "Unknown Artist" }
-                                                        groups.getOrPut(header) { mutableListOf() }.add(song)
-                                                    }
-                                                }
-                                                SortOrder.DURATION -> {
-                                                    for (song in sorted) {
-                                                        val minutes = song.duration / 60000
-                                                        val header = when {
-                                                            minutes < 2 -> "Under 2 min"
-                                                            minutes < 4 -> "2-4 min"
-                                                            minutes < 6 -> "4-6 min"
-                                                            minutes < 10 -> "6-10 min"
-                                                            else -> "Over 10 min"
-                                                        }
-                                                        groups.getOrPut(header) { mutableListOf() }.add(song)
-                                                    }
-                                                }
-                                            }
-
-                                            buildList<Any> {
-                                                for ((header, groupSongs) in groups) {
-                                                    add(header)
-                                                    addAll(groupSongs)
-                                                }
-                                            }
+                                        val sorted = when (sortOrder) {
+                                            SortOrder.A_Z -> filteredSongs.sortedWith(compareBy { it.title.lowercase() })
+                                            SortOrder.DATE_ADDED -> filteredSongs.sortedWith(compareByDescending { it.dateAdded })
+                                            SortOrder.ARTIST -> filteredSongs.sortedWith(compareBy { it.artist.lowercase() })
+                                            SortOrder.DURATION -> filteredSongs.sortedWith(compareByDescending { it.duration })
                                         }
-                                    }
-                                }
-
-                                // Precompute each song's position within its heading group once.
-                                // Calculating this by scanning the list inside every LazyColumn row
-                                // made large date/artist groups increasingly expensive to scroll.
-                                val groupedSongPositions by produceState(
-                                    initialValue = emptyMap<Long, Pair<Int, Int>>(),
-                                    sortedAndGrouped
-                                ) {
-                                    value = withContext(Dispatchers.Default) {
-                                        buildMap<Long, Pair<Int, Int>> {
-                                            var cursor = 0
-                                            while (cursor < sortedAndGrouped.size) {
-                                                if (sortedAndGrouped[cursor] !is String) {
-                                                    cursor++
-                                                    continue
-                                                }
-                                                val sectionStart = cursor + 1
-                                                var sectionEnd = sectionStart
-                                                while (
-                                                    sectionEnd < sortedAndGrouped.size &&
-                                                    sortedAndGrouped[sectionEnd] is SongItem
-                                                ) {
-                                                    sectionEnd++
-                                                }
-                                                val sectionCount = sectionEnd - sectionStart
-                                                for (songIndex in sectionStart until sectionEnd) {
-                                                    val song = sortedAndGrouped[songIndex] as SongItem
-                                                    put(song.id, (songIndex - sectionStart) to sectionCount)
-                                                }
-                                                cursor = sectionEnd
-                                            }
-                                        }
+                                        sorted.map { it as Any }
                                     }
                                 }
 
@@ -986,58 +896,56 @@ fun LibraryScreen(
                                             val headerSong = filteredSongs.firstOrNull()
                                             if (headerSong != null) {
                                                 Column(
-                                                    modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
-                                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(14.dp)
                                                 ) {
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                                                        verticalAlignment = Alignment.CenterVertically
+                                                    Column(
+                                                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                                        verticalArrangement = Arrangement.spacedBy(10.dp)
                                                     ) {
                                                         AsyncImage(
-                                                            model = headerSong.getAlbumArtUri() ?: R.drawable.ic_music_note,
-                                                            contentDescription = "Downloaded songs artwork",
-                                                            modifier = Modifier.size(112.dp).clip(RoundedCornerShape(14.dp)),
+                                                            model = libraryArtworkRequestBuilder(
+                                                                context,
+                                                                headerSong.getAlbumArtUri() ?: R.drawable.ic_music_note
+                                                            ).crossfade(false).build(),
+                                                            contentDescription = "Downloads playlist artwork",
+                                                            modifier = Modifier.size(216.dp).clip(RoundedCornerShape(18.dp)),
                                                             contentScale = ContentScale.Crop
                                                         )
-                                                        Column(
-                                                            modifier = Modifier.weight(1f).padding(start = 14.dp),
-                                                            verticalArrangement = Arrangement.spacedBy(5.dp)
-                                                        ) {
-                                                            Text(
-                                                                "Downloads",
-                                                                style = DsmusicTheme.typography.headlineSmall,
-                                                                fontWeight = FontWeight.ExtraBold
-                                                            )
-                                                            Text(
-                                                                "D.S Music · ${sourceSongs.size} songs",
-                                                                style = DsmusicTheme.typography.bodyMedium,
-                                                                color = DsmusicTheme.colorScheme.onSurfaceVariant
-                                                            )
-                                                            Text(
-                                                                "Saved on this device",
-                                                                style = DsmusicTheme.typography.labelMedium,
-                                                                color = DsmusicTheme.colorScheme.primary
-                                                            )
-                                                        }
+                                                        Text(
+                                                            "Downloads",
+                                                            style = DsmusicTheme.typography.headlineMedium,
+                                                            fontWeight = FontWeight.ExtraBold
+                                                        )
+                                                        Text(
+                                                            "D.S Music · ${sourceSongs.size} songs",
+                                                            style = DsmusicTheme.typography.bodyMedium,
+                                                            color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                        Text(
+                                                            "Saved on this device",
+                                                            style = DsmusicTheme.typography.labelMedium,
+                                                            color = DsmusicTheme.colorScheme.primary
+                                                        )
                                                     }
                                                     Row(
                                                         modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                                                     ) {
                                                         DsmusicButton(
                                                             onClick = {
-                                                                val playlist = filteredSongs
-                                                                if (playlist.isNotEmpty()) {
+                                                                if (filteredSongs.isNotEmpty()) {
                                                                     viewModel.setShuffleEnabled(false)
-                                                                    viewModel.setSongList(playlist)
-                                                                    viewModel.playSong(playlist.first())
+                                                                    viewModel.setSongList(filteredSongs)
+                                                                    viewModel.playSongAtIndex(0)
                                                                 }
                                                             },
                                                             enabled = filteredSongs.isNotEmpty(),
                                                             modifier = Modifier.weight(1f)
                                                         ) {
                                                             Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                                                            Spacer(Modifier.width(6.dp))
+                                                            Spacer(Modifier.width(8.dp))
                                                             Text("Play all")
                                                         }
                                                         DsmusicOutlinedButton(
@@ -1046,14 +954,14 @@ fun LibraryScreen(
                                                                 if (playlist.isNotEmpty()) {
                                                                     viewModel.setShuffleEnabled(true)
                                                                     viewModel.setSongList(playlist)
-                                                                    viewModel.playSong(playlist.first())
+                                                                    viewModel.playSongAtIndex(0)
                                                                 }
                                                             },
                                                             enabled = filteredSongs.isNotEmpty(),
                                                             modifier = Modifier.weight(1f)
                                                         ) {
                                                             Icon(Icons.Rounded.Shuffle, contentDescription = null)
-                                                            Spacer(Modifier.width(6.dp))
+                                                            Spacer(Modifier.width(8.dp))
                                                             Text("Shuffle")
                                                         }
                                                     }
@@ -1085,8 +993,8 @@ fun LibraryScreen(
                                                 val isPlaying = currentSong?.id == item.id
                                                 val isFav = favoriteIds.contains(item.id)
 
-                                                val (localIndex, count) =
-                                                    groupedSongPositions[item.id] ?: (0 to 1)
+                                                val localIndex = index
+                                                val count = sortedAndGrouped.size.coerceAtLeast(1)
 
                                                 // SwipeToDismissBox implementation
                                                 val dismissState = rememberSwipeToDismissBoxState(
