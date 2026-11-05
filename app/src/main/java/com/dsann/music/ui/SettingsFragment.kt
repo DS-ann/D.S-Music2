@@ -5428,7 +5428,7 @@ private fun AppLogoSection(isLandscape: Boolean) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
-            painter = painterResource(R.drawable.ic_applogo),
+            painter = painterResource(R.drawable.ic_launcher_art),
             contentDescription = null,
             tint = androidx.compose.ui.graphics.Color.Unspecified,
             modifier = Modifier.size(iconSize)
