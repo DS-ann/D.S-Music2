@@ -43,7 +43,6 @@ data class PlayerGestureSettings(
     val coverLongPress: PlayerGestureAction = PlayerGestureAction.NONE,
     val miniSwipeLeft: PlayerGestureAction = PlayerGestureAction.NEXT,
     val miniSwipeRight: PlayerGestureAction = PlayerGestureAction.PREVIOUS,
-    val miniSwipeUp: PlayerGestureAction = PlayerGestureAction.OPEN,
     val miniSwipeDown: PlayerGestureAction = PlayerGestureAction.STOP,
     val doubleTapSeekSeconds: Int = 10
 ) {
@@ -59,7 +58,6 @@ data class PlayerGestureSettings(
                 coverLongPress = PlayerGestureAction.fromStored(prefs.getString("cover_long_press", null), PlayerGestureAction.NONE),
                 miniSwipeLeft = PlayerGestureAction.fromStored(prefs.getString("mini_swipe_left", null), PlayerGestureAction.NEXT),
                 miniSwipeRight = PlayerGestureAction.fromStored(prefs.getString("mini_swipe_right", null), PlayerGestureAction.PREVIOUS),
-                miniSwipeUp = PlayerGestureAction.fromStored(prefs.getString("mini_swipe_up", null), PlayerGestureAction.OPEN),
                 miniSwipeDown = PlayerGestureAction.fromStored(prefs.getString("mini_swipe_down", null), PlayerGestureAction.STOP),
                 doubleTapSeekSeconds = prefs.getInt("double_tap_seek_seconds", 10).coerceIn(3, 30)
             )
