@@ -369,8 +369,8 @@ class PlayerSharedViewModel @Inject constructor(
         private const val TAG = "PlayerSharedViewModel"
         
         const val REPEAT_OFF = 0
-        const val REPEAT_ALL = 1
-        const val REPEAT_ONE = 2
+        const val REPEAT_ONCE = 1
+        const val REPEAT_INFINITY = 2
         private const val HISTORY_PROGRESS_PERSIST_INTERVAL_MS = 15_000L
     }
 
@@ -432,6 +432,9 @@ class PlayerSharedViewModel @Inject constructor(
         _duration.value = oldVm._duration.value
         _isShuffleEnabled.value = oldVm._isShuffleEnabled.value
         _repeatMode.value = oldVm._repeatMode.value
+        repeatOnceQueueOrder = oldVm.repeatOnceQueueOrder
+        repeatOncePosition = oldVm.repeatOncePosition
+        repeatOncePass = oldVm.repeatOncePass
         _isPlayerExpanded.value = oldVm._isPlayerExpanded.value
         _sleepTimerEndTime.value = oldVm._sleepTimerEndTime.value
         _sleepTimerMode.value = oldVm._sleepTimerMode.value
@@ -528,7 +531,7 @@ class PlayerSharedViewModel @Inject constructor(
      * count as available; repeat-one does not need queue extension.
      */
     fun maybeRefillAutoplayQueue() {
-        if (!isAutoplayEnabled() || _repeatMode.value == REPEAT_ONE) return
+        if (!isAutoplayEnabled() || _repeatMode.value != REPEAT_OFF) return
         val songs = _songList.value
         val currentSong = _currentSong.value ?: return
         val currentIndex = songs.indexOfFirst { it.id == currentSong.id }
@@ -638,6 +641,7 @@ class PlayerSharedViewModel @Inject constructor(
         }
         if (updated.size != songs.size) {
             _songList.value = updated
+            if (_repeatMode.value == REPEAT_ONCE) resetRepeatOnceCycleFromCurrent()
             audioService?.refreshNativeQueue()
         }
     }
@@ -682,6 +686,12 @@ class PlayerSharedViewModel @Inject constructor(
 
     private val _repeatMode = MutableStateFlow(REPEAT_OFF)
     val repeatMode: StateFlow<Int> = _repeatMode.asStateFlow()
+
+    // Repeat Once plays the current queue order twice, then stops. Keep a stable
+    // order snapshot so shuffle still visits every queued track exactly once per pass.
+    private var repeatOnceQueueOrder: List<Long> = emptyList()
+    private var repeatOncePosition: Int = 0
+    private var repeatOncePass: Int = 0
 
     private val _favoriteSongIds = MutableStateFlow<Set<Long>>(emptySet())
     val favoriteSongIds: StateFlow<Set<Long>> = _favoriteSongIds.asStateFlow()
@@ -1509,20 +1519,89 @@ class PlayerSharedViewModel @Inject constructor(
 
     fun toggleLoopMode() {
         val nextMode = when (_repeatMode.value) {
-            REPEAT_OFF -> REPEAT_ALL
-            REPEAT_ALL -> REPEAT_ONE
+            REPEAT_OFF -> REPEAT_ONCE
+            REPEAT_ONCE -> REPEAT_INFINITY
             else -> REPEAT_OFF
         }
-        _repeatMode.value = nextMode
+        setRepeatMode(nextMode)
     }
 
     fun setRepeatMode(mode: Int) {
         val normalizedMode = when (mode) {
-            REPEAT_OFF, REPEAT_ALL, REPEAT_ONE -> mode
+            REPEAT_OFF, REPEAT_ONCE, REPEAT_INFINITY -> mode
             else -> REPEAT_OFF
         }
-        if (_repeatMode.value != normalizedMode) {
-            _repeatMode.value = normalizedMode
+        if (_repeatMode.value == normalizedMode) return
+
+        _repeatMode.value = normalizedMode
+        if (normalizedMode == REPEAT_ONCE) {
+            resetRepeatOnceCycleFromCurrent()
+        } else {
+            clearRepeatOnceCycle()
+        }
+    }
+
+    private fun clearRepeatOnceCycle() {
+        repeatOnceQueueOrder = emptyList()
+        repeatOncePosition = 0
+        repeatOncePass = 0
+    }
+
+    private fun resetRepeatOnceCycleFromCurrent(startIndex: Int = _currentSongIndex.value) {
+        val songs = _songList.value
+        if (songs.isEmpty()) {
+            clearRepeatOnceCycle()
+            return
+        }
+
+        val currentSong = _currentSong.value
+        val matchingCurrentIndex = currentSong?.let { active ->
+            songs.indexOfFirst { it.id == active.id && it.videoId == active.videoId }
+                .takeIf { it >= 0 }
+        }
+        val start = startIndex.takeIf { it in songs.indices }
+            ?: matchingCurrentIndex
+            ?: 0
+
+        val order = if (_isShuffleEnabled.value && songs.size > 1) {
+            listOf(start) + songs.indices.filter { it != start }.shuffled(shuffleRandom)
+        } else {
+            (start until songs.size).toList() + (0 until start).toList()
+        }
+
+        repeatOnceQueueOrder = order.map { songs[it].id }
+        repeatOncePosition = 0
+        repeatOncePass = 0
+    }
+
+    private fun advanceRepeatOnceCursor(nextIndex: Int) {
+        if (_repeatMode.value != REPEAT_ONCE) return
+        val targetSong = _songList.value.getOrNull(nextIndex) ?: return
+        val order = repeatOnceQueueOrder
+        if (order.isEmpty()) {
+            resetRepeatOnceCycleFromCurrent(nextIndex)
+            return
+        }
+
+        val nextPosition = repeatOncePosition + 1
+        when {
+            nextPosition < order.size && order[nextPosition] == targetSong.id -> {
+                repeatOncePosition = nextPosition
+            }
+            repeatOncePosition == order.lastIndex &&
+                repeatOncePass == 0 &&
+                order.firstOrNull() == targetSong.id -> {
+                repeatOncePass = 1
+                repeatOncePosition = 0
+            }
+            else -> {
+                val actualPosition = order.indexOf(targetSong.id)
+                if (actualPosition >= 0) {
+                    repeatOncePosition = actualPosition
+                } else {
+                    resetRepeatOnceCycleFromCurrent(nextIndex)
+                }
+            }
         }
     }
 
@@ -1534,6 +1613,7 @@ class PlayerSharedViewModel @Inject constructor(
             previousSong?.videoId != song.videoId
 
         _currentSongIndex.value = index
+        if (isDifferentTrack) advanceRepeatOnceCursor(index)
         if (isDifferentTrack) {
             lyricsController.clearForSongChange(song)
             // Clear the previous video's title/uploader immediately. The player effect
@@ -1578,6 +1658,7 @@ class PlayerSharedViewModel @Inject constructor(
 
     fun setSongList(songs: List<SongItem>) {
         _songList.value = songs
+        if (_repeatMode.value == REPEAT_ONCE) resetRepeatOnceCycleFromCurrent()
         Log.d(TAG, "Song list updated: ${songs.size} songs")
         
         // Proactive queue warmer
@@ -1611,7 +1692,7 @@ class PlayerSharedViewModel @Inject constructor(
         _songUri.value = song.contentUri
     }
 
-    fun playSongAtIndex(index: Int) {
+    fun playSongAtIndex(index: Int, preserveRepeatOnceCycle: Boolean = false) {
         val songs = _songList.value
         if (index !in songs.indices) {
             Log.w(TAG, "Invalid song index: $index")
@@ -1631,6 +1712,9 @@ class PlayerSharedViewModel @Inject constructor(
             previousSong?.videoId != song.videoId
 
         _currentSongIndex.value = index
+        if (_repeatMode.value == REPEAT_ONCE && !preserveRepeatOnceCycle) {
+            resetRepeatOnceCycleFromCurrent(index)
+        }
         lyricsController.clearForSongChange(song)
         // Keep video mode enabled across queue changes so the service can bind the
         // matching video for the new track. It validates both song ID and video ID,
@@ -1756,9 +1840,20 @@ class PlayerSharedViewModel @Inject constructor(
                 return
             }
         }
+
+        val activeRepeatMode = _repeatMode.value
         val nextIndex = getNextSongIndex()
         if (nextIndex >= 0) {
-            playSongAtIndex(nextIndex)
+            if (activeRepeatMode == REPEAT_ONCE) advanceRepeatOnceCursor(nextIndex)
+            playSongAtIndex(
+                nextIndex,
+                preserveRepeatOnceCycle = activeRepeatMode == REPEAT_ONCE
+            )
+        } else if (activeRepeatMode == REPEAT_ONCE) {
+            // Repeat Once is finite: do not let Autoplay extend the queue after its
+            // second complete pass.
+            pauseAudio()
+            setCurrentPosition(0)
         } else if (isAutoplayEnabled()) {
             val sourceVideoId = _currentSong.value?.videoId
             if (sourceVideoId.isNullOrBlank()) {
@@ -1805,7 +1900,6 @@ class PlayerSharedViewModel @Inject constructor(
         // Previous is an explicit track-navigation command. Do not turn the first tap
         // into a restart based on the current playback position.
         val currentIdx = _currentSongIndex.value
-        val mode = _repeatMode.value
         val shuffle = _isShuffleEnabled.value
         
         if (shuffle && songs.size > 1) {
@@ -1817,11 +1911,7 @@ class PlayerSharedViewModel @Inject constructor(
         
         val prevIndex = currentIdx - 1
         if (prevIndex < 0) {
-            if (mode == REPEAT_ALL) {
-                playSongAtIndex(songs.size - 1)
-            } else {
-                audioService?.seekTo(0)
-            }
+            audioService?.seekTo(0)
         } else {
             playSongAtIndex(prevIndex)
         }
@@ -1835,7 +1925,19 @@ class PlayerSharedViewModel @Inject constructor(
         val mode = _repeatMode.value
         val shuffle = _isShuffleEnabled.value
 
-        if (mode == REPEAT_ONE) return if (currentIdx >= 0) currentIdx else 0
+        if (mode == REPEAT_INFINITY) return if (currentIdx in songs.indices) currentIdx else 0
+        if (mode == REPEAT_ONCE) {
+            val order = repeatOnceQueueOrder
+            if (order.isEmpty()) return -1
+
+            val nextId = when {
+                repeatOncePosition + 1 < order.size -> order[repeatOncePosition + 1]
+                repeatOncePass == 0 -> order.firstOrNull()
+                else -> null
+            } ?: return -1
+
+            return songs.indexOfFirst { it.id == nextId }
+        }
         if (shuffle && songs.size > 1) {
             var next = currentIdx
             while (next == currentIdx) next = shuffleRandom.nextInt(songs.size)
@@ -1843,9 +1945,7 @@ class PlayerSharedViewModel @Inject constructor(
         }
 
         val next = currentIdx + 1
-        return if (next >= songs.size) {
-            if (mode == REPEAT_ALL) 0 else -1
-        } else next
+        return if (next >= songs.size) -1 else next
     }
 
     private fun prefetchNextPredictedSongs() {
@@ -1883,6 +1983,7 @@ class PlayerSharedViewModel @Inject constructor(
             toIndex = toIndex
         )
         _songList.value = newList
+        if (_repeatMode.value == REPEAT_ONCE) resetRepeatOnceCycleFromCurrent()
         audioService?.refreshNativeQueue()
     }
 
@@ -1895,6 +1996,7 @@ class PlayerSharedViewModel @Inject constructor(
         _currentSongIndex.value = _currentSong.value?.let { active ->
             updatedQueue.indexOfFirst { it.id == active.id }
         } ?: -1
+        if (_repeatMode.value == REPEAT_ONCE) resetRepeatOnceCycleFromCurrent()
         audioService?.refreshNativeQueue()
         savePlaybackState()
     }
@@ -1904,6 +2006,7 @@ class PlayerSharedViewModel @Inject constructor(
         if (newList.none { it.id == song.id }) {
             newList.add(song)
             _songList.value = newList
+            if (_repeatMode.value == REPEAT_ONCE) resetRepeatOnceCycleFromCurrent()
             audioService?.refreshNativeQueue()
         }
     }
@@ -1918,6 +2021,7 @@ class PlayerSharedViewModel @Inject constructor(
         
         _songList.value = newList
         _currentSongIndex.value = findSongIndexById(_currentSong.value?.id ?: -1)
+        if (_repeatMode.value == REPEAT_ONCE) resetRepeatOnceCycleFromCurrent()
         audioService?.refreshNativeQueue()
     }
 
@@ -1926,6 +2030,7 @@ class PlayerSharedViewModel @Inject constructor(
     fun setShuffleEnabled(enabled: Boolean) {
         if (_isShuffleEnabled.value != enabled) {
             _isShuffleEnabled.value = enabled
+            if (_repeatMode.value == REPEAT_ONCE) resetRepeatOnceCycleFromCurrent()
             audioService?.setShuffleModeEnabled(enabled)
         }
     }
