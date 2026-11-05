@@ -35,7 +35,9 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -1848,7 +1850,7 @@ private fun ControlsAndGesturesScreen(
                 .padding(horizontal = 18.dp)
                 .padding(bottom = 120.dp)
         ) {
-            SettingsHeader("Player cover")
+            SettingsAccordionSection("Player cover") {
             Text(
                 "Choose what swipes, a double tap and a long press do on the full player's artwork. Swiping down still collapses the player.",
                 style = DsmusicTheme.typography.bodySmall,
@@ -1902,8 +1904,9 @@ private fun ControlsAndGesturesScreen(
                     )
                 }
             ))
+            }
             if (gestures.coverDoubleTap == PlayerGestureAction.SEEK_SIDES) {
-                SettingsHeader("Double-tap seek")
+                SettingsAccordionSection("Double-tap seek") {
                 SettingsGroupCard(listOf {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
                         Text("Seconds to seek", style = DsmusicTheme.typography.bodyLarge)
@@ -1929,8 +1932,9 @@ private fun ControlsAndGesturesScreen(
                         }
                     }
                 })
+                }
             }
-            SettingsHeader("Mini player")
+            SettingsAccordionSection("Mini player") {
             Text(
                 "These actions apply while the player is collapsed. A tap still opens the full player.",
                 style = DsmusicTheme.typography.bodySmall,
@@ -1971,7 +1975,8 @@ private fun ControlsAndGesturesScreen(
                     )
                 }
             ))
-            SettingsHeader("Default actions")
+            
+            }SettingsAccordionSection("Default actions") {
             SettingsGroupCard(listOf {
                 Row(
                     modifier = Modifier
@@ -1995,6 +2000,7 @@ private fun ControlsAndGesturesScreen(
                     Icon(Icons.Rounded.Refresh, contentDescription = null, tint = DsmusicTheme.colorScheme.primary)
                 }
             })
+            }}
         }
     }
 }
@@ -2373,7 +2379,7 @@ private fun MusicManagementScreen(
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 120.dp)
         ) {
-            SettingsHeader(stringResource(R.string.settings_header_library))
+            SettingsAccordionSection(stringResource(R.string.settings_header_library)) {
             SettingsGroupCard(buildList {
                 add { LibrarySourceHeader() }
                 libraryPaths.forEach { path ->
@@ -2385,7 +2391,8 @@ private fun MusicManagementScreen(
                 add { AddMorePathRow(onAddPathClick) }
             })
 
-            SettingsHeader("Audio Filtering")
+            
+            }SettingsAccordionSection("Audio Filtering") {
             SettingsGroupCard(buildList {
                 add {
                     IgnoreShortAudioRow(ignoreShortAudio, onIgnoreShortAudioChange)
@@ -2397,7 +2404,8 @@ private fun MusicManagementScreen(
                 }
             })
 
-            SettingsHeader("Hidden Folders")
+            
+            }}SettingsAccordionSection("Hidden Folders") {
             SettingsGroupCard(buildList {
                 hiddenFolders.forEach { folder ->
                     add { HiddenFolderRow(folder, onRemoveHiddenFolder) }
@@ -2415,12 +2423,14 @@ private fun MusicManagementScreen(
                 }
             })
 
-            SettingsHeader("Downloads")
+            
+            }}}SettingsAccordionSection("Downloads") {
             SettingsGroupCard(listOf(
                 { DownloadFolderRow(downloadFolder, onDownloadFolderClick) }
             ))
 
-            SettingsHeader(stringResource(R.string.settings_header_storage))
+            
+            }}}}SettingsAccordionSection(stringResource(R.string.settings_header_storage)) {
             SettingsGroupCard(buildList {
                 add { SongCacheSizeRow(songCacheSize, songCacheMaxSize, onSongCacheMaxSizeChange, onClearSongCache) }
                 add { ImageCacheSizeRow(imageCacheSize, imageCacheMaxSize, onImageCacheMaxSizeChange, onClearImageCache) }
@@ -2455,6 +2465,7 @@ private fun MusicManagementScreen(
                     }
                 }
             })
+            }}}}}
         }
     }
 }
@@ -2476,7 +2487,7 @@ private fun BackupRestoreScreen(
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 120.dp)
         ) {
-            SettingsHeader("Backup & Restore")
+            SettingsAccordionSection("Backup & Restore") {
             SettingsGroupCard(buildList {
                 add {
                     DsmusicListItem(
@@ -2519,6 +2530,7 @@ private fun BackupRestoreScreen(
                     )
                 }
             })
+            }
         }
     }
 }
@@ -2668,7 +2680,7 @@ private fun AccountScreen(
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 120.dp)
         ) {
-            SettingsHeader("YouTube Music Account")
+            SettingsAccordionSection("YouTube Music Account") {
             SettingsGroupCard(listOf(
                 {
                     var showLoginDialog by remember { mutableStateOf(false) }
@@ -2731,16 +2743,19 @@ private fun AccountScreen(
                 }
             ))
 
-            SettingsHeader("Data Saving")
+            
+            }SettingsAccordionSection("Data Saving") {
             SettingsGroupCard(listOf(
                 { DataSaverRow(dataSaver, onDataSaverChange) }
             ))
 
-            SettingsHeader("Sync & Privacy")
+            
+            }}SettingsAccordionSection("Sync & Privacy") {
             SettingsGroupCard(listOf(
                 { PauseHistoryRow(pauseHistory, onPauseHistoryChange) },
                 { ManualSyncRow() }
             ))
+            }}}
         }
     }
 }
@@ -2972,7 +2987,7 @@ private fun AppearanceScreen(
                 onDelete = onDeleteLook
             )
 
-            SettingsHeader("Theme")
+            SettingsAccordionSection("Theme") {
             SettingsGroupCard(buildList {
                 add {
                     SettingsChoiceRow(
@@ -2987,7 +3002,8 @@ private fun AppearanceScreen(
                 add { DynamicAlbumThemeRow(dynamicAlbumTheme, onDynamicAlbumThemeChange) }
             })
 
-            SettingsHeader("Colors")
+            
+            }SettingsAccordionSection("Colors") {
             SettingsGroupCard(listOf {
                 Column {
                     ColorPaletteSelector(
@@ -3010,7 +3026,8 @@ private fun AppearanceScreen(
                 )
             })
 
-            SettingsHeader("Artwork size")
+            
+            }}SettingsAccordionSection("Artwork size") {
             SettingsGroupCard(listOf {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Text(
@@ -3031,7 +3048,8 @@ private fun AppearanceScreen(
                 }
             })
 
-            SettingsHeader("Player buttons")
+            
+            }}}SettingsAccordionSection("Player buttons") {
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3058,14 +3076,16 @@ private fun AppearanceScreen(
                 onMove = onMovePlayerButton
             )
 
-            SettingsHeader("Notification & lock-screen controls")
+            
+            }}}}SettingsAccordionSection("Notification & lock-screen controls") {
             SessionButtonsSettings(
                 selected = sessionButtons,
                 onSelectionChanged = onSessionButtonsChange,
                 onMove = onMoveSessionButton
             )
 
-            SettingsHeader("Title and times")
+            
+            }}}}}SettingsAccordionSection("Title and times") {
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3113,7 +3133,8 @@ private fun AppearanceScreen(
                 }
             ))
 
-            SettingsHeader("Progress bar")
+            
+            }}}}}}SettingsAccordionSection("Progress bar") {
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3166,7 +3187,8 @@ private fun AppearanceScreen(
                 }
             ))
 
-            SettingsHeader("Visualizer")
+            
+            }}}}}}}SettingsAccordionSection("Visualizer") {
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
                     title = "Player animation",
@@ -3186,7 +3208,8 @@ private fun AppearanceScreen(
                 )
             })
 
-            SettingsHeader("Player appearance")
+            
+            }}}}}}}}SettingsAccordionSection("Player appearance") {
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3244,7 +3267,8 @@ private fun AppearanceScreen(
                 }
             ))
 
-            SettingsHeader("Lyrics")
+            
+            }}}}}}}}}SettingsAccordionSection("Lyrics") {
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3284,7 +3308,8 @@ private fun AppearanceScreen(
                 }
             ))
 
-            SettingsHeader("Typography & Layout")
+            
+            }}}}}}}}}}SettingsAccordionSection("Typography & Layout") {
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3352,7 +3377,8 @@ private fun AppearanceScreen(
                 )
             })
 
-            SettingsHeader("Navigation")
+            
+            }}}}}}}}}}}SettingsAccordionSection("Navigation") {
             SettingsGroupCard(buildList {
                 add {
                     SettingsChoiceRow(
@@ -3383,6 +3409,7 @@ private fun AppearanceScreen(
                 }
                 add { DynamicNavStyleRow(dynamicNavStyle, onDynamicNavStyleChange) }
             })
+            }}}}}}}}}}}}
         }
     }
 }
@@ -4300,17 +4327,19 @@ private fun PlaybackScreen(
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 120.dp)
         ) {
-            SettingsHeader("Autoplay")
+            SettingsAccordionSection("Autoplay") {
             SettingsGroupCard(listOf(
                 { AutoplayRow(autoplayEnabled, onAutoplayToggle) }
             ))
 
-            SettingsHeader("Crossfade")
+            
+            }SettingsAccordionSection("Crossfade") {
             SettingsGroupCard(listOf(
                 { CrossfadeRow(crossfadeEnabled, onCrossfadeToggle, crossfadeDuration, onCrossfadeDurationChange) }
             ))
 
-            SettingsHeader("Animation frame rate")
+            
+            }}SettingsAccordionSection("Animation frame rate") {
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
                     title = "Global animation frame rate",
@@ -4331,30 +4360,36 @@ private fun PlaybackScreen(
                 )
             })
 
-            SettingsHeader("Playback Bitrate")
+            
+            }}}SettingsAccordionSection("Playback Bitrate") {
             SettingsGroupCard(listOf(
                 { AudioQualityRow("Playback Bitrate", audioQuality, onAudioQualityChange) }
             ))
 
-            SettingsHeader("Download Format")
+            
+            }}}}SettingsAccordionSection("Download Format") {
             SettingsGroupCard(listOf(
                 { AudioFormatRow("Download Format", downloadAudioFormat, onDownloadAudioFormatChange) }
             ))
 
-            SettingsHeader("Download Bitrate")
+            
+            }}}}}SettingsAccordionSection("Download Bitrate") {
             SettingsGroupCard(listOf(
                 { AudioQualityRow("Download Bitrate", downloadBitrate, onDownloadBitrateChange) }
             ))
 
-            SettingsHeader("Audio Focus")
+            
+            }}}}}}SettingsAccordionSection("Audio Focus") {
             SettingsGroupCard(listOf(
                 { AudioFocusRow(audioFocus, onAudioFocusToggle) }
             ))
 
-            SettingsHeader("Sleep Timer")
+            
+            }}}}}}}SettingsAccordionSection("Sleep Timer") {
             SettingsGroupCard(listOf(
                 { SleepTimerSection(sleepTimerEndTime, sleepTimerMode, onStartSleepTimer, onCancelSleepTimer, onSetEndOfSong) }
             ))
+            }}}}}}}}
         }
     }
 }
@@ -4684,29 +4719,76 @@ private fun AboutScreen(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun SettingsHeader(text: String) {
-    Row(
-        modifier = Modifier.padding(top = 28.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            Modifier
-                .size(width = 4.dp, height = 18.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .background(DsmusicTheme.colorScheme.primary)
-        )
-        BasicText(
-            text = text.uppercase(),
-            style = DsmusicTheme.typography.titleMedium.copy(
-                color = DsmusicTheme.colorScheme.primary,
-                fontSize = 15.sp,
-                lineHeight = 20.sp,
-                letterSpacing = 1.15.sp,
-                fontWeight = FontWeight.Bold
-            ),
-            modifier = Modifier.padding(start = 9.dp),
-            maxLines = 1
-        )
+private fun SettingsAccordionSection(
+    text: String,
+    content: @Composable () -> Unit
+) {
+    var expanded by remember(text) { mutableStateOf(false) }
+    val arrowRotation by animateFloatAsState(
+        targetValue = if (expanded) 90f else 0f,
+        animationSpec = SmoothSpring
+    )
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable { expanded = !expanded }
+                .padding(start = 4.dp, end = 4.dp, top = 24.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier
+                    .size(width = 4.dp, height = 18.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(DsmusicTheme.colorScheme.primary)
+            )
+            BasicText(
+                text = text.uppercase(),
+                style = DsmusicTheme.typography.titleMedium.copy(
+                    color = DsmusicTheme.colorScheme.primary,
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
+                    letterSpacing = 1.15.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                modifier = Modifier.padding(start = 9.dp),
+                maxLines = 1
+            )
+            Spacer(Modifier.weight(1f))
+            Icon(
+                imageVector = Icons.Rounded.ChevronRight,
+                contentDescription = if (expanded) "Collapse $text" else "Expand $text",
+                tint = DsmusicTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(end = 4.dp)
+                    .size(18.dp)
+                    .graphicsLayer { rotationZ = arrowRotation }
+            )
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(
+                expandFrom = Alignment.Top,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ) + fadeIn(),
+            exit = shrinkVertically(
+                shrinkTowards = Alignment.Top,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ) + fadeOut()
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                content()
+            }
+        }
     }
 }
 
@@ -5434,7 +5516,7 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 120.dp)
         ) {
-            SettingsHeader("Report & Request")
+            SettingsAccordionSection("Report & Request") {
             SettingsGroupCard(
                 items = listOf(
                     {
@@ -5468,7 +5550,8 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
                 )
             )
 
-            SettingsHeader("Debug Information")
+            
+            }SettingsAccordionSection("Debug Information") {
             SettingsGroupCard(
                 items = listOf(
                     {
@@ -5502,6 +5585,7 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
                     }
                 )
             )
+            }}
         }
     }
 }
