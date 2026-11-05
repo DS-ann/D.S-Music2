@@ -1876,7 +1876,9 @@ fun PlayerBottomSheetCompose(
                                         modifier = Modifier.fillMaxSize(),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        val squareVideoSize = minOf(maxWidth, maxHeight) * artworkScaleFactor
+                                        // The shared artwork container already has the preferred
+                                        // artwork-scaled dimensions; use its measured bounds directly.
+                                        val squareVideoSize = minOf(maxWidth, maxHeight)
                                         androidx.compose.ui.viewinterop.AndroidView(
                                         factory = { viewContext ->
                                             (android.view.LayoutInflater.from(viewContext)
