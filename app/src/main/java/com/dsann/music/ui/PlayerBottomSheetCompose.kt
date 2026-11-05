@@ -2414,7 +2414,7 @@ private fun MiniPlayerContentInternal(
             }
         }
 
-        Spacer(modifier = Modifier.width(if (compactLandscape) 3.dp else 5.dp))
+        Spacer(modifier = Modifier.width(if (compactLandscape) 1.2.dp else 2.dp))
 
         // Song Info
         Column(modifier = Modifier.weight(1f)) {
