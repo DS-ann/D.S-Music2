@@ -757,6 +757,76 @@ fun LibraryScreen(
 
                                 // Downloads are a single playlist, not an alphabetically sectioned file browser.
                                 // Sorting changes track order while keeping all rows in one continuous queue.
+                                val selectedDownloadSongs = sourceSongs.filter { it.id in selectedDownloadIds }
+                                val downloadSelectionControls: @Composable (Modifier) -> Unit = { controlModifier ->
+                                    DownloadsSelectionControls(
+                                        isSelecting = isSelectingDownloads,
+                                        selectedCount = selectedDownloadIds.size,
+                                        onStartSelection = { isSelectingDownloads = true },
+                                        onSelectAll = { selectedDownloadIds = filteredSongs.map { it.id }.toSet() },
+                                        onOpenMenu = { downloadSelectionMenuExpanded = true },
+                                        menuExpanded = downloadSelectionMenuExpanded,
+                                        onDismissMenu = { downloadSelectionMenuExpanded = false },
+                                        onPlayNext = {
+                                            selectedDownloadSongs.asReversed().forEach(viewModel::addToQueueNext)
+                                            downloadSelectionMenuExpanded = false
+                                            selectedDownloadIds = emptySet()
+                                            isSelectingDownloads = false
+                                            com.dsann.music.ui.SnackbarController.showMessage(
+                                                "Added " + selectedDownloadSongs.size + " songs to play next"
+                                            )
+                                        },
+                                        onAddToQueue = {
+                                            selectedDownloadSongs.forEach(viewModel::addToQueue)
+                                            downloadSelectionMenuExpanded = false
+                                            selectedDownloadIds = emptySet()
+                                            isSelectingDownloads = false
+                                            com.dsann.music.ui.SnackbarController.showMessage(
+                                                "Added " + selectedDownloadSongs.size + " songs to queue"
+                                            )
+                                        },
+                                        onDeleteSelected = {
+                                            downloadSelectionMenuExpanded = false
+                                            scope.launch {
+                                                val deletedCount = withContext(Dispatchers.IO) {
+                                                    selectedDownloadSongs.count { selectedSong ->
+                                                        val rowsDeleted = runCatching {
+                                                            context.contentResolver.delete(selectedSong.contentUri, null, null)
+                                                        }.getOrDefault(0)
+                                                        if (rowsDeleted > 0) {
+                                                            true
+                                                        } else {
+                                                            val rawPath = (selectedSong.path ?: selectedSong.data).orEmpty()
+                                                            if (rawPath.isBlank()) false else {
+                                                                val file = java.io.File(rawPath)
+                                                                !file.exists() || file.delete()
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                scanLocalFiles(context, viewModel)
+                                                selectedDownloadIds = emptySet()
+                                                isSelectingDownloads = false
+                                                com.dsann.music.ui.SnackbarController.showMessage(
+                                                    "Deleted " + deletedCount + " of " +
+                                                        selectedDownloadSongs.size + " selected songs"
+                                                )
+                                            }
+                                        },
+                                        onClearSelection = {
+                                            downloadSelectionMenuExpanded = false
+                                            selectedDownloadIds = emptySet()
+                                            isSelectingDownloads = false
+                                        },
+                                        onDone = {
+                                            selectedDownloadIds = emptySet()
+                                            isSelectingDownloads = false
+                                            downloadSelectionMenuExpanded = false
+                                        },
+                                        modifier = controlModifier
+                                    )
+                                }
+
                                 val sortedAndGrouped by produceState<List<Any>>(
                                     initialValue = emptyList(),
                                     filteredSongs,
@@ -773,105 +843,10 @@ fun LibraryScreen(
                                     }
                                 }
 
-                                if (sourceSongs.isNotEmpty()) {
-                                    if (!isSelectingDownloads) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
-                                            horizontalArrangement = Arrangement.End
-                                        ) {
-                                            DsmusicTextButton(onClick = { isSelectingDownloads = true }) {
-                                                Text("Select songs")
-                                            }
-                                        }
-                                    } else {
-                                        val selectedSongs = sourceSongs.filter { it.id in selectedDownloadIds }
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Text(
-                                                "${selectedDownloadIds.size} selected",
-                                                modifier = Modifier.weight(1f),
-                                                style = DsmusicTheme.typography.labelLarge,
-                                                color = DsmusicTheme.colorScheme.primary
-                                            )
-                                            DsmusicTextButton(onClick = {
-                                                selectedDownloadIds = filteredSongs.map { it.id }.toSet()
-                                            }) { Text("Select all") }
-                                            Box {
-                                                DsmusicIconButton(onClick = { downloadSelectionMenuExpanded = true }) {
-                                                    Icon(Icons.Rounded.MoreVert, contentDescription = "Selected download actions")
-                                                }
-                                                DropdownMenu(
-                                                    expanded = downloadSelectionMenuExpanded,
-                                                    onDismissRequest = { downloadSelectionMenuExpanded = false }
-                                                ) {
-                                                    DropdownMenuItem(
-                                                        text = { Text("Play next") },
-                                                        onClick = {
-                                                            selectedSongs.asReversed().forEach(viewModel::addToQueueNext)
-                                                            downloadSelectionMenuExpanded = false
-                                                            selectedDownloadIds = emptySet()
-                                                            isSelectingDownloads = false
-                                                            com.dsann.music.ui.SnackbarController.showMessage("Added ${selectedSongs.size} songs to play next")
-                                                        }
-                                                    )
-                                                    DropdownMenuItem(
-                                                        text = { Text("Add to queue") },
-                                                        onClick = {
-                                                            selectedSongs.forEach(viewModel::addToQueue)
-                                                            downloadSelectionMenuExpanded = false
-                                                            selectedDownloadIds = emptySet()
-                                                            isSelectingDownloads = false
-                                                            com.dsann.music.ui.SnackbarController.showMessage("Added ${selectedSongs.size} songs to queue")
-                                                        }
-                                                    )
-                                                    DropdownMenuItem(
-                                                        text = { Text("Delete selected") },
-                                                        onClick = {
-                                                            downloadSelectionMenuExpanded = false
-                                                            scope.launch {
-                                                                val deletedCount = withContext(Dispatchers.IO) {
-                                                                    selectedSongs.count { selectedSong ->
-                                                                        val rowsDeleted = runCatching {
-                                                                            context.contentResolver.delete(selectedSong.contentUri, null, null)
-                                                                        }.getOrDefault(0)
-                                                                        if (rowsDeleted > 0) {
-                                                                            true
-                                                                        } else {
-                                                                            val rawPath = (selectedSong.path ?: selectedSong.data).orEmpty()
-                                                                            if (rawPath.isBlank()) false else {
-                                                                                val file = java.io.File(rawPath)
-                                                                                !file.exists() || file.delete()
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                }
-                                                                scanLocalFiles(context, viewModel)
-                                                                selectedDownloadIds = emptySet()
-                                                                isSelectingDownloads = false
-                                                                com.dsann.music.ui.SnackbarController.showMessage("Deleted $deletedCount of ${selectedSongs.size} selected songs")
-                                                            }
-                                                        }
-                                                    )
-                                                    DropdownMenuItem(
-                                                        text = { Text("Clear selection") },
-                                                        onClick = {
-                                                            downloadSelectionMenuExpanded = false
-                                                            selectedDownloadIds = emptySet()
-                                                            isSelectingDownloads = false
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                            DsmusicTextButton(onClick = {
-                                                selectedDownloadIds = emptySet()
-                                                isSelectingDownloads = false
-                                                downloadSelectionMenuExpanded = false
-                                            }) { Text("Done") }
-                                        }
-                                    }
+                                if (sourceSongs.isNotEmpty() && !isLandscapeLibraryLayout) {
+                                    downloadSelectionControls(
+                                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+                                    )
                                 }
 
                                 if (sortedAndGrouped.isEmpty()) {
@@ -948,6 +923,7 @@ fun LibraryScreen(
                                                         Text("Shuffle")
                                                     }
                                                 }
+                                                downloadSelectionControls(Modifier.fillMaxWidth())
                                             }
                                         }
                                         Box(
@@ -1839,6 +1815,64 @@ private fun libraryCardGradient(title: String): List<Color> {
     return palettes[Math.floorMod(title.hashCode(), palettes.size)]
 }
 
+
+
+@Composable
+private fun DownloadsSelectionControls(
+    isSelecting: Boolean,
+    selectedCount: Int,
+    onStartSelection: () -> Unit,
+    onSelectAll: () -> Unit,
+    onOpenMenu: () -> Unit,
+    menuExpanded: Boolean,
+    onDismissMenu: () -> Unit,
+    onPlayNext: () -> Unit,
+    onAddToQueue: () -> Unit,
+    onDeleteSelected: () -> Unit,
+    onClearSelection: () -> Unit,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (!isSelecting) {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            DsmusicTextButton(onClick = onStartSelection) {
+                Text("Select songs")
+            }
+        }
+    } else {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "$selectedCount selected",
+                modifier = Modifier.weight(1f),
+                style = DsmusicTheme.typography.labelLarge,
+                color = DsmusicTheme.colorScheme.primary
+            )
+            DsmusicTextButton(onClick = onSelectAll) { Text("Select all") }
+            Box {
+                DsmusicIconButton(onClick = onOpenMenu) {
+                    Icon(Icons.Rounded.MoreVert, contentDescription = "Selected download actions")
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = onDismissMenu
+                ) {
+                    DropdownMenuItem(text = { Text("Play next") }, onClick = onPlayNext)
+                    DropdownMenuItem(text = { Text("Add to queue") }, onClick = onAddToQueue)
+                    DropdownMenuItem(text = { Text("Delete selected") }, onClick = onDeleteSelected)
+                    DropdownMenuItem(text = { Text("Clear selection") }, onClick = onClearSelection)
+                }
+            }
+            DsmusicTextButton(onClick = onDone) { Text("Done") }
+        }
+    }
+}
 
 @Composable
 private fun LibraryGradientPlaylistHero(
