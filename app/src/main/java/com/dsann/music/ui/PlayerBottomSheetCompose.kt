@@ -2390,6 +2390,7 @@ private fun MiniPlayerContentInternal(
                     accentColor = accentColor,
                     backgroundColor = miniPlayerBackgroundColor,
                     expansionFraction = expansionFraction,
+                    centerOnArtworkEdge = true,
                     modifier = Modifier.size(48.dp)
                 )
             }
@@ -2576,6 +2577,7 @@ private fun MiniPlayerArtworkProgressOverlay(
     accentColor: Color,
     backgroundColor: Color,
     expansionFraction: Animatable<Float, AnimationVector1D>,
+    centerOnArtworkEdge: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val isMiniLayerVisible by remember(expansionFraction) {
@@ -2627,6 +2629,11 @@ private fun MiniPlayerArtworkProgressOverlay(
     androidx.compose.foundation.Canvas(
         modifier = modifier.graphicsLayer {
             alpha = (1f - expansionFraction.value * 2f).coerceIn(0f, 1f)
+            // On the mini artwork only, expand the overlay by half a stroke on each side.
+            // This centers the Matching cover line directly on the artwork boundary.
+            val edgeScale = if (centerOnArtworkEdge && style == "Matching cover") 1.028f else 1f
+            scaleX = edgeScale
+            scaleY = edgeScale
         }
     ) {
         val side = size.minDimension
@@ -2702,7 +2709,10 @@ private fun MiniPlayerArtworkProgressOverlay(
             "Matching cover" -> {
                 // Trace the same outline used to clip the artwork. Inset the path by
                 // half the stroke so the complete border remains visible inside its bounds.
-                val strokeWidth = (side * 0.042f).coerceIn(1.5f, 4.5f)
+                // Match the standard Line progress thickness. The mini-player's
+                // overlay is expanded by half this width on both sides so the stroke
+                // is split evenly outside and inside the cover's actual perimeter.
+                val strokeWidth = (side * 0.028f).coerceAtLeast(1f)
                 val inset = strokeWidth / 2f
                 val outlineSize = Size(
                     (size.width - strokeWidth).coerceAtLeast(1f),
