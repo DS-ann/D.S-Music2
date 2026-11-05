@@ -924,21 +924,39 @@ fun PlayerBottomSheetCompose(
         var showVideoQualityDialog by remember { mutableStateOf(false) }
         var isVideoFullscreen by remember { mutableStateOf(false) }
 
-        LaunchedEffect(isVideoMode, currentSong?.videoId, audioService) {
-            val videoId = currentSong?.videoId
-            if (!isVideoMode || videoId.isNullOrBlank()) {
-                videoQualityOptions = emptyList()
-                showVideoQualityDialog = false
-                isVideoFullscreen = false
-                // Keep the preferred resolution when audio mode is active. It is a
-                // playback preference and must survive closing/reopening the player.
+        LaunchedEffect(isVideoMode, currentSong?.id, currentSong?.videoId, audioService) {
+            val targetSongId = currentSong?.id
+            val videoId = currentSong?.videoId?.takeIf { it.isNotBlank() }
+            // A new queue item gets its own quality/fullscreen state. Never leave the
+            // previous video's controls or fullscreen surface attached to the next song.
+            videoQualityOptions = emptyList()
+            showVideoQualityDialog = false
+            isVideoFullscreen = false
+
+            if (!isVideoMode) {
+                // Keep the preferred resolution when audio mode is active.
+                videoQualityLoading = false
+                selectedVideoQuality = playerPreferences.getString("video_quality_preferred_label", null)
+            } else if (videoId == null) {
+                // The active queue item is local or has no video ID: immediately return
+                // to the already-loaded audio item and remove the video window.
+                audioService?.setVideoMode(false)
+                videoQualityLoading = false
             } else {
+                // If the queue item changed while Video was active, the service rebinds
+                // playback to this video's own stream. This is a no-op for the already
+                // active video ID.
+                audioService?.setVideoMode(true)
                 videoQualityLoading = true
-                isVideoFullscreen = false
                 try {
                     val options = com.dsann.music.data.innertube.NewPipeStreamExtractor
                         .getVideoStreamOptions(videoId)
-                    if (currentSong?.videoId != videoId || !isVideoMode) return@LaunchedEffect
+                    if (
+                        currentSong?.id != targetSongId ||
+                        currentSong?.videoId != videoId ||
+                        !isVideoMode
+                    ) return@LaunchedEffect
+
                     videoQualityOptions = options
                     val dataSaverOption = com.dsann.music.data.innertube.NewPipeStreamExtractor
                         .dataSaverVideoOption(options)
@@ -960,9 +978,8 @@ fun PlayerBottomSheetCompose(
                         ?: playerPreferences.getString("video_quality_preferred_label", null)
 
                     if (selectedOption != null) {
-                        // Reapply an explicitly selected resolution to new tracks and
-                        // when the player composition is recreated. Preserve the current
-                        // playback position through AudioPlaybackService's quality switch.
+                        // Apply the preferred quality only after the service has installed
+                        // the matching track video. Its default option remains the safe fallback.
                         if (
                             preferredOption != null &&
                             preferredOption.url != dataSaverOption?.url
@@ -994,6 +1011,8 @@ fun PlayerBottomSheetCompose(
                             )
                         )
                     }
+                } catch (_: kotlinx.coroutines.CancellationException) {
+                    throw kotlinx.coroutines.CancellationException("Video quality lookup cancelled")
                 } catch (_: Exception) {
                     videoQualityOptions = emptyList()
                     selectedVideoQuality = playerPreferences.getString("video_quality_preferred_label", null)
