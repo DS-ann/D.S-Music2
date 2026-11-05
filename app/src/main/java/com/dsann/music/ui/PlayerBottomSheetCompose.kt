@@ -85,6 +85,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
@@ -2461,6 +2463,11 @@ private fun MiniPlayerArtworkProgressOverlay(
         context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
     }
     val style by preferences.observeKey("mini_player_progress", "Ring")
+    val artworkShapeName by preferences.observeKey("player_artwork_shape", "Rounded")
+    val artworkLayout by preferences.observeKey("player_layout", "Standard")
+    val matchingCoverShape = remember(artworkShapeName, artworkLayout) {
+        DsmCoverShapes.forPlayerLayout(artworkLayout, artworkShapeName)
+    }
     if (style == "None") return
 
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
@@ -2565,6 +2572,63 @@ private fun MiniPlayerArtworkProgressOverlay(
                         strokeWidth = thickness,
                         cap = androidx.compose.ui.graphics.StrokeCap.Round
                     )
+                }
+            }
+            "Matching cover" -> {
+                // Trace the same outline used to clip the artwork. Inset the path by
+                // half the stroke so the complete border remains visible inside its bounds.
+                val strokeWidth = (side * 0.042f).coerceIn(1.5f, 4.5f)
+                val inset = strokeWidth / 2f
+                val outlineSize = Size(
+                    (size.width - strokeWidth).coerceAtLeast(1f),
+                    (size.height - strokeWidth).coerceAtLeast(1f)
+                )
+                val outline = matchingCoverShape.createOutline(
+                    outlineSize,
+                    layoutDirection,
+                    this
+                )
+                val outlinePath = when (outline) {
+                    is Outline.Rectangle -> androidx.compose.ui.graphics.Path().apply {
+                        addRect(outline.rect)
+                    }
+                    is Outline.Rounded -> androidx.compose.ui.graphics.Path().apply {
+                        addRoundRect(outline.roundRect)
+                    }
+                    is Outline.Generic -> outline.path
+                }
+                val coverBorderPath = androidx.compose.ui.graphics.Path().apply {
+                    addPath(outlinePath, androidx.compose.ui.geometry.Offset(inset, inset))
+                }
+                val borderMeasure = android.graphics.PathMeasure(
+                    coverBorderPath.asAndroidPath(),
+                    false
+                )
+                val borderLength = borderMeasure.length
+                if (borderLength > 0f) {
+                    val borderStroke = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = strokeWidth,
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                    drawPath(
+                        path = coverBorderPath,
+                        color = progressTrackColor,
+                        style = borderStroke
+                    )
+                    if (progress > 0f) {
+                        val completedPath = android.graphics.Path()
+                        borderMeasure.getSegment(
+                            0f,
+                            (borderLength * progress).coerceIn(0f, borderLength),
+                            completedPath,
+                            true
+                        )
+                        drawPath(
+                            path = completedPath.asComposePath(),
+                            color = visibleAccentColor,
+                            style = borderStroke
+                        )
+                    }
                 }
             }
             "Fill" -> {
