@@ -4163,12 +4163,17 @@ private fun StreamCacheTabContent(
     var isSelectingCache by remember { mutableStateOf(false) }
     var selectedCacheSongIds by remember { mutableStateOf(setOf<String>()) }
     var cacheSelectionMenuExpanded by remember { mutableStateOf(false) }
+    var cacheOptionsExpanded by remember { mutableStateOf(false) }
+    var isCacheSearchVisible by rememberSaveable { mutableStateOf(false) }
+    var cacheSearchQuery by rememberSaveable { mutableStateOf("") }
+    var cacheSortOrder by rememberSaveable { mutableStateOf(SortOrder.A_Z) }
+
     val scope = rememberCoroutineScope()
     val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
     val rootTabActive = LocalRootTabActive.current
-    val isLandscapeLibraryLayout =
-        LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
+    // Poll only while the Library root tab is active. Cache stays in the root content
+    // viewport, above the persistent navigation and mini-player overlays.
     LaunchedEffect(context, lyricsCache, rootTabActive) {
         if (!rootTabActive) return@LaunchedEffect
         var snapshot = readCacheTabSnapshot(context, lyricsCache).entries
@@ -4179,6 +4184,7 @@ private fun StreamCacheTabContent(
             if (updated != snapshot) {
                 snapshot = updated
                 cacheEntries = updated
+                selectedCacheSongIds = selectedCacheSongIds.intersect(updated.map { it.songId }.toSet())
             }
         }
     }
@@ -4204,6 +4210,40 @@ private fun StreamCacheTabContent(
             }
         }
     }
+    val cacheQueueByUri = remember(cacheQueue) {
+        cacheQueue.associateBy { it.contentUri.toString() }
+    }
+
+    val filteredCacheEntries by produceState(
+        initialValue = emptyList<CachedSongEntry>(),
+        cacheEntries,
+        cacheSearchQuery,
+        cacheSortOrder
+    ) {
+        if (cacheSearchQuery.isNotBlank()) delay(120L)
+        val query = cacheSearchQuery.trim()
+        value = withContext(Dispatchers.Default) {
+            val matching = if (query.isBlank()) {
+                cacheEntries
+            } else {
+                cacheEntries.filter {
+                    it.title.contains(query, ignoreCase = true) ||
+                        it.artist.contains(query, ignoreCase = true)
+                }
+            }
+            when (cacheSortOrder) {
+                SortOrder.A_Z, SortOrder.DATE_ADDED ->
+                    matching.sortedBy { it.title.lowercase() }
+                SortOrder.ARTIST ->
+                    matching.sortedBy { it.artist.lowercase() }
+                SortOrder.DURATION ->
+                    matching.sortedByDescending { it.durationMs }
+            }
+        }
+    }
+    val filteredCacheQueue = remember(filteredCacheEntries, cacheQueueByUri) {
+        filteredCacheEntries.mapNotNull { cacheQueueByUri[it.cachedUri] }
+    }
     val selectedCacheEntries = cacheEntries.filter { it.songId in selectedCacheSongIds }
     val selectedCacheQueue = cacheQueue.filter { queueSong ->
         selectedCacheEntries.any { it.cachedUri == queueSong.contentUri.toString() }
@@ -4218,11 +4258,13 @@ private fun StreamCacheTabContent(
     }
 
     fun startPlaylist(shuffle: Boolean) {
-        if (cacheQueue.isEmpty()) return
+        if (filteredCacheQueue.isEmpty()) return
         exploreViewModel?.clearOnlinePlaybackSelection()
+        val playlist = if (shuffle) filteredCacheQueue.shuffled() else filteredCacheQueue
         viewModel.setShuffleEnabled(shuffle)
-        viewModel.setSongList(if (shuffle) cacheQueue.shuffled() else cacheQueue)
+        viewModel.setSongList(playlist)
         viewModel.playSongAtIndex(0)
+        cacheOptionsExpanded = false
     }
 
     fun playSelectedNext() {
@@ -4283,12 +4325,12 @@ private fun StreamCacheTabContent(
 
     val selectionControls: @Composable (Modifier) -> Unit = { controlModifier ->
         CacheSelectionControls(
-            isSelecting = isSelectingCache,
+            isSelecting = true,
             selectedCount = selectedCacheSongIds.size,
-            totalCount = cacheEntries.size,
+            totalCount = filteredCacheEntries.size,
             menuExpanded = cacheSelectionMenuExpanded,
             onStartSelection = { isSelectingCache = true },
-            onSelectAll = { selectedCacheSongIds = cacheEntries.map { it.songId }.toSet() },
+            onSelectAll = { selectedCacheSongIds = filteredCacheEntries.map { it.songId }.toSet() },
             onOpenMenu = { cacheSelectionMenuExpanded = true },
             onDismissMenu = { cacheSelectionMenuExpanded = false },
             onPlayNext = { playSelectedNext() },
@@ -4308,166 +4350,179 @@ private fun StreamCacheTabContent(
         )
     }
 
-    val playlistActions: @Composable () -> Unit = {
+    Column(modifier = modifier.fillMaxSize()) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            DsmusicButton(
-                onClick = { startPlaylist(false) },
-                enabled = cacheQueue.isNotEmpty(),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text("Play all")
-            }
-            DsmusicOutlinedButton(
-                onClick = { startPlaylist(true) },
-                enabled = cacheQueue.isNotEmpty(),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Rounded.Shuffle, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text("Shuffle")
-            }
-        }
-        selectionControls(Modifier.fillMaxWidth())
-    }
-
-    if (isLandscapeLibraryLayout) {
-        Row(
-            modifier = modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier
-                    .weight(0.40f)
-                    .fillMaxHeight()
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 14.dp, top = 12.dp, end = 12.dp, bottom = 18.dp)
-            ) {
-                LibraryGradientPlaylistHero(
-                    title = "Cache",
-                    subtitle = cacheEntries.size.toString() + " songs · Offline media",
-                    status = "Available offline",
-                    artwork = cacheEntries.firstOrNull()?.let {
-                        AudioPlaybackService.getCachedMediaArtworkFile(context, it.songId)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    actions = playlistActions
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Cache",
+                    style = DsmusicTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "${filteredCacheEntries.size} songs",
+                    style = DsmusicTheme.typography.bodySmall,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(1.dp)
-                    .background(DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.38f))
-            )
-            if (cacheEntries.isEmpty()) {
-                Box(
-                    modifier = Modifier.weight(0.60f).fillMaxHeight(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            Icons.Rounded.MusicNote,
-                            contentDescription = null,
-                            modifier = Modifier.size(42.dp),
-                            tint = DsmusicTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text("No cached songs yet", style = DsmusicTheme.typography.titleMedium)
-                        Text(
-                            "Cached audio, artwork and lyrics will appear here.",
-                            style = DsmusicTheme.typography.bodyMedium,
-                            color = DsmusicTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+            Box {
+                DsmusicIconButton(onClick = { cacheOptionsExpanded = true }) {
+                    Icon(Icons.Rounded.MoreVert, contentDescription = "Cache options")
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(0.60f).fillMaxHeight(),
-                    contentPadding = PaddingValues(start = 10.dp, top = 14.dp, end = 12.dp, bottom = 160.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                DropdownMenu(
+                    expanded = cacheOptionsExpanded,
+                    onDismissRequest = { cacheOptionsExpanded = false }
                 ) {
-                    itemsIndexed(cacheEntries, key = { _, item -> item.songId }) { index, item ->
-                        val artwork = AudioPlaybackService.getCachedMediaArtworkFile(context, item.songId)
-                        val queueSong = cacheQueue.getOrNull(index)
-                        val isCurrentSong = currentSong?.isCachedTrack == true &&
-                            currentSong?.id == queueSong?.id &&
-                            currentSong?.contentUri?.toString() == item.cachedUri
-                        val isSelected = item.songId in selectedCacheSongIds
-                        CachedSongListItem(
-                            item = item,
-                            artwork = artwork,
-                            isCurrentSong = isCurrentSong,
-                            isSelecting = isSelectingCache,
-                            isSelected = isSelected,
-                            onClick = {
-                                if (isSelectingCache) {
-                                    toggleCacheSelection(item.songId)
-                                } else if (index in cacheQueue.indices) {
-                                    exploreViewModel?.clearOnlinePlaybackSelection()
-                                    viewModel.setSongList(cacheQueue)
-                                    viewModel.playSongAtIndex(index)
-                                }
+                    Text(
+                        "SORT BY",
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 7.dp),
+                        style = DsmusicTheme.typography.labelSmall,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
+                    listOf(SortOrder.A_Z, SortOrder.ARTIST, SortOrder.DURATION).forEach { order ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    when (order) {
+                                        SortOrder.A_Z -> "Title (A–Z)"
+                                        SortOrder.ARTIST -> "Artist"
+                                        SortOrder.DURATION -> "Duration"
+                                        SortOrder.DATE_ADDED -> "Date added"
+                                    }
+                                )
                             },
-                            onLongClick = {
-                                if (isSelectingCache) toggleCacheSelection(item.songId)
-                                else onSongLongClick(item)
+                            onClick = {
+                                cacheSortOrder = order
+                                cacheOptionsExpanded = false
+                            },
+                            trailingIcon = {
+                                if (cacheSortOrder == order) Icon(
+                                    Icons.Rounded.Check,
+                                    contentDescription = "Selected",
+                                    tint = DsmusicTheme.colorScheme.primary
+                                )
                             }
                         )
                     }
+                    com.dsann.music.ui.theme.HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("Select songs") },
+                        onClick = {
+                            isSelectingCache = true
+                            cacheOptionsExpanded = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (isCacheSearchVisible) "Hide search" else "Search") },
+                        onClick = {
+                            isCacheSearchVisible = !isCacheSearchVisible
+                            if (!isCacheSearchVisible) cacheSearchQuery = ""
+                            cacheOptionsExpanded = false
+                        }
+                    )
+                    com.dsann.music.ui.theme.HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("Play all") },
+                        enabled = filteredCacheQueue.isNotEmpty(),
+                        onClick = { startPlaylist(false) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Shuffle") },
+                        enabled = filteredCacheQueue.isNotEmpty(),
+                        onClick = { startPlaylist(true) }
+                    )
                 }
             }
         }
-    } else {
-        LazyColumn(
-            modifier = modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            item(key = "cache-playlist-header") {
-                LibraryGradientPlaylistHero(
-                    title = "Cache",
-                    subtitle = cacheEntries.size.toString() + " songs · D.S Music",
-                    status = "Available offline",
-                    artwork = cacheEntries.firstOrNull()?.let {
-                        AudioPlaybackService.getCachedMediaArtworkFile(context, it.songId)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    actions = playlistActions
+
+        if (isCacheSearchVisible) {
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .clip(CircleShape)
+                    .background(DsmusicTheme.colorScheme.surfaceContainerLow)
+                    .border(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.42f), CircleShape)
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Rounded.Search,
+                    contentDescription = "Search cache",
+                    tint = DsmusicTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
                 )
-                com.dsann.music.ui.theme.HorizontalDivider()
-            }
-            if (cacheEntries.isEmpty()) {
-                item(key = "cache-playlist-empty") {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            Icons.Rounded.MusicNote,
-                            contentDescription = null,
-                            modifier = Modifier.size(42.dp),
-                            tint = DsmusicTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text("No cached songs yet", style = DsmusicTheme.typography.titleMedium)
+                Box(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                    if (cacheSearchQuery.isEmpty()) {
                         Text(
-                            "A song appears here after its full audio, cover art, and lyrics are cached on this device.",
+                            "Search cached songs…",
                             style = DsmusicTheme.typography.bodyMedium,
                             color = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    BasicTextField(
+                        value = cacheSearchQuery,
+                        onValueChange = { cacheSearchQuery = it },
+                        singleLine = true,
+                        textStyle = DsmusicTheme.typography.bodyMedium.copy(
+                            color = DsmusicTheme.colorScheme.onSurface
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
-            } else {
-                itemsIndexed(cacheEntries, key = { _, item -> item.songId }) { index, item ->
+                DsmusicIconButton(onClick = {
+                    cacheSearchQuery = ""
+                    isCacheSearchVisible = false
+                }) {
+                    Icon(Icons.Rounded.Close, contentDescription = "Close search")
+                }
+            }
+        }
+
+        if (isSelectingCache) {
+            selectionControls(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
+        }
+
+        if (filteredCacheEntries.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize().weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.MusicNote,
+                        contentDescription = null,
+                        modifier = Modifier.size(42.dp),
+                        tint = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        if (cacheEntries.isEmpty()) "No cached songs yet" else "No matching cached songs",
+                        style = DsmusicTheme.typography.titleMedium
+                    )
+                    Text(
+                        if (cacheEntries.isEmpty()) {
+                            "Cached audio, artwork and lyrics will appear here."
+                        } else {
+                            "Try a different search."
+                        },
+                        style = DsmusicTheme.typography.bodyMedium,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp).copy(bottom = 160.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                itemsIndexed(filteredCacheEntries, key = { _, item -> item.songId }) { index, item ->
                     val artwork = AudioPlaybackService.getCachedMediaArtworkFile(context, item.songId)
-                    val queueSong = cacheQueue.getOrNull(index)
+                    val queueSong = filteredCacheQueue.getOrNull(index)
                     val isCurrentSong = currentSong?.isCachedTrack == true &&
                         currentSong?.id == queueSong?.id &&
                         currentSong?.contentUri?.toString() == item.cachedUri
@@ -4481,9 +4536,9 @@ private fun StreamCacheTabContent(
                         onClick = {
                             if (isSelectingCache) {
                                 toggleCacheSelection(item.songId)
-                            } else if (index in cacheQueue.indices) {
+                            } else if (index in filteredCacheQueue.indices) {
                                 exploreViewModel?.clearOnlinePlaybackSelection()
-                                viewModel.setSongList(cacheQueue)
+                                viewModel.setSongList(filteredCacheQueue)
                                 viewModel.playSongAtIndex(index)
                             }
                         },
@@ -4497,5 +4552,3 @@ private fun StreamCacheTabContent(
         }
     }
 }
-
-
