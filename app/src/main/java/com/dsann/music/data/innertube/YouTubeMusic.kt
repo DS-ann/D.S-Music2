@@ -113,7 +113,7 @@ object YouTubeMusic {
     }
 
     /**
-     * Prism-style Top results: request each YouTube Music category independently, then keep
+     * Top results: request each YouTube Music category independently, then keep
      * the result groups separate so the UI can show songs as rows and browseable collections
      * as horizontal shelves. The unfiltered response supplies an extra best-match candidate.
      */
@@ -124,7 +124,7 @@ object YouTubeMusic {
                     val normalizedQuery = query.trim()
                     require(normalizedQuery.isNotEmpty()) { "Enter a search query." }
 
-                    // Prism's strategy: independent searches for each result kind, plus
+                    // Use independent searches for each result kind, plus
                     // YouTube Music's own unfiltered Top result card. Do not let a mixed,
                     // trend-heavy shelf decide what the query means.
                     val cardRequest = async(Dispatchers.IO) {
@@ -555,7 +555,7 @@ object YouTubeMusic {
 
     /**
      * Load the dedicated YouTube Music moods-and-genres catalogue used by Search.
-     * This is the same browse surface used by Prism; it is separate from Home's chips.
+     * This browse surface is separate from Home's chips.
      */
     suspend fun moodsAndGenres(): Result<List<HomeCategory>> = withContext(Dispatchers.IO) {
         runCatching {
