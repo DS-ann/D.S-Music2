@@ -1,18 +1,43 @@
 #include <jni.h>
-#include <lame.h>
 
 #include <algorithm>
 #include <cstdint>
 #include <memory>
 
+// The Prefab LAME AAR exports the stable C API from libmp3lame.so but does not
+// ship lame.h in its include directory. Declare only the ABI-stable functions
+// used here; the library itself remains the implementation and source of symbols.
+struct lame_global_struct;
+using lame_t = lame_global_struct*;
+
+extern "C" {
+lame_t lame_init(void);
+int lame_close(lame_t);
+int lame_set_num_channels(lame_t, int);
+int lame_set_in_samplerate(lame_t, int);
+int lame_set_out_samplerate(lame_t, int);
+int lame_set_brate(lame_t, int);
+int lame_set_quality(lame_t, int);
+int lame_init_params(lame_t);
+int lame_encode_buffer_interleaved(
+    lame_t, short int[], int, unsigned char[], int
+);
+int lame_encode_flush(lame_t, unsigned char[], int);
+}
+
 namespace {
+struct EncoderState {
+    lame_t lame = nullptr;
+    int channels = 0;
+};
+
 void throwIllegalState(JNIEnv* env, const char* message) {
     jclass cls = env->FindClass("java/lang/IllegalStateException");
     if (cls != nullptr) env->ThrowNew(cls, message);
 }
 
-lame_t asLame(jlong handle) {
-    return reinterpret_cast<lame_t>(static_cast<intptr_t>(handle));
+EncoderState* asState(jlong handle) {
+    return reinterpret_cast<EncoderState*>(static_cast<intptr_t>(handle));
 }
 }  // namespace
 
@@ -26,40 +51,43 @@ Java_com_dsann_music_util_NativeMp3Encoder_nativeCreate(
         return 0;
     }
 
-    lame_t encoder = lame_init();
-    if (encoder == nullptr) {
+    std::unique_ptr<EncoderState> state(new EncoderState());
+    state->lame = lame_init();
+    state->channels = channels;
+    if (state->lame == nullptr) {
         throwIllegalState(env, "LAME could not allocate an encoder");
         return 0;
     }
 
-    lame_set_num_channels(encoder, channels);
-    lame_set_in_samplerate(encoder, sampleRate);
-    lame_set_out_samplerate(encoder, sampleRate);
-    lame_set_brate(encoder, bitrateKbps);
-    lame_set_quality(encoder, 2);
+    lame_set_num_channels(state->lame, channels);
+    lame_set_in_samplerate(state->lame, sampleRate);
+    lame_set_out_samplerate(state->lame, sampleRate);
+    lame_set_brate(state->lame, bitrateKbps);
+    lame_set_quality(state->lame, 2);
 
-    if (lame_init_params(encoder) < 0) {
-        lame_close(encoder);
+    if (lame_init_params(state->lame) < 0) {
+        lame_close(state->lame);
+        state->lame = nullptr;
         throwIllegalState(env, "LAME rejected the PCM audio format");
         return 0;
     }
 
-    return static_cast<jlong>(reinterpret_cast<intptr_t>(encoder));
+    return static_cast<jlong>(reinterpret_cast<intptr_t>(state.release()));
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_dsann_music_util_NativeMp3Encoder_nativeEncode(
     JNIEnv* env, jobject /* thiz */, jlong handle, jshortArray pcm
 ) {
-    lame_t encoder = asLame(handle);
-    if (encoder == nullptr || pcm == nullptr) {
+    EncoderState* state = asState(handle);
+    if (state == nullptr || state->lame == nullptr || pcm == nullptr) {
         throwIllegalState(env, "Invalid MP3 encoder state");
         return nullptr;
     }
 
     const jsize valueCount = env->GetArrayLength(pcm);
-    const int channels = lame_get_num_channels(encoder);
-    if (channels < 1 || channels > 2 || valueCount <= 0 || valueCount % channels != 0) {
+    if (state->channels < 1 || state->channels > 2 ||
+        valueCount <= 0 || valueCount % state->channels != 0) {
         throwIllegalState(env, "PCM buffer does not match the encoder channel count");
         return nullptr;
     }
@@ -67,12 +95,12 @@ Java_com_dsann_music_util_NativeMp3Encoder_nativeEncode(
     jshort* samples = env->GetShortArrayElements(pcm, nullptr);
     if (samples == nullptr) return nullptr;
 
-    const int samplesPerChannel = valueCount / channels;
+    const int samplesPerChannel = valueCount / state->channels;
     const int capacity = std::max(8192, static_cast<int>(samplesPerChannel * 1.35) + 7200);
     std::unique_ptr<unsigned char[]> encoded(new unsigned char[capacity]);
 
     const int written = lame_encode_buffer_interleaved(
-        encoder,
+        state->lame,
         reinterpret_cast<short int*>(samples),
         samplesPerChannel,
         encoded.get(),
@@ -96,15 +124,15 @@ extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_dsann_music_util_NativeMp3Encoder_nativeFlush(
     JNIEnv* env, jobject /* thiz */, jlong handle
 ) {
-    lame_t encoder = asLame(handle);
-    if (encoder == nullptr) {
+    EncoderState* state = asState(handle);
+    if (state == nullptr || state->lame == nullptr) {
         throwIllegalState(env, "Invalid MP3 encoder state");
         return nullptr;
     }
 
     constexpr int capacity = 16384;
     std::unique_ptr<unsigned char[]> encoded(new unsigned char[capacity]);
-    const int written = lame_encode_flush(encoder, encoded.get(), capacity);
+    const int written = lame_encode_flush(state->lame, encoded.get(), capacity);
     if (written < 0) {
         throwIllegalState(env, "LAME failed to flush the final MP3 frames");
         return nullptr;
@@ -121,6 +149,8 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_dsann_music_util_NativeMp3Encoder_nativeClose(
     JNIEnv* /* env */, jobject /* thiz */, jlong handle
 ) {
-    lame_t encoder = asLame(handle);
-    if (encoder != nullptr) lame_close(encoder);
+    EncoderState* state = asState(handle);
+    if (state == nullptr) return;
+    if (state->lame != nullptr) lame_close(state->lame);
+    delete state;
 }
