@@ -1400,13 +1400,11 @@ fun LibraryScreen(
                                     "Removed from cache: ${cachedItem.title}"
                                 } else {
                                     "Cache entry not found: ${cachedItem.title}"
-                                },
-                    onNavigateToExplore = {
-                        onNavigateToExplore()
-                    }
+                                }
                             )
                         }
-                    }
+                    },
+                    onNavigateToExplore = { onNavigateToExplore() }
                 )
             }
         }
