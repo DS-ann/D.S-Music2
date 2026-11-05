@@ -36,8 +36,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -1905,6 +1905,7 @@ private fun ControlsAndGesturesScreen(
                 }
             ))
             }
+            
             if (gestures.coverDoubleTap == PlayerGestureAction.SEEK_SIDES) {
                 SettingsAccordionSection("Double-tap seek") {
                 SettingsGroupCard(listOf {
@@ -1933,6 +1934,7 @@ private fun ControlsAndGesturesScreen(
                     }
                 })
                 }
+                
             }
             SettingsAccordionSection("Mini player") {
             Text(
@@ -1976,7 +1978,8 @@ private fun ControlsAndGesturesScreen(
                 }
             ))
             
-            }SettingsAccordionSection("Default actions") {
+            }
+            SettingsAccordionSection("Default actions") {
             SettingsGroupCard(listOf {
                 Row(
                     modifier = Modifier
@@ -2000,7 +2003,8 @@ private fun ControlsAndGesturesScreen(
                     Icon(Icons.Rounded.Refresh, contentDescription = null, tint = DsmusicTheme.colorScheme.primary)
                 }
             })
-            }}
+            }
+            
         }
     }
 }
@@ -2392,7 +2396,8 @@ private fun MusicManagementScreen(
             })
 
             
-            }SettingsAccordionSection("Audio Filtering") {
+            }
+            SettingsAccordionSection("Audio Filtering") {
             SettingsGroupCard(buildList {
                 add {
                     IgnoreShortAudioRow(ignoreShortAudio, onIgnoreShortAudioChange)
@@ -2405,7 +2410,8 @@ private fun MusicManagementScreen(
             })
 
             
-            }}SettingsAccordionSection("Hidden Folders") {
+            }
+            SettingsAccordionSection("Hidden Folders") {
             SettingsGroupCard(buildList {
                 hiddenFolders.forEach { folder ->
                     add { HiddenFolderRow(folder, onRemoveHiddenFolder) }
@@ -2424,13 +2430,15 @@ private fun MusicManagementScreen(
             })
 
             
-            }}}SettingsAccordionSection("Downloads") {
+            }
+            SettingsAccordionSection("Downloads") {
             SettingsGroupCard(listOf(
                 { DownloadFolderRow(downloadFolder, onDownloadFolderClick) }
             ))
 
             
-            }}}}SettingsAccordionSection(stringResource(R.string.settings_header_storage)) {
+            }
+            SettingsAccordionSection(stringResource(R.string.settings_header_storage)) {
             SettingsGroupCard(buildList {
                 add { SongCacheSizeRow(songCacheSize, songCacheMaxSize, onSongCacheMaxSizeChange, onClearSongCache) }
                 add { ImageCacheSizeRow(imageCacheSize, imageCacheMaxSize, onImageCacheMaxSizeChange, onClearImageCache) }
@@ -2465,7 +2473,8 @@ private fun MusicManagementScreen(
                     }
                 }
             })
-            }}}}}
+            }
+            
         }
     }
 }
@@ -2531,6 +2540,7 @@ private fun BackupRestoreScreen(
                 }
             })
             }
+            
         }
     }
 }
@@ -2744,18 +2754,21 @@ private fun AccountScreen(
             ))
 
             
-            }SettingsAccordionSection("Data Saving") {
+            }
+            SettingsAccordionSection("Data Saving") {
             SettingsGroupCard(listOf(
                 { DataSaverRow(dataSaver, onDataSaverChange) }
             ))
 
             
-            }}SettingsAccordionSection("Sync & Privacy") {
+            }
+            SettingsAccordionSection("Sync & Privacy") {
             SettingsGroupCard(listOf(
                 { PauseHistoryRow(pauseHistory, onPauseHistoryChange) },
                 { ManualSyncRow() }
             ))
-            }}}
+            }
+            
         }
     }
 }
@@ -3003,7 +3016,8 @@ private fun AppearanceScreen(
             })
 
             
-            }SettingsAccordionSection("Colors") {
+            }
+            SettingsAccordionSection("Colors") {
             SettingsGroupCard(listOf {
                 Column {
                     ColorPaletteSelector(
@@ -3027,7 +3041,8 @@ private fun AppearanceScreen(
             })
 
             
-            }}SettingsAccordionSection("Artwork size") {
+            }
+            SettingsAccordionSection("Artwork size") {
             SettingsGroupCard(listOf {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Text(
@@ -3049,7 +3064,8 @@ private fun AppearanceScreen(
             })
 
             
-            }}}SettingsAccordionSection("Player buttons") {
+            }
+            SettingsAccordionSection("Player buttons") {
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3077,7 +3093,8 @@ private fun AppearanceScreen(
             )
 
             
-            }}}}SettingsAccordionSection("Notification & lock-screen controls") {
+            }
+            SettingsAccordionSection("Notification & lock-screen controls") {
             SessionButtonsSettings(
                 selected = sessionButtons,
                 onSelectionChanged = onSessionButtonsChange,
@@ -3085,7 +3102,8 @@ private fun AppearanceScreen(
             )
 
             
-            }}}}}SettingsAccordionSection("Title and times") {
+            }
+            SettingsAccordionSection("Title and times") {
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3134,7 +3152,8 @@ private fun AppearanceScreen(
             ))
 
             
-            }}}}}}SettingsAccordionSection("Progress bar") {
+            }
+            SettingsAccordionSection("Progress bar") {
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3188,7 +3207,8 @@ private fun AppearanceScreen(
             ))
 
             
-            }}}}}}}SettingsAccordionSection("Visualizer") {
+            }
+            SettingsAccordionSection("Visualizer") {
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
                     title = "Player animation",
@@ -3209,7 +3229,8 @@ private fun AppearanceScreen(
             })
 
             
-            }}}}}}}}SettingsAccordionSection("Player appearance") {
+            }
+            SettingsAccordionSection("Player appearance") {
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3268,7 +3289,8 @@ private fun AppearanceScreen(
             ))
 
             
-            }}}}}}}}}SettingsAccordionSection("Lyrics") {
+            }
+            SettingsAccordionSection("Lyrics") {
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3309,7 +3331,8 @@ private fun AppearanceScreen(
             ))
 
             
-            }}}}}}}}}}SettingsAccordionSection("Typography & Layout") {
+            }
+            SettingsAccordionSection("Typography & Layout") {
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3378,7 +3401,8 @@ private fun AppearanceScreen(
             })
 
             
-            }}}}}}}}}}}SettingsAccordionSection("Navigation") {
+            }
+            SettingsAccordionSection("Navigation") {
             SettingsGroupCard(buildList {
                 add {
                     SettingsChoiceRow(
@@ -3409,7 +3433,8 @@ private fun AppearanceScreen(
                 }
                 add { DynamicNavStyleRow(dynamicNavStyle, onDynamicNavStyleChange) }
             })
-            }}}}}}}}}}}}
+            }
+            
         }
     }
 }
@@ -4333,13 +4358,15 @@ private fun PlaybackScreen(
             ))
 
             
-            }SettingsAccordionSection("Crossfade") {
+            }
+            SettingsAccordionSection("Crossfade") {
             SettingsGroupCard(listOf(
                 { CrossfadeRow(crossfadeEnabled, onCrossfadeToggle, crossfadeDuration, onCrossfadeDurationChange) }
             ))
 
             
-            }}SettingsAccordionSection("Animation frame rate") {
+            }
+            SettingsAccordionSection("Animation frame rate") {
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
                     title = "Global animation frame rate",
@@ -4361,35 +4388,41 @@ private fun PlaybackScreen(
             })
 
             
-            }}}SettingsAccordionSection("Playback Bitrate") {
+            }
+            SettingsAccordionSection("Playback Bitrate") {
             SettingsGroupCard(listOf(
                 { AudioQualityRow("Playback Bitrate", audioQuality, onAudioQualityChange) }
             ))
 
             
-            }}}}SettingsAccordionSection("Download Format") {
+            }
+            SettingsAccordionSection("Download Format") {
             SettingsGroupCard(listOf(
                 { AudioFormatRow("Download Format", downloadAudioFormat, onDownloadAudioFormatChange) }
             ))
 
             
-            }}}}}SettingsAccordionSection("Download Bitrate") {
+            }
+            SettingsAccordionSection("Download Bitrate") {
             SettingsGroupCard(listOf(
                 { AudioQualityRow("Download Bitrate", downloadBitrate, onDownloadBitrateChange) }
             ))
 
             
-            }}}}}}SettingsAccordionSection("Audio Focus") {
+            }
+            SettingsAccordionSection("Audio Focus") {
             SettingsGroupCard(listOf(
                 { AudioFocusRow(audioFocus, onAudioFocusToggle) }
             ))
 
             
-            }}}}}}}SettingsAccordionSection("Sleep Timer") {
+            }
+            SettingsAccordionSection("Sleep Timer") {
             SettingsGroupCard(listOf(
                 { SleepTimerSection(sleepTimerEndTime, sleepTimerMode, onStartSleepTimer, onCancelSleepTimer, onSetEndOfSong) }
             ))
-            }}}}}}}}
+            }
+            
         }
     }
 }
@@ -5551,7 +5584,8 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
             )
 
             
-            }SettingsAccordionSection("Debug Information") {
+            }
+            SettingsAccordionSection("Debug Information") {
             SettingsGroupCard(
                 items = listOf(
                     {
@@ -5585,7 +5619,8 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
                     }
                 )
             )
-            }}
+            }
+            
         }
     }
 }
