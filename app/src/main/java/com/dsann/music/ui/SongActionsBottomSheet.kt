@@ -245,7 +245,11 @@ fun BottomSheetScaffoldContent(
     val completedDownloads by com.dsann.music.util.SongDownloader.downloadedVideoIds
         .collectAsStateWithLifecycle(emptySet())
     var hasDownloadedOpus by remember(song?.id) { mutableStateOf(false) }
-    var isConvertingToMp3 by remember(song?.id) { mutableStateOf(false) }
+    val convertingKeys by com.dsann.music.util.OpusToMp3Converter.convertingKeys
+        .collectAsStateWithLifecycle(emptySet())
+    val isConvertingToMp3 = song?.let { target ->
+        com.dsann.music.util.OpusToMp3Converter.conversionKeys(target).any { it in convertingKeys }
+    } == true
 
     LaunchedEffect(song?.id, song?.videoId, song?.path, completedDownloads.contains(song?.videoId)) {
         hasDownloadedOpus = song?.let { target ->
@@ -261,13 +265,11 @@ fun BottomSheetScaffoldContent(
         // The converter resolves the source itself and returns a useful error when it is absent.
         if (target != null && !isConvertingToMp3) {
             conversionScope.launch {
-                isConvertingToMp3 = true
                 val result = try {
                     withContext(Dispatchers.IO) {
                         com.dsann.music.util.OpusToMp3Converter.convert(context.applicationContext, target)
                     }
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                    isConvertingToMp3 = false
                     throw cancelled
                 } catch (error: Exception) {
                     com.dsann.music.util.Mp3ConversionResult(
@@ -275,7 +277,6 @@ fun BottomSheetScaffoldContent(
                         message = error.message ?: "MP3 conversion failed"
                     )
                 }
-                isConvertingToMp3 = false
                 if (result.success) {
                     hasDownloadedOpus = false
                     com.dsann.music.util.SongDownloader.refreshDownloadedStatus(context, target)
@@ -591,7 +592,7 @@ fun OptionsContent(
         ActionButtonRow1(song, isFavorite, onFavoriteChange, actionListener, onDismiss)
         ActionButtonRow2(song, actionListener, onDismiss, showAddToQueue = showAddToQueue)
         DestructiveActionRow(song, actionListener, onAddToPlaylist, onDismiss, showDelete = showDelete)
-        if (hasDownloadedOpus || isConvertingToMp3 || !song?.videoId.isNullOrBlank()) {
+        if (hasDownloadedOpus || isConvertingToMp3) {
             SongActionWideTile(
                 modifier = Modifier.fillMaxWidth(),
                 label = if (isConvertingToMp3) "Converting to MP3…" else "Convert Opus to MP3",
@@ -993,11 +994,16 @@ fun ActionButtonRow2(
     val isOnline = !videoId.isNullOrBlank()
     val activeDownloadIds by com.dsann.music.util.SongDownloader.activeDownloadIds.collectAsStateWithLifecycle()
     val downloadedVideoIds by com.dsann.music.util.SongDownloader.downloadedVideoIds.collectAsStateWithLifecycle()
+    val convertingKeys by com.dsann.music.util.OpusToMp3Converter.convertingKeys
+        .collectAsStateWithLifecycle(emptySet())
     LaunchedEffect(videoId, song?.title, song?.artist) {
         song?.let { com.dsann.music.util.SongDownloader.refreshDownloadedStatus(context, it) }
     }
     val isDownloading = videoId?.let { it in activeDownloadIds } == true
     val isDownloaded = videoId?.let { it in downloadedVideoIds } == true
+    val isConvertingToMp3 = song?.let { target ->
+        com.dsann.music.util.OpusToMp3Converter.conversionKeys(target).any { it in convertingKeys }
+    } == true
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -1041,24 +1047,27 @@ fun ActionButtonRow2(
         SongActionTile(
             modifier = Modifier.weight(1f),
             label = when {
+                isConvertingToMp3 -> "Converting to MP3…"
                 !isOnline -> "Offline"
                 isDownloading -> "Cancel"
                 isDownloaded -> "Downloaded"
                 else -> "Download"
             },
             containerColor = when {
+                isConvertingToMp3 -> DsmusicTheme.colorScheme.tertiaryContainer
                 !isOnline -> DsmusicTheme.colorScheme.surfaceVariant
                 isDownloading -> DsmusicTheme.colorScheme.errorContainer
                 isDownloaded -> DsmusicTheme.colorScheme.secondaryContainer
                 else -> DsmusicTheme.colorScheme.primaryContainer
             },
             contentColor = when {
+                isConvertingToMp3 -> DsmusicTheme.colorScheme.onTertiaryContainer
                 !isOnline -> DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
                 isDownloading -> DsmusicTheme.colorScheme.onErrorContainer
                 isDownloaded -> DsmusicTheme.colorScheme.onSecondaryContainer
                 else -> DsmusicTheme.colorScheme.onPrimaryContainer
             },
-            enabled = isOnline && (isDownloading || !isDownloaded),
+            enabled = !isConvertingToMp3 && isOnline && (isDownloading || !isDownloaded),
             onClick = {
                 song?.let {
                     when {
@@ -1071,17 +1080,20 @@ fun ActionButtonRow2(
         ) {
             Icon(
                 imageVector = when {
+                    isConvertingToMp3 -> Icons.Rounded.Download
                     !isOnline -> Icons.Rounded.Check
                     isDownloading -> Icons.Rounded.Close
                     isDownloaded -> Icons.Rounded.Check
                     else -> Icons.Rounded.Download
                 },
                 contentDescription = when {
+                    isConvertingToMp3 -> "Converting to MP3"
                     isDownloading -> "Cancel download"
                     isDownloaded -> "Downloaded"
                     else -> "Download"
                 },
                 tint = when {
+                    isConvertingToMp3 -> DsmusicTheme.colorScheme.onTertiaryContainer
                     !isOnline -> DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
                     isDownloading -> DsmusicTheme.colorScheme.onErrorContainer
                     isDownloaded -> DsmusicTheme.colorScheme.onSecondaryContainer
