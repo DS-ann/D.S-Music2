@@ -122,6 +122,9 @@ import com.bumptech.glide.Glide
 import com.dsann.music.MainActivity
 import com.dsann.music.R
 import com.dsann.music.model.SongItem
+import com.dsann.music.data.innertube.AccountManager
+import com.dsann.music.data.innertube.OnlinePlaylist
+import com.dsann.music.data.innertube.YouTubeMusic
 import com.dsann.music.service.AudioPlaybackService
 import com.dsann.music.service.CurrentAudioFormatDetails
 import com.dsann.music.ui.player.OnlineStreamMetadata
@@ -321,7 +324,19 @@ fun BottomSheetScaffoldContent(
         }
     }
 
-    if (showAddToPlaylistDialog) {
+    val onlineVideoId = song?.videoId?.takeIf { it.isNotBlank() }
+    if (showAddToPlaylistDialog && onlineVideoId != null) {
+        YouTubeMusicPlaylistPickerDialog(
+            videoIds = listOf(onlineVideoId),
+            onPlaylistAdded = { playlistTitle ->
+                showAddToPlaylistDialog = false
+                onDismiss()
+                SnackbarController.showMessage("Added to YouTube Music playlist: $playlistTitle")
+            },
+            onDismiss = { showAddToPlaylistDialog = false }
+        )
+    } else if (showAddToPlaylistDialog) {
+        // Device-only tracks have no YouTube video ID; retain local playlist support for them.
         LocalPlaylistPickerDialog(
             playlists = localPlaylists,
             onCreateNew = {
@@ -329,9 +344,7 @@ fun BottomSheetScaffoldContent(
                 showAddToPlaylistDialog = false
             },
             onPlaylistSelected = { playlist ->
-                if (song != null) {
-                    viewModel.addSongToLocalPlaylist(playlist.id, song)
-                }
+                if (song != null) viewModel.addSongToLocalPlaylist(playlist.id, song)
                 showAddToPlaylistDialog = false
                 onDismiss()
             },
@@ -663,6 +676,234 @@ fun DestructiveActionRow(
                 )
             }
         }
+    }
+}
+
+/**
+ * Adds online tracks to playlists owned by the connected YouTube Music account.
+ * Local-only tracks continue to use LocalPlaylistPickerDialog.
+ */
+@Composable
+fun YouTubeMusicPlaylistPickerDialog(
+    videoIds: List<String>,
+    onPlaylistAdded: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val isAccountConnected = remember(context) { AccountManager.isLoggedIn(context) }
+    val safeVideoIds = remember(videoIds) {
+        videoIds.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+    }
+
+    var playlists by remember { mutableStateOf<List<OnlinePlaylist>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var loadError by remember { mutableStateOf<String?>(null) }
+    var isWorking by remember { mutableStateOf(false) }
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var newPlaylistTitle by remember { mutableStateOf("") }
+
+    suspend fun refreshPlaylists() {
+        if (!isAccountConnected) return
+        isLoading = true
+        loadError = null
+        YouTubeMusic.libraryPlaylists()
+            .onSuccess { items ->
+                playlists = items.filter { !it.isPodcast && it.playlistId.isNotBlank() }
+            }
+            .onFailure { error ->
+                loadError = error.message ?: "Couldn't load YouTube Music playlists."
+            }
+        isLoading = false
+    }
+
+    LaunchedEffect(isAccountConnected) {
+        refreshPlaylists()
+    }
+
+    fun addToExistingPlaylist(playlist: OnlinePlaylist) {
+        if (isWorking || safeVideoIds.isEmpty()) return
+        scope.launch {
+            isWorking = true
+            val result = YouTubeMusic.addToPlaylist(playlist.playlistId, safeVideoIds)
+            isWorking = false
+            if (result.getOrNull() == true) {
+                onPlaylistAdded(playlist.title)
+            } else {
+                com.dsann.music.ui.SnackbarController.showMessage(
+                    result.exceptionOrNull()?.message
+                        ?: "YouTube Music didn't confirm adding these tracks."
+                )
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!isWorking) onDismiss() },
+        title = {
+            Text(
+                "YouTube Music playlists",
+                fontWeight = FontWeight.Bold,
+                style = DsmusicTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                when {
+                    !isAccountConnected -> {
+                        Text(
+                            "Connect your YouTube Music account in Settings → Account & Sync to add tracks to your online playlists.",
+                            style = DsmusicTheme.typography.bodyMedium,
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    safeVideoIds.isEmpty() -> {
+                        Text(
+                            "These tracks don't have YouTube Music video IDs, so they can't be added to an online playlist.",
+                            style = DsmusicTheme.typography.bodyMedium,
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    isLoading -> {
+                        Text("Loading your YouTube Music playlists…", style = DsmusicTheme.typography.bodyMedium)
+                    }
+                    loadError != null -> {
+                        Text(
+                            loadError.orEmpty(),
+                            style = DsmusicTheme.typography.bodyMedium,
+                            color = DsmusicTheme.colorScheme.error
+                        )
+                        DsmusicTextButton(onClick = { scope.launch { refreshPlaylists() } }) {
+                            Text("Retry")
+                        }
+                    }
+                    playlists.isEmpty() -> {
+                        Text(
+                            "No YouTube Music playlists were found in this account.",
+                            style = DsmusicTheme.typography.bodyMedium,
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            items(playlists, key = { it.playlistId }) { playlist ->
+                                DsmusicSurface(
+                                    onClick = { addToExistingPlaylist(playlist) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = DsmusicTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.PlaylistPlay,
+                                            contentDescription = null,
+                                            tint = DsmusicTheme.colorScheme.primary,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                        Spacer(Modifier.width(12.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text(
+                                                playlist.title,
+                                                fontWeight = FontWeight.SemiBold,
+                                                style = DsmusicTheme.typography.bodyLarge,
+                                                color = DsmusicTheme.colorScheme.onSurface
+                                            )
+                                            playlist.songCount?.takeIf { it.isNotBlank() }?.let {
+                                                Text(
+                                                    it,
+                                                    style = DsmusicTheme.typography.bodySmall,
+                                                    color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                        if (isWorking) {
+                                            Text("Adding…", style = DsmusicTheme.typography.labelSmall)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (isAccountConnected && safeVideoIds.isNotEmpty()) {
+                    DsmusicOutlinedButton(
+                        onClick = {
+                            newPlaylistTitle = ""
+                            showCreateDialog = true
+                        },
+                        enabled = !isWorking,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Create YouTube Music playlist")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            DsmusicTextButton(onClick = { if (!isWorking) onDismiss() }) {
+                Text("Cancel")
+            }
+        }
+    )
+
+    if (showCreateDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isWorking) showCreateDialog = false },
+            title = { Text("New YouTube Music playlist", fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = newPlaylistTitle,
+                    onValueChange = { newPlaylistTitle = it },
+                    label = { Text("Playlist name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                DsmusicButton(
+                    onClick = {
+                        val title = newPlaylistTitle.trim()
+                        if (title.isNotEmpty() && !isWorking) {
+                            scope.launch {
+                                isWorking = true
+                                val result = YouTubeMusic.createPlaylist(
+                                    title = title,
+                                    videoIds = safeVideoIds
+                                )
+                                isWorking = false
+                                result.onSuccess {
+                                    onPlaylistAdded(title)
+                                }.onFailure { error ->
+                                    com.dsann.music.ui.SnackbarController.showMessage(
+                                        error.message ?: "Couldn't create the YouTube Music playlist."
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    enabled = newPlaylistTitle.isNotBlank() && !isWorking
+                ) {
+                    Text(if (isWorking) "Creating…" else "Create and add")
+                }
+            },
+            dismissButton = {
+                DsmusicTextButton(onClick = { if (!isWorking) showCreateDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
