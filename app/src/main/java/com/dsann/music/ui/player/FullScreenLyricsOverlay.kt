@@ -664,7 +664,7 @@ private fun ProvidersSelector(
                 val lyricTypeLabel = when {
                     result?.isWordByWord == true -> "Karaoke"
                     result?.isSynced == true -> "Synced"
-                    result?.hasLyrics() == true -> "Plain"
+                    result?.hasLyrics() == true || result?.payloadClearedForMemory == true -> "Plain"
                     else -> null
                 }
                 val supportingText = when {
