@@ -2352,6 +2352,10 @@ private fun MiniPlayerContentInternal(
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Reserve an extra 20 dp before the artwork so the cover and song text
+        // shift right together while the playback controls stay anchored.
+        Spacer(modifier = Modifier.width(20.dp))
+
         // Keep the Android 6 mini cover at its actual display size. The full-size
         // artwork pager is mounted only once the player is meaningfully expanded.
         Box(
