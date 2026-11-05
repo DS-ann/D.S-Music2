@@ -1,6 +1,4 @@
-@file:Suppress("NULLABILITY_MISMATCH_
-    val isLandscapeLayout = LocalConfiguration.current.orientation ==
-        android.content.res.Configuration.ORIENTATION_LANDSCAPEBASED_ON_JAVA_ANNOTATIONS",
+@file:Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS",
     "TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS"
 )
 
