@@ -480,6 +480,15 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                         state.copy(searchResults = currentList + uniqueNewItems)
                     }
                     prefetchThumbnails(newItemsToPrefetch.take(8))
+                }.onFailure { failure ->
+                    _uiState.update {
+                        it.copy(
+                            searchOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                                failure,
+                                getApplication<Application>()
+                            )
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
