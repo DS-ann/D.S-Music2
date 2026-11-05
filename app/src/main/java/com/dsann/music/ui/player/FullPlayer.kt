@@ -410,6 +410,123 @@ private fun PlayerVisualizer(
     }
 }
 
+/**
+ * Compact one-line lyric preview for the portrait full player.
+ *
+ * Ordinary synced lyrics advance at the next line timestamp. Karaoke lines are
+ * presented as whole lines and advance only after the outgoing line's final timed
+ * word has completed, reusing the already selected/cached lyric payload.
+ */
+@Composable
+private fun PortraitSyncedLyricPreview(
+    lyrics: List<LyricLine>,
+    currentSong: SongItem?,
+    currentPositionProvider: () -> Int,
+    isPlaying: Boolean,
+    contentColor: Color,
+    lyricsColorStyle: String
+) {
+    val displayLines = remember(lyrics) {
+        lyrics.mapIndexedNotNull { index, line ->
+            if (line.isInterlude || line.content.isBlank()) null else index to line
+        }.sortedWith(
+            compareBy<Pair<Int, LyricLine>> { it.second.startTimeMs }
+                .thenBy { it.first }
+        ).map { it.second }
+    }
+    val songKey = currentSong?.videoId?.takeIf { it.isNotBlank() }
+        ?: currentSong?.path?.takeIf { it.isNotBlank() }
+        ?: currentSong?.id?.toString()
+    val songDurationMs = currentSong?.duration?.takeIf { it > 0L }
+
+    val activeLineText by produceState<String?>(
+        initialValue = null,
+        songKey,
+        displayLines,
+        songDurationMs,
+        isPlaying,
+        currentPositionProvider
+    ) {
+        if (displayLines.isEmpty()) {
+            value = null
+            return@produceState
+        }
+
+        while (true) {
+            val positionMs = currentPositionProvider().coerceAtLeast(0).toLong()
+            val finalLine = displayLines.last()
+            val finalWordEndMs = finalLine.words
+                .maxOfOrNull { it.absoluteStartTimeMs + it.durationMs }
+                ?.takeIf { it > 0L }
+            val hasPassedFinalLine =
+                (songDurationMs != null && positionMs >= songDurationMs) ||
+                    (finalWordEndMs != null && positionMs > finalWordEndMs + 1000L)
+
+            val activeIndex = if (
+                positionMs < displayLines.first().startTimeMs || hasPassedFinalLine
+            ) {
+                -1
+            } else {
+                var targetIndex = 0
+                var lineIndex = 0
+                while (lineIndex < displayLines.lastIndex) {
+                    val line = displayLines[lineIndex]
+                    val nextLine = displayLines[lineIndex + 1]
+                    val finalWordEnd = line.words
+                        .maxOfOrNull { it.absoluteStartTimeMs + it.durationMs }
+                        ?.takeIf { it > 0L }
+                    val completionTime = finalWordEnd ?: nextLine.startTimeMs
+                    if (positionMs >= completionTime) {
+                        targetIndex = lineIndex + 1
+                        lineIndex = targetIndex
+                    } else {
+                        break
+                    }
+                }
+                targetIndex
+            }
+
+            val nextText = displayLines.getOrNull(activeIndex)?.content?.trim()
+                ?.takeIf { it.isNotEmpty() }
+            if (value != nextText) value = nextText
+
+            // Poll the native playback clock without driving per-frame recomposition.
+            delay(
+                if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) {
+                    84L
+                } else if (isPlaying) {
+                    48L
+                } else {
+                    84L
+                }
+            )
+        }
+    }
+
+    if (!activeLineText.isNullOrBlank()) {
+        val textStyle = DsmusicTheme.typography.bodyLarge.copy(
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 16.sp,
+            brush = if (lyricsColorStyle == "Home Studio Gradient") {
+                dsmusicHomeStudioGradientBrush()
+            } else {
+                null
+            }
+        )
+        Text(
+            text = activeLineText.orEmpty(),
+            style = textStyle,
+            color = if (lyricsColorStyle == "Home Studio Gradient") Color.Unspecified else contentColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp)
+        )
+    }
+}
+
 @Composable
 private fun LandscapePlayerDetailsPane(
     modifier: Modifier = Modifier,
@@ -427,6 +544,7 @@ private fun LandscapePlayerDetailsPane(
     accentColor: Color,
     selectedProvider: String?,
     providerResults: Map<String, LyricsResult>,
+    sourcePickerBackgroundBrush: Brush,
     lyricsColorStyle: String = "Home Studio Gradient",
     onProviderSelected: (String) -> Unit,
     onSeekTo: (Int) -> Unit,
@@ -502,9 +620,7 @@ private fun LandscapePlayerDetailsPane(
             onRefindClick = onRetryLyrics,
             accentColor = accentColor,
             contentColor = contentColor,
-            backgroundBrush = Brush.verticalGradient(
-                listOf(contentColor.copy(alpha = 0.13f), contentColor.copy(alpha = 0.035f))
-            ),
+            backgroundBrush = sourcePickerBackgroundBrush,
             onDismissRequest = { showProviderPicker = false }
         )
     }
@@ -564,6 +680,7 @@ fun FullPlayerScreen(
     val scrubberThumbStyle by customizeViewModel.scrubberThumbStyle.collectAsStateWithLifecycle()
     val visualizerColor by customizeViewModel.visualizerColor.collectAsStateWithLifecycle()
     val lyricsColorStyle by customizeViewModel.lyricsColorStyle.collectAsStateWithLifecycle()
+    val showSyncedLyricsInPlayer by customizeViewModel.showSyncedLyricsInPlayer.collectAsStateWithLifecycle()
 
     // Legacy layout values are normalized to Standard; lyrics are entered only through
     // the explicit Lyrics action, never by opening the mini player.
@@ -603,6 +720,7 @@ fun FullPlayerScreen(
         scrubberThickness = scrubberThickness,
         scrubberThumbStyle = scrubberThumbStyle,
         visualizerColor = visualizerColor,
+        showSyncedLyricsInPlayer = showSyncedLyricsInPlayer,
         onProviderSelected = { viewModel.selectLyricsProvider(it) },
         currentPositionProvider = currentPositionProvider,
         playbackSpeedProvider = playbackSpeedProvider,
@@ -696,6 +814,7 @@ fun FullPlayer(
     scrubberThickness: Float = 1.5f,
     scrubberThumbStyle: String = "Auto",
     visualizerColor: String = "Accent",
+    showSyncedLyricsInPlayer: Boolean = true,
     onProviderSelected: (String) -> Unit,
     onArtistClick: (String?, String) -> Unit = { _, _ -> },
     dragModifier: Modifier = Modifier,
@@ -1206,9 +1325,33 @@ fun FullPlayer(
                 Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 10.dp))
             }
 
-            // The matching 0.75f spacer above the title keeps the action row fixed.
-            // The remaining gap below the visualizer is therefore 25% smaller.
-            Spacer(modifier = Modifier.weight(2.25f, fill = true))
+            // Keep the action row at its existing vertical anchor. In portrait mode,
+            // use this free gap for one active synced lyric line. Karaoke lines advance
+            // only when the outgoing line's final timed word has completed.
+            if (
+                showSyncedLyricsInPlayer &&
+                !isLandscapeWindow &&
+                !isLyricsModeEnabled &&
+                !syncedLyrics.isNullOrEmpty()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(2.25f, fill = true),
+                    contentAlignment = Alignment.Center
+                ) {
+                    PortraitSyncedLyricPreview(
+                        lyrics = syncedLyrics,
+                        currentSong = uiState.currentSong,
+                        currentPositionProvider = currentPositionProvider,
+                        isPlaying = uiState.isPlaying,
+                        contentColor = lyricsTextColor,
+                        lyricsColorStyle = lyricsColorStyle
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.weight(2.25f, fill = true))
+            }
 
             // Reorderable action chips. The selected order is saved by Customize.
             Row(
@@ -1612,6 +1755,7 @@ fun FullPlayer(
                         contentColor = lyricsTextColor,
                         secondaryColor = lyricsSecondaryColor,
                         accentColor = lyricsAccentColor,
+                        sourcePickerBackgroundBrush = backgroundBrush,
                         lyricsColorStyle = lyricsColorStyle,
                         selectedProvider = selectedProvider,
                         providerResults = providerResults,
