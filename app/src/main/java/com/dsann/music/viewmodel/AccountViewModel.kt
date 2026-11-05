@@ -10,6 +10,7 @@ import com.dsann.music.data.innertube.OnlinePlaylist
 import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.UserProfile
 import com.dsann.music.data.innertube.YouTubeMusic
+import com.dsann.music.util.NetworkFailureClassifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +25,9 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
+
+    private val _offlineError = MutableStateFlow(false)
+    val offlineError = _offlineError.asStateFlow()
 
     private val _playlists = MutableStateFlow<List<OnlinePlaylist>>(emptyList())
     val playlists = _playlists.asStateFlow()
@@ -86,21 +90,33 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
             return
         }
 
+        _offlineError.value = false
         viewModelScope.launch {
             _isLoading.value = true
+            var hasSuccessfulRequest = false
+            var hasOfflineFailure = false
+            fun recordFailure(error: Throwable) {
+                if (NetworkFailureClassifier.isNoInternetFailure(error, context)) {
+                    hasOfflineFailure = true
+                }
+            }
             try {
                 // Load Playlists
                 YouTubeMusic.libraryPlaylists().onSuccess { items ->
                     val filtered = items.filter { it.title.isNotEmpty() && !it.title.equals("New playlist", ignoreCase = true) }
                     _playlists.value = filtered
+                    hasSuccessfulRequest = true
                 }.onFailure {
+                    recordFailure(it)
                     android.util.Log.w("AccountViewModel", "Failed to load playlists", it)
                 }
 
                 // Load Podcasts
                 YouTubeMusic.libraryPodcasts().onSuccess { items ->
                     _podcasts.value = items
+                    hasSuccessfulRequest = true
                 }.onFailure { throwable ->
+                    recordFailure(throwable)
                     val filteredPlaylists = _playlists.value
                     _podcasts.value = filteredPlaylists.filter { it.title.lowercase().contains("podcast") || it.title.lowercase().contains("show") }
                     android.util.Log.w("AccountViewModel", "Failed to load podcasts, using playlist fallback", throwable)
@@ -109,21 +125,27 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
                 // Load Albums
                 YouTubeMusic.libraryAlbums().onSuccess { items ->
                     _albums.value = items
+                    hasSuccessfulRequest = true
                 }.onFailure {
+                    recordFailure(it)
                     android.util.Log.w("AccountViewModel", "Failed to load library albums", it)
                 }
 
                 // Load Liked Songs (from playlist "LM")
                 YouTubeMusic.playlist("LM").onSuccess { page ->
                     _songs.value = page.songs
+                    hasSuccessfulRequest = true
                 }.onFailure {
+                    recordFailure(it)
                     android.util.Log.w("AccountViewModel", "Failed to load liked songs from playlist LM", it)
                 }
 
                 // Load History
                 YouTubeMusic.history().onSuccess { items ->
                     _history.value = items
+                    hasSuccessfulRequest = true
                 }.onFailure {
+                    recordFailure(it)
                     android.util.Log.w("AccountViewModel", "Failed to load listening history", it)
                 }
 
@@ -131,7 +153,9 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
                 var fetchedArtists = emptyList<OnlineArtist>()
                 YouTubeMusic.libraryArtists().onSuccess { items ->
                     fetchedArtists = items
+                    hasSuccessfulRequest = true
                 }.onFailure {
+                    recordFailure(it)
                     android.util.Log.w("AccountViewModel", "Failed to load library artists", it)
                 }
 
@@ -176,7 +200,10 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
                     compiledMap.values.toList().sortedBy { it.title.lowercase() }
                 }
                 _artists.value = mergedArtists
+                _offlineError.value = hasOfflineFailure && !hasSuccessfulRequest
             } catch (e: Exception) {
+                recordFailure(e)
+                _offlineError.value = hasOfflineFailure && !hasSuccessfulRequest
                 android.util.Log.e("AccountViewModel", "Error fetching library", e)
             } finally {
                 _isLoading.value = false
@@ -198,6 +225,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
     fun logout() {
         AccountManager.logout(getApplication())
         _userProfile.value = null
+        _offlineError.value = false
         _playlists.value = emptyList()
         _artists.value = emptyList()
         _albums.value = emptyList()
