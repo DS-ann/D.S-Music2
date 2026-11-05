@@ -36,7 +36,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.MoreVert
-import com.dsann.music.ui.theme.CircularProgressIndicator
+import com.dsann.music.ui.theme.LoadingIndicator
 import com.dsann.music.ui.theme.Icon
 import com.dsann.music.ui.theme.IconButton
 import com.dsann.music.ui.theme.ListItem
@@ -65,6 +65,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalContext
+import com.dsann.music.util.NetworkFailureClassifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -210,6 +212,7 @@ internal fun PlayerLyricsContent(
 ) {
     val compactLandscapeLyrics = LocalConfiguration.current.orientation ==
         android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val context = LocalContext.current
 
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         when {
@@ -264,6 +267,12 @@ internal fun PlayerLyricsContent(
                         contentColor = contentColor
                     )
                 }
+            }
+            NetworkFailureClassifier.isNoInternetFailure(lyricsError, context) -> {
+                com.dsann.music.ui.theme.NoInternetState(
+                    modifier = Modifier.fillMaxSize(),
+                    onRetry = onRetryLyrics
+                )
             }
             lyricsError != null -> LyricsErrorState(
                 message = lyricsError.message ?: "Lyrics not found",
