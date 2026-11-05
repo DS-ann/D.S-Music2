@@ -262,7 +262,7 @@ fun BottomSheetScaffoldContent(
         com.dsann.music.util.OpusToMp3Converter.conversionKeys(target).any { it in convertingKeys }
     } == true
 
-    LaunchedEffect(song?.id, song?.videoId, song?.path, completedDownloads.contains(song?.videoId)) {
+    LaunchedEffect(song?.id, song?.videoId, song?.path, completedDownloads.contains(song?.videoId), isConvertingToMp3) {
         hasDownloadedOpus = song?.let { target ->
             withContext(Dispatchers.IO) {
                 com.dsann.music.util.SongDownloader.findDownloadedOpusUri(context, target) != null
