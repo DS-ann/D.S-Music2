@@ -344,7 +344,6 @@ object TtmlParser {
                     coversVisibleCharacters(contentText, words)
                 val displayWords = if (hasCompleteWordTiming) words else emptyList()
 
-                val contentText = lineSb.toString().trim()
                 if (contentText.isNotEmpty()) {
                     val prevLine = lines.lastOrNull()
                     val isRecent = prevLine != null && (lineStartMs - prevLine.startTimeMs) < 4000L

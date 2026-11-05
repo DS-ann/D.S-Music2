@@ -125,7 +125,7 @@ class AdvancedLyricsParserTest {
 
     @Test
     fun qrcCharacterRangesExcludeLeadingAndTrailingTokenWhitespace() {
-        val line = LrcParser.parse("[1000,2000] (1000,300)Hello (1300,400) world ").single()
+        val line = LrcParser.parse("[1000,2000] (1000,300)Hello (1300,400)world (1800,200)").single()
         assertEquals("Hello world", line.content)
         assertEquals(0, line.words.first().charRange.first)
         assertEquals(4, line.words.first().charRange.last)
