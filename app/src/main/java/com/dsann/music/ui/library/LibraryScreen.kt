@@ -4094,94 +4094,27 @@ private suspend fun readCacheTabSnapshot(
 
 @Composable
 private fun CachedSongListItem(
-    item: CachedSongEntry,
-    artwork: java.io.File,
+    song: SongItem,
     isCurrentSong: Boolean,
+    isFavorite: Boolean,
     isSelecting: Boolean,
     isSelected: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    DsmusicListItem(
-        leadingContent = {
-            Box(modifier = Modifier.size(52.dp), contentAlignment = Alignment.Center) {
-                AsyncImage(
-                    model = libraryArtworkRequestBuilder(LocalContext.current, artwork).crossfade(false).build(),
-                    contentDescription = item.title + " cover art",
-                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
-                )
-                if (isSelecting) {
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (isSelected) DsmusicTheme.colorScheme.primary
-                                else DsmusicTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f)
-                            )
-                            .border(
-                                1.dp,
-                                if (isSelected) DsmusicTheme.colorScheme.primary
-                                else DsmusicTheme.colorScheme.outline,
-                                CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (isSelected) Icon(
-                            Icons.Rounded.Check,
-                            contentDescription = "Selected",
-                            tint = DsmusicTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(17.dp)
-                        )
-                    }
-                }
-            }
-        },
-        headlineContent = {
-            Text(
-                item.title,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = if (isCurrentSong) DsmusicTheme.colorScheme.primary
-                    else DsmusicTheme.colorScheme.onSurface
-            )
-        },
-        supportingContent = {
-            Text(
-                if (isCurrentSong) item.artist + " · Now playing" else item.artist,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = DsmusicTheme.colorScheme.onSurfaceVariant
-            )
-        },
-        trailingContent = {
-            if (isSelecting) {
-                Icon(
-                    if (isSelected) Icons.Rounded.Check else Icons.Rounded.MoreVert,
-                    contentDescription = if (isSelected) "Selected" else "Select cached song",
-                    tint = if (isSelected) DsmusicTheme.colorScheme.primary
-                        else DsmusicTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                Icon(
-                    if (isCurrentSong) Icons.Rounded.PlayArrow else Icons.AutoMirrored.Rounded.PlaylistPlay,
-                    contentDescription = if (isCurrentSong) "Now playing" else "Play cached song",
-                    tint = if (isCurrentSong) DsmusicTheme.colorScheme.primary
-                        else DsmusicTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        colors = ListItemDefaults.colors(
-            containerColor = if (isSelected) DsmusicTheme.colorScheme.primaryContainer.copy(alpha = 0.82f)
-                else DsmusicTheme.colorScheme.surfaceContainerLow
-        ),
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+    // Cache is a real playlist: reuse the same borderless song-row treatment as Downloads.
+    // The standard row only outlines a selected or currently playing track.
+    SongListItem(
+        song = song,
+        isPlaying = isCurrentSong,
+        isFavorite = isFavorite,
+        localIndex = 0,
+        localCount = 1,
+        onClick = onClick,
+        onLongClick = onLongClick,
+        selectionMode = isSelecting,
+        isSelected = isSelected
     )
 }
 
@@ -4267,6 +4200,7 @@ private fun StreamCacheTabContent(
 
     val scope = rememberCoroutineScope()
     val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
+    val favoriteIds by viewModel.favoriteSongIds.collectAsStateWithLifecycle(emptySet())
     val rootTabActive = LocalRootTabActive.current
 
     // Poll only while the Library root tab is active. Cache stays in the root content
@@ -4601,21 +4535,23 @@ private fun StreamCacheTabContent(
 
         LazyColumn(
             modifier = Modifier.fillMaxWidth().weight(1f),
-            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 160.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            contentPadding = PaddingValues(start = 0.dp, top = 16.dp, end = 0.dp, bottom = 160.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             item(key = "cache-playlist-header") {
-                LibraryGradientPlaylistHero(
-                    title = "Cache",
-                    subtitle = filteredCacheEntries.size.toString() + " songs · D.S Music",
-                    status = "Available offline",
-                    artwork = filteredCacheEntries.firstOrNull()?.let {
-                        AudioPlaybackService.getCachedMediaArtworkFile(context, it.songId)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    actions = playlistActions
-                )
-                com.dsann.music.ui.theme.HorizontalDivider()
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    LibraryGradientPlaylistHero(
+                        title = "Cache",
+                        subtitle = filteredCacheEntries.size.toString() + " songs · D.S Music",
+                        status = "Available offline",
+                        artwork = filteredCacheEntries.firstOrNull()?.let {
+                            AudioPlaybackService.getCachedMediaArtworkFile(context, it.songId)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        actions = playlistActions
+                    )
+                    com.dsann.music.ui.theme.HorizontalDivider()
+                }
             }
             if (filteredCacheEntries.isEmpty()) {
                 item(key = "cache-playlist-empty") {
@@ -4650,26 +4586,28 @@ private fun StreamCacheTabContent(
                         currentSong?.id == queueSong?.id &&
                         currentSong?.contentUri?.toString() == item.cachedUri
                     val isSelected = item.songId in selectedCacheSongIds
-                    CachedSongListItem(
-                        item = item,
-                        artwork = artwork,
-                        isCurrentSong = isCurrentSong,
-                        isSelecting = isSelectingCache,
-                        isSelected = isSelected,
-                        onClick = {
-                            if (isSelectingCache) {
-                                toggleCacheSelection(item.songId)
-                            } else if (index in filteredCacheQueue.indices) {
-                                exploreViewModel?.clearOnlinePlaybackSelection()
-                                viewModel.setSongList(filteredCacheQueue)
-                                viewModel.playSongAtIndex(index)
+                    if (queueSong != null) {
+                        CachedSongListItem(
+                            song = queueSong,
+                            isCurrentSong = isCurrentSong,
+                            isFavorite = favoriteIds.contains(queueSong.id),
+                            isSelecting = isSelectingCache,
+                            isSelected = isSelected,
+                            onClick = {
+                                if (isSelectingCache) {
+                                    toggleCacheSelection(item.songId)
+                                } else {
+                                    exploreViewModel?.clearOnlinePlaybackSelection()
+                                    viewModel.setSongList(filteredCacheQueue)
+                                    viewModel.playSongAtIndex(index)
+                                }
+                            },
+                            onLongClick = {
+                                if (isSelectingCache) toggleCacheSelection(item.songId)
+                                else onSongLongClick(item)
                             }
-                        },
-                        onLongClick = {
-                            if (isSelectingCache) toggleCacheSelection(item.songId)
-                            else onSongLongClick(item)
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
