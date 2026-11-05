@@ -209,10 +209,10 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
                     compiledMap.values.toList().sortedBy { it.title.lowercase() }
                 }
                 _artists.value = mergedArtists
-                _offlineError.value = hasOfflineFailure && !hasSuccessfulRequest
+                _offlineError.value = hasOfflineFailure
             } catch (e: Exception) {
                 recordFailure(e)
-                _offlineError.value = hasOfflineFailure && !hasSuccessfulRequest
+                _offlineError.value = hasOfflineFailure
                 android.util.Log.e("AccountViewModel", "Error fetching library", e)
             } finally {
                 _isLoading.value = false
