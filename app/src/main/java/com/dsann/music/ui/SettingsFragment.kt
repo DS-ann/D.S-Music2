@@ -494,7 +494,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     )
     val miniPlayerProgressStyle: StateFlow<String> = _miniPlayerProgressStyle.asStateFlow()
     fun setMiniPlayerProgressStyle(value: String) {
-        val safe = value.takeIf { it in listOf("Ring", "Line", "Fill", "None") } ?: "Ring"
+        val safe = value.takeIf { it in listOf("Ring", "Line", "Fill", "Matching cover", "None") } ?: "Ring"
         _miniPlayerProgressStyle.value = safe
         prefs.edit { putString("mini_player_progress", safe) }
     }
@@ -3286,9 +3286,9 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Mini-player progress",
-                        description = "Use a circular ring, a slim line, a filling track, or hide progress around the mini-player artwork.",
+                        description = "Use a ring, line, fill, or trace playback progress along the song cover's exact outer shape. None hides it.",
                         selected = miniPlayerProgressStyle,
-                        options = listOf("Ring", "Line", "Fill", "None"),
+                        options = listOf("Ring", "Line", "Fill", "Matching cover", "None"),
                         onSelected = onMiniPlayerProgressStyleChange
                     )
                 },
