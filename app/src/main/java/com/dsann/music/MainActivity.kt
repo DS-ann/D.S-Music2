@@ -481,10 +481,14 @@ class MainActivity : AppCompatActivity() {
                     ) 64.dp else 80.dp
                     val systemBottomInset = WindowInsets.navigationBars.asPaddingValues()
                         .calculateBottomPadding()
-                    // Root tabs must measure their scroll viewport above the collapsed mini-player.
-                    // Otherwise the last rows can scroll underneath the overlay and become unreachable.
+                    // Portrait's mini-player spans the full screen width, so reserve its
+                    // height from the scroll viewport to keep the final rows reachable.
+                    // In landscape the player is a centered half-width capsule: the left and
+                    // right portions of the bottom row remain visible and must keep rendering
+                    // the underlying tab content instead of becoming a full-width blank strip.
                     val miniPlayerScrollReserve = if (
-                        currentSong != null &&
+                        !isLandscapeLayout &&
+                            currentSong != null &&
                             currentRoute != null && currentRoute in rootTabRoutes
                     ) {
                         miniPlayerHeight + if (useNavigationRail) 8.dp + systemBottomInset else 4.dp
