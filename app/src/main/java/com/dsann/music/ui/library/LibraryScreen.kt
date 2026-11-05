@@ -81,6 +81,7 @@ import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
@@ -676,6 +677,8 @@ fun LibraryScreen(
                         var selectedDownloadIds by remember { mutableStateOf(setOf<Long>()) }
                         var downloadSelectionMenuExpanded by remember { mutableStateOf(false) }
                         var downloadOptionsExpanded by remember { mutableStateOf(false) }
+                        var downloadSortMenuExpanded by remember { mutableStateOf(false) }
+                        var downloadSortAscending by rememberSaveable { mutableStateOf(true) }
                         var isDownloadSearchVisible by rememberSaveable { mutableStateOf(false) }
                         var downloadSearchQuery by rememberSaveable { mutableStateOf("") }
 
@@ -793,14 +796,20 @@ fun LibraryScreen(
                                 val sortedAndGrouped by produceState<List<Any>>(
                                     initialValue = emptyList(),
                                     filteredSongs,
-                                    sortOrder
+                                    sortOrder,
+                                    downloadSortAscending
                                 ) {
                                     value = withContext(Dispatchers.Default) {
-                                        val sorted = when (sortOrder) {
-                                            SortOrder.A_Z -> filteredSongs.sortedWith(compareBy { it.title.lowercase() })
-                                            SortOrder.DATE_ADDED -> filteredSongs.sortedWith(compareByDescending { it.dateAdded })
-                                            SortOrder.ARTIST -> filteredSongs.sortedWith(compareBy { it.artist.lowercase() })
-                                            SortOrder.DURATION -> filteredSongs.sortedWith(compareByDescending { it.duration })
+                                        val ascendingSorted = when (sortOrder) {
+                                            SortOrder.A_Z -> filteredSongs.sortedBy { it.title.lowercase() }
+                                            SortOrder.DATE_ADDED -> filteredSongs.sortedBy { it.dateAdded }
+                                            SortOrder.ARTIST -> filteredSongs.sortedBy { it.artist.lowercase() }
+                                            SortOrder.DURATION -> filteredSongs.sortedBy { it.duration }
+                                        }
+                                        val sorted = if (downloadSortAscending) {
+                                            ascendingSorted
+                                        } else {
+                                            ascendingSorted.asReversed()
                                         }
                                         sorted.map { it as Any }
                                     }
@@ -915,6 +924,36 @@ fun LibraryScreen(
                                             expanded = downloadOptionsExpanded,
                                             onDismissRequest = { downloadOptionsExpanded = false }
                                         ) {
+                                            DropdownMenuItem(
+                                                text = { Text("Sort by") },
+                                                onClick = {
+                                                    downloadOptionsExpanded = false
+                                                    downloadSortMenuExpanded = true
+                                                },
+                                                trailingIcon = {
+                                                    Icon(Icons.Rounded.ChevronRight, contentDescription = null)
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Search") },
+                                                onClick = {
+                                                    isDownloadSearchVisible = !isDownloadSearchVisible
+                                                    if (!isDownloadSearchVisible) downloadSearchQuery = ""
+                                                    downloadOptionsExpanded = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Select") },
+                                                onClick = {
+                                                    isSelectingDownloads = true
+                                                    downloadOptionsExpanded = false
+                                                }
+                                            )
+                                        }
+                                        DropdownMenu(
+                                            expanded = downloadSortMenuExpanded,
+                                            onDismissRequest = { downloadSortMenuExpanded = false }
+                                        ) {
                                             Text(
                                                 "SORT BY",
                                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 7.dp),
@@ -926,62 +965,56 @@ fun LibraryScreen(
                                                     text = {
                                                         Text(
                                                             when (order) {
-                                                                SortOrder.A_Z -> "Title (A–Z)"
+                                                                SortOrder.A_Z -> "A–Z"
                                                                 SortOrder.DATE_ADDED -> "Date added"
                                                                 SortOrder.ARTIST -> "Artist"
                                                                 SortOrder.DURATION -> "Duration"
                                                             }
                                                         )
                                                     },
-                                                    onClick = {
-                                                        sortOrder = order
-                                                        downloadOptionsExpanded = false
-                                                    },
+                                                    onClick = { sortOrder = order },
                                                     trailingIcon = {
                                                         if (sortOrder == order) Icon(
                                                             Icons.Rounded.Check,
-                                                            contentDescription = "Selected",
+                                                            contentDescription = "Selected sort",
                                                             tint = DsmusicTheme.colorScheme.primary
                                                         )
                                                     }
                                                 )
                                             }
                                             com.dsann.music.ui.theme.HorizontalDivider()
+                                            Text(
+                                                "ORDER",
+                                                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 7.dp),
+                                                style = DsmusicTheme.typography.labelSmall,
+                                                color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                            )
                                             DropdownMenuItem(
-                                                text = { Text("Select songs") },
+                                                text = { Text("Ascending") },
                                                 onClick = {
-                                                    isSelectingDownloads = true
-                                                    downloadOptionsExpanded = false
+                                                    downloadSortAscending = true
+                                                    downloadSortMenuExpanded = false
+                                                },
+                                                trailingIcon = {
+                                                    if (downloadSortAscending) Icon(
+                                                        Icons.Rounded.Check,
+                                                        contentDescription = "Ascending selected",
+                                                        tint = DsmusicTheme.colorScheme.primary
+                                                    )
                                                 }
                                             )
                                             DropdownMenuItem(
-                                                text = { Text(if (isDownloadSearchVisible) "Hide search" else "Search") },
+                                                text = { Text("Descending") },
                                                 onClick = {
-                                                    isDownloadSearchVisible = !isDownloadSearchVisible
-                                                    if (!isDownloadSearchVisible) downloadSearchQuery = ""
-                                                    downloadOptionsExpanded = false
-                                                }
-                                            )
-                                            com.dsann.music.ui.theme.HorizontalDivider()
-                                            DropdownMenuItem(
-                                                text = { Text("Play all") },
-                                                enabled = filteredSongs.isNotEmpty(),
-                                                onClick = {
-                                                    viewModel.setShuffleEnabled(false)
-                                                    viewModel.setSongList(sortedAndGrouped.filterIsInstance<SongItem>())
-                                                    viewModel.playSongAtIndex(0)
-                                                    downloadOptionsExpanded = false
-                                                }
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text("Shuffle") },
-                                                enabled = filteredSongs.isNotEmpty(),
-                                                onClick = {
-                                                    val playlist = sortedAndGrouped.filterIsInstance<SongItem>().shuffled()
-                                                    viewModel.setShuffleEnabled(true)
-                                                    viewModel.setSongList(playlist)
-                                                    viewModel.playSongAtIndex(0)
-                                                    downloadOptionsExpanded = false
+                                                    downloadSortAscending = false
+                                                    downloadSortMenuExpanded = false
+                                                },
+                                                trailingIcon = {
+                                                    if (!downloadSortAscending) Icon(
+                                                        Icons.Rounded.Check,
+                                                        contentDescription = "Descending selected",
+                                                        tint = DsmusicTheme.colorScheme.primary
+                                                    )
                                                 }
                                             )
                                         }
@@ -4073,7 +4106,8 @@ private data class CachedSongEntry(
     val albumName: String,
     val videoId: String,
     val durationMs: Long,
-    val cachedUri: String
+    val cachedUri: String,
+    val dateAddedMs: Long = 0L
 )
 
 private data class CacheTabSnapshot(
@@ -4124,7 +4158,8 @@ private suspend fun readCacheTabSnapshot(
             albumName = metadata.albumName,
             videoId = metadata.videoId,
             durationMs = metadata.durationMs,
-            cachedUri = cachedUri
+            cachedUri = cachedUri,
+            dateAddedMs = metadata.cachedAtMs
         )
         val existing = entriesBySong[metadata.songId]
         if (existing == null || bytes > existing.second) {
@@ -4239,6 +4274,8 @@ private fun StreamCacheTabContent(
     var selectedCacheSongIds by remember { mutableStateOf(setOf<String>()) }
     var cacheSelectionMenuExpanded by remember { mutableStateOf(false) }
     var cacheOptionsExpanded by remember { mutableStateOf(false) }
+    var cacheSortMenuExpanded by remember { mutableStateOf(false) }
+    var cacheSortAscending by rememberSaveable { mutableStateOf(true) }
     var isCacheSearchVisible by rememberSaveable { mutableStateOf(false) }
     var cacheSearchQuery by rememberSaveable { mutableStateOf("") }
     var cacheSortOrder by rememberSaveable { mutableStateOf(SortOrder.A_Z) }
@@ -4296,7 +4333,8 @@ private fun StreamCacheTabContent(
         initialValue = emptyList<CachedSongEntry>(),
         cacheEntries,
         cacheSearchQuery,
-        cacheSortOrder
+        cacheSortOrder,
+        cacheSortAscending
     ) {
         if (cacheSearchQuery.isNotBlank()) delay(120L)
         val query = cacheSearchQuery.trim()
@@ -4309,14 +4347,17 @@ private fun StreamCacheTabContent(
                         it.artist.contains(query, ignoreCase = true)
                 }
             }
-            when (cacheSortOrder) {
-                SortOrder.A_Z, SortOrder.DATE_ADDED ->
+            val ascendingSorted = when (cacheSortOrder) {
+                SortOrder.A_Z ->
                     matching.sortedBy { it.title.lowercase() }
+                SortOrder.DATE_ADDED ->
+                    matching.sortedBy { it.dateAddedMs }
                 SortOrder.ARTIST ->
                     matching.sortedBy { it.artist.lowercase() }
                 SortOrder.DURATION ->
-                    matching.sortedByDescending { it.durationMs }
+                    matching.sortedBy { it.durationMs }
             }
+            if (cacheSortAscending) ascendingSorted else ascendingSorted.asReversed()
         }
     }
     val filteredCacheQueue = remember(filteredCacheEntries, cacheQueueByUri) {
@@ -4487,63 +4528,98 @@ private fun StreamCacheTabContent(
                     expanded = cacheOptionsExpanded,
                     onDismissRequest = { cacheOptionsExpanded = false }
                 ) {
-                    Text(
-                        "SORT BY",
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 7.dp),
-                        style = DsmusicTheme.typography.labelSmall,
-                        color = DsmusicTheme.colorScheme.onSurfaceVariant
-                    )
-                    listOf(SortOrder.A_Z, SortOrder.ARTIST, SortOrder.DURATION).forEach { order ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    when (order) {
-                                        SortOrder.A_Z -> "Title (A–Z)"
-                                        SortOrder.ARTIST -> "Artist"
-                                        SortOrder.DURATION -> "Duration"
-                                        SortOrder.DATE_ADDED -> "Date added"
-                                    }
-                                )
-                            },
-                            onClick = {
-                                cacheSortOrder = order
-                                cacheOptionsExpanded = false
-                            },
-                            trailingIcon = {
-                                if (cacheSortOrder == order) Icon(
-                                    Icons.Rounded.Check,
-                                    contentDescription = "Selected",
-                                    tint = DsmusicTheme.colorScheme.primary
-                                )
-                            }
-                        )
-                    }
-                    com.dsann.music.ui.theme.HorizontalDivider()
                     DropdownMenuItem(
-                        text = { Text("Select songs") },
+                        text = { Text("Sort by") },
                         onClick = {
-                            isSelectingCache = true
                             cacheOptionsExpanded = false
+                            cacheSortMenuExpanded = true
+                        },
+                        trailingIcon = {
+                            Icon(Icons.Rounded.ChevronRight, contentDescription = null)
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text(if (isCacheSearchVisible) "Hide search" else "Search") },
+                        text = { Text("Search") },
                         onClick = {
                             isCacheSearchVisible = !isCacheSearchVisible
                             if (!isCacheSearchVisible) cacheSearchQuery = ""
                             cacheOptionsExpanded = false
                         }
                     )
-                    com.dsann.music.ui.theme.HorizontalDivider()
                     DropdownMenuItem(
-                        text = { Text("Play all") },
-                        enabled = filteredCacheQueue.isNotEmpty(),
-                        onClick = { startPlaylist(false) }
+                        text = { Text("Select") },
+                        onClick = {
+                            isSelectingCache = true
+                            cacheOptionsExpanded = false
+                        }
+                    )
+                }
+                DropdownMenu(
+                    expanded = cacheSortMenuExpanded,
+                    onDismissRequest = { cacheSortMenuExpanded = false }
+                ) {
+                    Text(
+                        "SORT BY",
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 7.dp),
+                        style = DsmusicTheme.typography.labelSmall,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
+                    SortOrder.entries.forEach { order ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    when (order) {
+                                        SortOrder.A_Z -> "A–Z"
+                                        SortOrder.DATE_ADDED -> "Date added"
+                                        SortOrder.ARTIST -> "Artist"
+                                        SortOrder.DURATION -> "Duration"
+                                    }
+                                )
+                            },
+                            onClick = { cacheSortOrder = order },
+                            trailingIcon = {
+                                if (cacheSortOrder == order) Icon(
+                                    Icons.Rounded.Check,
+                                    contentDescription = "Selected sort",
+                                    tint = DsmusicTheme.colorScheme.primary
+                                )
+                            }
+                        )
+                    }
+                    com.dsann.music.ui.theme.HorizontalDivider()
+                    Text(
+                        "ORDER",
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 7.dp),
+                        style = DsmusicTheme.typography.labelSmall,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
                     )
                     DropdownMenuItem(
-                        text = { Text("Shuffle") },
-                        enabled = filteredCacheQueue.isNotEmpty(),
-                        onClick = { startPlaylist(true) }
+                        text = { Text("Ascending") },
+                        onClick = {
+                            cacheSortAscending = true
+                            cacheSortMenuExpanded = false
+                        },
+                        trailingIcon = {
+                            if (cacheSortAscending) Icon(
+                                Icons.Rounded.Check,
+                                contentDescription = "Ascending selected",
+                                tint = DsmusicTheme.colorScheme.primary
+                            )
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Descending") },
+                        onClick = {
+                            cacheSortAscending = false
+                            cacheSortMenuExpanded = false
+                        },
+                        trailingIcon = {
+                            if (!cacheSortAscending) Icon(
+                                Icons.Rounded.Check,
+                                contentDescription = "Descending selected",
+                                tint = DsmusicTheme.colorScheme.primary
+                            )
+                        }
                     )
                 }
             }
