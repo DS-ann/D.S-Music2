@@ -544,7 +544,7 @@ fun LibraryScreen(
                     }
                 }
 
-                // Keep Library navigation visible while browsing, like Prism's tab-first Library.
+                // Keep Library navigation visible while browsing.
                 val tabs = listOf(
                     "Playlists" to "Playlists",
                     "Songs" to "Songs",
@@ -1663,7 +1663,7 @@ private fun UnifiedLibraryContent(
     val unifiedItems = remember(onlinePlaylists, onlineAlbums, onlineArtists, onlinePodcasts, onlineSongs) {
         val list = mutableListOf<UnifiedLibraryItem>()
 
-        // Keep the key library actions first, in a stable Prism-style tile order.
+        // Keep the key library actions first in a stable tile order.
         list.addAll(
             listOf(
                 LibraryCategoryItem("Playlists", "Your playlists", Icons.AutoMirrored.Rounded.PlaylistPlay) {
