@@ -802,12 +802,16 @@ private fun androidx.compose.foundation.layout.BoxScope.VideoOverlayControls(
     qualityEnabled: Boolean,
     onOpenQuality: () -> Unit,
     onToggleFullscreen: () -> Unit,
-    fullscreen: Boolean
+    fullscreen: Boolean,
+    artworkScaleFactor: Float
 ) {
+    val scale = artworkScaleFactor.coerceIn(0.65f, 1f)
+    val controlSize = (48.dp * scale).coerceIn(32.dp, 48.dp)
+    val iconSize = (20.dp * scale).coerceIn(14.dp, 20.dp)
     Row(
         modifier = Modifier
             .align(Alignment.TopEnd)
-            .padding(12.dp),
+            .padding(12.dp * scale),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -815,12 +819,16 @@ private fun androidx.compose.foundation.layout.BoxScope.VideoOverlayControls(
             shape = CircleShape,
             color = Color.Black.copy(alpha = 0.62f)
         ) {
-            DsmusicIconButton(onClick = onOpenQuality, enabled = qualityEnabled) {
+            DsmusicIconButton(
+                onClick = onOpenQuality,
+                enabled = qualityEnabled,
+                modifier = Modifier.size(controlSize)
+            ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_settings),
                     contentDescription = "Video quality",
                     tint = Color.White,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(iconSize)
                 )
             }
         }
@@ -828,14 +836,17 @@ private fun androidx.compose.foundation.layout.BoxScope.VideoOverlayControls(
             shape = CircleShape,
             color = Color.Black.copy(alpha = 0.62f)
         ) {
-            DsmusicIconButton(onClick = onToggleFullscreen) {
+            DsmusicIconButton(
+                onClick = onToggleFullscreen,
+                modifier = Modifier.size(controlSize)
+            ) {
                 Icon(
                     painter = painterResource(
                         if (fullscreen) R.drawable.ic_fullscreen_exit else R.drawable.ic_fullscreen
                     ),
                     contentDescription = if (fullscreen) "Exit fullscreen" else "Enter fullscreen",
                     tint = Color.White,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(iconSize)
                 )
             }
         }
@@ -1865,7 +1876,7 @@ fun PlayerBottomSheetCompose(
                                         modifier = Modifier.fillMaxSize(),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        val squareVideoSize = minOf(maxWidth, maxHeight)
+                                        val squareVideoSize = minOf(maxWidth, maxHeight) * artworkScaleFactor
                                         androidx.compose.ui.viewinterop.AndroidView(
                                         factory = { viewContext ->
                                             (android.view.LayoutInflater.from(viewContext)
@@ -1891,7 +1902,8 @@ fun PlayerBottomSheetCompose(
                                     qualityEnabled = videoQualityOptions.isNotEmpty() && !videoQualityLoading,
                                     onOpenQuality = { showVideoQualityDialog = true },
                                     onToggleFullscreen = { isVideoFullscreen = !isVideoFullscreen },
-                                    fullscreen = false
+                                    fullscreen = false,
+                                    artworkScaleFactor = artworkScaleFactor
                                 )
                             }
 
@@ -1934,7 +1946,8 @@ fun PlayerBottomSheetCompose(
                                             qualityEnabled = videoQualityOptions.isNotEmpty() && !videoQualityLoading,
                                             onOpenQuality = { showVideoQualityDialog = true },
                                             onToggleFullscreen = { isVideoFullscreen = false },
-                                            fullscreen = true
+                                            fullscreen = true,
+                                            artworkScaleFactor = artworkScaleFactor
                                         )
                                     }
                                 }
