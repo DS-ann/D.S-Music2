@@ -627,6 +627,7 @@ class PlayerSharedViewModel @Inject constructor(
     val currentSong: StateFlow<SongItem?> = _currentSong.asStateFlow()
 
     private val _currentSongArtwork = MutableStateFlow<ByteArray?>(null)
+    val currentSongArtwork: StateFlow<ByteArray?> = _currentSongArtwork.asStateFlow()
 
     // Lyrics State (Delegated to Controller)
     val lyricsController = PlayerLyricsStateController(TAG)
@@ -1083,7 +1084,10 @@ class PlayerSharedViewModel @Inject constructor(
                 _isCurrentSongDisliked.value = false
                 if (song != null) {
                     SongDownloader.refreshDownloadedStatus(appContext, song)
-                    // Load embedded artwork bytes for legacy notification/artwork references
+                    // Clear the previous track's image immediately. Downloaded-file art is
+                    // then reloaded from the active file:// or content:// playback source.
+                    _currentSongArtwork.value = null
+                    // Load embedded artwork bytes for legacy notification and player artwork.
                     val embedded = withContext(Dispatchers.IO) { song.getEmbeddedPicture(appContext) }
                     _currentSongArtwork.value = embedded
                     
