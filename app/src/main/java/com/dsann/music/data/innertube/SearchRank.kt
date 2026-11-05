@@ -3,7 +3,7 @@ package com.dsann.music.data.innertube
 import java.text.Normalizer
 
 /**
- * Prism-style ranking for YouTube Music search.
+ * Relevance ranking for YouTube Music search.
  *
  * Search results are fetched per result type. YouTube's unfiltered "Top result" card is
  * treated as a strong candidate, but exact artists/songs/albums and non-cover versions
