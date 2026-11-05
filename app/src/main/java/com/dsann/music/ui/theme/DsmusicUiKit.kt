@@ -1154,28 +1154,48 @@ fun PullToRefreshBox(
                     return Offset.Zero
                 }
 
-                if (available.y > 0f) {
-                    // Only the unconsumed downward drag reaches here when the list is at
-                    // its top. Normal scrolling inside the feed remains owned by LazyColumn.
-                    state.pullDistancePx += available.y
-                    state.peakPullDistancePx = maxOf(state.peakPullDistancePx, state.pullDistancePx)
-                    state.progress = (state.pullDistancePx / thresholdPx).coerceIn(0f, 1f)
-                    return Offset(0f, available.y)
-                }
+                // onPostScroll's consumed value is important here: once the finger
+                // reverses, the child list can consume the upward delta itself (leaving
+                // available.y == 0). Looking only at available.y misses that reversal and
+                // incorrectly refreshes when the gesture is released.
+                val gestureDeltaY = consumed.y + available.y
 
-                if (available.y < 0f && state.pullDistancePx > 0f) {
-                    val consumedY = maxOf(available.y, -state.pullDistancePx)
+                if (gestureDeltaY < 0f && state.pullDistancePx > 0f) {
+                    val reversedBy = -gestureDeltaY
                     if (state.peakPullDistancePx >= thresholdPx) {
-                        // Once armed, reversing the drag is an explicit cancellation.
-                        // Do not re-arm this same gesture if the finger moves downward again.
-                        state.reverseDistancePx += -consumedY
+                        // A deliberate upward reversal after arming cancels this pull,
+                        // even when the child list consumed the upward movement.
+                        state.reverseDistancePx += reversedBy
                         if (state.reverseDistancePx >= reverseCancelDistancePx) {
                             state.reversedAfterThreshold = true
                         }
                     }
-                    state.pullDistancePx = (state.pullDistancePx + consumedY).coerceAtLeast(0f)
+
+                    // Reduce the indicator by the complete upward gesture delta, but only
+                    // consume the part that the child list did not already handle.
+                    val distanceBeforeReverse = state.pullDistancePx
+                    state.pullDistancePx =
+                        (distanceBeforeReverse - reversedBy).coerceAtLeast(0f)
                     state.progress = (state.pullDistancePx / thresholdPx).coerceIn(0f, 1f)
-                    return Offset(0f, consumedY)
+                    val unconsumedUpward = if (available.y < 0f) {
+                        maxOf(available.y, -distanceBeforeReverse)
+                    } else {
+                        0f
+                    }
+                    return Offset(0f, unconsumedUpward)
+                }
+
+                if (gestureDeltaY > 0f && available.y > 0f) {
+                    // Only the unconsumed downward drag reaches here when the list is at
+                    // its top. Normal scrolling inside the feed remains owned by LazyColumn.
+                    // Once reversed after arming, this same gesture cannot re-arm.
+                    if (!state.reversedAfterThreshold) {
+                        state.pullDistancePx += available.y
+                        state.peakPullDistancePx =
+                            maxOf(state.peakPullDistancePx, state.pullDistancePx)
+                        state.progress = (state.pullDistancePx / thresholdPx).coerceIn(0f, 1f)
+                        return Offset(0f, available.y)
+                    }
                 }
 
                 return Offset.Zero
