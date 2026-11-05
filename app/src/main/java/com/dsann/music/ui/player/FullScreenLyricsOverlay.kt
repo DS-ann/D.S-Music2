@@ -213,7 +213,10 @@ internal fun PlayerLyricsContent(
 
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         when {
-            isLoading -> CircularProgressIndicator(color = dynamicAccentColor)
+            isLoading -> LoadingIndicator(
+                modifier = Modifier.size(32.dp),
+                color = dynamicAccentColor
+            )
             !contentReady -> Unit
             !syncedLyrics.isNullOrEmpty() -> SyncedLyricsCompose(
                 onSeekTo = onSeekTo,
