@@ -71,6 +71,7 @@ import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -429,7 +430,9 @@ private fun PortraitSyncedLyricPreview(
     currentPositionProvider: () -> Int,
     isPlaying: Boolean,
     contentColor: Color,
-    lyricsColorStyle: String
+    lyricsColorStyle: String,
+    compact: Boolean,
+    onLineBoundsChanged: (Rect?) -> Unit
 ) {
     val displayLines = remember(lyrics) {
         lyrics.mapIndexedNotNull { index, line ->
@@ -538,10 +541,15 @@ private fun PortraitSyncedLyricPreview(
         }
     }
 
+    LaunchedEffect(activeLineText) {
+        if (activeLineText.isNullOrBlank()) onLineBoundsChanged(null)
+    }
+
     if (!activeLineText.isNullOrBlank()) {
+        val baseFontSize = if (compact) 13f else 16f
         val textStyle = DsmusicTheme.typography.bodyLarge.copy(
             fontWeight = FontWeight.SemiBold,
-            fontSize = 16.sp,
+            fontSize = baseFontSize.sp,
             brush = if (lyricsColorStyle == "Home Studio Gradient") {
                 dsmusicHomeStudioGradientBrush()
             } else {
@@ -562,9 +570,10 @@ private fun PortraitSyncedLyricPreview(
                 activeLineText,
                 availableWidthPx,
                 lyricsColorStyle,
-                contentColor
+                contentColor,
+                compact
             ) {
-                var candidateSize = 16f
+                var candidateSize = baseFontSize
                 while (candidateSize > 7f) {
                     val measured = textMeasurer.measure(
                         text = activeLineText.orEmpty(),
@@ -587,7 +596,17 @@ private fun PortraitSyncedLyricPreview(
                 softWrap = false,
                 overflow = TextOverflow.Clip,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().onGloballyPositioned { coordinates ->
+                    val position = coordinates.positionInRoot()
+                    onLineBoundsChanged(
+                        Rect(
+                            position.x,
+                            position.y,
+                            position.x + coordinates.size.width.toFloat(),
+                            position.y + coordinates.size.height.toFloat()
+                        )
+                    )
+                }
             )
         }
     }
@@ -1134,6 +1153,58 @@ fun FullPlayer(
         val isCompactPortraitMultiWindow = isMultiWindowMode &&
             !isLandscapeWindow &&
             (screenWidth < 720.dp || screenHeight < 900.dp)
+
+        // Track the visible lyric line and action row in root coordinates. Older devices
+        // and unusual display scales can make text metrics exceed the weighted preview
+        // slot even when the nominal screen size says the standard layout should fit.
+        var portraitLyricLineBounds by remember(screenWidth, screenHeight, currentSongId) {
+            mutableStateOf<Rect?>(null)
+        }
+        var portraitActionRowBounds by remember(screenWidth, screenHeight, currentSongId) {
+            mutableStateOf<Rect?>(null)
+        }
+        var compactPortraitAfterCollision by remember(screenWidth, screenHeight, currentSongId) {
+            mutableStateOf(false)
+        }
+        val collisionClearancePx = with(LocalDensity.current) { 8.dp.toPx() }
+
+        LaunchedEffect(
+            portraitLyricLineBounds,
+            portraitActionRowBounds,
+            isLandscapeWindow,
+            isLyricsModeEnabled,
+            showSyncedLyricsInPlayer,
+            syncedLyrics
+        ) {
+            if (
+                isLandscapeWindow ||
+                isLyricsModeEnabled ||
+                !showSyncedLyricsInPlayer ||
+                syncedLyrics.isNullOrEmpty()
+            ) {
+                compactPortraitAfterCollision = false
+                portraitLyricLineBounds = null
+            } else {
+                val lyricBounds = portraitLyricLineBounds
+                val actionBounds = portraitActionRowBounds
+                if (lyricBounds != null && actionBounds != null) {
+                    val horizontalOverlap =
+                        lyricBounds.left < actionBounds.right &&
+                            lyricBounds.right > actionBounds.left
+                    val verticalCollision =
+                        lyricBounds.bottom + collisionClearancePx > actionBounds.top &&
+                            lyricBounds.top < actionBounds.bottom
+                    if (horizontalOverlap && verticalCollision) {
+                        // Latch for this song/window size. Compaction must not toggle
+                        // off again after the moved line clears the measured collision.
+                        compactPortraitAfterCollision = true
+                    }
+                }
+            }
+        }
+        val compactPortraitLyrics = !isLandscapeWindow &&
+            (isCompactPortraitMultiWindow || compactPortraitAfterCollision)
+
         // When the queue opens on a tablet-sized landscape layout, reserve its left pane
         // instead of letting the queue cover the player controls.
         val animatedQueueDockInset by animateDpAsState(
@@ -1186,7 +1257,7 @@ fun FullPlayer(
         // Move the title group down and reduce the gap before the action chips while
         // keeping their shared vertical anchor unchanged. Preserve landscape spacing.
         val titleToActionsSpacerWeight =
-            if (isLandscapeWindow || isCompactPortraitMultiWindow) 2.25f else 1.5f
+            if (isLandscapeWindow || compactPortraitLyrics) 2.25f else 1.5f
         // Match the exact height factor used to position the shared artwork layer.
         // Multi-window mode may compact controls, but must not shrink the artwork slot.
         val portraitArtHeightFactor = when {
@@ -1313,7 +1384,7 @@ fun FullPlayer(
             // retain their exact vertical position while the group moves down.
             Spacer(
                 modifier = Modifier.weight(
-                    if (isLandscapeWindow) 0.75f else 1.5f,
+                    if (isLandscapeWindow || compactPortraitLyrics) 0.75f else 1.5f,
                     fill = true
                 )
             )
@@ -1445,16 +1516,21 @@ fun FullPlayer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(titleToActionsSpacerWeight, fill = true)
-                        // Keep the lyric baseline inside its own measured slot. In a resized
-                        // window, an almost-zero weighted slot must not paint over the actions row.
+                        // Clip text to its measured slot on every Android version. If the
+                        // measured lyric/action bounds collide, reallocate vertical space
+                        // above this slot and use the compact single-line text treatment.
+                        .clipToBounds()
                         .then(
-                            if (isCompactPortraitMultiWindow) {
-                                Modifier.heightIn(min = 36.dp).clipToBounds()
-                            } else {
-                                Modifier
-                            }
+                            if (isCompactPortraitMultiWindow) Modifier.heightIn(min = 36.dp)
+                            else Modifier
                         )
-                        .offset(y = if (isCompactPortraitMultiWindow) 0.dp else (-5).dp),
+                        .offset(
+                            y = when {
+                                compactPortraitLyrics && compactPortraitAfterCollision -> (-8).dp
+                                compactPortraitLyrics -> 0.dp
+                                else -> (-5).dp
+                            }
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     PortraitSyncedLyricPreview(
@@ -1463,7 +1539,13 @@ fun FullPlayer(
                         currentPositionProvider = currentPositionProvider,
                         isPlaying = uiState.isPlaying,
                         contentColor = lyricsTextColor,
-                        lyricsColorStyle = lyricsColorStyle
+                        lyricsColorStyle = lyricsColorStyle,
+                        compact = compactPortraitLyrics,
+                        onLineBoundsChanged = { bounds ->
+                            if (portraitLyricLineBounds != bounds) {
+                                portraitLyricLineBounds = bounds
+                            }
+                        }
                     )
                 }
             } else {
@@ -1484,6 +1566,18 @@ fun FullPlayer(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .onGloballyPositioned { coordinates ->
+                        val position = coordinates.positionInRoot()
+                        val bounds = Rect(
+                            position.x,
+                            position.y,
+                            position.x + coordinates.size.width.toFloat(),
+                            position.y + coordinates.size.height.toFloat()
+                        )
+                        if (portraitActionRowBounds != bounds) {
+                            portraitActionRowBounds = bounds
+                        }
+                    }
                     .clip(if (playerButtonsPill) CircleShape else RoundedCornerShape(0.dp))
                     .background(
                         if (playerButtonsPill) contentColor.copy(alpha = if (isDark) 0.075f else 0.055f)
