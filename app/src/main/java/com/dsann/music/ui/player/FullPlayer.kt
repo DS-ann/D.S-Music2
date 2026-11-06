@@ -31,7 +31,6 @@ import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.RepeatOne
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -74,6 +73,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -886,16 +886,11 @@ fun FullPlayer(
     dragModifier: Modifier = Modifier,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = DsmusicTheme.colorScheme.background.luminance() < 0.5f
     val contentColor = if (isDark) Color.White else Color(0xFF1C1B1F)
-    // Match the transport button fills to the requested inverted theme palette.
-    // The title uses this same color; button glyphs use the contrasting counterpart.
-    val playerButtonColor = if (isDark) Color.White else Color.Black
-    val playerButtonContentColor = if (playerButtonStyle == "None") {
-        playerButtonColor
-    } else {
-        if (isDark) Color.Black else Color.White
-    }
+    // Light mode uses black glyphs on white control surfaces; dark mode reverses them.
+    val playerButtonColor = if (isDark) Color.Black else Color.White
+    val playerButtonContentColor = if (isDark) Color.White else Color.Black
     val contentSecondary = contentColor.copy(alpha = 0.6f)
     val playerFrameTimeNanos = rememberAppAnimationFrameTimeNanos(
         active = isPlayerVisible && uiState.isPlaying
@@ -1355,7 +1350,7 @@ fun FullPlayer(
                         style = DsmusicTheme.typography.headlineMediumEmphasized,
                         fontSize = titleSize,
                         fontWeight = titleWeight,
-                        color = playerButtonColor,
+                        color = contentColor,
                         maxLines = 1,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         modifier = Modifier
