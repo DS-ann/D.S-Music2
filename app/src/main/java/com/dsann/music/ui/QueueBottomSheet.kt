@@ -831,12 +831,13 @@ class DragDropState(
         val anchor = initiallyDraggedElement ?: return
         val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
         val draggedItem = visibleItems.firstOrNull { it.key == anchor.key }
-        // Keep the last confirmed index if the dragged row's layout slot temporarily
-        // leaves the visible range while the list auto-scrolls.
-        val fromIndex = draggedItem?.index ?: currentIndexOfDraggedItem ?: return
-        currentIndexOfDraggedItem = fromIndex
-
         val pendingTarget = pendingMoveTargetIndex
+        // A list update is synchronous in the ViewModel but LazyColumn composition can
+        // lag by a frame. If the dragged slot is temporarily off-screen, trust the
+        // pending index from that completed reorder instead of waiting on a row that
+        // may not be in visibleItemsInfo during auto-scroll.
+        val fromIndex = draggedItem?.index ?: pendingTarget ?: currentIndexOfDraggedItem ?: return
+        currentIndexOfDraggedItem = fromIndex
         if (pendingTarget != null) {
             if (fromIndex != pendingTarget) return
             pendingMoveTargetIndex = null
