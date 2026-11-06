@@ -746,7 +746,11 @@ fun ExploreScreen(
                     RecapTabContent(
                         nestedScrollConnection = nestedScrollConnection,
                         viewModel = playerSharedViewModel,
-                        onNavigateToExplore = { showReplayScreen = false }
+                        onNavigateToExplore = { showReplayScreen = false },
+                        onArtistClick = { artistName ->
+                            showReplayScreen = false
+                            viewModel.loadArtistByName(artistName)
+                        }
                     )
                 } else {
                     ExploreTransitionHost(
