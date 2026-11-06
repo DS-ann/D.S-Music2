@@ -23,7 +23,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -83,6 +82,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asAndroidPath
@@ -1032,7 +1032,7 @@ fun PlayerBottomSheetCompose(
         val isShuffleEnabled by viewModel.isShuffleEnabled.collectAsStateWithLifecycle()
         val playerBackgroundColor by viewModel.playerBackgroundColor.collectAsStateWithLifecycle()
         val likesCount by viewModel.likesCountFlow.collectAsStateWithLifecycle()
-        val isDark = isSystemInDarkTheme()
+        val isDark = DsmusicTheme.colorScheme.background.luminance() < 0.5f
         val themePlayerSurface = DsmusicTheme.colorScheme.surface
         val dynamicBgColor = remember(playerBackgroundColor, isDark, playerBackgroundStyle, themePlayerSurface) {
             when (playerBackgroundStyle) {
@@ -1060,12 +1060,14 @@ fun PlayerBottomSheetCompose(
                 }
             }
         }
-        // Keep the full player background unchanged. On light themes, raise only the
-        // collapsed mini-player surface luminance so artwork-derived colors remain clear
-        // without making the mini capsule look muddy.
+        // The dark mini-player capsule should sit deeper in the theme than the full player.
+        // Light mode keeps the artwork-tinted surface bright and clean.
         val miniPlayerBackgroundColor = remember(dynamicBgColor, isDark) {
             if (isDark) {
-                dynamicBgColor
+                val hsl = FloatArray(3)
+                androidx.core.graphics.ColorUtils.colorToHSL(dynamicBgColor.toArgb(), hsl)
+                hsl[2] = hsl[2].coerceAtMost(0.10f)
+                Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
             } else {
                 val hsl = FloatArray(3)
                 androidx.core.graphics.ColorUtils.colorToHSL(dynamicBgColor.toArgb(), hsl)
@@ -2295,7 +2297,7 @@ private fun MiniPlayerContentInternal(
     modifier: Modifier = Modifier
 ) {
 
-    val isDark = isSystemInDarkTheme()
+    val isDark = DsmusicTheme.colorScheme.background.luminance() < 0.5f
     val context = LocalContext.current
     val miniPlayerPreferences = remember(context) {
         context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
@@ -2347,14 +2349,9 @@ private fun MiniPlayerContentInternal(
         "Pill" -> RoundedCornerShape(percent = 50)
         else -> CircleShape
     }
-    // Contrast palette: black controls on the light artwork tint, white controls on the dark tint.
-    val playerButtonColor = if (isDark) Color.White else Color.Black
-    // A shape of "None" has no filled control surface, so keep its glyphs on the title color.
-    val playerButtonContentColor = if (controlShapeName == "None") {
-        playerButtonColor
-    } else {
-        if (isDark) Color.Black else Color.White
-    }
+    // Light mode uses black icons on white buttons; dark mode uses white icons on black buttons.
+    val playerButtonColor = if (isDark) Color.Black else Color.White
+    val playerButtonContentColor = if (isDark) Color.White else Color.Black
     val miniControlBackgroundColor = playerButtonColor
     val controlBackground: Modifier = if (controlShapeName == "None") {
         Modifier
@@ -2383,7 +2380,7 @@ private fun MiniPlayerContentInternal(
     val artworkSize = if (compactLandscape) 48.dp else 60.dp
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     // Keep the song title on the same color as the filled transport buttons.
-    val contentColor = playerButtonColor
+    val contentColor = playerButtonContentColor
     val contentSecondary = contentColor.copy(alpha = 0.6f)
     Row(
         modifier = modifier
