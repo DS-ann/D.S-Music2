@@ -822,7 +822,7 @@ fun BentoCell(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImage(
-                model = rememberExploreImageRequest(thumbnailUrl, if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) 384 else 512),
+                model = rememberExploreImageRequest(thumbnailUrl, 512),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
@@ -1163,7 +1163,7 @@ fun HomeSectionRow(
                                         )
                                 ) {
                                     AsyncImage(
-                                        model = rememberExploreImageRequest(thumbnailUrl, if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) 256 else 512),
+                                        model = rememberExploreImageRequest(thumbnailUrl, 512),
                                         contentDescription = null,
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = ContentScale.Crop
@@ -1262,7 +1262,7 @@ fun HomeSectionRow(
                                 )
                         ) {
                             AsyncImage(
-                                model = rememberExploreImageRequest(thumbnailUrl, if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) 384 else 512),
+                                model = rememberExploreImageRequest(thumbnailUrl, 512),
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
@@ -2501,15 +2501,9 @@ fun OnlineSongBottomSheet(
 
 
 /**
- * Android 6 uses compact artwork requests throughout Explore and search results.
- * Newer Android versions retain the requested card-specific size.
+ * Keep Explore and search artwork decode sizes consistent across Android versions.
  */
-internal fun exploreImageRequestTargetPx(targetSizePx: Int): Int =
-    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
-        targetSizePx.coerceAtMost(60)
-    } else {
-        targetSizePx
-    }
+internal fun exploreImageRequestTargetPx(targetSizePx: Int): Int = targetSizePx
 
 /**
  * Uses stable source + decode-size keys so an artwork tile can be restored from Coil's
