@@ -685,7 +685,8 @@ fun OptionsContent(
     showAddToPlaylist: Boolean = true,
     localSongMode: Boolean = false,
     showInfoAction: Boolean = false,
-    onShowInfoAction: () -> Unit = {}
+    onShowInfoAction: () -> Unit = {},
+    showStandaloneDelete: Boolean = false
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -765,6 +766,26 @@ fun OptionsContent(
                     Icons.Rounded.Download,
                     contentDescription = null,
                     tint = DsmusicTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.size(21.dp)
+                )
+            }
+        }
+        if (showStandaloneDelete) {
+            SongActionWideTile(
+                modifier = Modifier.fillMaxWidth(),
+                label = "Delete",
+                containerColor = DsmusicTheme.colorScheme.errorContainer,
+                contentColor = DsmusicTheme.colorScheme.onErrorContainer,
+                enabled = song != null,
+                onClick = {
+                    song?.let { actionListener?.onDelete(it) }
+                    onDismiss()
+                }
+            ) {
+                Icon(
+                    Icons.Rounded.DeleteOutline,
+                    contentDescription = null,
+                    tint = DsmusicTheme.colorScheme.onErrorContainer,
                     modifier = Modifier.size(21.dp)
                 )
             }
