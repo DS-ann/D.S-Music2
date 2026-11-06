@@ -2,6 +2,7 @@ package com.dsann.music.ui.explore
 
 import com.dsann.music.ui.theme.DsmusicPageHeading
 import com.dsann.music.ui.LocalRootTabActive
+import com.dsann.music.ui.library.RecapTabContent
 import com.dsann.music.ui.theme.DsmusicCard
 import com.dsann.music.ui.theme.DsmusicSurface
 import com.dsann.music.ui.theme.DsmusicListItem
@@ -262,6 +263,7 @@ fun ExploreScreen(
     var isSearchActive by rememberSaveable(isSearchDestination) {
         mutableStateOf(false)
     }
+    var showReplayScreen by rememberSaveable { mutableStateOf(false) }
     var showSearchGenreBrowser by rememberSaveable { mutableStateOf(false) }
     var selectedSongForMenu by remember { mutableStateOf<OnlineSong?>(null) }
     var selectedCollectionForMenu by remember { mutableStateOf<SearchItem?>(null) }
@@ -587,6 +589,10 @@ fun ExploreScreen(
         isAccountVisible = false
     }
 
+    androidx.activity.compose.BackHandler(enabled = showReplayScreen && !isPlayerBackActive) {
+        showReplayScreen = false
+    }
+
     LaunchedEffect(isSearchDestination) {
         if (isSearchDestination) {
             viewModel.loadMoodsAndGenres()
@@ -731,7 +737,14 @@ fun ExploreScreen(
         ) {
             // ===== Main Content (Now encapsulates scrolling headers) =====
             Box(modifier = Modifier.fillMaxSize().nestedScroll(nestedScrollConnection)) {
-                ExploreTransitionHost(
+                if (showReplayScreen) {
+                    RecapTabContent(
+                        nestedScrollConnection = nestedScrollConnection,
+                        viewModel = playerSharedViewModel,
+                        onNavigateToExplore = { showReplayScreen = false }
+                    )
+                } else {
+                    ExploreTransitionHost(
                     enabled = android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.M
                 ) { sharedTransitionScope ->
                     CompositionLocalProvider(LocalSharedTransitionScope provides sharedTransitionScope) {
@@ -1872,7 +1885,13 @@ fun ExploreScreen(
                                                                             contentAlignment = Alignment.TopStart
                                                                         ) {
                                                                             WelcomeGreetingBanner(
-                                                                                userName = userProfile?.name
+                                                                                userName = userProfile?.name,
+                                                                                onReplayClick = if (
+                                                                                    !isSearchDestination &&
+                                                                                    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R
+                                                                                ) {
+                                                                                    { showReplayScreen = true }
+                                                                                } else null
                                                                             )
                                                                         }
                                                                     }
@@ -2067,6 +2086,7 @@ fun ExploreScreen(
                             }
                         }
                     }
+                }
                 }
 
                 // Error Snackbar
