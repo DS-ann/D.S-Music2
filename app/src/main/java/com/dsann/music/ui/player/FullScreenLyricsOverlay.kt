@@ -47,6 +47,7 @@ import com.dsann.music.ui.theme.ModalBottomSheet
 import com.dsann.music.ui.theme.Text
 import com.dsann.music.ui.theme.TextButton
 import com.dsann.music.ui.theme.rememberModalBottomSheetState
+import com.dsann.music.ui.theme.rememberDsmusicModalSheetGeometry
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -71,6 +72,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.dsann.music.R
 import com.dsann.music.data.lyrics.LyricLine
@@ -143,9 +145,16 @@ internal fun LyricsProviderPickerSheet(
     onDismissRequest: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val modalGeometry = rememberDsmusicModalSheetGeometry()
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
+        sheetMaxWidth = if (isLandscape) modalGeometry.width else Dp.Unspecified,
+        centeredLandscape = true,
+        centerOffsetX = modalGeometry.centerOffsetX,
         containerColor = Color.Transparent,
         dragHandle = null
     ) {
