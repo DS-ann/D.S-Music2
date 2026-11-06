@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -90,13 +91,18 @@ fun DsmusicNavigationBar(
                     if (isFloating) Modifier.shadow(12.dp, dockShape, clip = false)
                     else Modifier
                 )
-                .clip(dockShape)
-                .background(if (barStyle == "Minimal") Color.Transparent else surface)
+                .background(
+                    color = if (barStyle == "Minimal") Color.Transparent else surface,
+                    shape = dockShape
+                )
                 .border(
                     width = if (isFloating) 0.9.dp else 0.75.dp,
                     color = borderColor,
                     shape = dockShape
                 )
+                // Keep the icon/label content inside the exact same rounded boundary
+                // used to draw the dock surface and outline.
+                .clip(dockShape)
                 .padding(horizontal = 6.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
@@ -147,9 +153,11 @@ fun DsmusicNavigationBar(
                 }
             }
         }
-        // Keep the gesture/navigation inset outside the outlined floating surface.
+        // Reserve the full-width system inset below the outlined dock without painting a second surface.
         if (bottomInset > 0.dp) {
-            androidx.compose.foundation.layout.Spacer(Modifier.size(width = 1.dp, height = bottomInset))
+            androidx.compose.foundation.layout.Spacer(
+                Modifier.fillMaxWidth().height(bottomInset)
+            )
         }
     }
 }
