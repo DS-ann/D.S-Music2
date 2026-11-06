@@ -1219,7 +1219,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         "speed_dial_songs_json",
         "not_interested_ids",
         "recent_artists_list",
-        "last_played_artist"
+        "last_played_artist",
+        "custom_profile_name"
     )
 
     /** Refresh every settings StateFlow after a restore so the open screen reflects it immediately. */
