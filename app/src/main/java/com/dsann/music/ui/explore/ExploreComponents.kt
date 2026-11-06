@@ -834,14 +834,6 @@ fun BentoCell(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
-            if (isCurrentSong) {
-                NowPlayingCoverIndicator(
-                    isPlaying = true,
-                    isAnimating = isPlaybackActive,
-                    coverColor = playingCoverColor,
-                    modifier = Modifier.align(Alignment.Center).size(38.dp)
-                )
-            }
             Box(
                 modifier = Modifier.fillMaxSize().background(
                     Brush.verticalGradient(
@@ -850,6 +842,14 @@ fun BentoCell(
                     )
                 )
             )
+            if (isCurrentSong) {
+                NowPlayingCoverIndicator(
+                    isPlaying = true,
+                    isAnimating = isPlaybackActive,
+                    coverColor = playingCoverColor,
+                    modifier = Modifier.align(Alignment.Center).size(38.dp)
+                )
+            }
             Column(
                 modifier = Modifier.fillMaxSize().padding(if (isFeature) 16.dp else 12.dp),
                 verticalArrangement = Arrangement.Bottom
@@ -1189,14 +1189,6 @@ fun HomeSectionRow(
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = ContentScale.Crop
                                     )
-                                    if (isCurrentSong) {
-                                        NowPlayingCoverIndicator(
-                                            isPlaying = true,
-                                            isAnimating = isPlaybackActive,
-                                            coverColor = playingCoverColor,
-                                            modifier = Modifier.align(Alignment.Center).size(38.dp)
-                                        )
-                                    }
                                     // Scrim overlay using theme token scrim is always dark by M3 spec
                                     Box(
                                         modifier = Modifier.fillMaxSize().background(
@@ -1209,6 +1201,14 @@ fun HomeSectionRow(
                                             )
                                         )
                                     )
+                                    if (isCurrentSong) {
+                                        NowPlayingCoverIndicator(
+                                            isPlaying = true,
+                                            isAnimating = isPlaybackActive,
+                                            coverColor = playingCoverColor,
+                                            modifier = Modifier.align(Alignment.Center).size(38.dp)
+                                        )
+                                    }
                                     Text(
                                         text = title,
                                         color = DsmusicTheme.colorScheme.inverseOnSurface,
