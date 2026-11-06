@@ -664,9 +664,10 @@ fun SearchTopResultCard(
                 modifier = Modifier.fillMaxSize().clip(imageShape),
                 contentScale = ContentScale.Crop
             )
-            if (isSongPlaying) {
+            if (isCurrentSong) {
                 NowPlayingCoverIndicator(
                     isPlaying = true,
+                    isAnimating = isPlaybackActive,
                     coverColor = playingCoverColor,
                     modifier = Modifier.align(Alignment.Center)
                 )
@@ -1050,7 +1051,7 @@ fun HomeSectionRow(
                         )
                         // Column of stacked tiles
                         Column(modifier = Modifier.weight(0.75f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            BentoCell(item = items[1], modifier = Modifier.weight(1f).fillMaxWidth(), onClick = {
+                            BentoCell(currentPlayingVideoId = currentPlayingVideoId, isPlaybackActive = isPlaybackActive, item = items[1], modifier = Modifier.weight(1f).fillMaxWidth(), onClick = {
                                 when (val it = items[1]) {
                                     is SearchItem.Song -> onSongClick(it.song)
                                     is SearchItem.Album -> onAlbumClick(it.album)
@@ -1058,7 +1059,7 @@ fun HomeSectionRow(
                                     is SearchItem.Playlist -> onPlaylistClick(it.playlist)
                                 }
                             }, onLongClick = { openExploreItemMenu(items[1], onSongMenuClick, onCollectionMenuClick) })
-                            BentoCell(item = items[2], modifier = Modifier.weight(1f).fillMaxWidth(), onClick = {
+                            BentoCell(currentPlayingVideoId = currentPlayingVideoId, isPlaybackActive = isPlaybackActive, item = items[2], modifier = Modifier.weight(1f).fillMaxWidth(), onClick = {
                                 when (val it = items[2]) {
                                     is SearchItem.Song -> onSongClick(it.song)
                                     is SearchItem.Album -> onAlbumClick(it.album)
@@ -1070,7 +1071,7 @@ fun HomeSectionRow(
                     }
                     Row(modifier = Modifier.height(130.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         // Lower row wide tiles
-                        BentoCell(item = items[3], modifier = Modifier.weight(1f).fillMaxHeight(), onClick = {
+                        BentoCell(currentPlayingVideoId = currentPlayingVideoId, isPlaybackActive = isPlaybackActive, item = items[3], modifier = Modifier.weight(1f).fillMaxHeight(), onClick = {
                             when (val it = items[3]) {
                                 is SearchItem.Song -> onSongClick(it.song)
                                 is SearchItem.Album -> onAlbumClick(it.album)
@@ -1078,7 +1079,7 @@ fun HomeSectionRow(
                                 is SearchItem.Playlist -> onPlaylistClick(it.playlist)
                             }
                         }, onLongClick = { openExploreItemMenu(items[3], onSongMenuClick, onCollectionMenuClick) })
-                        BentoCell(item = items[4], modifier = Modifier.weight(1f).fillMaxHeight(), onClick = {
+                        BentoCell(currentPlayingVideoId = currentPlayingVideoId, isPlaybackActive = isPlaybackActive, item = items[4], modifier = Modifier.weight(1f).fillMaxHeight(), onClick = {
                             when (val it = items[4]) {
                                 is SearchItem.Song -> onSongClick(it.song)
                                 is SearchItem.Album -> onAlbumClick(it.album)
