@@ -467,9 +467,26 @@ class MainActivity : AppCompatActivity() {
                     // single state change instead of measuring the entire retained NavHost
                     // on every animation frame; the sheet itself owns the smooth transition.
 
-                    // Base padding target not considering expansion
-                    val baseTargetPadding = if (!useNavigationRail && showBottomBar) {
-                        paddingValues.calculateBottomPadding()
+                    val systemBottomInset = WindowInsets.navigationBars.asPaddingValues()
+                        .calculateBottomPadding()
+                    // The portrait dock is overlaid on the page. Stop the page's opaque
+                    // background above the dock and system navigation inset so the area
+                    // outside the outlined dock stays transparent.
+                    val portraitDockHeight = if (dynamicNavStyle) {
+                        64.dp
+                    } else {
+                        when (navBarSize) {
+                            "Compact" -> 56.dp
+                            "Tall" -> 76.dp
+                            else -> 68.dp
+                        }
+                    }
+                    // Reserve the full portrait dock footprint, including the OS inset.
+                    // The dock itself still paints its own surface and outline.
+                    val baseTargetPadding = if (
+                        !useNavigationRail && !isLandscapeLayout && showBottomBar
+                    ) {
+                        portraitDockHeight + systemBottomInset
                     } else {
                         0.dp
                     }
@@ -489,8 +506,6 @@ class MainActivity : AppCompatActivity() {
                     val miniPlayerHeight = if (
                         configuration.screenWidthDp > configuration.screenHeightDp
                     ) MiniPlayerHeight * 0.8f else MiniPlayerHeight
-                    val systemBottomInset = WindowInsets.navigationBars.asPaddingValues()
-                        .calculateBottomPadding()
                     // Portrait's mini-player spans the full screen width, so reserve its
                     // height from the scroll viewport to keep the final rows reachable.
                     // In landscape the player is a centered half-width capsule: the left and
