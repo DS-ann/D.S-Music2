@@ -2507,7 +2507,7 @@ private fun MiniPlayerContentInternal(
                 if (isLoading) {
                     com.dsann.music.ui.theme.LoadingIndicator(
                         modifier = Modifier.size(20.dp),
-                        color = contentColor
+                        color = playerButtonContentColor
                     )
                 } else if (controlIconSet == "Classic") {
                     Icon(
