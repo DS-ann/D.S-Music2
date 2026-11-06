@@ -264,10 +264,12 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         for (int id : ids) {
             try {
                 RemoteViews views = new RemoteViews(context.getPackageName(), layoutId);
-                views.setImageViewResource(R.id.widget_play_pause, playPauseIcon);
-                views.setInt(
-                        R.id.widget_play_pause, "setColorFilter",
-                        android.graphics.Color.WHITE);
+                applyWidgetActionIcons(
+                        views,
+                        isPlaying,
+                        layoutId,
+                        layoutId == R.layout.widget_large ? R.drawable.ic_repeat : R.drawable.ic_repeat
+                );
                 setupPendingIntents(context, views, isPlaying, layoutId, providerClass);
                 manager.partiallyUpdateAppWidget(id, views);
             } catch (Exception error) {
@@ -308,20 +310,26 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         Context appContext = update.context;
         AppWidgetManager manager = AppWidgetManager.getInstance(appContext);
         try {
+            int[] smallIds = manager.getAppWidgetIds(
+                    new ComponentName(appContext, WidgetSmallProvider.class));
             int[] mediumIds = manager.getAppWidgetIds(
                     new ComponentName(appContext, WidgetMediumProvider.class));
             int[] largeIds = manager.getAppWidgetIds(
                     new ComponentName(appContext, WidgetLargeProvider.class));
-            if (mediumIds.length == 0 && largeIds.length == 0) {
+            if (smallIds.length == 0 && mediumIds.length == 0 && largeIds.length == 0) {
                 return;
             }
 
+            for (int id : smallIds) {
+                updateWidgetProgress(
+                        appContext, manager, id, update.position, update.duration,
+                        null, R.layout.widget_small);
+            }
             for (int id : mediumIds) {
                 updateWidgetProgress(
                         appContext, manager, id, update.position, update.duration,
                         update.currentLyric, R.layout.widget_medium);
             }
-
             for (int id : largeIds) {
                 updateWidgetProgress(
                         appContext, manager, id, update.position, update.duration,
@@ -332,90 +340,104 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         }
     }
 
-    private static void updateWidgetProgress(Context context, AppWidgetManager manager, int id, int position, int duration, CharSequence currentLyric, int layoutId) {
+    private static void updateWidgetProgress(
+            Context context,
+            AppWidgetManager manager,
+            int id,
+            int position,
+            int duration,
+            CharSequence currentLyric,
+            int layoutId
+    ) {
         try {
             RemoteViews views = new RemoteViews(context.getPackageName(), layoutId);
-            if (duration > 0 && layoutId != R.layout.widget_small) {
-                int progress = (int) (((float) position / duration) * 100);
-                views.setProgressBar(R.id.widget_progress, 100, progress, false);
-            }
+            int progress = duration > 0
+                    ? (int) (((float) Math.max(0, position) / duration) * 100f)
+                    : 0;
+            views.setProgressBar(R.id.widget_progress, 100, Math.max(0, Math.min(100, progress)), false);
             if (layoutId == R.layout.widget_medium) {
                 applyLyricsPresentation(context, views, currentLyric);
             }
             manager.partiallyUpdateAppWidget(id, views);
         } catch (Exception e) {
-            Log.e(TAG, "Error in partial update: " + e.getMessage());
+            Log.e(TAG, "Error in partial widget update: " + e.getMessage());
         }
     }
 
-    private static void updateWidget(Context context, AppWidgetManager manager, int id, SongItem song,
-            boolean isPlaying, int position, int duration, CharSequence currentLyric, int repeatIconResId,
-            int layoutId, Class<?> providerClass) {
+    private static void setWidgetIcon(RemoteViews views, int viewId, int drawableId) {
+        views.setImageViewResource(viewId, drawableId);
+        views.setInt(viewId, "setColorFilter", Color.WHITE);
+    }
+
+    private static void applyWidgetActionIcons(
+            RemoteViews views,
+            boolean isPlaying,
+            int layoutId,
+            int repeatIconResId
+    ) {
+        // Set drawable resources explicitly instead of relying on the launcher's
+        // interpretation of XML ImageButton defaults or inherited theme tints.
+        setWidgetIcon(views, R.id.widget_play_pause,
+                isPlaying ? R.drawable.ic_pause : R.drawable.ic_play);
+
+        if (layoutId == R.layout.widget_small ||
+                layoutId == R.layout.widget_medium ||
+                layoutId == R.layout.widget_large) {
+            setWidgetIcon(views, R.id.widget_prev, R.drawable.ic_skip_previous);
+            setWidgetIcon(views, R.id.widget_next, R.drawable.ic_skip_next);
+        }
+
+        if (layoutId == R.layout.widget_medium) {
+            setWidgetIcon(views, R.id.widget_toggle_lyrics, R.drawable.ic_lyrics);
+        } else if (layoutId == R.layout.widget_large) {
+            setWidgetIcon(views, R.id.widget_favorite, R.drawable.ic_favorite_border);
+            setWidgetIcon(views, R.id.widget_repeat, repeatIconResId);
+        }
+    }
+
+    private static void updateWidget(
+            Context context,
+            AppWidgetManager manager,
+            int id,
+            SongItem song,
+            boolean isPlaying,
+            int position,
+            int duration,
+            CharSequence currentLyric,
+            int repeatIconResId,
+            int layoutId,
+            Class<?> providerClass
+    ) {
         try {
             RemoteViews views = hideSkeleton(context, layoutId);
 
-            // Basic Text and State
-            if (song != null) {
-                if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
-                    views.setTextViewText(R.id.widget_song_title, song.title);
-                    views.setTextViewText(R.id.widget_artist_name, song.artist);
-                }
-
-                int playIcon = isPlaying ? R.drawable.ic_pause : R.drawable.ic_play;
-                views.setImageViewResource(R.id.widget_play_pause, playIcon);
-
-                // --- APPLY TINTS PROGRAMMATICALLY ---
-                // User requested all controls to be White
-                int controlColor = android.graphics.Color.WHITE;
-
-                views.setInt(R.id.widget_play_pause, "setColorFilter", controlColor);
-
-                if (layoutId == R.layout.widget_medium) {
-                    views.setInt(R.id.widget_prev, "setColorFilter", controlColor);
-                    views.setInt(R.id.widget_next, "setColorFilter", controlColor);
-                    views.setInt(R.id.widget_toggle_lyrics, "setColorFilter", controlColor);
-
-                    if (duration > 0) {
-                        int progress = (int) (((float) position / duration) * 100);
-                        views.setProgressBar(R.id.widget_progress, 100, progress, false);
-                    }
-
-                    // Keep widget lyrics aligned with the full-player typography preferences.
-                    applyLyricsPresentation(context, views, currentLyric);
-                    
-                    // Persistent View State: Ensure the correct slide is shown during updates
-                    boolean isLyricsMode = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                            .getBoolean(PREF_LYRICS_MODE + id, false);
-                    views.setDisplayedChild(R.id.widget_flipper, isLyricsMode ? 1 : 0);
-                } else if (layoutId == R.layout.widget_large) {
-                    views.setInt(R.id.widget_prev, "setColorFilter", controlColor);
-                    views.setInt(R.id.widget_next, "setColorFilter", controlColor);
-                    views.setInt(R.id.widget_favorite, "setColorFilter", controlColor);
-                    views.setImageViewResource(R.id.widget_repeat, repeatIconResId);
-                    views.setInt(R.id.widget_repeat, "setColorFilter", controlColor);
-
-                    if (duration > 0) {
-                        int progress = (int) (((float) position / duration) * 100);
-                        views.setProgressBar(R.id.widget_progress, 100, progress, false);
-                    }
-                }
-
-                // Setup Intents with the correct Context for isPlaying
-                setupPendingIntents(context, views, isPlaying, layoutId, providerClass);
-
-            } else {
-                if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
-                    views.setTextViewText(R.id.widget_song_title, "D.S Music");
-                    views.setTextViewText(R.id.widget_artist_name, "Select a song");
-                }
-                if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
-                    views.setProgressBar(R.id.widget_progress, 100, 0, false);
-                }
-                setupPendingIntents(context, views, false, layoutId, providerClass);
+            if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
+                views.setTextViewText(
+                        R.id.widget_song_title,
+                        song != null && song.title != null ? song.title : "D.S Music"
+                );
+                views.setTextViewText(
+                        R.id.widget_artist_name,
+                        song != null && song.artist != null ? song.artist : "Select a song"
+                );
             }
 
-            // Apply the complete, usable widget layout before starting asynchronous artwork
-            // work. If a thumbnail URI or transformation fails, the controls and text still render.
+            int progress = duration > 0
+                    ? (int) (((float) Math.max(0, position) / duration) * 100f)
+                    : 0;
+            views.setProgressBar(R.id.widget_progress, 100, Math.max(0, Math.min(100, progress)), false);
+
+            if (layoutId == R.layout.widget_medium) {
+                applyLyricsPresentation(context, views, currentLyric);
+                boolean isLyricsMode = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                        .getBoolean(PREF_LYRICS_MODE + id, false);
+                views.setDisplayedChild(R.id.widget_flipper, isLyricsMode ? 1 : 0);
+            }
+
+            // Apply icon resources, tint, and click actions on every full refresh,
+            // including the initial empty-state refresh before a song is selected.
+            applyWidgetActionIcons(views, isPlaying, layoutId, repeatIconResId);
+            setupPendingIntents(context, views, isPlaying, layoutId, providerClass);
             manager.updateAppWidget(id, views);
 
             if (song != null) {
@@ -438,19 +460,31 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                     }
                 }
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to update widget " + id, e);
-            // Last-resort fallback: a new RemoteViews without artwork still avoids an empty
-            // widget when a non-artwork update operation is rejected by the launcher.
+        } catch (Exception error) {
+            Log.e(TAG, "Failed to update widget " + id, error);
             try {
                 RemoteViews fallback = new RemoteViews(context.getPackageName(), layoutId);
                 if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
-                    fallback.setTextViewText(R.id.widget_song_title, song != null ? song.title : "D.S Music");
-                    fallback.setTextViewText(R.id.widget_artist_name, song != null ? song.artist : "Select a song");
+                    fallback.setTextViewText(
+                            R.id.widget_song_title,
+                            song != null && song.title != null ? song.title : "D.S Music"
+                    );
+                    fallback.setTextViewText(
+                            R.id.widget_artist_name,
+                            song != null && song.artist != null ? song.artist : "Select a song"
+                    );
                 }
-                if (layoutId == R.layout.widget_large) {
-                    fallback.setImageViewResource(R.id.widget_repeat, repeatIconResId);
+                int progress = duration > 0
+                        ? (int) (((float) Math.max(0, position) / duration) * 100f)
+                        : 0;
+                fallback.setProgressBar(R.id.widget_progress, 100, Math.max(0, Math.min(100, progress)), false);
+                if (layoutId == R.layout.widget_medium) {
+                    applyLyricsPresentation(context, fallback, currentLyric);
+                    boolean isLyricsMode = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                            .getBoolean(PREF_LYRICS_MODE + id, false);
+                    fallback.setDisplayedChild(R.id.widget_flipper, isLyricsMode ? 1 : 0);
                 }
+                applyWidgetActionIcons(fallback, isPlaying, layoutId, repeatIconResId);
                 setupPendingIntents(context, fallback, isPlaying, layoutId, providerClass);
                 manager.updateAppWidget(id, fallback);
             } catch (Exception fallbackError) {
@@ -472,8 +506,14 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                 continue;
             }
             if (first == null || line.startTimeMs < first.startTimeMs) first = line;
-            if (line.startTimeMs <= position &&
-                    (current == null || line.startTimeMs > current.startTimeMs)) {
+            long lineStart = line.startTimeMs;
+            if (line.words != null && !line.words.isEmpty()) {
+                for (com.dsann.music.data.lyrics.LyricWord word : line.words) {
+                    lineStart = Math.min(lineStart, word.absoluteStartTimeMs);
+                }
+            }
+            if (lineStart <= position &&
+                    (current == null || lineStart > current.startTimeMs)) {
                 current = line;
             }
         }
@@ -793,7 +833,9 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         PendingIntent piPlayPause = getServicePendingIntent(context, isPlaying ? ACTION_PAUSE : ACTION_PLAY, 10);
         views.setOnClickPendingIntent(R.id.widget_play_pause, piPlayPause);
         
-        if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
+        if (layoutId == R.layout.widget_small ||
+                layoutId == R.layout.widget_medium ||
+                layoutId == R.layout.widget_large) {
             PendingIntent piPrev = getServicePendingIntent(context, ACTION_PREVIOUS, 11);
             views.setOnClickPendingIntent(R.id.widget_prev, piPrev);
 

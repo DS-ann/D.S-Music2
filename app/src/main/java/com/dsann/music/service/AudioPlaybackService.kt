@@ -3025,7 +3025,7 @@ class AudioPlaybackService : MediaSessionService() {
         val vm = viewModel
         val activeSong = vm?.currentSong?.value
         if (vm != null && activeSong != null) {
-            widgetSyncedLyrics = vm.syncedLyrics.value.orEmpty().sortedBy { it.startTimeMs }
+            widgetSyncedLyrics = vm.syncedLyrics.value.orEmpty().sortedBy { widgetLyricStartMs(it) }
             widgetPlainLyrics = vm.plainLyrics.value?.takeIf { it.isNotBlank() }
             if (widgetSyncedLyrics.isEmpty() && widgetPlainLyrics.isNullOrBlank()) {
                 vm.fetchLyricsForCurrentSong()
@@ -3095,7 +3095,7 @@ class AudioPlaybackService : MediaSessionService() {
             val duration = player.duration.coerceAtLeast(0L)
             widgetSyncedLyrics = result?.syncedLyrics
                 ?.takeIf { it.isNotBlank() }
-                ?.let { com.dsann.music.data.lyrics.LrcParser.parse(it).sortedBy { line -> line.startTimeMs } }
+                ?.let { com.dsann.music.data.lyrics.LrcParser.parse(it).sortedBy { line -> widgetLyricStartMs(line) } }
                 .orEmpty()
             widgetPlainLyrics = result?.plainLyrics?.takeIf { it.isNotBlank() }
                 ?: fallbackText?.takeIf { it.isNotBlank() }
@@ -3111,29 +3111,45 @@ class AudioPlaybackService : MediaSessionService() {
      * Select the same active lyric line as the full-screen player, then use RemoteViews
      * spans for the selected lyrics font/colour and the available karaoke word timing.
      */
+    private fun widgetLyricStartMs(line: LyricLine): Long =
+        line.words.minOfOrNull { it.absoluteStartTimeMs } ?: line.startTimeMs
+
+    /** Last timed word boundary; used as the end of a karaoke-origin line window. */
+    private fun widgetLyricEndMs(line: LyricLine): Long =
+        line.words.maxOfOrNull {
+            it.absoluteStartTimeMs + it.durationMs.coerceAtLeast(1L)
+        } ?: line.startTimeMs
+
+    /**
+     * Widgets render line-synced lyrics, not the full-player karaoke sweep.
+     * For word-timed sources, the first word timestamp starts the whole line and
+     * the last word end is its final timing boundary. The full text stays together
+     * until the next line begins, matching the portrait player's one-active-line model.
+     */
     private fun currentWidgetLyricText(positionMs: Long): CharSequence {
         val synced = widgetSyncedLyrics
+            .asSequence()
+            .filter { !it.isInterlude && it.content.isNotBlank() }
+            .sortedBy { widgetLyricStartMs(it) }
+            .toList()
+
         if (synced.isNotEmpty()) {
-            val line = synced.lastOrNull {
-                !it.isInterlude && it.startTimeMs <= positionMs
-            } ?: synced.firstOrNull { !it.isInterlude }
-            if (line != null) return styleWidgetLyricText(line.content, line, positionMs)
+            val line = synced.lastOrNull { widgetLyricStartMs(it) <= positionMs }
+                ?: synced.first()
+            return styleWidgetLyricText(line.content)
         }
 
-        val plain = (widgetPlainLyrics ?: viewModel?.plainLyrics?.value).orEmpty()
+        // Plain lyrics have no timestamps. Keep the widget to one complete line
+        // rather than shrinking multiple paragraphs into its compact display area.
+        val plainLine = (widgetPlainLyrics ?: viewModel?.plainLyrics?.value).orEmpty()
             .lineSequence()
             .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .take(4)
-            .joinToString("\n")
-        return if (plain.isBlank()) "..." else styleWidgetLyricText(plain, null, positionMs)
+            .firstOrNull { it.isNotEmpty() }
+            .orEmpty()
+        return if (plainLine.isBlank()) "..." else styleWidgetLyricText(plainLine)
     }
 
-    private fun styleWidgetLyricText(
-        text: String,
-        line: LyricLine?,
-        positionMs: Long
-    ): CharSequence {
+    private fun styleWidgetLyricText(text: String): CharSequence {
         val value = text.trim()
         if (value.isEmpty()) return "..."
         val appearance = getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
@@ -3153,11 +3169,8 @@ class AudioPlaybackService : MediaSessionService() {
         output.setSpan(TypefaceSpan(typeface), 0, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         output.setSpan(StyleSpan(Typeface.BOLD), 0, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
 
-        val widgetPrefs = getSharedPreferences("dsmusic_widget_prefs", Context.MODE_PRIVATE)
-        val accentColor = widgetPrefs.getInt(
-            "widget_lyrics_dynamic_accent",
-            android.graphics.Color.rgb(124, 156, 255)
-        )
+        val accentColor = getSharedPreferences("dsmusic_widget_prefs", Context.MODE_PRIVATE)
+            .getInt("widget_lyrics_dynamic_accent", android.graphics.Color.rgb(124, 156, 255))
         val gradientStops = intArrayOf(
             android.graphics.Color.rgb(83, 246, 255),
             android.graphics.Color.rgb(105, 157, 255),
@@ -3165,15 +3178,14 @@ class AudioPlaybackService : MediaSessionService() {
             android.graphics.Color.rgb(255, 112, 205),
             android.graphics.Color.rgb(255, 207, 127)
         )
-        val isKaraoke = line?.isWordByWord == true && line.words.isNotEmpty()
 
-        fun colorAt(index: Int, alpha: Float): Int {
-            val position = if (value.length <= 1) 0f else index.toFloat() / (value.length - 1)
-            val scaled = position * (gradientStops.size - 1)
+        fun colorAt(index: Int): Int {
+            val characterPosition = if (value.length <= 1) 0f else index.toFloat() / (value.length - 1)
+            val scaled = characterPosition * (gradientStops.size - 1)
             val lower = scaled.toInt().coerceIn(0, gradientStops.lastIndex)
             val upper = (lower + 1).coerceAtMost(gradientStops.lastIndex)
             val fraction = (scaled - lower).coerceIn(0f, 1f)
-            val base = when (colourStyle) {
+            return when (colourStyle) {
                 "White" -> android.graphics.Color.WHITE
                 "UI Matching" -> accentColor
                 else -> {
@@ -3189,63 +3201,22 @@ class AudioPlaybackService : MediaSessionService() {
                     )
                 }
             }
-            return android.graphics.Color.argb(
-                (255f * alpha).toInt().coerceIn(0, 255),
-                android.graphics.Color.red(base),
-                android.graphics.Color.green(base),
-                android.graphics.Color.blue(base)
-            )
         }
 
+        // A complete line uses one steady synced-lyrics colour treatment. No timed
+        // per-word opacity, character fill, or karaoke progress is applied here.
         for (index in value.indices) {
             output.setSpan(
-                ForegroundColorSpan(colorAt(index, if (isKaraoke) 0.38f else 1f)),
+                ForegroundColorSpan(colorAt(index)),
                 index,
                 index + 1,
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
             )
         }
-
-        if (isKaraoke && line != null) {
-            var searchFrom = 0
-            line.words.forEach { word ->
-                var start = word.charRange.first
-                var endExclusive = word.charRange.last + 1
-                if (start < 0 || endExclusive <= start || start >= value.length ||
-                    (start == 0 && endExclusive == 1 && word.text.length > 1)
-                ) {
-                    val found = value.indexOf(word.text, searchFrom)
-                    if (found >= 0) {
-                        start = found
-                        endExclusive = (found + word.text.length).coerceAtMost(value.length)
-                    }
-                }
-                start = start.coerceIn(0, value.length)
-                endExclusive = endExclusive.coerceIn(start, value.length)
-                if (endExclusive <= start) return@forEach
-                searchFrom = endExclusive
-
-                val duration = word.durationMs.coerceAtLeast(1L)
-                val progress = ((positionMs - word.absoluteStartTimeMs).toFloat() / duration)
-                    .coerceIn(0f, 1f)
-                val spanLength = endExclusive - start
-                for (character in start until endExclusive) {
-                    val characterProgress = (character - start + 1f) / spanLength
-                    if (characterProgress <= progress || progress >= 1f) {
-                        output.setSpan(
-                            ForegroundColorSpan(colorAt(character, 1f)),
-                            character,
-                            character + 1,
-                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                        )
-                    }
-                }
-            }
-        }
         return output
     }
 
-    private fun isWidgetLyricsPageActive(forceRefresh: Boolean = false): Boolean {
+        private fun isWidgetLyricsPageActive(forceRefresh: Boolean = false): Boolean {
         val now = System.currentTimeMillis()
         if (forceRefresh || now - lastWidgetLyricsModeCheckAtMs >= 1_200L) {
             widgetLyricsPageActiveCached =
@@ -3276,17 +3247,22 @@ class AudioPlaybackService : MediaSessionService() {
         }
 
         val lines = widgetSyncedLyrics
-        val activeLine = lines.lastOrNull { !it.isInterlude && it.startTimeMs <= positionMs }
-        val nextLineTime = lines.asSequence()
-            .filter { !it.isInterlude && it.startTimeMs > positionMs + 20L }
-            .minOfOrNull { it.startTimeMs }
-        val nextWordEvent = activeLine?.words
-            ?.flatMap { word ->
-                listOf(word.absoluteStartTimeMs, word.absoluteStartTimeMs + word.durationMs.coerceAtLeast(1L))
-            }
-            ?.filter { it > positionMs + 20L }
-            ?.minOrNull()
-        val nextEvent = listOfNotNull(nextLineTime, nextWordEvent).minOrNull()
+            .filter { !it.isInterlude && it.content.isNotBlank() }
+            .sortedBy { widgetLyricStartMs(it) }
+        val activeLine = lines.lastOrNull { widgetLyricStartMs(it) <= positionMs }
+        val nextLineStart = lines.asSequence()
+            .map { widgetLyricStartMs(it) }
+            .filter { it > positionMs + 20L }
+            .minOrNull()
+
+        // A karaoke-origin line has one line window: first word start through last
+        // word end. After that end boundary, keep the full line visible until the
+        // next line's first timestamp, just like ordinary line-synced lyrics.
+        val lastWordEnd = activeLine
+            ?.takeIf { it.words.isNotEmpty() }
+            ?.let { widgetLyricEndMs(it) }
+            ?.takeIf { it > positionMs + 20L }
+        val nextEvent = listOfNotNull(lastWordEnd, nextLineStart).minOrNull()
         if (nextEvent == null) {
             cancelWidgetLyricRefresh()
             return

@@ -9,18 +9,16 @@
         android:id="@+id/widget_aura"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:alpha="0.30"
-        android:background="@drawable/widget_background"
-        android:clipToOutline="true"
+        android:alpha="0.18"
         android:scaleType="centerCrop"
+        android:background="@android:color/transparent"
         android:visibility="visible" />
-
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="18dp">
+        android:padding="15dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -31,8 +29,8 @@
 
             <ImageView
                 android:id="@+id/widget_album_art"
-                android:layout_width="112dp"
-                android:layout_height="112dp"
+                android:layout_width="116dp"
+                android:layout_height="116dp"
                 android:background="@drawable/shape_album_art_round"
                 android:clipToOutline="true"
                 android:scaleType="centerCrop"
@@ -48,18 +46,18 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="NOW PLAYING"
-                    android:textColor="#BFD0EE"
+                    android:text="D.S MUSIC · NOW PLAYING"
+                    android:textColor="#C9D8F5"
                     android:textSize="10sp"
                     android:textStyle="bold"
-                    android:letterSpacing="0.14"
+                    android:letterSpacing="0.10"
                     android:includeFontPadding="false" />
 
                 <TextView
                     android:id="@+id/widget_song_title"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="9dp"
                     android:ellipsize="end"
                     android:maxLines="2"
                     android:text="Song Title"
@@ -73,7 +71,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="5dp"
-                    android:alpha="0.82"
+                    android:alpha="0.86"
                     android:ellipsize="end"
                     android:maxLines="1"
                     android:text="Artist Name"
@@ -83,88 +81,86 @@
             </LinearLayout>
         </LinearLayout>
 
+        <ProgressBar
+            android:id="@+id/widget_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="14dp"
+            android:progress="0"
+            android:progressDrawable="@drawable/widget_progress_bar" />
+
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:gravity="center"
-            android:orientation="vertical">
+            android:layout_height="52dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-            <ProgressBar
-                android:id="@+id/widget_progress"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="4dp"
-                android:layout_marginBottom="16dp"
-                android:progress="0"
-                android:progressDrawable="@drawable/widget_progress_bar" />
+            <ImageButton
+                android:id="@+id/widget_favorite"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="@drawable/widget_control_background"
+                android:contentDescription="Favorite"
+                android:padding="9dp"
+                android:src="@drawable/ic_favorite_border"
+                android:tint="@android:color/white" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:orientation="horizontal">
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
 
-                <ImageButton
-                    android:id="@+id/widget_favorite"
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
-                    android:background="@drawable/widget_control_background"
-                    android:contentDescription="Favorite"
-                    android:padding="8dp"
-                    android:src="@drawable/ic_favorite_border" />
+            <ImageButton
+                android:id="@+id/widget_prev"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/widget_control_background"
+                android:contentDescription="Previous"
+                android:padding="9dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_skip_previous"
+                android:tint="@android:color/white" />
 
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical" />
+            <ImageButton
+                android:id="@+id/widget_play_pause"
+                android:layout_width="54dp"
+                android:layout_height="54dp"
+                android:layout_marginStart="10dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/widget_control_background"
+                android:contentDescription="Play or Pause"
+                android:padding="13dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_play"
+                android:tint="@android:color/white" />
 
-                <ImageButton
-                    android:id="@+id/widget_prev"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:background="@drawable/widget_control_background"
-                    android:contentDescription="Previous"
-                    android:padding="8dp"
-                    android:src="@drawable/ic_skip_previous" />
+            <ImageButton
+                android:id="@+id/widget_next"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/widget_control_background"
+                android:contentDescription="Next"
+                android:padding="9dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_skip_next"
+                android:tint="@android:color/white" />
 
-                <ImageButton
-                    android:id="@+id/widget_play_pause"
-                    android:layout_width="52dp"
-                    android:layout_height="52dp"
-                    android:layout_marginStart="12dp"
-                    android:layout_marginEnd="12dp"
-                    android:background="@drawable/widget_control_background"
-                    android:contentDescription="Play or Pause"
-                    android:padding="12dp"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/ic_play" />
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
 
-                <ImageButton
-                    android:id="@+id/widget_next"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:background="@drawable/widget_control_background"
-                    android:contentDescription="Next"
-                    android:padding="12dp"
-                    android:src="@drawable/ic_skip_next" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical" />
-
-                <ImageButton
-                    android:id="@+id/widget_repeat"
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
-                    android:background="@drawable/widget_control_background"
-                    android:contentDescription="Repeat"
-                    android:padding="11dp"
-                    android:src="@drawable/ic_repeat_noti" />
-            </LinearLayout>
+            <ImageButton
+                android:id="@+id/widget_repeat"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="@drawable/widget_control_background"
+                android:contentDescription="Repeat"
+                android:padding="10dp"
+                android:src="@drawable/ic_repeat_noti"
+                android:tint="@android:color/white" />
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>
