@@ -34,6 +34,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -302,28 +303,32 @@ fun LibraryScreen(
 
     val libraryOverlayVisible =
         (showAccountScreen && accountViewModel != null) || showHistoryScreen
+    var previousLibraryOverlayVisible by remember { mutableStateOf(libraryOverlayVisible) }
     val libraryBaseOpacity = remember {
         androidx.compose.animation.core.Animatable(1f)
     }
     LaunchedEffect(libraryOverlayVisible) {
-        // Keep the underlying page present while the account/history page travels in or out.
-        // It dims to 50% at the midpoint but is never faded to a blank surface.
-        val firstHalf = (pageTransitionDurationMillis / 2).coerceAtLeast(1)
-        val secondHalf = (pageTransitionDurationMillis - firstHalf).coerceAtLeast(1)
-        libraryBaseOpacity.animateTo(
-            0.5f,
-            androidx.compose.animation.core.tween(
-                durationMillis = firstHalf,
-                easing = androidx.compose.animation.core.LinearEasing
+        if (previousLibraryOverlayVisible != libraryOverlayVisible) {
+            previousLibraryOverlayVisible = libraryOverlayVisible
+            // Keep the underlying page present while the account/history page travels in or out.
+            // It dims to 50% at the midpoint but is never faded to a blank surface.
+            val firstHalf = (pageTransitionDurationMillis / 2).coerceAtLeast(1)
+            val secondHalf = (pageTransitionDurationMillis - firstHalf).coerceAtLeast(1)
+            libraryBaseOpacity.animateTo(
+                0.5f,
+                androidx.compose.animation.core.tween(
+                    durationMillis = firstHalf,
+                    easing = androidx.compose.animation.core.LinearEasing
+                )
             )
-        )
-        libraryBaseOpacity.animateTo(
-            1f,
-            androidx.compose.animation.core.tween(
-                durationMillis = secondHalf,
-                easing = androidx.compose.animation.core.LinearEasing
+            libraryBaseOpacity.animateTo(
+                1f,
+                androidx.compose.animation.core.tween(
+                    durationMillis = secondHalf,
+                    easing = androidx.compose.animation.core.LinearEasing
+                )
             )
-        )
+        }
     }
 
     val history by accountViewModel?.history?.collectAsStateWithLifecycle(emptyList()) ?: remember { mutableStateOf(emptyList()) }
