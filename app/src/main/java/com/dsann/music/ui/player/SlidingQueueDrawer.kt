@@ -265,7 +265,7 @@ fun SlidingQueueDrawer(
                                     .background(DsmusicTheme.colorScheme.primaryContainer)
                                     .clickable(enabled = displayedCurrentSongIndex in displayedSongs.indices) {
                                         queueScope.launch {
-                                            if (currentSongIndex in songList.indices) {
+                                            if (displayedCurrentSongIndex in displayedSongs.indices) {
                                                 lazyListState.animateScrollToItem(displayedCurrentSongIndex)
                                             }
                                         }
