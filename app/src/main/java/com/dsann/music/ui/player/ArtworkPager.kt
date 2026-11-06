@@ -63,8 +63,8 @@ fun ArtworkPager(
         DsmCoverShapes.forPlayerLayout(playerLayout, artworkShapeName)
     }
 
-    // Decode covers close to their display size. Full-resolution artwork wastes memory
-    // bandwidth and can cause avoidable bitmap pressure while the pager is moving.
+    // Decode covers close to their display size with the same ceiling on every Android
+    // version. Full-resolution artwork beyond the display scale wastes memory bandwidth.
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     // A consistent decode ceiling avoids oversized bitmaps and repeated resampling
@@ -76,10 +76,7 @@ fun ArtworkPager(
     ) {
         (minOf(configuration.screenWidthDp, configuration.screenHeightDp) * density.density)
             .roundToInt()
-            .coerceIn(
-                256,
-                if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 256 else 768
-            )
+            .coerceIn(256, 768)
     }
 
     // Keep adjacent covers warm on modern devices. On API 23, speculative decoding
