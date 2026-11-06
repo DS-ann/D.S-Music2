@@ -1580,12 +1580,12 @@ fun SettingsScreenContent(
                 imageCacheSize = imageCacheSize,
                 onClearSongCache = {
                     viewModel.clearSongCache {
-                        (context as? MainActivity)?.showSnackbar("Song cache cleared", 0)
+                        (context as? MainActivity)?.showSnackbar("Temporary song files cleared", 0)
                     }
                 },
                 onClearImageCache = {
                     viewModel.clearImageCache {
-                        (context as? MainActivity)?.showSnackbar("Image cache cleared", 0)
+                        (context as? MainActivity)?.showSnackbar("Temporary image files cleared", 0)
                     }
                 },
                 songCacheMaxSize = songCacheMaxSize,
@@ -2210,7 +2210,7 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             SettingsDashboardTile(
-                title = "Account & Sync",
+                title = "Account & playlists",
                 subtitle = "YouTube Music and history",
                 iconResId = R.drawable.ic_settings_account,
                 modifier = Modifier.weight(1f),
@@ -2700,7 +2700,7 @@ private fun AccountScreen(
     onPauseHistoryChange: (Boolean) -> Unit
 ) {
     Scaffold(
-        topBar = { SettingsDetailTopBar("Account & Sync") { navController.popBackStack() } }
+        topBar = { SettingsDetailTopBar("Account & playlists") { navController.popBackStack() } }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -2782,7 +2782,7 @@ private fun AccountScreen(
 
             
             }
-            SettingsAccordionSection("Sync & Privacy") {
+            SettingsAccordionSection("Playlists & privacy") {
             SettingsGroupCard(listOf(
                 { PauseHistoryRow(pauseHistory, onPauseHistoryChange) },
                 { ManualSyncRow() }
@@ -3094,7 +3094,7 @@ private fun AppearanceScreen(
             SettingsAccordionSection("Player layout") {
                 SettingsGroupCard(listOf {
                     SettingsChoiceRow(
-                        title = "Layout preset",
+                        title = "Player layout",
                         description = "Choose the player layout. Vinyl and Cassette give the album cover a different look.",
                         selected = playerLayout,
                         options = listOf("Standard", "Vinyl", "Cassette"),
@@ -3212,7 +3212,7 @@ private fun AppearanceScreen(
                 },
                 {
                     SettingsChoiceRow(
-                        title = "Thumb style",
+                        title = "Progress marker",
                         description = "Choose the progress marker: dot, line, ring, automatic or none.",
                         selected = scrubberThumbStyle,
                         options = listOf("Auto", "Dot", "Line", "Ring", "None"),
@@ -3396,7 +3396,7 @@ private fun AppearanceScreen(
 
             
             }
-            SettingsAccordionSection("Typography & Layout") {
+            SettingsAccordionSection("Text & layout") {
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3456,7 +3456,7 @@ private fun AppearanceScreen(
             })
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
-                    title = "Interface density",
+                    title = "Screen spacing",
                     description = "Compact shows more on each screen. Large adds more space around buttons and items.",
                     selected = uiDensity,
                     options = listOf("Compact", "Comfortable", "Large"),
@@ -3465,7 +3465,7 @@ private fun AppearanceScreen(
             })
             SettingsGroupCard(listOf {
                 ToggleSettingRow(
-                    title = "Tapered song dividers",
+                    title = "Thin song dividers",
                     description = "Show a thin line between songs when a row has no border.",
                     checked = taperedSongDividers,
                     onCheckedChange = onTaperedSongDividersChange
@@ -3522,7 +3522,7 @@ private fun CustomAccentEditor(value: String, onApply: (String) -> Unit) {
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text("Custom accent", style = DsmusicTheme.typography.bodyLarge)
+        Text("Custom highlight colour", style = DsmusicTheme.typography.bodyLarge)
         Text(
             "Enter a 6-digit colour code to choose your own app highlight colour.",
             style = DsmusicTheme.typography.bodySmall,
@@ -3577,7 +3577,7 @@ private fun ColorPaletteSelector(selected: String, onSelected: (String) -> Unit)
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("Accent palette", style = DsmusicTheme.typography.bodyLarge)
+        Text("App colour palette", style = DsmusicTheme.typography.bodyLarge)
         Text(
             "Choose the main colour for the app. Colours from the current album cover can also appear in the interface.",
             style = DsmusicTheme.typography.bodySmall,
@@ -4442,15 +4442,21 @@ private fun PlaybackScreen(
                 SettingsChoiceRow(
                     title = "Animation smoothness",
                     description = "Choose how smoothly animations appear. Device uses your screen's normal setting; lower values use less battery. Karaoke timing and music playback stay the same.",
-                    selected = if (playerFrameRate == 0) "Device (Default)" else "$playerFrameRate FPS",
-                    options = listOf("Device (Default)", "20 FPS", "30 FPS", "40 FPS", "60 FPS"),
+                    selected = when (playerFrameRate) {
+                        20 -> "Battery saver"
+                        30 -> "Balanced"
+                        40 -> "Smooth"
+                        60 -> "Very smooth"
+                        else -> "Device default"
+                    },
+                    options = listOf("Device default", "Battery saver", "Balanced", "Smooth", "Very smooth"),
                     onSelected = { selected ->
                         onPlayerFrameRateChange(
                             when (selected) {
-                                "20 FPS" -> 20
-                                "30 FPS" -> 30
-                                "40 FPS" -> 40
-                                "60 FPS" -> 60
+                                "Battery saver" -> 20
+                                "Balanced" -> 30
+                                "Smooth" -> 40
+                                "Very smooth" -> 60
                                 else -> 0
                             }
                         )
@@ -4506,7 +4512,7 @@ private fun AutoplayRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
             Column {
                 Text("Autoplay", style = DsmusicTheme.typography.bodyLarge)
                 Text(
-                    "Continue with similar YouTube Music tracks when the current queue ends.",
+                    "Automatically play similar songs when the current list ends.",
                     style = DsmusicTheme.typography.bodyMedium,
                     color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
@@ -5118,7 +5124,7 @@ private fun SleepTimerSection(
                 val supportingText = when (mode) {
                     PlayerSharedViewModel.SleepTimerMode.OFF -> stringResource(R.string.setting_sleep_timer_off)
                     PlayerSharedViewModel.SleepTimerMode.END_OF_SONG -> "Stop at end of current song"
-                    PlayerSharedViewModel.SleepTimerMode.END_OF_QUEUE -> "Stop at end of queue"
+                    PlayerSharedViewModel.SleepTimerMode.END_OF_QUEUE -> "Stop after the current list finishes"
                     PlayerSharedViewModel.SleepTimerMode.CUSTOM -> {
                         if (remaining > 0) "${remaining / 60000} min remaining"
                         else stringResource(R.string.setting_sleep_timer_off)
