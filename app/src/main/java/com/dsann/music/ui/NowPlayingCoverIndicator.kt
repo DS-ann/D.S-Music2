@@ -2,7 +2,6 @@ package com.dsann.music.ui
 
 import android.content.Context
 import android.graphics.drawable.BitmapDrawable
-import android.os.Build
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -132,8 +131,8 @@ fun rememberNowPlayingCoverColor(
 }
 
 /**
- * A compact, theme-aware animation badge. Only the playing row creates an active
- * frame subscription; Android 6 keeps a static version to avoid continuous redraws.
+ * A compact, theme-aware animation badge. Only the playing row on the active tab
+ * creates a frame subscription; pausing playback freezes its current visual state.
  */
 @Composable
 fun NowPlayingCoverIndicator(
@@ -149,7 +148,7 @@ fun NowPlayingCoverIndicator(
         NowPlayingCoverAnimationPreference.observe(context)
     }.collectAsState()
     // Keep the current-track badge visible while paused, but stop its frame subscription.
-    val isMotionAllowed = isAnimating && LocalRootTabActive.current && Build.VERSION.SDK_INT > Build.VERSION_CODES.M
+    val isMotionAllowed = isAnimating && LocalRootTabActive.current
     val frameTime = rememberAppAnimationFrameTimeNanos(active = isMotionAllowed)
     val phase = if (isMotionAllowed && frameTime.value > 0L) {
         (frameTime.value % 1_600_000_000L).toFloat() / 1_600_000_000f
