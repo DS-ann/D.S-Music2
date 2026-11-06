@@ -1844,8 +1844,8 @@ private data class ExploreTrackMenuItem(
 )
 
 /**
- * Local-file action sheet. It uses the same quick-action layout as downloaded tracks,
- * but deliberately omits online/social actions and never offers to delete the source file.
+ * Local-file action sheet. It keeps local playback actions, omits online/social actions,
+ * and provides a delete action for the selected source file.
  */
 @Composable
 fun LocalSongActionsBottomSheet(
