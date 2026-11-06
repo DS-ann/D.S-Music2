@@ -299,7 +299,7 @@ fun SlidingQueueDrawer(
                         Box(
                             modifier = Modifier
                                 .then(
-                                    if (isDragging) Modifier
+                                    if (dragDropState.isDragging) Modifier
                                     else Modifier.animateItem(
                                         fadeInSpec = null,
                                         fadeOutSpec = null,
