@@ -210,9 +210,7 @@ class PlayerLyricsStateController(private val logTag: String) {
                 results[name] = item.copy(
                     syncedLyrics = null,
                     plainLyrics = null,
-                    isSynced = false,
-                    isWordByWord = false,
-                    isInstrumental = false,
+                    // Preserve the source's lyric type after dropping its raw text.
                     payloadClearedForMemory = true
                 )
             }
