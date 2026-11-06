@@ -93,6 +93,18 @@ private data class LocalMusicFolderListing(
 )
 
 /**
+ * MediaStore's DATE_ADDED can be identical for multiple files (or unavailable on
+ * older/partially indexed media). Use the filesystem timestamp as a tie-breaker
+ * so Date Added remains a meaningful order instead of falling back to title order.
+ * This is called from the background sorting block, never from composition.
+ */
+private fun localSongFileModifiedAt(song: SongItem): Long {
+    val rawPath = (song.path ?: song.data).orEmpty()
+    if (rawPath.isBlank()) return 0L
+    return runCatching { java.io.File(rawPath).lastModified() }.getOrDefault(0L)
+}
+
+/**
  * A separate, local-only music destination.
  *
  * Every playback action builds the queue from MediaStore results, never from the online
@@ -148,7 +160,8 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
         initialValue = emptyList<SongItem>(),
         localSongs,
         searchQuery,
-        sortOrder
+        sortOrder,
+        sortAscending
     ) {
         // Avoid sorting the entire MediaStore collection for every intermediate keystroke.
         if (searchQuery.isNotBlank()) delay(140L)
@@ -167,7 +180,11 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                 SortOrder.A_Z -> filtered.sortedWith(
                     Comparator { first, second -> first.title.compareTo(second.title, ignoreCase = true) }
                 )
-                SortOrder.DATE_ADDED -> filtered.sortedBy { it.dateAdded }
+                SortOrder.DATE_ADDED -> filtered.sortedWith(
+                    compareBy<SongItem> { it.dateAdded }
+                        .thenBy { localSongFileModifiedAt(it) }
+                        .thenBy { it.id }
+                )
                 SortOrder.ARTIST -> filtered.sortedWith(
                     Comparator { first, second ->
                         val artistOrder = first.artist.compareTo(second.artist, ignoreCase = true)
@@ -273,7 +290,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                     }
                 }
             ) {
-                Icon(Icons.Rounded.Refresh, contentDescription = "Rescan local music")
+                Icon(Icons.Rounded.Refresh, contentDescription = "Refresh local music")
             }
         }
 
