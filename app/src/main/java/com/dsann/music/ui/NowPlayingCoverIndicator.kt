@@ -139,7 +139,8 @@ fun rememberNowPlayingCoverColor(
 fun NowPlayingCoverIndicator(
     isPlaying: Boolean,
     coverColor: Color?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isAnimating: Boolean = true
 ) {
     if (!isPlaying) return
 
@@ -147,7 +148,8 @@ fun NowPlayingCoverIndicator(
     val style by remember(context) {
         NowPlayingCoverAnimationPreference.observe(context)
     }.collectAsState()
-    val isMotionAllowed = LocalRootTabActive.current && Build.VERSION.SDK_INT > Build.VERSION_CODES.M
+    // Keep the current-track badge visible while paused, but stop its frame subscription.
+    val isMotionAllowed = isAnimating && LocalRootTabActive.current && Build.VERSION.SDK_INT > Build.VERSION_CODES.M
     val frameTime = rememberAppAnimationFrameTimeNanos(active = isMotionAllowed)
     val phase = if (isMotionAllowed && frameTime.value > 0L) {
         (frameTime.value % 1_600_000_000L).toFloat() / 1_600_000_000f

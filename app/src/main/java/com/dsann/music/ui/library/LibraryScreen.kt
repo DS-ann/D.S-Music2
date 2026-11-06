@@ -3547,6 +3547,7 @@ fun RecapTabContent(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
+            .statusBarsPadding()
             .nestedScroll(nestedScrollConnection),
         contentPadding = PaddingValues(bottom = 160.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)

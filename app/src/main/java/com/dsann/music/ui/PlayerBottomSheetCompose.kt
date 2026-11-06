@@ -1290,6 +1290,8 @@ fun PlayerBottomSheetCompose(
 
         fun handleCoverTap() {
             when {
+                // The queue owns taps while open; do not pass them through to player actions.
+                isQueueExpanded -> Unit
                 isLyricsModeEnabled -> viewModel.setLyricsModeEnabled(false)
                 currentSheetContentState != PlayerSheetState.EXPANDED ||
                     playerContentExpansionFraction.value < 0.95f -> {

@@ -399,8 +399,8 @@ fun SearchResultItem(
     val imageShape = if (isCircle) CircleShape else RoundedCornerShape(4.dp) // Match YT Music sharp rounded corner
     val taperedDividersEnabled = rememberTaperedSongDividersEnabled()
     val isSongItem = item is SearchItem.Song
-    val isSongPlaying = isSongItem && isCurrentlyPlaying && isPlaybackActive && !isLoading
-    val playingCoverColor = rememberNowPlayingCoverColor(thumbnailUrl, isSongPlaying)
+    val isCurrentSong = isSongItem && isCurrentlyPlaying && !isLoading
+    val playingCoverColor = rememberNowPlayingCoverColor(thumbnailUrl, isCurrentSong)
     // Most Explore/history/detail rows do not need press-time prefetch. Avoid installing
     // an always-listening pointer coroutine for those rows, especially on API 23.
     val touchDownModifier = if (onTouchDown != null) {
@@ -450,9 +450,10 @@ fun SearchResultItem(
                 modifier = Modifier.fillMaxSize().clip(imageShape).sharedElementIfAvailable("image-$itemId"),
                 contentScale = ContentScale.Crop
             )
-            if (isSongPlaying) {
+            if (isCurrentSong) {
                 NowPlayingCoverIndicator(
                     isPlaying = true,
+                    isAnimating = isPlaybackActive,
                     coverColor = playingCoverColor,
                     modifier = Modifier.align(Alignment.Center)
                 )
@@ -626,9 +627,8 @@ fun SearchTopResultCard(
             (item.playlist.author?.name?.let { " • $it" } ?: "")
     }
     val imageShape = if (item is SearchItem.Artist) CircleShape else RoundedCornerShape(14.dp)
-    val isSongPlaying = item is SearchItem.Song && isCurrentlyPlaying &&
-        isPlaybackActive && !isLoading
-    val playingCoverColor = rememberNowPlayingCoverColor(thumbnail, isSongPlaying)
+    val isCurrentSong = item is SearchItem.Song && isCurrentlyPlaying && !isLoading
+    val playingCoverColor = rememberNowPlayingCoverColor(thumbnail, isCurrentSong)
 
     Row(
         modifier = Modifier
@@ -793,7 +793,9 @@ fun BentoCell(
     modifier: Modifier = Modifier,
     isFeature: Boolean = false,
     onClick: () -> Unit,
-    onLongClick: () -> Unit = {}
+    onLongClick: () -> Unit = {},
+    currentPlayingVideoId: String? = null,
+    isPlaybackActive: Boolean = false
 ) {
     val title = when (item) {
         is SearchItem.Song -> item.song.title
@@ -814,6 +816,10 @@ fun BentoCell(
         is SearchItem.Playlist -> item.playlist.thumbnailUrl
     }
 
+    val isCurrentSong = !currentPlayingVideoId.isNullOrBlank() &&
+        item is SearchItem.Song && item.song.videoId == currentPlayingVideoId
+    val playingCoverColor = rememberNowPlayingCoverColor(thumbnailUrl, isCurrentSong)
+
     Box(
         modifier = modifier.clip(RoundedCornerShape(24.dp)).combinedClickable(
             onClick = onClick,
@@ -827,6 +833,14 @@ fun BentoCell(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
+            if (isCurrentSong) {
+                NowPlayingCoverIndicator(
+                    isPlaying = true,
+                    isAnimating = isPlaybackActive,
+                    coverColor = playingCoverColor,
+                    modifier = Modifier.align(Alignment.Center).size(38.dp)
+                )
+            }
             Box(
                 modifier = Modifier.fillMaxSize().background(
                     Brush.verticalGradient(
@@ -1019,6 +1033,8 @@ fun HomeSectionRow(
                     Row(modifier = Modifier.height(260.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         // Dominant Feature
                         BentoCell(
+                            currentPlayingVideoId = currentPlayingVideoId,
+                            isPlaybackActive = isPlaybackActive,
                             item = items[0],
                             modifier = Modifier.weight(1.25f).fillMaxHeight(),
                             isFeature = true,
@@ -1103,8 +1119,9 @@ fun HomeSectionRow(
                             ) { _, item ->
                                 HomeCarouselItem(
                                     item = item,
-                                    isPlaying = isPlaybackActive && item is SearchItem.Song &&
+                                    isPlaying = !currentPlayingVideoId.isNullOrBlank() && item is SearchItem.Song &&
                                         item.song.videoId == currentPlayingVideoId,
+                                    isAnimating = isPlaybackActive,
                                     onSongMenuClick = onSongMenuClick,
                                     onCollectionMenuClick = onCollectionMenuClick,
                                     onClick = {
@@ -1145,6 +1162,9 @@ fun HomeSectionRow(
                                     is SearchItem.Artist -> item.artist.thumbnailUrl
                                     is SearchItem.Playlist -> item.playlist.thumbnailUrl
                                 }
+                                val isCurrentSong = !currentPlayingVideoId.isNullOrBlank() &&
+                                    item is SearchItem.Song && item.song.videoId == currentPlayingVideoId
+                                val playingCoverColor = rememberNowPlayingCoverColor(thumbnailUrl, isCurrentSong)
                                 Box(
                                     modifier = Modifier.weight(1f).aspectRatio(1f)
                                         .clip(RoundedCornerShape(12.dp))
@@ -1168,6 +1188,14 @@ fun HomeSectionRow(
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = ContentScale.Crop
                                     )
+                                    if (isCurrentSong) {
+                                        NowPlayingCoverIndicator(
+                                            isPlaying = true,
+                                            isAnimating = isPlaybackActive,
+                                            coverColor = playingCoverColor,
+                                            modifier = Modifier.align(Alignment.Center).size(38.dp)
+                                        )
+                                    }
                                     // Scrim overlay using theme token scrim is always dark by M3 spec
                                     Box(
                                         modifier = Modifier.fillMaxSize().background(
@@ -1475,7 +1503,8 @@ fun HomeSectionRow(
                                     songChunk.forEachIndexed { songIndex, item ->
                                         HomeSongListItem(
                                             song = item.song,
-                                            isPlaying = isPlaybackActive && item.song.videoId == currentPlayingVideoId,
+                                            isPlaying = !currentPlayingVideoId.isNullOrBlank() && item.song.videoId == currentPlayingVideoId,
+                                            isAnimating = isPlaybackActive,
                                             showDivider = songIndex < songChunk.lastIndex,
                                             onTouchDown = { onSongTouchDown(item.song) },
                                             onClick = { onSongClick(item.song) },
@@ -1511,10 +1540,11 @@ fun HomeSectionRow(
                         ) { _, item ->
                             HomeCarouselItem(
                                 item = item,
-                                isPlaying = isPlaybackActive && when (item) {
-                                    is SearchItem.Song -> item.song.videoId == currentPlayingVideoId
+                                isPlaying = when (item) {
+                                    is SearchItem.Song -> !currentPlayingVideoId.isNullOrBlank() && item.song.videoId == currentPlayingVideoId
                                     else -> false
                                 },
+                                isAnimating = isPlaybackActive,
                                 onTouchDown = if (item is SearchItem.Song) {
                                     { onSongTouchDown(item.song) }
                                 } else null,
@@ -1547,7 +1577,8 @@ fun HomeCarouselItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier.width(160.dp),
     onSongMenuClick: ((OnlineSong) -> Unit)? = null,
-    onCollectionMenuClick: ((SearchItem) -> Unit)? = null
+    onCollectionMenuClick: ((SearchItem) -> Unit)? = null,
+    isAnimating: Boolean = isPlaying
 ) {
     val isCircle = item is SearchItem.Artist
     val imageShape = if (isCircle) CircleShape else RoundedCornerShape(8.dp)
@@ -1627,6 +1658,7 @@ fun HomeCarouselItem(
                     if (isPlaying) {
                         NowPlayingCoverIndicator(
                             isPlaying = true,
+                            isAnimating = isAnimating,
                             coverColor = playingCoverColor,
                             modifier = Modifier.align(Alignment.Center).size(36.dp)
                         )
@@ -1676,7 +1708,8 @@ fun HomeSongListItem(
     showDivider: Boolean = true,
     onTouchDown: () -> Unit = {},
     onClick: () -> Unit,
-    onMenuClick: () -> Unit
+    onMenuClick: () -> Unit,
+    isAnimating: Boolean = isPlaying
 ) {
     val taperedDividersEnabled = rememberTaperedSongDividersEnabled()
     val playingCoverColor = rememberNowPlayingCoverColor(song.thumbnailUrl, isPlaying)
@@ -1714,6 +1747,7 @@ fun HomeSongListItem(
             if (isPlaying) {
                 NowPlayingCoverIndicator(
                     isPlaying = true,
+                    isAnimating = isAnimating,
                     coverColor = playingCoverColor,
                     modifier = Modifier.align(Alignment.Center)
                 )

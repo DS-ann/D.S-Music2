@@ -162,7 +162,9 @@ fun SlidingQueueDrawer(
         color = queueBgColor,
         showBorder = false
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier.fillMaxSize().clickable { onQueueExpandedChange(false) }
+        ) {
             val boxScope = this
             val lazyListState = rememberLazyListState()
             val queueScope = rememberCoroutineScope()
