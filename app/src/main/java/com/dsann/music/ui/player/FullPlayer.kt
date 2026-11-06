@@ -556,6 +556,20 @@ private fun PortraitSyncedLyricPreview(
                 null
             }
         )
+        // Android 6's native text metrics can clip the top of glyphs when font padding
+        // is omitted. The full lyrics renderer opts into legacy font padding already;
+        // apply the same safeguard to this portrait one-line preview on API 23 only.
+        val previewTextStyle = if (
+            android.os.Build.VERSION.SDK_INT == android.os.Build.VERSION_CODES.M
+        ) {
+            textStyle.copy(
+                platformStyle = androidx.compose.ui.text.PlatformTextStyle(
+                    includeFontPadding = true
+                )
+            )
+        } else {
+            textStyle
+        }
         BoxWithConstraints(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
             contentAlignment = Alignment.Center
@@ -577,7 +591,7 @@ private fun PortraitSyncedLyricPreview(
                 while (candidateSize > 7f) {
                     val measured = textMeasurer.measure(
                         text = activeLineText.orEmpty(),
-                        style = textStyle.copy(fontSize = candidateSize.sp),
+                        style = previewTextStyle.copy(fontSize = candidateSize.sp),
                         constraints = Constraints(maxWidth = availableWidthPx),
                         softWrap = false,
                         maxLines = 1,
@@ -590,7 +604,7 @@ private fun PortraitSyncedLyricPreview(
             }
             Text(
                 text = activeLineText.orEmpty(),
-                style = textStyle.copy(fontSize = fittedFontSize),
+                style = previewTextStyle.copy(fontSize = fittedFontSize),
                 color = if (lyricsColorStyle == "Home Studio Gradient") Color.Unspecified else contentColor,
                 maxLines = 1,
                 softWrap = false,
