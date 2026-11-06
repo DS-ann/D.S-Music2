@@ -376,6 +376,11 @@ fun QueueBottomSheetContent(
                             )
                         }
 
+                        QueueSyncedLyricPreview(
+                            viewModel = viewModel,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
                         HorizontalDivider(color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                         Text(
