@@ -1,7 +1,7 @@
 package com.dsann.music.ui
 
 import android.content.Context
-import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -30,6 +30,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.palette.graphics.Palette
+import coil.imageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
 import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
 import com.dsann.music.ui.theme.DsmusicTheme
 import kotlinx.coroutines.Dispatchers
@@ -85,21 +88,41 @@ object NowPlayingCoverAnimationPreference {
  * off the UI thread and uses the already-decoded Coil bitmap.
  */
 @Composable
-fun rememberNowPlayingCoverColor(bitmap: Bitmap?): Color? {
-    var sampledColor by remember(bitmap) { mutableStateOf<Color?>(null) }
-    LaunchedEffect(bitmap) {
-        sampledColor = if (bitmap == null) {
+fun rememberNowPlayingCoverColor(
+    artwork: Any?,
+    enabled: Boolean,
+    sizePx: Int = 96
+): Color? {
+    val context = LocalContext.current
+    var sampledColor by remember(artwork, enabled) { mutableStateOf<Color?>(null) }
+    LaunchedEffect(artwork, enabled, sizePx) {
+        sampledColor = if (!enabled || artwork == null) {
             null
         } else {
-            withContext(Dispatchers.Default) {
+            withContext(Dispatchers.IO) {
                 runCatching {
-                    val palette = Palette.from(bitmap).maximumColorCount(12).generate()
-                    val colorInt = palette.vibrantSwatch?.rgb
-                        ?: palette.lightVibrantSwatch?.rgb
-                        ?: palette.darkVibrantSwatch?.rgb
-                        ?: palette.mutedSwatch?.rgb
-                        ?: palette.dominantColor
-                    Color(colorInt)
+                    val request = ImageRequest.Builder(context)
+                        .data(artwork)
+                        .size(sizePx, sizePx)
+                        .allowHardware(false)
+                        .build()
+                    val result = context.imageLoader.execute(request)
+                    val bitmap = (result as? SuccessResult)?.drawable
+                        ?.let { it as? BitmapDrawable }
+                        ?.bitmap
+                    if (bitmap == null) {
+                        null
+                    } else {
+                        withContext(Dispatchers.Default) {
+                            val palette = Palette.from(bitmap).maximumColorCount(12).generate()
+                            val colorInt = palette.vibrantSwatch?.rgb
+                                ?: palette.lightVibrantSwatch?.rgb
+                                ?: palette.darkVibrantSwatch?.rgb
+                                ?: palette.mutedSwatch?.rgb
+                                ?: palette.dominantColor
+                            Color(colorInt)
+                        }
+                    }
                 }.getOrNull()
             }
         }
