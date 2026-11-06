@@ -1261,6 +1261,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         _playerBackgroundStyle.value = prefs.getString("player_background_style", "Artwork") ?: "Artwork"
         _nowPlayingCoverAnimation.value = prefs.getString(NowPlayingCoverAnimationPreference.KEY, "Bars")
             ?.takeIf { it in NowPlayingCoverAnimationPreference.choices } ?: "Bars"
+        NowPlayingCoverAnimationPreference.set(context, _nowPlayingCoverAnimation.value)
         _miniPlayerStyle.value = prefs.getString("mini_player_style", "Card") ?: "Card"
         _miniPlayerControlShape.value = prefs.getString("mini_player_control_shape", "Circle") ?: "Circle"
         _miniPlayerControlIcons.value = prefs.getString("mini_player_control_icons", "Classic") ?: "Classic"
@@ -1308,6 +1309,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         _lyricsFontFamily.value = prefs.getString("lyrics_font_family", "Rounded") ?: "Rounded"
         _uiDensity.value = prefs.getString("ui_density", "Comfortable") ?: "Comfortable"
         _taperedSongDividers.value = prefs.getBoolean(KEY_TAPERED_SONG_DIVIDERS, false)
+        SongRowDividerPreferences.set(context, _taperedSongDividers.value)
         _uiFontFamily.value = when (prefs.getString("ui_font_family", "Roboto") ?: "Roboto") {
             "Cursive" -> "Cursive"
             "Sans", "Google Sans Flex" -> "Sans"
@@ -1786,6 +1788,7 @@ fun SettingsScreenContent(
             viewModel.importBackup(context, it) { success, msg ->
                 if (success) {
                     playerSharedViewModel.refreshFavorites()
+                    playerSharedViewModel.refreshPlayerGestureSettings()
                     val activity = context.findActivity()
                     if (activity is androidx.fragment.app.FragmentActivity) {
                         androidx.lifecycle.ViewModelProvider(activity)[
@@ -2867,7 +2870,7 @@ private fun BackupRestoreScreen(
                         content = {
                             Column {
                                 Text("Import Settings & Library", style = DsmusicTheme.typography.bodyLarge)
-                                Text("Restore settings and library data. Sign in again on this device; downloaded audio files are not included.", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
+                                Text("Restore settings and library data. Sign in again on this device; downloaded audio and stream-cache files are not included.", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                             }
                         },
                         leadingContent = {
