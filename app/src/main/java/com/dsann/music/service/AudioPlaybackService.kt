@@ -8,6 +8,12 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Typeface
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
+import android.text.style.TypefaceSpan
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.net.Uri
@@ -48,6 +54,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
+import com.dsann.music.data.lyrics.LyricLine
 import com.dsann.music.R
 import com.dsann.music.model.SongItem
 import com.dsann.music.data.innertube.YouTubeMusic
@@ -655,6 +662,12 @@ class AudioPlaybackService : MediaSessionService() {
     private var widgetRestoredQueue: List<SongItem> = emptyList()
     private var widgetRestoredIndex: Int = 0
     private var widgetLyricsObserverJob: Job? = null
+    private var widgetPlainLyricsObserverJob: Job? = null
+    private var widgetSongObserverJob: Job? = null
+    @Volatile private var widgetSyncedLyrics: List<LyricLine> = emptyList()
+    @Volatile private var widgetPlainLyrics: String? = null
+    private var widgetLyricUpdateRunnable: Runnable? = null
+    private var widgetLyricScheduledBoundaryMs: Long? = null
     private lateinit var handler: Handler
     // The Handler below does slower playback housekeeping; position snapshots use vsync.
     private lateinit var progressUpdateRunnable: Runnable
@@ -810,7 +823,9 @@ class AudioPlaybackService : MediaSessionService() {
                 handler.removeCallbacks(progressUpdateRunnable)
                 handler.post(progressUpdateRunnable)
                 startProgressFrameUpdates()
+                scheduleNextWidgetLyricRefresh(player.currentPosition.coerceAtLeast(0L))
             } else {
+                cancelWidgetLyricRefresh()
                 handler.removeCallbacks(progressUpdateRunnable)
                 stopProgressFrameUpdates()
             }
@@ -1012,7 +1027,13 @@ class AudioPlaybackService : MediaSessionService() {
             // playing/paused state, so onIsPlayingChanged is not guaranteed to run.
             cancelCurrentTrackCache()
             cacheAssetsSongId = null
+            widgetSyncedLyrics = emptyList()
+            widgetPlainLyrics = null
+            cancelWidgetLyricRefresh()
             updateWidgetState(player.isPlaying)
+            if (DsmusicWidgetProvider.hasLyricsModeWidget(this@AudioPlaybackService)) {
+                requestWidgetLyrics()
+            }
             if (player.isPlaying) {
                 handler.post {
                     ensureCurrentTrackCacheAssets()
@@ -1309,35 +1330,49 @@ class AudioPlaybackService : MediaSessionService() {
         this.viewModel = vm
         if (player.isPlaying) startProgressFrameUpdates()
 
-        // Keep widget lyrics live after the activity has closed. Tapping the widget's
-        // lyrics page starts the normal provider pipeline, and each result updates RemoteViews.
+        // Retain the lyric timeline in the service so widgets stay live even after
+        // the Activity is gone. The same sorted timeline drives full-screen lyric timing.
         widgetLyricsObserverJob?.cancel()
         widgetLyricsObserverJob = serviceScope.launch {
             vm.syncedLyrics.collect { lyrics ->
+                widgetSyncedLyrics = lyrics.orEmpty().sortedBy { it.startTimeMs }
+                if (widgetSyncedLyrics.isNotEmpty()) widgetPlainLyrics = null
+                else if (vm.plainLyrics.value.isNullOrBlank()) widgetPlainLyrics = null
+
                 val position = player.currentPosition.coerceAtLeast(0L)
                 val duration = player.duration.coerceAtLeast(0L)
-                val currentText = currentWidgetLyricText(position)
-                if (currentText != "...") {
-                    DsmusicWidgetProvider.updateAllWidgetsPartial(
-                        this@AudioPlaybackService,
-                        position.toInt(),
-                        duration.toInt(),
-                        currentText
-                    )
+                if (DsmusicWidgetProvider.hasLyricsModeWidget(this@AudioPlaybackService)) {
+                    updateWidgetProgress(position, duration)
+                    scheduleNextWidgetLyricRefresh(position)
                 }
             }
         }
-        serviceScope.launch {
+        widgetPlainLyricsObserverJob?.cancel()
+        widgetPlainLyricsObserverJob = serviceScope.launch {
             vm.plainLyrics.collect { plain ->
-                if (vm.syncedLyrics.value.isNullOrEmpty() && !plain.isNullOrBlank()) {
-                    val position = player.currentPosition.coerceAtLeast(0L)
-                    val duration = player.duration.coerceAtLeast(0L)
-                    DsmusicWidgetProvider.updateAllWidgetsPartial(
-                        this@AudioPlaybackService,
-                        position.toInt(),
-                        duration.toInt(),
-                        currentWidgetLyricText(position)
-                    )
+                if (vm.syncedLyrics.value.isNullOrEmpty()) {
+                    widgetPlainLyrics = plain?.takeIf { it.isNotBlank() }
+                    if (DsmusicWidgetProvider.hasLyricsModeWidget(this@AudioPlaybackService) &&
+                        !plain.isNullOrBlank()
+                    ) {
+                        val position = player.currentPosition.coerceAtLeast(0L)
+                        updateWidgetProgress(position, player.duration.coerceAtLeast(0L))
+                    }
+                }
+            }
+        }
+        widgetSongObserverJob?.cancel()
+        widgetSongObserverJob = serviceScope.launch {
+            var previousSongId = vm.currentSong.value?.id
+            vm.currentSong.collect { song ->
+                if (song?.id != previousSongId) {
+                    previousSongId = song?.id
+                    widgetSyncedLyrics = emptyList()
+                    widgetPlainLyrics = null
+                    cancelWidgetLyricRefresh()
+                    if (DsmusicWidgetProvider.hasLyricsModeWidget(this@AudioPlaybackService) && song != null) {
+                        vm.fetchLyricsForCurrentSong()
+                    }
                 }
             }
         }
@@ -2840,16 +2875,21 @@ class AudioPlaybackService : MediaSessionService() {
                         lastPositionPersistedAtMs = nowMs
                     }
 
+                    val lyricsWidgetActive = DsmusicWidgetProvider.hasLyricsModeWidget(this@AudioPlaybackService)
+                    if (player.isPlaying && lyricsWidgetActive) {
+                        // Re-evaluate after seeks and track changes, but the scheduled task
+                        // itself fires at the next timed lyric/word boundary.
+                        scheduleNextWidgetLyricRefresh(pos)
+                    }
                     val widgetProgressIntervalMs = if (
-                        Build.VERSION.SDK_INT <= Build.VERSION_CODES.M && !lyricsModeActive
+                        Build.VERSION.SDK_INT <= Build.VERSION_CODES.M && !lyricsWidgetActive
                     ) 5_000L else 1_000L
                     if (player.isPlaying &&
                         nowMs - lastWidgetProgressUpdateAtMs >= widgetProgressIntervalMs
                     ) {
                         lastWidgetProgressUpdateAtMs = nowMs
-                        // Widget progress is intentionally less frequent on API 23. RemoteViews
-                        // Binder traffic is expensive on older devices and widgets do not need
-                        // a one-second clock; lyrics mode keeps its normal update cadence.
+                        // API 23 keeps ordinary progress updates inexpensive. Lyrics pages
+                        // receive separate boundary-timed updates instead of waiting 5 seconds.
                         serviceScope.launch(Dispatchers.Default) {
                             updateWidgetProgress(pos, dur)
                         }
@@ -2894,10 +2934,13 @@ class AudioPlaybackService : MediaSessionService() {
         val vm = viewModel
         val activeSong = vm?.currentSong?.value
         if (vm != null && activeSong != null) {
-            if (vm.syncedLyrics.value.isNullOrEmpty() && vm.plainLyrics.value.isNullOrBlank()) {
+            widgetSyncedLyrics = vm.syncedLyrics.value.orEmpty().sortedBy { it.startTimeMs }
+            widgetPlainLyrics = vm.plainLyrics.value?.takeIf { it.isNotBlank() }
+            if (widgetSyncedLyrics.isEmpty() && widgetPlainLyrics.isNullOrBlank()) {
                 vm.fetchLyricsForCurrentSong()
             }
             updateWidgetState(player.isPlaying)
+            scheduleNextWidgetLyricRefresh(player.currentPosition.coerceAtLeast(0L))
             return
         }
 
@@ -2905,6 +2948,9 @@ class AudioPlaybackService : MediaSessionService() {
         // Recover the current track from the active Media3 item and use the same lyrics
         // provider pipeline instead of leaving the lyrics page permanently blank.
         val item = player.currentMediaItem ?: return
+        val requestedMediaId = item.mediaId
+        widgetSyncedLyrics = emptyList()
+        widgetPlainLyrics = null
         val title = item.mediaMetadata.title?.toString()?.trim().orEmpty()
         val artist = item.mediaMetadata.artist?.toString()?.trim().orEmpty()
         if (title.isBlank()) return
@@ -2923,23 +2969,23 @@ class AudioPlaybackService : MediaSessionService() {
             videoId = cachedMetadata?.videoId,
             callback = object : com.dsann.music.data.lyrics.LyricsRepository.ExtendedLyricsCallback {
                 override fun onLyricsFound(result: com.dsann.music.data.lyrics.LyricsResult) {
-                    publishWidgetLyrics(result)
+                    publishWidgetLyrics(result, expectedMediaId = requestedMediaId)
                 }
 
                 override fun onLyricsUpgraded(betterResult: com.dsann.music.data.lyrics.LyricsResult) {
-                    publishWidgetLyrics(betterResult)
+                    publishWidgetLyrics(betterResult, expectedMediaId = requestedMediaId)
                 }
 
                 override fun onLyricsNotFound(reason: String) {
-                    publishWidgetLyrics(null, "Lyrics not found")
+                    publishWidgetLyrics(null, "Lyrics not found", requestedMediaId)
                 }
 
                 override fun onInstrumental() {
-                    publishWidgetLyrics(null, "Instrumental")
+                    publishWidgetLyrics(null, "Instrumental", requestedMediaId)
                 }
 
                 override fun onSearchStatus(message: String) {
-                    publishWidgetLyrics(null, message)
+                    publishWidgetLyrics(null, message, requestedMediaId)
                 }
             }
         )
@@ -2947,55 +2993,223 @@ class AudioPlaybackService : MediaSessionService() {
 
     private fun publishWidgetLyrics(
         result: com.dsann.music.data.lyrics.LyricsResult?,
-        fallbackText: String? = null
+        fallbackText: String? = null,
+        expectedMediaId: String? = null
     ) {
         handler.post {
+            if (expectedMediaId != null && player.currentMediaItem?.mediaId != expectedMediaId) {
+                return@post
+            }
             val position = player.currentPosition.coerceAtLeast(0L)
             val duration = player.duration.coerceAtLeast(0L)
-            val synced = result?.syncedLyrics
-            val timedLine = if (!synced.isNullOrBlank()) {
-                DsmusicWidgetProvider.findCurrentLyricLine(
-                    com.dsann.music.data.lyrics.LrcParser.parse(synced),
-                    position.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-                )
-            } else null
-            val plain = result?.plainLyrics.orEmpty()
-                .lineSequence()
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-                .take(4)
-                .joinToString("\n")
-            val text = timedLine?.takeIf { it.isNotBlank() }
-                ?: plain.ifBlank { fallbackText.orEmpty() }
-            if (text.isNotBlank()) {
-                DsmusicWidgetProvider.updateAllWidgetsPartial(
-                    this@AudioPlaybackService,
-                    position.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-                    duration.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-                    text
-                )
+            widgetSyncedLyrics = result?.syncedLyrics
+                ?.takeIf { it.isNotBlank() }
+                ?.let { com.dsann.music.data.lyrics.LrcParser.parse(it).sortedBy { line -> line.startTimeMs } }
+                .orEmpty()
+            widgetPlainLyrics = result?.plainLyrics?.takeIf { it.isNotBlank() }
+                ?: fallbackText?.takeIf { it.isNotBlank() }
+            if (widgetSyncedLyrics.isEmpty() && widgetPlainLyrics.isNullOrBlank()) {
+                widgetPlainLyrics = fallbackText
             }
+            updateWidgetProgress(position, duration)
+            scheduleNextWidgetLyricRefresh(position)
         }
     }
 
     /**
-     * Prefer time-synchronised lyrics; when only plain lyrics exist, show several readable
-     * lines instead of replacing the widget content with "..." on every progress tick.
+     * Select the same active lyric line as the full-screen player, then use RemoteViews
+     * spans for the selected lyrics font/colour and the available karaoke word timing.
      */
-    private fun currentWidgetLyricText(positionMs: Long): String {
-        val vm = viewModel ?: return "..."
-        val synced = vm.syncedLyrics.value
-        if (!synced.isNullOrEmpty()) {
-            return DsmusicWidgetProvider.findCurrentLyricLine(synced, positionMs.toInt())
-                ?.takeIf { it.isNotBlank() } ?: "..."
+    private fun currentWidgetLyricText(positionMs: Long): CharSequence {
+        val synced = widgetSyncedLyrics
+        if (synced.isNotEmpty()) {
+            val line = synced.lastOrNull {
+                !it.isInterlude && it.startTimeMs <= positionMs
+            } ?: synced.firstOrNull { !it.isInterlude }
+            if (line != null) return styleWidgetLyricText(line.content, line, positionMs)
         }
-        val plain = vm.plainLyrics.value.orEmpty()
+
+        val plain = (widgetPlainLyrics ?: viewModel?.plainLyrics?.value).orEmpty()
             .lineSequence()
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .take(4)
             .joinToString("\n")
-        return plain.ifBlank { "..." }
+        return if (plain.isBlank()) "..." else styleWidgetLyricText(plain, null, positionMs)
+    }
+
+    private fun styleWidgetLyricText(
+        text: String,
+        line: LyricLine?,
+        positionMs: Long
+    ): CharSequence {
+        val value = text.trim()
+        if (value.isEmpty()) return "..."
+        val appearance = getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+        val colourStyle = when (appearance.getString("lyrics_color_style", "Home Studio Gradient")) {
+            "UI Matching" -> "UI Matching"
+            "White" -> "White"
+            else -> "Home Studio Gradient"
+        }
+        val family = when (appearance.getString("lyrics_font_family", "Rounded")) {
+            "Sans" -> "sans-serif"
+            "Serif" -> "serif"
+            "Mono" -> "monospace"
+            else -> "sans-serif"
+        }
+        val output = SpannableString(value)
+        output.setSpan(TypefaceSpan(family), 0, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        output.setSpan(StyleSpan(Typeface.BOLD), 0, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+        val widgetPrefs = getSharedPreferences("dsmusic_widget_prefs", Context.MODE_PRIVATE)
+        val accentColor = widgetPrefs.getInt(
+            "widget_lyrics_dynamic_accent",
+            android.graphics.Color.rgb(124, 156, 255)
+        )
+        val gradientStops = intArrayOf(
+            android.graphics.Color.rgb(83, 246, 255),
+            android.graphics.Color.rgb(105, 157, 255),
+            android.graphics.Color.rgb(174, 126, 255),
+            android.graphics.Color.rgb(255, 112, 205),
+            android.graphics.Color.rgb(255, 207, 127)
+        )
+        val isKaraoke = line?.isWordByWord == true && line.words.isNotEmpty()
+
+        fun colorAt(index: Int, alpha: Float): Int {
+            val position = if (value.length <= 1) 0f else index.toFloat() / (value.length - 1)
+            val scaled = position * (gradientStops.size - 1)
+            val lower = scaled.toInt().coerceIn(0, gradientStops.lastIndex)
+            val upper = (lower + 1).coerceAtMost(gradientStops.lastIndex)
+            val fraction = (scaled - lower).coerceIn(0f, 1f)
+            val base = when (colourStyle) {
+                "White" -> android.graphics.Color.WHITE
+                "UI Matching" -> accentColor
+                else -> {
+                    val start = gradientStops[lower]
+                    val end = gradientStops[upper]
+                    android.graphics.Color.rgb(
+                        (android.graphics.Color.red(start) +
+                            (android.graphics.Color.red(end) - android.graphics.Color.red(start)) * fraction).toInt(),
+                        (android.graphics.Color.green(start) +
+                            (android.graphics.Color.green(end) - android.graphics.Color.green(start)) * fraction).toInt(),
+                        (android.graphics.Color.blue(start) +
+                            (android.graphics.Color.blue(end) - android.graphics.Color.blue(start)) * fraction).toInt()
+                    )
+                }
+            }
+            return android.graphics.Color.argb(
+                (255f * alpha).toInt().coerceIn(0, 255),
+                android.graphics.Color.red(base),
+                android.graphics.Color.green(base),
+                android.graphics.Color.blue(base)
+            )
+        }
+
+        for (index in value.indices) {
+            output.setSpan(
+                ForegroundColorSpan(colorAt(index, if (isKaraoke) 0.38f else 1f)),
+                index,
+                index + 1,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
+
+        if (isKaraoke && line != null) {
+            var searchFrom = 0
+            line.words.forEach { word ->
+                var start = word.charRange.first
+                var endExclusive = word.charRange.last + 1
+                if (start < 0 || endExclusive <= start || start >= value.length ||
+                    (start == 0 && endExclusive == 1 && word.text.length > 1)
+                ) {
+                    val found = value.indexOf(word.text, searchFrom)
+                    if (found >= 0) {
+                        start = found
+                        endExclusive = (found + word.text.length).coerceAtMost(value.length)
+                    }
+                }
+                start = start.coerceIn(0, value.length)
+                endExclusive = endExclusive.coerceIn(start, value.length)
+                if (endExclusive <= start) return@forEach
+                searchFrom = endExclusive
+
+                val duration = word.durationMs.coerceAtLeast(1L)
+                val progress = ((positionMs - word.absoluteStartTimeMs).toFloat() / duration)
+                    .coerceIn(0f, 1f)
+                val spanLength = endExclusive - start
+                for (character in start until endExclusive) {
+                    val characterProgress = (character - start + 1f) / spanLength
+                    if (characterProgress <= progress || progress >= 1f) {
+                        output.setSpan(
+                            ForegroundColorSpan(colorAt(character, 1f)),
+                            character,
+                            character + 1,
+                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                    }
+                }
+            }
+        }
+        return output
+    }
+
+    private fun cancelWidgetLyricRefresh() {
+        widgetLyricUpdateRunnable?.let { runnable ->
+            if (::handler.isInitialized) handler.removeCallbacks(runnable)
+        }
+        widgetLyricUpdateRunnable = null
+        widgetLyricScheduledBoundaryMs = null
+    }
+
+    /**
+     * Schedule only at the next lyric/word timestamp. This keeps the widget close to the
+     * full-player line timing without redrawing RemoteViews every display frame.
+     */
+    private fun scheduleNextWidgetLyricRefresh(positionMs: Long) {
+        if (!::handler.isInitialized || !player.isPlaying ||
+            !DsmusicWidgetProvider.hasLyricsModeWidget(applicationContext) ||
+            widgetSyncedLyrics.isEmpty()
+        ) {
+            cancelWidgetLyricRefresh()
+            return
+        }
+
+        val lines = widgetSyncedLyrics
+        val activeLine = lines.lastOrNull { !it.isInterlude && it.startTimeMs <= positionMs }
+        val nextLineTime = lines.asSequence()
+            .filter { !it.isInterlude && it.startTimeMs > positionMs + 20L }
+            .minOfOrNull { it.startTimeMs }
+        val nextWordEvent = activeLine?.words
+            ?.flatMap { word ->
+                listOf(word.absoluteStartTimeMs, word.absoluteStartTimeMs + word.durationMs.coerceAtLeast(1L))
+            }
+            ?.filter { it > positionMs + 20L }
+            ?.minOrNull()
+        val nextEvent = listOfNotNull(nextLineTime, nextWordEvent).minOrNull()
+        if (nextEvent == null) {
+            cancelWidgetLyricRefresh()
+            return
+        }
+        if (widgetLyricScheduledBoundaryMs == nextEvent && widgetLyricUpdateRunnable != null) {
+            return
+        }
+
+        cancelWidgetLyricRefresh()
+        val speed = player.playbackParameters.speed.takeIf { it.isFinite() && it > 0f } ?: 1f
+        val delayMs = (((nextEvent - positionMs).toDouble() / speed.toDouble()).roundToInt() + 24L)
+            .coerceAtLeast(60L)
+            .coerceAtMost(60_000L)
+        val update = Runnable {
+            widgetLyricUpdateRunnable = null
+            widgetLyricScheduledBoundaryMs = null
+            if (!player.isPlaying) return@Runnable
+            val position = player.currentPosition.coerceAtLeast(0L)
+            updateWidgetProgress(position, player.duration.coerceAtLeast(0L))
+            scheduleNextWidgetLyricRefresh(position)
+        }
+        widgetLyricScheduledBoundaryMs = nextEvent
+        widgetLyricUpdateRunnable = update
+        handler.postDelayed(update, delayMs)
     }
 
     private fun updateWidgetProgress(pos: Long, dur: Long) {
