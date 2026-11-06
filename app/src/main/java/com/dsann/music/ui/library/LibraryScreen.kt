@@ -203,6 +203,22 @@ enum class SortOrder {
     DURATION
 }
 
+/**
+ * MediaStore DATE_ADDED is stored in seconds, so several downloads made in the
+ * same second can share the same value. Use the file timestamp for those ties;
+ * also fall back to it when MediaStore has no date for an older download.
+ */
+private fun downloadedSongFileModifiedAtMs(song: SongItem): Long {
+    val rawPath = (song.path ?: song.data).orEmpty()
+    if (rawPath.isBlank()) return 0L
+    return runCatching { java.io.File(rawPath).lastModified() }.getOrDefault(0L)
+}
+
+private fun downloadedSongAddedAtSeconds(song: SongItem): Long {
+    return song.dateAdded.takeIf { it > 0L }
+        ?: (downloadedSongFileModifiedAtMs(song) / 1000L)
+}
+
 
 @Composable
 fun LibraryScreen(
@@ -811,7 +827,11 @@ fun LibraryScreen(
                                     value = withContext(Dispatchers.Default) {
                                         val ascendingSorted = when (sortOrder) {
                                             SortOrder.A_Z -> filteredSongs.sortedBy { it.title.lowercase() }
-                                            SortOrder.DATE_ADDED -> filteredSongs.sortedBy { it.dateAdded }
+                                            SortOrder.DATE_ADDED -> filteredSongs.sortedWith(
+                                                compareBy<SongItem> { downloadedSongAddedAtSeconds(it) }
+                                                    .thenBy { downloadedSongFileModifiedAtMs(it) }
+                                                    .thenBy { it.id }
+                                            )
                                             SortOrder.ARTIST -> filteredSongs.sortedBy { it.artist.lowercase() }
                                             SortOrder.DURATION -> filteredSongs.sortedBy { it.duration }
                                         }
@@ -4084,7 +4104,8 @@ private data class CachedSongEntry(
     val videoId: String,
     val durationMs: Long,
     val cachedUri: String,
-    val dateAddedMs: Long = 0L
+    val dateAddedMs: Long = 0L,
+    val cacheFileModifiedAtMs: Long = 0L
 )
 
 private data class CacheTabSnapshot(
@@ -4107,7 +4128,11 @@ private suspend fun readCacheTabSnapshot(context: Context): CacheTabSnapshot = w
             videoId = metadata.videoId,
             durationMs = metadata.durationMs,
             cachedUri = cached.cacheKey,
-            dateAddedMs = metadata.cachedAtMs
+            // New entries use the saved cache date. Older cache metadata did not
+            // always contain one, so fall back to the actual cached chunk file date.
+            dateAddedMs = metadata.cachedAtMs.takeIf { it > 0L }
+                ?: cached.cacheFileModifiedAtMs,
+            cacheFileModifiedAtMs = cached.cacheFileModifiedAtMs
         )
         val existing = entriesBySong[metadata.songId]
         if (existing == null || cached.cachedBytes > existing.second) {
@@ -4301,7 +4326,12 @@ private fun StreamCacheTabContent(
                 SortOrder.A_Z ->
                     matching.sortedBy { it.title.lowercase() }
                 SortOrder.DATE_ADDED ->
-                    matching.sortedBy { it.dateAddedMs }
+                    matching.sortedWith(
+                        compareBy<CachedSongEntry> { it.dateAddedMs }
+                            .thenBy { it.cacheFileModifiedAtMs }
+                            .thenBy { it.title.lowercase() }
+                            .thenBy { it.songId }
+                    )
                 SortOrder.ARTIST ->
                     matching.sortedBy { it.artist.lowercase() }
                 SortOrder.DURATION ->
