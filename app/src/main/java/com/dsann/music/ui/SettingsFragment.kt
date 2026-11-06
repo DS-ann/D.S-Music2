@@ -3544,28 +3544,6 @@ private fun AppearanceScreen(
                         onSelected = onScrubberThumbStyleChange
                     )
                 },
-                {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Progress bar thickness", style = DsmusicTheme.typography.bodyMedium)
-                            Text(
-                                "Keep the progress bar the same thickness for every song.",
-                                style = DsmusicTheme.typography.bodySmall,
-                                color = DsmusicTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Text(
-                            "1.5×",
-                            style = DsmusicTheme.typography.labelLarge,
-                            color = DsmusicTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
             ))
 
             

@@ -88,6 +88,8 @@ fun WavyMusicSlider(
 
     val trackHeightPx = with(LocalDensity.current) { trackHeight.toPx() }
     val thumbRadiusPx = with(LocalDensity.current) { thumbRadius.toPx() }
+    // Keep the ring outline slim and independent of the track's selected thickness.
+    val ringStrokeWidthPx = with(LocalDensity.current) { 1.5.dp.toPx() }
     val waveAmplitudePxInternal = with(LocalDensity.current) { animatedWaveAmplitude.toPx() }
     val waveLengthPx = with(LocalDensity.current) { waveLength.toPx() }
     val waveFrequency = if (waveLengthPx > 0f) ((2 * PI) / waveLengthPx).toFloat() else 0f
@@ -296,9 +298,9 @@ fun WavyMusicSlider(
                             "None" -> Unit
                             "Ring" -> drawCircle(
                                 color = thumbColor,
-                                radius = (thumbRadiusPx - trackHeightPx / 2f).coerceAtLeast(1f),
+                                radius = (thumbRadiusPx - ringStrokeWidthPx / 2f).coerceAtLeast(1f),
                                 center = Offset(currentThumbCenterX, localCenterY),
-                                style = Stroke(width = trackHeightPx.coerceAtLeast(1.5f))
+                                style = Stroke(width = ringStrokeWidthPx)
                             )
                             "Line" -> drawRoundRect(
                                 color = thumbColor,
