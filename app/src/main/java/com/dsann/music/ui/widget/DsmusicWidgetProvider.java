@@ -8,11 +8,14 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.util.TypedValue;
 import android.widget.RemoteViews;
+import android.view.Gravity;
 
 import androidx.annotation.NonNull;
 
@@ -103,9 +106,9 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         final Context context;
         final int position;
         final int duration;
-        final String currentLyric;
+        final CharSequence currentLyric;
 
-        WidgetProgressUpdate(Context context, int position, int duration, String currentLyric) {
+        WidgetProgressUpdate(Context context, int position, int duration, CharSequence currentLyric) {
             this.context = context;
             this.position = position;
             this.duration = duration;
@@ -159,12 +162,12 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
     }
 
     public static void updateAllWidgets(Context context, SongItem currentSong, boolean isPlaying, int position,
-            int duration, String currentLyric) {
+            int duration, CharSequence currentLyric) {
         updateAllWidgets(context, currentSong, isPlaying, position, duration, currentLyric, R.drawable.ic_repeat);
     }
 
     public static void updateAllWidgets(Context context, SongItem currentSong, boolean isPlaying, int position,
-            int duration, String currentLyric, int repeatIconResId) {
+            int duration, CharSequence currentLyric, int repeatIconResId) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
         new Handler(Looper.getMainLooper()).post(() -> {
             // Update Small Widgets
@@ -187,7 +190,37 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         });
     }
 
-    public static void updateAllWidgetsPartial(Context context, int position, int duration, String currentLyric) {
+    /** True only while at least one installed medium widget is displaying its lyrics page. */
+    public static boolean hasLyricsModeWidget(Context context) {
+        try {
+            AppWidgetManager manager = AppWidgetManager.getInstance(context.getApplicationContext());
+            int[] ids = manager.getAppWidgetIds(
+                    new ComponentName(context, WidgetMediumProvider.class));
+            SharedPreferences preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            for (int id : ids) {
+                if (preferences.getBoolean(PREF_LYRICS_MODE + id, false)) return true;
+            }
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Could not inspect lyrics widget state", error);
+        }
+        return false;
+    }
+
+    private static void applyLyricsPresentation(Context context, RemoteViews views, CharSequence lyrics) {
+        views.setTextViewText(R.id.widget_lyrics_text, lyrics != null ? lyrics : "...");
+        SharedPreferences appearance = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE);
+        String size = appearance.getString("lyrics_text_size", "Standard");
+        float textSize = "Small".equals(size) ? 16.5f : "Large".equals(size) ? 21.5f : 19f;
+        views.setTextViewTextSize(
+                R.id.widget_lyrics_text, TypedValue.COMPLEX_UNIT_SP, textSize);
+        String alignment = appearance.getString("lyrics_alignment", "Original");
+        int horizontalGravity = "Center".equals(alignment) ? Gravity.CENTER_HORIZONTAL : Gravity.START;
+        views.setInt(
+                R.id.widget_lyrics_text, "setGravity",
+                horizontalGravity | Gravity.CENTER_VERTICAL);
+    }
+
+    public static void updateAllWidgetsPartial(Context context, int position, int duration, CharSequence currentLyric) {
         final Context appContext = context.getApplicationContext();
         PENDING_PARTIAL_WIDGET_UPDATE.set(
                 new WidgetProgressUpdate(appContext, position, duration, currentLyric));
@@ -299,15 +332,15 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         }
     }
 
-    private static void updateWidgetProgress(Context context, AppWidgetManager manager, int id, int position, int duration, String currentLyric, int layoutId) {
+    private static void updateWidgetProgress(Context context, AppWidgetManager manager, int id, int position, int duration, CharSequence currentLyric, int layoutId) {
         try {
             RemoteViews views = new RemoteViews(context.getPackageName(), layoutId);
             if (duration > 0 && layoutId != R.layout.widget_small) {
                 int progress = (int) (((float) position / duration) * 100);
                 views.setProgressBar(R.id.widget_progress, 100, progress, false);
             }
-            if (currentLyric != null && layoutId == R.layout.widget_medium) {
-                views.setTextViewText(R.id.widget_lyrics_text, currentLyric);
+            if (layoutId == R.layout.widget_medium) {
+                applyLyricsPresentation(context, views, currentLyric);
             }
             manager.partiallyUpdateAppWidget(id, views);
         } catch (Exception e) {
@@ -316,7 +349,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
     }
 
     private static void updateWidget(Context context, AppWidgetManager manager, int id, SongItem song,
-            boolean isPlaying, int position, int duration, String currentLyric, int repeatIconResId,
+            boolean isPlaying, int position, int duration, CharSequence currentLyric, int repeatIconResId,
             int layoutId, Class<?> providerClass) {
         try {
             RemoteViews views = hideSkeleton(context, layoutId);
@@ -347,8 +380,8 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                         views.setProgressBar(R.id.widget_progress, 100, progress, false);
                     }
 
-                    // Set Lyric Text
-                    views.setTextViewText(R.id.widget_lyrics_text, currentLyric != null ? currentLyric : "...");
+                    // Keep widget lyrics aligned with the full-player typography preferences.
+                    applyLyricsPresentation(context, views, currentLyric);
                     
                     // Persistent View State: Ensure the correct slide is shown during updates
                     boolean isLyricsMode = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -398,12 +431,10 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                     } catch (Exception artworkError) {
                         Log.w(TAG, "Could not load widget album art for " + song.title, artworkError);
                     }
-                    if (layoutId == R.layout.widget_small || layoutId == R.layout.widget_medium) {
-                        try {
-                            loadBlurredAura(context, views, artworkUri, id);
-                        } catch (Exception artworkError) {
-                            Log.w(TAG, "Could not load widget aura for " + song.title, artworkError);
-                        }
+                    try {
+                        loadBlurredAura(context, views, artworkUri, id);
+                    } catch (Exception artworkError) {
+                        Log.w(TAG, "Could not load widget aura for " + song.title, artworkError);
                     }
                 }
             }
@@ -430,18 +461,24 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
 
     public static String findCurrentLyricLine(java.util.List<com.dsann.music.data.lyrics.LyricLine> lyrics,
             int position) {
-        if (lyrics == null || lyrics.isEmpty())
-            return null;
+        if (lyrics == null || lyrics.isEmpty()) return null;
 
-        String currentLine = lyrics.get(0).content;
+        // Providers do not all return timestamps in ascending order. The full-screen
+        // player sorts its display list; use the same order-independent lookup here.
+        com.dsann.music.data.lyrics.LyricLine current = null;
+        com.dsann.music.data.lyrics.LyricLine first = null;
         for (com.dsann.music.data.lyrics.LyricLine line : lyrics) {
-            if (line.startTimeMs <= position) {
-                currentLine = line.content;
-            } else {
-                break;
+            if (line == null || line.isInterlude || line.content == null || line.content.trim().isEmpty()) {
+                continue;
+            }
+            if (first == null || line.startTimeMs < first.startTimeMs) first = line;
+            if (line.startTimeMs <= position &&
+                    (current == null || line.startTimeMs > current.startTimeMs)) {
+                current = line;
             }
         }
-        return currentLine;
+        if (current != null) return current.content;
+        return first != null ? first.content : null;
     }
 
     private static RemoteViews hideSkeleton(Context context, int layoutId) {
@@ -472,6 +509,13 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                     @Override
                     protected Bitmap transform(@NonNull com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool pool,
                             @NonNull Bitmap toTransform, int outWidth, int outHeight) {
+                        // Cache a vivid artwork-derived accent for the widget's UI-Matching
+                        // lyrics mode before blurring the image for the background.
+                        int lyricAccent = sampleWidgetAccent(toTransform);
+                        context.getApplicationContext()
+                                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                                .edit().putInt("widget_lyrics_dynamic_accent", lyricAccent).apply();
+
                         // 1. Zoom in (2x)
                         int zoomWidth = toTransform.getWidth() / 2;
                         int zoomHeight = toTransform.getHeight() / 2;
@@ -487,6 +531,31 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                     }
                 })
                 .into(auraTarget);
+    }
+
+    private static int sampleWidgetAccent(Bitmap bitmap) {
+        if (bitmap == null || bitmap.getWidth() <= 0 || bitmap.getHeight() <= 0) {
+            return Color.rgb(124, 156, 255);
+        }
+        long red = 0L, green = 0L, blue = 0L, count = 0L;
+        int stepX = Math.max(1, bitmap.getWidth() / 24);
+        int stepY = Math.max(1, bitmap.getHeight() / 24);
+        for (int y = 0; y < bitmap.getHeight(); y += stepY) {
+            for (int x = 0; x < bitmap.getWidth(); x += stepX) {
+                int pixel = bitmap.getPixel(x, y);
+                red += Color.red(pixel);
+                green += Color.green(pixel);
+                blue += Color.blue(pixel);
+                count++;
+            }
+        }
+        if (count == 0L) return Color.rgb(124, 156, 255);
+        int average = Color.rgb((int) (red / count), (int) (green / count), (int) (blue / count));
+        float[] hsv = new float[3];
+        Color.colorToHSV(average, hsv);
+        hsv[1] = Math.max(0.46f, Math.min(0.86f, hsv[1]));
+        hsv[2] = Math.max(0.78f, Math.min(0.94f, hsv[2]));
+        return Color.HSVToColor(hsv);
     }
 
     private static Bitmap blur(Bitmap image) {
