@@ -93,7 +93,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dsann.music.MainActivity
 import com.dsann.music.ui.SettingsViewModel
-import com.dsann.music.ui.showQueueSongActions
+import com.dsann.music.ui.explore.QueueSongActionsBottomSheet
 import com.dsann.music.R
 import com.dsann.music.data.lyrics.LyricLine
 import com.dsann.music.data.lyrics.LyricsResult
@@ -1001,6 +1001,7 @@ fun FullPlayer(
     val isVideoMode by viewModel.isVideoMode.collectAsStateWithLifecycle()
     val videoPlaybackMetadata by viewModel.videoPlaybackMetadata.collectAsStateWithLifecycle()
     var showSongInfoDialog by remember { mutableStateOf(false) }
+    var selectedQueueSongForMenu by remember { mutableStateOf<SongItem?>(null) }
     var lastLyricsFetchSongId by remember { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
     
@@ -1893,9 +1894,17 @@ fun FullPlayer(
             playerBackgroundColor = uiState.playerBackgroundColor,
             dynamicAccentColor = dynamicAccentColor,
             isDark = isDark,
-            onSongLongClick = { song -> showQueueSongActions(context, song, viewModel) },
+            onSongLongClick = { song -> selectedQueueSongForMenu = song },
             onRemoveFromQueue = { song -> viewModel.removeFromQueue(song.id) }
         )
+
+        selectedQueueSongForMenu?.let { queueSong ->
+            QueueSongActionsBottomSheet(
+                song = queueSong,
+                playerSharedViewModel = viewModel,
+                onDismissRequest = { selectedQueueSongForMenu = null }
+            )
+        }
 
         // --- Standalone Sleep Timer Bottom Sheet ---
         if (showSleepTimerDialog) {
