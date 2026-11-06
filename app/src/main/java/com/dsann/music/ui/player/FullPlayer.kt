@@ -438,6 +438,20 @@ private fun PortraitSyncedLyricPreview(
                 .thenBy { it.first }
         ).map { it.second }
     }
+    val isKaraokeLyrics = remember(displayLines) {
+        displayLines.any { it.isWordByWord && it.words.isNotEmpty() }
+    }
+    val timedPositionProvider: () -> Int = remember(currentPositionProvider, isKaraokeLyrics) {
+        if (isKaraokeLyrics) {
+            {
+                (currentPositionProvider().toLong() + DEFAULT_KARAOKE_TIMING_BASE_OFFSET_MS)
+                    .coerceIn(0L, Int.MAX_VALUE.toLong())
+                    .toInt()
+            }
+        } else {
+            currentPositionProvider
+        }
+    }
     val songKey = currentSong?.videoId?.takeIf { it.isNotBlank() }
         ?: currentSong?.path?.takeIf { it.isNotBlank() }
         ?: currentSong?.id?.toString()
@@ -475,7 +489,7 @@ private fun PortraitSyncedLyricPreview(
         finalWordEndMs,
         songDurationMs,
         isPlaying,
-        currentPositionProvider
+        timedPositionProvider
     ) {
         if (displayLines.isEmpty()) {
             value = null
@@ -486,7 +500,7 @@ private fun PortraitSyncedLyricPreview(
         var targetIndex = -1
         var previousPositionMs = -1L
         while (true) {
-            val positionMs = currentPositionProvider().coerceAtLeast(0).toLong()
+            val positionMs = timedPositionProvider().coerceAtLeast(0).toLong()
             val hasPassedFinalLine =
                 (songDurationMs != null && positionMs >= songDurationMs) ||
                     (finalWordEndMs != null && positionMs > finalWordEndMs + 1000L)
