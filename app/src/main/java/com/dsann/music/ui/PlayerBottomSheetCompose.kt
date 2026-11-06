@@ -1830,8 +1830,28 @@ fun PlayerBottomSheetCompose(
                                 val miniArtworkSlotWidth = if (isLandscapeWindow) 48.dp else 60.dp
                                 val miniArtworkContentInset =
                                     24.dp + 10.dp + (miniArtworkSlotWidth - 48.dp) / 2f
+                                // Keep the title's row position unchanged while moving the
+                                // shared cover toward it by half of the actual visible gap.
+                                // Include the selected shape's horizontal scale so Rounded and
+                                // Square covers receive the same 50% gap reduction as other shapes.
+                                val miniTitleStartInset = if (isLandscapeWindow) {
+                                    24.dp + 10.dp + 8.8.dp + 48.dp + 1.2.dp
+                                } else {
+                                    24.dp + 10.dp + 2.dp + 60.dp + 2.dp
+                                }
+                                val miniArtworkContentInsetPx = with(density) {
+                                    miniArtworkContentInset.toPx()
+                                }
+                                val miniTitleStartInsetPx = with(density) {
+                                    miniTitleStartInset.toPx()
+                                }
+                                val miniVisibleArtworkRightPx =
+                                    miniArtworkContentInsetPx + miniSizePx * (1f + miniShapeScaleX) / 2f
+                                val miniArtworkGapReductionPx =
+                                    (miniTitleStartInsetPx - miniVisibleArtworkRightPx)
+                                        .coerceAtLeast(0f) / 2f
                                 val xStartPx = with(density) {
-                                    miniArtworkContentInset.toPx() +
+                                    miniArtworkContentInset.toPx() + miniArtworkGapReductionPx +
                                         if (isLandscapeWindow) {
                                             (containerWidthDp * ((1f - miniPlayerWidthFraction) / 2f)).toPx() +
                                                 miniPlayerHorizontalOffsetPx
