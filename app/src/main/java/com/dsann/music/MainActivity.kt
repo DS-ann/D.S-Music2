@@ -919,7 +919,7 @@ class MainActivity : AppCompatActivity() {
             if (cameFromOutside) {
                 exploreViewModel.cameFromLibrary = true
             }
-            exploreViewModel.loadArtist(artistId)
+            exploreViewModel.loadArtist(artistId, fallbackArtistName = artistName)
         } else if (!artistName.isNullOrBlank() && artistName != "Unknown Artist") {
             if (cameFromOutside) {
                 exploreViewModel.cameFromLibrary = true
