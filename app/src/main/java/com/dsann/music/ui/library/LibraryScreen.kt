@@ -1458,11 +1458,6 @@ private fun libraryArtworkRequestBuilder(
     data: Any?
 ): ImageRequest.Builder = ImageRequest.Builder(context)
     .data(data)
-    .apply {
-        if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) {
-            size(100, 100)
-        }
-    }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -1483,21 +1478,10 @@ fun SongListItem(
     val playingCoverColor = rememberNowPlayingCoverColor(artModel, isPlaying, artworkRequestSizePx.coerceAtMost(96))
     // The lazy list reuses rows while playback/favourite state changes. Keep the
     // immutable Coil request stable instead of rebuilding it during each row recompose.
-    val artworkRequest = remember(context, artModel) {
+    val artworkRequest = remember(context, artModel, artworkRequestSizePx) {
         ImageRequest.Builder(context)
             .data(artModel)
-            .size(
-                if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) {
-                    artworkRequestSizePx.coerceAtMost(100)
-                } else {
-                    artworkRequestSizePx
-                },
-                if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) {
-                    artworkRequestSizePx.coerceAtMost(100)
-                } else {
-                    artworkRequestSizePx
-                }
-            )
+            .size(artworkRequestSizePx, artworkRequestSizePx)
             .crossfade(false)
             .error(R.drawable.ic_music_note)
             .placeholder(R.drawable.ic_music_note)
