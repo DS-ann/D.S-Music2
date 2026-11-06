@@ -143,6 +143,8 @@ import com.dsann.music.util.SongDownloader
 import com.dsann.music.viewmodel.ExploreViewModel
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import com.dsann.music.ui.LocalRootTabActive
+import com.dsann.music.ui.NowPlayingCoverIndicator
+import com.dsann.music.ui.rememberNowPlayingCoverColor
 import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
 
 /**
@@ -375,6 +377,8 @@ fun SearchResultItem(
     val imageShape = if (isCircle) CircleShape else RoundedCornerShape(4.dp) // Match YT Music sharp rounded corner
     val taperedDividersEnabled = rememberTaperedSongDividersEnabled()
     val isSongItem = item is SearchItem.Song
+    val isSongPlaying = isSongItem && isCurrentlyPlaying && isPlaybackActive && !isLoading
+    val playingCoverColor = rememberNowPlayingCoverColor(thumbnailUrl, isSongPlaying)
     // Most Explore/history/detail rows do not need press-time prefetch. Avoid installing
     // an always-listening pointer coroutine for those rows, especially on API 23.
     val touchDownModifier = if (onTouchDown != null) {
@@ -424,6 +428,13 @@ fun SearchResultItem(
                 modifier = Modifier.fillMaxSize().clip(imageShape).sharedElementIfAvailable("image-$itemId"),
                 contentScale = ContentScale.Crop
             )
+            if (isSongPlaying) {
+                NowPlayingCoverIndicator(
+                    isPlaying = true,
+                    coverColor = playingCoverColor,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
             if (isLoading) {
                 val loadingShimmerColor = DsmusicTheme.colorScheme.surfaceContainerHigh
                 if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
@@ -500,14 +511,6 @@ fun SearchResultItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (item is SearchItem.Song && isCurrentlyPlaying && isPlaybackActive && !isLoading) {
-                AnimatedEqualizerBars(
-                    modifier = Modifier.size(20.dp).height(12.dp),
-                    color = DsmusicTheme.colorScheme.primary,
-                    isPlaying = isPlaybackActive
-                )
-            }
-            
             when (item) {
                 is SearchItem.Song -> {
                     if (onSongMenuClick != null) {
@@ -1525,6 +1528,7 @@ fun HomeCarouselItem(
         is SearchItem.Artist -> item.artist.thumbnailUrl
         is SearchItem.Playlist -> item.playlist.thumbnailUrl
     }
+    val playingCoverColor = rememberNowPlayingCoverColor(thumbnailUrl, isPlaying)
     val title = when (item) {
         is SearchItem.Song -> item.song.title
         is SearchItem.Album -> item.album.title
@@ -1586,17 +1590,11 @@ fun HomeCarouselItem(
                         contentScale = ContentScale.Crop
                     )
                     if (isPlaying) {
-                        Box(
-                            modifier = Modifier.fillMaxSize()
-                                .background(DsmusicTheme.colorScheme.scrim.copy(alpha = 0.45f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AnimatedEqualizerBars(
-                                modifier = Modifier.size(32.dp).height(24.dp),
-                                color = DsmusicTheme.colorScheme.inverseOnSurface,
-                                isPlaying = isPlaying
-                            )
-                        }
+                        NowPlayingCoverIndicator(
+                            isPlaying = true,
+                            coverColor = playingCoverColor,
+                            modifier = Modifier.align(Alignment.Center).size(36.dp)
+                        )
                     }
                 }
             }
@@ -1646,6 +1644,7 @@ fun HomeSongListItem(
     onMenuClick: () -> Unit
 ) {
     val taperedDividersEnabled = rememberTaperedSongDividersEnabled()
+    val playingCoverColor = rememberNowPlayingCoverColor(song.thumbnailUrl, isPlaying)
     Row(
         modifier = Modifier.fillMaxWidth()
             .background(DsmusicTheme.colorScheme.background)
@@ -1678,17 +1677,11 @@ fun HomeSongListItem(
                 contentScale = ContentScale.Crop
             )
             if (isPlaying) {
-                Box(
-                    modifier = Modifier.fillMaxSize()
-                        .background(DsmusicTheme.colorScheme.scrim.copy(alpha = 0.45f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    AnimatedEqualizerBars(
-                        modifier = Modifier.size(24.dp).height(16.dp),
-                        color = DsmusicTheme.colorScheme.inverseOnSurface,
-                        isPlaying = isPlaying
-                    )
-                }
+                NowPlayingCoverIndicator(
+                    isPlaying = true,
+                    coverColor = playingCoverColor,
+                    modifier = Modifier.align(Alignment.Center)
+                )
             }
         }
         Spacer(modifier = Modifier.width(12.dp))
