@@ -450,7 +450,7 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
                 isPlaying = isPlaying,
                 accentColor = baseAccentColor,
                 miniPlayerBackgroundColor = miniPlayerBackgroundColor,
-                coverDerivedColor = Color(playerBackgroundColor),
+                coverDerivedColor = Color(uiState.playerBackgroundColor),
                 showLegacyCompactArtwork = showLegacyCompactArtwork,
                 expansionFraction = playerContentExpansionFraction,
                 onClick = {
