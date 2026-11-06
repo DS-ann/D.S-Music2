@@ -795,8 +795,8 @@ fun QueueListItem(
                                 )
                             }
                         },
-                        onDragEnd = { state.onDragInterrupted() },
-                        onDragCancel = { state.onDragInterrupted() },
+                        onDragEnd = { state.onDragInterrupted(commit = true) },
+                        onDragCancel = { state.onDragInterrupted(commit = false) },
                         onDrag = { change, dragAmount ->
                             change.consume()
                             state.onDrag(dragAmount)
