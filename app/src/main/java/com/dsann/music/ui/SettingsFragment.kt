@@ -814,7 +814,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     // account and library settings are deliberately excluded.
     private val appearanceLookKeys = listOf(
         "theme_mode", KEY_AMOLED_BLACK, KEY_DYNAMIC_ALBUM_THEME, KEY_APPEARANCE_PRESET,
-        "custom_accent_color", "genre_card_gradient_style", "ui_corner_style", KEY_PLAYER_ARTWORK_SHAPE, "player_background_style", "mini_player_style",
+        "custom_accent_color", "genre_card_gradient_style", "ui_corner_style", KEY_PLAYER_ARTWORK_SHAPE, "player_background_style",
+        NowPlayingCoverAnimationPreference.KEY, "mini_player_style",
         "mini_player_control_shape", "mini_player_control_icons", "mini_player_progress",
         "player_layout", "player_artwork_scale", "player_buttons_pill", "player_buttons", "session_buttons", "player_title_align", "player_title_size",
         "player_title_weight", "player_title_scroll", "player_times", "scrubber_style",
@@ -875,6 +876,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         setUiCornerStyle(look.optString("ui_corner_style", _uiCornerStyle.value))
         setPlayerArtworkShape(look.optString(KEY_PLAYER_ARTWORK_SHAPE, _playerArtworkShape.value))
         setPlayerBackgroundStyle(look.optString("player_background_style", _playerBackgroundStyle.value))
+        setNowPlayingCoverAnimation(look.optString(NowPlayingCoverAnimationPreference.KEY, _nowPlayingCoverAnimation.value))
         setMiniPlayerStyle(look.optString("mini_player_style", _miniPlayerStyle.value))
         setMiniPlayerControlShape(look.optString("mini_player_control_shape", _miniPlayerControlShape.value))
         setMiniPlayerControlIcons(look.optString("mini_player_control_icons", _miniPlayerControlIcons.value))
