@@ -742,7 +742,9 @@ fun ExploreScreen(
         ) {
             // ===== Main Content (Now encapsulates scrolling headers) =====
             Box(modifier = Modifier.fillMaxSize().nestedScroll(nestedScrollConnection)) {
-                if (showReplayScreen) {
+                // Let artist/detail navigation from the full player replace Replay,
+                // then naturally return to Replay when the detail stack is closed.
+                if (showReplayScreen && currentScreen == "home") {
                     RecapTabContent(
                         nestedScrollConnection = nestedScrollConnection,
                         viewModel = playerSharedViewModel,
