@@ -492,12 +492,12 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                         : 0;
                 fallback.setProgressBar(R.id.widget_progress, 100, Math.max(0, Math.min(100, progress)), false);
                 if (layoutId == R.layout.widget_medium) {
-                    applyLyricsPresentation(context, fallback, currentLyric);
+                    applyLyricsPresentation(context, fallback, currentLyric, R.layout.widget_medium);
                     boolean isLyricsMode = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                             .getBoolean(PREF_LYRICS_MODE + id, false);
                     fallback.setDisplayedChild(R.id.widget_flipper, isLyricsMode ? 1 : 0);
                 } else if (layoutId == R.layout.widget_large) {
-                    applyLyricsPresentation(context, fallback, currentLyric);
+                    applyLyricsPresentation(context, fallback, currentLyric, R.layout.widget_large);
                 }
                 applyWidgetActionIcons(fallback, isPlaying, layoutId, repeatIconResId);
                 setupPendingIntents(context, fallback, isPlaying, layoutId, providerClass, id);

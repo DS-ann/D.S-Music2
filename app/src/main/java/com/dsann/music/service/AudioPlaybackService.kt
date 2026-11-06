@@ -696,8 +696,10 @@ class AudioPlaybackService : MediaSessionService() {
             val isPlaying = player.isPlaying
             val position = player.currentPosition.coerceAtLeast(0L)
             val duration = player.duration.coerceAtLeast(0L)
-            DsmusicWidgetProvider.refreshAllWidgetControls(this, isPlaying)
-            updateWidgetProgress(position, duration)
+            if (DsmusicWidgetProvider.hasAnyWidgets(applicationContext)) {
+                DsmusicWidgetProvider.refreshAllWidgetControls(this, isPlaying)
+                updateWidgetProgress(position, duration)
+            }
         }
     }
     private val screenWakeReceiver = object : BroadcastReceiver() {
@@ -3286,6 +3288,9 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     private fun updateWidgetProgress(pos: Long, dur: Long) {
+        // Do not build styled lyric spans or dispatch RemoteViews work unless at least
+        // one D.S Music widget is actually installed on the current launcher.
+        if (!DsmusicWidgetProvider.hasAnyWidgets(applicationContext)) return
         DsmusicWidgetProvider.updateAllWidgetsPartial(
             this,
             pos.toInt(),
@@ -3303,6 +3308,9 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     fun updateWidgetState(isPlaying: Boolean) {
+        // Playback notifications and song changes also arrive when the user has never
+        // added a widget. Return before formatting lyrics or reading widget artwork state.
+        if (!DsmusicWidgetProvider.hasAnyWidgets(applicationContext)) return
         val activeSong = viewModel?.currentSong?.value ?: widgetRestoredSong
         val playerHasItem = player.currentMediaItem != null
         val position = if (playerHasItem) {
