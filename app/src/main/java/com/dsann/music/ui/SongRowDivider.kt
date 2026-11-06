@@ -56,13 +56,13 @@ fun rememberTaperedSongDividersEnabled(): Boolean {
     return SongRowDividerPreferences.enabled
 }
 
-/** A lens-shaped line with 0 dp at the edges and 1.5 dp at its midpoint. */
+/** A lens-shaped line with 0 dp at the edges and 2.2 dp at its midpoint. */
 fun Modifier.taperedSongDivider(enabled: Boolean, color: Color): Modifier {
     if (!enabled) return this
     return drawWithContent {
         drawContent()
         if (size.width <= 0f || size.height <= 0f) return@drawWithContent
-        val maxThickness = 1.5.dp.toPx()
+        val maxThickness = 2.2.dp.toPx()
         val centerY = size.height - maxThickness / 2f
         val path = Path().apply {
             moveTo(0f, centerY)
