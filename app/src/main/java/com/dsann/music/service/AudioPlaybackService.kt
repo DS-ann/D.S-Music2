@@ -2313,7 +2313,8 @@ class AudioPlaybackService : MediaSessionService() {
         val currentIndex = queue.indexOfFirst { it.id == widgetRestoredSong?.id }
             .takeIf { it >= 0 } ?: widgetRestoredIndex
 
-        if (delta < 0 && player.currentPosition > 3_000L) {
+        if (delta < 0 && getStablePlaybackPositionMs() > 3_000L) {
+            rememberPlaybackPosition(0L)
             player.seekTo(0L)
             com.dsann.music.util.PlaybackStateManager.savePosition(applicationContext, 0L)
             return
@@ -3511,11 +3512,17 @@ class AudioPlaybackService : MediaSessionService() {
             "shuffle" -> vm?.toggleShuffle()
             "repeat" -> vm?.toggleLoopMode()
             "dislike" -> vm?.toggleDislike()
-            "back10" -> player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
+            "back10" -> {
+                val targetPosition = (getStablePlaybackPositionMs() - 10_000L).coerceAtLeast(0L)
+                rememberPlaybackPosition(targetPosition)
+                player.seekTo(targetPosition)
+            }
             "ahead30" -> {
-                val nextPosition = player.currentPosition + 30_000L
+                val nextPosition = getStablePlaybackPositionMs() + 30_000L
                 val duration = player.duration
-                player.seekTo(if (duration > 0L) nextPosition.coerceAtMost(duration) else nextPosition)
+                val targetPosition = if (duration > 0L) nextPosition.coerceAtMost(duration) else nextPosition
+                rememberPlaybackPosition(targetPosition)
+                player.seekTo(targetPosition)
             }
         }
         updateMediaSessionCustomLayout()
@@ -3740,6 +3747,7 @@ class AudioPlaybackService : MediaSessionService() {
                 vm.songList.value.getOrNull(index)
             }
             cleanupEndedVideoCacheIfNeeded(endedSong, nextSong)
+            rememberPlaybackPosition(0L)
             vm.setCurrentPosition(0)
             handler.post { vm.playNextSong() }
         }
