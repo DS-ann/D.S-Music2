@@ -160,6 +160,19 @@ internal fun SyncedLyricsCompose(
     val isKaraokeMode = remember(lyrics) {
         lyrics.any { !it.isInterlude && it.isWordByWord && it.words.isNotEmpty() }
     }
+    // The UI's neutral timing value is 0 ms; karaoke playback uses a fixed +50 ms
+    // internal baseline so this compensation is invisible in the adjustment controls.
+    val timedPositionProvider: () -> Int = remember(currentPositionProvider, isKaraokeMode) {
+        if (isKaraokeMode) {
+            {
+                (currentPositionProvider().toLong() + DEFAULT_KARAOKE_TIMING_BASE_OFFSET_MS)
+                    .coerceIn(0L, Int.MAX_VALUE.toLong())
+                    .toInt()
+            }
+        } else {
+            currentPositionProvider
+        }
+    }
     // Word highlights are synchronization-critical, not decorative animation. Always
     // sample native display VSYNC here, even when decorative animations use a lower FPS cap.
     val karaokeFrameTimeNanos = rememberAppAnimationFrameTimeNanos(
@@ -196,13 +209,13 @@ internal fun SyncedLyricsCompose(
         ?: currentSong?.path?.takeIf { it.isNotBlank() }
         ?: currentSong?.id?.toString()
     val lyricClock = remember(lyricTrackKey) {
-        mutableIntStateOf(currentPositionProvider().coerceAtLeast(0))
+        mutableIntStateOf(timedPositionProvider().coerceAtLeast(0))
     }
     val karaokePlaybackClock = remember(lyricTrackKey) { KaraokePlaybackClock() }
     LaunchedEffect(
-        isPlaying, lyricTrackKey, lyrics, currentPositionProvider, playbackSpeedProvider, isKaraokeMode
+        isPlaying, lyricTrackKey, lyrics, timedPositionProvider, playbackSpeedProvider, isKaraokeMode
     ) {
-        val initialPosition = currentPositionProvider().coerceAtLeast(0)
+        val initialPosition = timedPositionProvider().coerceAtLeast(0)
         var previousPosition = initialPosition
         karaokePlaybackClock.reset(initialPosition)
         lyricClock.intValue = initialPosition
@@ -210,7 +223,7 @@ internal fun SyncedLyricsCompose(
         while (true) {
             if (!isPlaying) {
                 // Keep paused seeks responsive without running an idle display-frame loop.
-                val actualMs = currentPositionProvider().coerceAtLeast(0)
+                val actualMs = timedPositionProvider().coerceAtLeast(0)
                 val rewoundToStart = actualMs < previousPosition - 750 &&
                     actualMs <= (displayItems.firstOrNull()?.line?.startTimeMs ?: 0L) + 1200L
                 karaokePlaybackClock.reset(actualMs)
@@ -222,7 +235,7 @@ internal fun SyncedLyricsCompose(
                 // Ordinary synced lyrics only need accurate line changes, not word-sweep FPS.
                 val interval = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 84L else 40L
                 delay(interval)
-                val actualMs = currentPositionProvider().coerceAtLeast(0)
+                val actualMs = timedPositionProvider().coerceAtLeast(0)
                 val rewoundToStart = actualMs < previousPosition - 750 &&
                     actualMs <= (displayItems.firstOrNull()?.line?.startTimeMs ?: 0L) + 1200L
                 if (rewoundToStart) {
@@ -239,7 +252,7 @@ internal fun SyncedLyricsCompose(
                     val frameNanos = karaokeFrameTimeNanos.value
                     if (frameNanos <= 0L) return@withFrameNanos
 
-                    val actualMs = currentPositionProvider().coerceAtLeast(0)
+                    val actualMs = timedPositionProvider().coerceAtLeast(0)
                     val framePosition = if (
                         actualMs < previousPosition - 750 &&
                         actualMs <= (displayItems.firstOrNull()?.line?.startTimeMs ?: 0L) + 1200L
