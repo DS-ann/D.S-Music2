@@ -227,7 +227,7 @@ private fun Dp.nonNegative(): Dp = takeIf { it.value.isFinite() && it.value > 0f
 // ==========================================
 // 3. STEP 3: DRAW-PHASE & LAYOUT-PHASE PROVIDERS
 // ==========================================
-val MiniPlayerHeight = 80.dp // High-fidelity capsule height matching controls breathing room
+val MiniPlayerHeight = 72.dp // Reduced by 10% while preserving the existing layout
 
 data class SheetVisualState(
     val currentBottomPadding: Dp,
@@ -891,7 +891,7 @@ fun PlayerBottomSheetCompose(
         val useNavigationRail = maxWidth >= 600.dp
         val useWidePlayer = maxWidth >= 840.dp ||
             (useNavigationRail && isLandscapeWindow)
-        val miniPlayerHeight = if (isLandscapeWindow) 64.dp else MiniPlayerHeight
+        val miniPlayerHeight = if (isLandscapeWindow) MiniPlayerHeight * 0.8f else MiniPlayerHeight
         val scope = rememberCoroutineScope()
         val playerPreferences = remember(context) {
             context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
@@ -1058,6 +1058,19 @@ fun PlayerBottomSheetCompose(
                         Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
                     }
                 }
+            }
+        }
+        // Keep the full player background unchanged. On light themes, raise only the
+        // collapsed mini-player surface luminance so artwork-derived colors remain clear
+        // without making the mini capsule look muddy.
+        val miniPlayerBackgroundColor = remember(dynamicBgColor, isDark) {
+            if (isDark) {
+                dynamicBgColor
+            } else {
+                val hsl = FloatArray(3)
+                androidx.core.graphics.ColorUtils.colorToHSL(dynamicBgColor.toArgb(), hsl)
+                hsl[2] = hsl[2].coerceAtLeast(0.88f)
+                Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
             }
         }
         val isCurrentSongDisliked by viewModel.isCurrentSongDisliked.collectAsStateWithLifecycle()
@@ -1721,7 +1734,7 @@ fun PlayerBottomSheetCompose(
                                 miniPlayerHeight = miniPlayerHeight,
                                 miniPlayerWidthFraction = miniPlayerWidthFraction,
                                 miniPlayerHorizontalOffset = miniPlayerHorizontalOffset,
-                                miniPlayerBackgroundColor = dynamicBgColor,
+                                miniPlayerBackgroundColor = miniPlayerBackgroundColor,
                                 miniPlayerShape = miniPlayerShape,
                                 miniPlayerElevation = miniPlayerElevation,
                                 miniSwipeModifier = miniSwipeGestureModifier

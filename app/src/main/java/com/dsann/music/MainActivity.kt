@@ -99,6 +99,7 @@ import com.dsann.music.service.AudioPlaybackService
 import com.dsann.music.ui.CachedRootTabLifecycle
 import com.dsann.music.ui.AudioFormatChoiceDialogHost
 import com.dsann.music.ui.PlayerBottomSheetCompose
+import com.dsann.music.ui.MiniPlayerHeight
 import com.dsann.music.ui.SettingsScreenContent
 import com.dsann.music.ui.SettingsViewModel
 import com.dsann.music.ui.TagEditorScreenEntryPoint
@@ -481,7 +482,7 @@ class MainActivity : AppCompatActivity() {
                     val finalPadding = animatedBasePaddingState.value
                     val miniPlayerHeight = if (
                         configuration.screenWidthDp > configuration.screenHeightDp
-                    ) 64.dp else 80.dp
+                    ) MiniPlayerHeight * 0.8f else MiniPlayerHeight
                     val systemBottomInset = WindowInsets.navigationBars.asPaddingValues()
                         .calculateBottomPadding()
                     // Portrait's mini-player spans the full screen width, so reserve its

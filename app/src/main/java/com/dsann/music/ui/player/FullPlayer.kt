@@ -1132,17 +1132,27 @@ fun FullPlayer(
         // A spring can undershoot its zero target. Compose padding rejects negative values,
         // so clamp the animated inset before passing it to Modifier.padding.
         val queueDockInset = animatedQueueDockInset.coerceAtLeast(0.dp)
-        // The fullscreen lyrics overlay and the landscape side pane share this one
-        // fetch trigger. A track is requested once when either lyrics surface becomes active.
+        // Fetch lyrics when any visible lyrics surface needs them. Portrait's inline
+        // synced-line preview must prefetch too; otherwise it stays empty until the user
+        // manually opens the full-screen Lyrics overlay.
         val landscapeLyricsVisible = isPlayerVisible && useWidePlayer && isLandscapeWindow
+        val portraitLyricsPreviewVisible = isPlayerVisible &&
+            !isLandscapeWindow &&
+            showSyncedLyricsInPlayer &&
+            !isLyricsModeEnabled
         LaunchedEffect(
             isLyricsModeEnabled,
             landscapeLyricsVisible,
+            portraitLyricsPreviewVisible,
             currentSongId,
             hasLyrics,
             isLyricsLoading
         ) {
-            if (!isLyricsModeEnabled && !landscapeLyricsVisible) return@LaunchedEffect
+            if (
+                !isLyricsModeEnabled &&
+                !landscapeLyricsVisible &&
+                !portraitLyricsPreviewVisible
+            ) return@LaunchedEffect
             if (currentSongId == null) {
                 lastLyricsFetchSongId = null
                 return@LaunchedEffect
