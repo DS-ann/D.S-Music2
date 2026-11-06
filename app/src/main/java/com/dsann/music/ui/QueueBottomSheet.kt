@@ -105,6 +105,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
 
 
 class QueueBottomSheet : BottomSheetDialogFragment() {
@@ -744,6 +746,8 @@ class DragDropState(
     private var autoScrollDeltaPx: Float = 0f
     private var pendingMoveTargetIndex: Int? = null
     private var dragItemStridePx: Float = 0f
+    private var dragStartIndex: Int = -1
+    private var autoScrollAccumulatedPx: Float = 0f
 
     val draggedItemKey: Any?
         get() = initiallyDraggedElement?.key
@@ -773,6 +777,8 @@ class DragDropState(
         pendingMoveTargetIndex = null
         draggedDistance = 0f
         dragItemStridePx = 0f
+        dragStartIndex = -1
+        autoScrollAccumulatedPx = 0f
         initiallyDraggedElement = null
         currentIndexOfDraggedItem = null
         lazyListState.layoutInfo.visibleItemsInfo
@@ -791,9 +797,12 @@ class DragDropState(
         pendingMoveTargetIndex = null
         draggedDistance = 0f
         dragItemStridePx = 0f
+        dragStartIndex = -1
+        autoScrollAccumulatedPx = 0f
         val item = lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
         initiallyDraggedElement = item
         currentIndexOfDraggedItem = item?.index
+        dragStartIndex = item?.index ?: -1
         item?.let(::captureDragItemStride)
     }
 
@@ -805,6 +814,8 @@ class DragDropState(
         pendingMoveTargetIndex = null
         draggedDistance = 0f
         dragItemStridePx = 0f
+        dragStartIndex = -1
+        autoScrollAccumulatedPx = 0f
         stopAutoScroll()
         // The list has been reordered in Compose already. Rebuild Media3's native
         // next-item preload only once after the user releases the drag handle.
@@ -819,31 +830,38 @@ class DragDropState(
     private fun moveDraggedItemToPointer() {
         val anchor = initiallyDraggedElement ?: return
         val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
-        // The dragged row itself is not placement-animated, so its layout slot is stable.
-        // Neighbour rows are animated and their transient offsets must not be used as drop
-        // targets: doing so can alternately move a song forward and backward around a midpoint.
-        val draggedItem = visibleItems.firstOrNull { it.key == anchor.key } ?: return
-        val fromIndex = draggedItem.index
+        val draggedItem = visibleItems.firstOrNull { it.key == anchor.key }
+        // Keep the last confirmed index if the dragged row's layout slot temporarily
+        // leaves the visible range while the list auto-scrolls.
+        val fromIndex = draggedItem?.index ?: currentIndexOfDraggedItem ?: return
         currentIndexOfDraggedItem = fromIndex
+
         val pendingTarget = pendingMoveTargetIndex
         if (pendingTarget != null) {
             if (fromIndex != pendingTarget) return
             pendingMoveTargetIndex = null
         }
 
-        val currentCenter = anchor.offset + draggedDistance + anchor.size / 2f
-        val slotCenter = draggedItem.offset + draggedItem.size / 2f
-        val stride = dragItemStridePx.takeIf { it > 0f } ?: draggedItem.size.toFloat()
-        // A 58% threshold adds a small hysteresis band. The row that slides into the
-        // vacated slot cannot immediately become a reverse target while its placement
-        // animation is still settling.
-        val threshold = stride * 0.58f
-        val totalItems = lazyListState.layoutInfo.totalItemsCount
-        val targetIndex = when {
-            currentCenter > slotCenter + threshold && fromIndex < totalItems - 1 -> fromIndex + 1
-            currentCenter < slotCenter - threshold && fromIndex > 0 -> fromIndex - 1
-            else -> fromIndex
+        val startIndex = dragStartIndex
+        if (startIndex !in 0 until lazyListState.layoutInfo.totalItemsCount) return
+        val stride = dragItemStridePx.takeIf { it > 0f }
+            ?: anchor.size.toFloat().coerceAtLeast(1f)
+
+        // Calculate the drop slot from the original index and total pointer travel.
+        // Do not compare against the animated neighbour offsets or the dragged row's
+        // newly assigned slot: both change during placement animation and caused the
+        // previous one-step-forward / one-step-back flicker.
+        val travelledRows = (draggedDistance + autoScrollAccumulatedPx) / stride
+        val currentRelativeIndex = fromIndex - startIndex
+        val targetRelativeIndex = when {
+            travelledRows > currentRelativeIndex + 0.58f ->
+                floor(travelledRows + 0.42f).toInt()
+            travelledRows < currentRelativeIndex - 0.58f ->
+                ceil(travelledRows - 0.42f).toInt()
+            else -> currentRelativeIndex
         }
+        val targetIndex = (startIndex + targetRelativeIndex)
+            .coerceIn(0, lazyListState.layoutInfo.totalItemsCount - 1)
 
         if (targetIndex != fromIndex) {
             queueChangedDuringDrag = true
@@ -903,11 +921,16 @@ class DragDropState(
                 lastFrameNanos = frameNanos
                 val frameScale = elapsedNanos.toFloat() / 16_666_667f
                 val scrolledPx = lazyListState.scrollBy(autoScrollDeltaPx * frameScale)
-                // Commit the new target only after scrollBy has moved the viewport.
-                // If the list is already at its absolute end, there is no further
-                // scroll to wait for, so the visible rows remain valid drop targets.
-                if (kotlin.math.abs(scrolledPx) > 0.5f || autoScrollDeltaPx != 0f) {
+                if (abs(scrolledPx) > 0.5f) {
+                    // Scrolling moves queue content under the stationary finger. Add the
+                    // actual consumed distance to the drag's content-space position so
+                    // the target index keeps advancing while the user holds at an edge.
+                    autoScrollAccumulatedPx += scrolledPx
                     moveDraggedItemToPointer()
+                } else {
+                    // Reached the absolute list boundary; stop the frame loop until the
+                    // pointer moves away and re-enters an edge zone.
+                    stopAutoScroll()
                 }
             }
         }
