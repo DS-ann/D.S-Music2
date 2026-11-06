@@ -49,7 +49,7 @@ import kotlinx.coroutines.ensureActive
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 object SongDownloader {
     private const val TAG = "SongDownloader"
-    private const val CHANNEL_ID = "dsmusic_downloads
+    private const val CHANNEL_ID = "dsmusic_downloads"
     private val scope = CoroutineScope(Dispatchers.IO)
 
     private val _downloadProgress = MutableStateFlow<Map<String, Int>>(emptyMap())
