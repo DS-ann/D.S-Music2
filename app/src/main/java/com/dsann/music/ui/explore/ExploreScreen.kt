@@ -385,12 +385,17 @@ fun ExploreScreen(
 
     val prefs = remember { context.getSharedPreferences("explore_prefs", 0) }
     var lastPlayedArtist by rememberSaveable { mutableStateOf(prefs.getString("last_played_artist", null)) }
+    var customProfileName by remember {
+        mutableStateOf(prefs.getString("custom_profile_name", "").orEmpty())
+    }
 
     DisposableEffect(context) {
         val listener =
             android.content.SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
                 if (key == "last_played_artist") lastPlayedArtist =
                     p.getString("last_played_artist", null)
+                if (key == "custom_profile_name") customProfileName =
+                    p.getString("custom_profile_name", "").orEmpty()
             }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -1885,7 +1890,8 @@ fun ExploreScreen(
                                                                             contentAlignment = Alignment.TopStart
                                                                         ) {
                                                                             WelcomeGreetingBanner(
-                                                                                userName = userProfile?.name,
+                                                                                userName = customProfileName.takeIf { it.isNotBlank() }
+                                                                                    ?: userProfile?.name,
                                                                                 onReplayClick = if (!isSearchDestination) {
                                                                                     { showReplayScreen = true }
                                                                                 } else null

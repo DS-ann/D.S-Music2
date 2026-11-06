@@ -10,6 +10,8 @@ import com.dsann.music.ui.theme.DsmusicIconButton
 import com.dsann.music.ui.theme.DsmusicFilterChip
 import com.dsann.music.ui.theme.DsmusicSwitchControl
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -144,6 +147,22 @@ fun AccountSettingsSection(
 
     var syncEnabled by remember { mutableStateOf(AccountManager.isSyncEnabled(context)) }
     var showTokenAlert by remember { mutableStateOf(false) }
+    val explorePrefs = remember { context.getSharedPreferences("explore_prefs", 0) }
+    var customProfileName by remember {
+        mutableStateOf(explorePrefs.getString("custom_profile_name", "").orEmpty())
+    }
+    var profileNameDraft by remember { mutableStateOf(customProfileName) }
+    var showProfileNameDialog by remember { mutableStateOf(false) }
+    val greeting = remember {
+        when (java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)) {
+            in 0..11 -> "Good morning,"
+            in 12..16 -> "Good afternoon,"
+            else -> "Good evening,"
+        }
+    }
+    val greetingName = customProfileName.trim().ifBlank {
+        accountName.trim().ifBlank { "Listener" }
+    }
 
     androidx.compose.foundation.lazy.LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -151,47 +170,175 @@ fun AccountSettingsSection(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Box(
                     modifier = Modifier
-                        .size(112.dp)
-                        .clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(DsmusicTheme.colorScheme.surfaceContainerHigh),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isLoggedIn && !userProfile?.avatarUrl.isNullOrEmpty()) {
-                        AsyncImage(
-                            model = rememberExploreImageRequest(userProfile!!.avatarUrl, 96),
-                            contentDescription = "Profile Picture",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    DsmusicTheme.colorScheme.primaryContainer,
+                                    DsmusicTheme.colorScheme.secondaryContainer
+                                )
+                            )
                         )
-                    } else {
-                        Icon(
-                            Icons.Rounded.PersonOutline,
-                            contentDescription = null,
-                            modifier = Modifier.size(56.dp),
-                            tint = DsmusicTheme.colorScheme.onSurfaceVariant
+                        .padding(22.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(76.dp)
+                                    .clip(androidx.compose.foundation.shape.CircleShape)
+                                    .background(DsmusicTheme.colorScheme.surface.copy(alpha = 0.72f))
+                                    .border(
+                                        2.dp,
+                                        DsmusicTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                        androidx.compose.foundation.shape.CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isLoggedIn && !userProfile?.avatarUrl.isNullOrEmpty()) {
+                                    AsyncImage(
+                                        model = rememberExploreImageRequest(userProfile!!.avatarUrl, 96),
+                                        contentDescription = "Profile picture",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Rounded.PersonOutline,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(38.dp),
+                                        tint = DsmusicTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isLoggedIn) "YOUTUBE MUSIC ACCOUNT" else "LOCAL PROFILE",
+                                    style = DsmusicTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = DsmusicTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                                    letterSpacing = 1.sp
+                                )
+                                Spacer(modifier = Modifier.height(5.dp))
+                                Text(
+                                    text = accountName,
+                                    style = DsmusicTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = DsmusicTheme.colorScheme.onSurface,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (isLoggedIn) {
+                                    Text(
+                                        text = userProfile?.email ?: "YouTube Music connected",
+                                        style = DsmusicTheme.typography.bodySmall,
+                                        color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                        Text(
+                            text = "Your music space, your identity.",
+                            style = DsmusicTheme.typography.bodyMedium,
+                            color = DsmusicTheme.colorScheme.onSurface.copy(alpha = 0.78f)
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(20.dp))
-                Text(
-                    text = accountName,
-                    style = DsmusicTheme.typography.headlineMedium.copy(letterSpacing = (-0.5).sp),
-                    fontWeight = FontWeight.ExtraBold,
-                    color = DsmusicTheme.colorScheme.onSurface
-                )
-                if (isLoggedIn) {
-                    Text(
-                        text = userProfile?.email ?: "YouTube Music Connected",
-                        style = DsmusicTheme.typography.labelLarge,
-                        color = DsmusicTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 4.dp)
+
+                DsmusicCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = DsmusicTheme.colorScheme.surfaceContainerLow
                     )
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(13.dp))
+                                    .background(DsmusicTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Rounded.MusicNote,
+                                    contentDescription = null,
+                                    tint = DsmusicTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Explore greeting",
+                                    style = DsmusicTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    "Choose the name D.S Music uses to welcome you.",
+                                    style = DsmusicTheme.typography.bodySmall,
+                                    color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(DsmusicTheme.colorScheme.surfaceContainerHigh)
+                                .padding(horizontal = 16.dp, vertical = 15.dp)
+                        ) {
+                            Text(
+                                greeting,
+                                style = DsmusicTheme.typography.titleSmall,
+                                color = DsmusicTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                greetingName,
+                                style = DsmusicTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = DsmusicTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            DsmusicOutlinedButton(
+                                onClick = {
+                                    profileNameDraft = customProfileName
+                                    showProfileNameDialog = true
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(if (customProfileName.isBlank()) "Add profile name" else "Edit profile name")
+                            }
+                            if (customProfileName.isNotBlank()) {
+                                DsmusicTextButton(
+                                    onClick = {
+                                        customProfileName = ""
+                                        profileNameDraft = ""
+                                        explorePrefs.edit().remove("custom_profile_name").apply()
+                                    }
+                                ) {
+                                    Text("Reset")
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -341,6 +488,68 @@ fun AccountSettingsSection(
                 }
             }
         }
+    }
+
+    if (showProfileNameDialog) {
+        AlertDialog(
+            onDismissRequest = { showProfileNameDialog = false },
+            title = { Text("Choose your profile name") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "This name appears in your Explore greeting. It does not change your YouTube Music account.",
+                        style = DsmusicTheme.typography.bodyMedium,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
+                    BasicTextField(
+                        value = profileNameDraft,
+                        onValueChange = { profileNameDraft = it.take(32) },
+                        singleLine = true,
+                        textStyle = DsmusicTheme.typography.bodyLarge.copy(
+                            color = DsmusicTheme.colorScheme.onSurface
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(DsmusicTheme.colorScheme.surfaceContainerHigh)
+                            .padding(horizontal = 14.dp, vertical = 14.dp),
+                        decorationBox = { innerTextField ->
+                            Box {
+                                if (profileNameDraft.isBlank()) {
+                                    Text(
+                                        "Enter the name you want to see",
+                                        style = DsmusicTheme.typography.bodyLarge,
+                                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        }
+                    )
+                }
+            },
+            confirmButton = {
+                DsmusicTextButton(
+                    onClick = {
+                        val cleanedName = profileNameDraft.trim()
+                        customProfileName = cleanedName
+                        if (cleanedName.isBlank()) {
+                            explorePrefs.edit().remove("custom_profile_name").apply()
+                        } else {
+                            explorePrefs.edit().putString("custom_profile_name", cleanedName).apply()
+                        }
+                        showProfileNameDialog = false
+                    }
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                DsmusicTextButton(onClick = { showProfileNameDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     if (showTokenAlert) {

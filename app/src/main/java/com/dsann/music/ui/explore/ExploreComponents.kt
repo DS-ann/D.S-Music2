@@ -307,7 +307,7 @@ fun WelcomeGreetingBanner(
 ) {
     val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
     val greeting = remember(hour) {
-        when (hour) { in 0..11 -> "Good Morning"; in 12..16 -> "Good Afternoon"; else -> "Good Evening" }
+        when (hour) { in 0..11 -> "Good Morning,"; in 12..16 -> "Good Afternoon,"; else -> "Good Evening," }
     }
     val iconResId = remember(hour) {
         when (hour) {
