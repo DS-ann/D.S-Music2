@@ -1137,7 +1137,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     val stringValues = value.filterIsInstance<String>()
                     if (stringValues.size == value.size) {
                         val array = com.google.gson.JsonArray()
-                        stringValues.sorted().forEach(array::add)
+                        stringValues.sorted().forEach { array.add(it) }
                         values.add(key, array)
                         types.addProperty(key, "string_set")
                     }
@@ -1378,7 +1378,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     add("explore_preferences_types", explore.types)
 
                     val favoritesArray = com.google.gson.JsonArray()
-                    favoritesList.forEach(favoritesArray::add)
+                    favoritesList.forEach { favoritesArray.add(it) }
                     add("favorites", favoritesArray)
 
                     add("playlists", gson.toJsonTree(playlists))
@@ -1396,7 +1396,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             } catch (e: Exception) {
                 android.util.Log.e("SettingsViewModel", "Failed to export backup", e)
                 withContext(Dispatchers.Main) {
-                    onResult(false, "Failed to export: \${e.localizedMessage ?: "Unknown error"}")
+                    onResult(false, "Failed to export: ${e.localizedMessage ?: "Unknown error"}")
                 }
             }
         }
@@ -1498,7 +1498,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 if (exploreObject != null) {
                     val explorePrefs = context.getSharedPreferences("explore_prefs", Context.MODE_PRIVATE)
                     val editor = explorePrefs.edit()
-                    exploreBackupPreferenceKeys.forEach(editor::remove)
+                    exploreBackupPreferenceKeys.forEach { editor.remove(it) }
                     if (!editor.commit()) {
                         throw IllegalStateException("Could not prepare Explore preferences for restore")
                     }
@@ -1521,7 +1521,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             } catch (e: Exception) {
                 android.util.Log.e("SettingsViewModel", "Failed to import backup", e)
                 withContext(Dispatchers.Main) {
-                    onResult(false, "Import failed: \${e.localizedMessage ?: "Unknown error"}")
+                    onResult(false, "Import failed: ${e.localizedMessage ?: "Unknown error"}")
                 }
             }
         }
@@ -1783,7 +1783,16 @@ fun SettingsScreenContent(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let {
-            viewModel.importBackup(context, it) { _, msg ->
+            viewModel.importBackup(context, it) { success, msg ->
+                if (success) {
+                    playerSharedViewModel.refreshFavorites()
+                    val activity = context.findActivity()
+                    if (activity is androidx.fragment.app.FragmentActivity) {
+                        androidx.lifecycle.ViewModelProvider(activity)[
+                            com.dsann.music.viewmodel.ExploreViewModel::class.java
+                        ].reloadRestoredPreferences()
+                    }
+                }
                 (context as? MainActivity)?.showSnackbar(msg, 0)
             }
         }
@@ -2838,7 +2847,7 @@ private fun BackupRestoreScreen(
                         content = {
                             Column {
                                 Text("Export Settings & Library", style = DsmusicTheme.typography.bodyLarge)
-                                Text("Save your playlists, favourites and settings to a backup file", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
+                                Text("Save settings, appearance, player customisation, favourites, playlists, Explore preferences and listening history", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                             }
                         },
                         leadingContent = {
@@ -2858,7 +2867,7 @@ private fun BackupRestoreScreen(
                         content = {
                             Column {
                                 Text("Import Settings & Library", style = DsmusicTheme.typography.bodyLarge)
-                                Text("Restore your playlists, favourites and settings from a backup file", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
+                                Text("Restore settings and library data. Sign in again on this device; downloaded audio files are not included.", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                             }
                         },
                         leadingContent = {
