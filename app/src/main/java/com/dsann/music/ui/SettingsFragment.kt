@@ -1881,7 +1881,7 @@ private fun ControlsAndGesturesScreen(
         ) {
             SettingsAccordionSection("Player cover") {
             Text(
-                "Choose what swipes, a double tap and a long press do on the full player's artwork. Swiping down still collapses the player.",
+                "Choose what happens when you swipe, double-tap or press and hold the album cover in the full player. Swiping down still closes the full player.",
                 style = DsmusicTheme.typography.bodySmall,
                 color = DsmusicTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -1967,7 +1967,7 @@ private fun ControlsAndGesturesScreen(
             }
             SettingsAccordionSection("Mini player") {
             Text(
-                "These actions apply while the player is collapsed. A tap still opens the full player.",
+                "These actions work while the mini player is showing. Tap it to open the full player.",
                 style = DsmusicTheme.typography.bodySmall,
                 color = DsmusicTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -2101,7 +2101,7 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
     ) {
         DsmusicPageHeading(
             title = "Settings",
-            subtitle = "Shape the way D.S Music sounds and feels.",
+            subtitle = "Make D.S Music look and sound the way you like.",
             kicker = "YOUR LISTENING SPACE",
             modifier = Modifier
                 .fillMaxWidth()
@@ -2188,7 +2188,7 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             SettingsDashboardTile(
                 title = "Playback",
-                subtitle = "Quality, autoplay and crossfade",
+                subtitle = "Sound quality, autoplay and song transitions",
                 iconResId = R.drawable.ic_settings_playback,
                 modifier = Modifier.weight(1f),
                 onClick = { navController.navigate(SettingsRoute.Playback.route) }
@@ -2218,7 +2218,7 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
             )
             SettingsDashboardTile(
                 title = "Music Management",
-                subtitle = "Folders, downloads and cache",
+                subtitle = "Folders, downloads and saved files",
                 iconResId = R.drawable.ic_settings_library,
                 modifier = Modifier.weight(1f),
                 onClick = { navController.navigate(SettingsRoute.MusicManagement.route) }
@@ -2417,7 +2417,7 @@ private fun MusicManagementScreen(
 
             
             }
-            SettingsAccordionSection("Audio Filtering") {
+            SettingsAccordionSection("Short recordings") {
             SettingsGroupCard(buildList {
                 add {
                     IgnoreShortAudioRow(ignoreShortAudio, onIgnoreShortAudioChange)
@@ -2439,7 +2439,7 @@ private fun MusicManagementScreen(
                 if (hiddenFolders.isEmpty()) {
                     add {
                         DsmusicListItem(
-                            headlineContent = { Text("No folders blacklisted", style = DsmusicTheme.typography.bodyLarge) },
+                            headlineContent = { Text("No hidden folders yet", style = DsmusicTheme.typography.bodyLarge) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                         )
                     }
@@ -2465,10 +2465,10 @@ private fun MusicManagementScreen(
                 add {
                     DsmusicListItem(
                         modifier = Modifier.clickable { onMediaCacheToggle(!mediaCacheEnabled) },
-                        headlineContent = { Text("Online audio cache", fontWeight = FontWeight.SemiBold) },
+                        headlineContent = { Text("Save online audio", fontWeight = FontWeight.SemiBold) },
                         supportingContent = {
-                            Text(if (mediaCacheEnabled) "Cache streamed audio for faster repeat playback."
-                                else "Disabled. New stream data is not retained.",
+                            Text(if (mediaCacheEnabled) "Temporarily save online songs so they load faster next time."
+                                else "Online songs will not be saved for faster repeat playback.",
                                 color = DsmusicTheme.colorScheme.onSurfaceVariant)
                         },
                         trailingContent = { DsmusicSwitch(checked = mediaCacheEnabled, onCheckedChange = onMediaCacheToggle) },
@@ -2480,14 +2480,14 @@ private fun MusicManagementScreen(
                         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically) {
-                                Text("Stream cache limit", style = DsmusicTheme.typography.bodyLarge)
+                                Text("Online audio storage limit", style = DsmusicTheme.typography.bodyLarge)
                                 Text(mediaCacheLimitGb.toString() + " GB", style = DsmusicTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold, color = DsmusicTheme.colorScheme.primary)
                             }
                             Slider(value = mediaCacheLimitGb.toFloat(),
                                 onValueChange = { onMediaCacheLimitChange(it.toInt().coerceIn(1, 10)) },
                                 valueRange = 1f..10f, steps = 8)
-                            Text("Limit is applied immediately. Oldest cached audio is evicted first when exceeded.",
+                            Text("This limit takes effect right away. When storage is full, the oldest saved songs are removed first.",
                                 style = DsmusicTheme.typography.bodySmall, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -2524,7 +2524,7 @@ private fun BackupRestoreScreen(
                         content = {
                             Column {
                                 Text("Export Settings & Library", style = DsmusicTheme.typography.bodyLarge)
-                                Text("Export playlists, favorites, and preferences to JSON", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
+                                Text("Save your playlists, favourites and settings to a backup file", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                             }
                         },
                         leadingContent = {
@@ -2544,7 +2544,7 @@ private fun BackupRestoreScreen(
                         content = {
                             Column {
                                 Text("Import Settings & Library", style = DsmusicTheme.typography.bodyLarge)
-                                Text("Restore playlists, favorites, and preferences from JSON", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
+                                Text("Restore your playlists, favourites and settings from a backup file", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                             }
                         },
                         leadingContent = {
@@ -2598,11 +2598,11 @@ private fun IgnoreShortAudioDurationRow(
         content = {
             Column {
                 Text(
-                    text = "Minimum Duration Threshold",
+                    text = "Minimum song length",
                     style = DsmusicTheme.typography.bodyLarge
                 )
                 Text(
-                    text = "Ignore tracks under ${value.toInt()} seconds",
+                    text = "Hide songs shorter than ${value.toInt()} seconds",
                     style = DsmusicTheme.typography.bodyMedium,
                     color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
@@ -2734,7 +2734,7 @@ private fun AccountScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (ytCookies != null) "Logged in to YouTube Music" else "Guest Mode (Anonymous)",
+                                text = if (ytCookies != null) "Logged in to YouTube Music" else "Guest mode",
                                 style = DsmusicTheme.typography.titleMedium,
                                 color = DsmusicTheme.colorScheme.onSurface
                             )
@@ -2747,7 +2747,7 @@ private fun AccountScreen(
                                 )
                             }
                             Text(
-                                text = if (ytCookies != null) "Accessing personalized playlists, library, and recommended interests." else "No account linked. Tap to sign in securely.",
+                                text = if (ytCookies != null) "Your personal playlists, library and recommendations are available." else "No account connected. Sign in to see your playlists and recommendations.",
                                 style = DsmusicTheme.typography.bodySmall,
                                 color = DsmusicTheme.colorScheme.onSurfaceVariant
                             )
@@ -2804,7 +2804,7 @@ private fun DataSaverRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
                     style = DsmusicTheme.typography.bodyLarge
                 )
                 Text(
-                    text = "Restrict streaming and high-res cover art downloads to Wi-Fi only",
+                    text = "Use Wi-Fi only for music streaming and high-quality album covers",
                     style = DsmusicTheme.typography.bodyMedium,
                     color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
@@ -2831,7 +2831,7 @@ private fun PauseHistoryRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
                     style = DsmusicTheme.typography.bodyLarge
                 )
                 Text(
-                    text = "Stop tracking played songs for recommendations",
+                    text = "Stop saving the songs you listen to for recommendations",
                     style = DsmusicTheme.typography.bodyMedium,
                     color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
@@ -2864,8 +2864,8 @@ private fun ManualSyncRow() {
         },
         content = {
             Column {
-                Text(text = "Manual Sync", style = DsmusicTheme.typography.bodyLarge)
-                Text(text = "Sync playlists and favorites with server", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
+                Text(text = "Refresh playlists", style = DsmusicTheme.typography.bodyLarge)
+                Text(text = "Update your playlists and favourites", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
             }
         },
         trailingContent = {
@@ -2999,7 +2999,7 @@ private fun AppearanceScreen(
                 .padding(bottom = 120.dp)
         ) {
             Text(
-                "Make the player and interface your own: choose a layout, arrange its buttons, tune typography and progress, and set its background.",
+                "Change how the player and app look. Choose layouts, button styles, colours and text settings.",
                 style = DsmusicTheme.typography.bodyMedium,
                 color = DsmusicTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
@@ -3031,7 +3031,7 @@ private fun AppearanceScreen(
                 add {
                     SettingsChoiceRow(
                         title = "Theme mode",
-                        description = "System follows your device setting. Light and Dark stay fixed until you change them.",
+                        description = "System matches your phone's light or dark setting. Light and Dark stay as chosen until you change them.",
                         selected = themeMode.replaceFirstChar { it.uppercase() },
                         options = listOf("System", "Light", "Dark"),
                         onSelected = { onThemeModeChange(it.lowercase()) }
@@ -3059,7 +3059,7 @@ private fun AppearanceScreen(
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
                     title = "Genre card gradients",
-                    description = "Give each genre a different, coordinated gradient. Theme follows your selected app colours; the other palettes offer alternate colour families.",
+                    description = "Choose the colours used on genre cards. Theme uses your app colours; the other choices use different colour blends.",
                     selected = genreGradientStyle,
                     options = listOf("Theme", "Aurora", "Ocean", "Sunset", "Forest", "Berry"),
                     onSelected = onGenreGradientStyleChange
@@ -3095,7 +3095,7 @@ private fun AppearanceScreen(
                 SettingsGroupCard(listOf {
                     SettingsChoiceRow(
                         title = "Layout preset",
-                        description = "Standard keeps the balanced player; Vinyl and Cassette change the artwork presentation.",
+                        description = "Choose the player layout. Vinyl and Cassette give the album cover a different look.",
                         selected = playerLayout,
                         options = listOf("Standard", "Vinyl", "Cassette"),
                         onSelected = onPlayerLayoutChange
@@ -3107,7 +3107,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Action button grouping",
-                        description = "Place the player actions inside one shared capsule or leave each action separate.",
+                        description = "Show the player buttons together in one rounded group or keep them separate.",
                         selected = if (playerButtonsPill) "Capsule" else "Separate",
                         options = listOf("Capsule", "Separate"),
                         onSelected = { onPlayerButtonsPillChange(it == "Capsule") }
@@ -3116,7 +3116,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Button presentation",
-                        description = "Choose rounded corners, a pill, no background, or a square background for player action buttons.",
+                        description = "Choose the shape behind the player buttons.",
                         selected = playerButtonStyle,
                         options = listOf("Round", "Pill", "None", "Square"),
                         onSelected = onPlayerButtonStyleChange
@@ -3145,7 +3145,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Title alignment",
-                        description = "Align the title to the artwork's left edge or center it.",
+                        description = "Place the song title on the left or in the centre.",
                         selected = playerTitleAlign,
                         options = listOf("Left", "Centered"),
                         onSelected = onPlayerTitleAlignChange
@@ -3154,7 +3154,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Title size",
-                        description = "Adjust the song title scale independently.",
+                        description = "Change the size of the song title.",
                         selected = playerTitleSize,
                         options = listOf("Small", "Medium", "Large"),
                         onSelected = onPlayerTitleSizeChange
@@ -3163,7 +3163,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Title weight",
-                        description = "Choose light, regular or bold lettering.",
+                        description = "Choose how thin or bold the song title looks.",
                         selected = playerTitleWeight,
                         options = listOf("Light", "Regular", "Bold"),
                         onSelected = onPlayerTitleWeightChange
@@ -3172,7 +3172,7 @@ private fun AppearanceScreen(
                 {
                     ToggleSettingRow(
                         title = "Scrolling titles",
-                        description = "Long titles scroll instead of ending in an ellipsis.",
+                        description = "Long song titles move across the screen instead of being cut off.",
                         checked = playerTitleScroll,
                         onCheckedChange = onPlayerTitleScrollChange
                     )
@@ -3180,7 +3180,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Time labels",
-                        description = "Display elapsed time, remaining time, both or neither.",
+                        description = "Show the time played, time left, both or neither.",
                         selected = playerTimes,
                         options = listOf("Both", "Elapsed", "Time left", "None"),
                         onSelected = onPlayerTimesChange
@@ -3195,7 +3195,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Progress style",
-                        description = "Choose a fine line, a thicker line, a thumb or the animated waveform.",
+                        description = "Choose how song progress looks: a thin line, thick line, marker or moving wave.",
                         selected = scrubberStyle,
                         options = listOf("Hairline", "Bold", "Thumb", "Waveform"),
                         onSelected = onScrubberStyleChange
@@ -3204,7 +3204,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Progress color",
-                        description = "Use the accent color, white or the cover-derived color.",
+                        description = "Use the app's main colour, white, or a colour from the album cover.",
                         selected = scrubberColor,
                         options = listOf("Accent", "White", "Cover"),
                         onSelected = onScrubberColorChange
@@ -3213,7 +3213,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Thumb style",
-                        description = "Choose a dot, line, ring, automatic thumb or no thumb.",
+                        description = "Choose the progress marker: dot, line, ring, automatic or none.",
                         selected = scrubberThumbStyle,
                         options = listOf("Auto", "Dot", "Line", "Ring", "None"),
                         onSelected = onScrubberThumbStyleChange
@@ -3226,9 +3226,9 @@ private fun AppearanceScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text("Track thickness", style = DsmusicTheme.typography.bodyMedium)
+                            Text("Progress bar thickness", style = DsmusicTheme.typography.bodyMedium)
                             Text(
-                                "Fixed progress-track weight",
+                                "Keep the progress bar the same thickness for every song.",
                                 style = DsmusicTheme.typography.bodySmall,
                                 color = DsmusicTheme.colorScheme.onSurfaceVariant
                             )
@@ -3249,7 +3249,7 @@ private fun AppearanceScreen(
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
                     title = "Player animation",
-                    description = "Playback-state animation only. It does not use the microphone or record audio. Off uses the least resources.",
+                    description = "Choose an animation for the player. It follows music playback and never uses your microphone. Turn it off to save battery.",
                     selected = visualizerStyle,
                     options = listOf("Off", "Bars", "Wave", "Oval", "Pulse", "Glow"),
                     onSelected = onVisualizerStyleChange
@@ -3258,7 +3258,7 @@ private fun AppearanceScreen(
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
                     title = "Visualizer color",
-                    description = "Match the accent, use white, follow the artwork or cycle through a spectrum.",
+                    description = "Use the app's main colour, white, a colour from the album cover, or changing colours.",
                     selected = visualizerColor,
                     options = listOf("Accent", "White", "Cover", "Spectrum"),
                     onSelected = onVisualizerColorChange
@@ -3272,7 +3272,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Background treatment",
-                        description = "Artwork, theme, black or a soft gradient based on the current cover.",
+                        description = "Choose the player background: album cover, app theme, black, or a soft blend of colours based on the cover.",
                         selected = playerBackgroundStyle,
                         options = listOf("Artwork", "Theme", "Black", "Gradient"),
                         onSelected = onPlayerBackgroundStyleChange
@@ -3281,7 +3281,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Mini player style",
-                        description = "Card, flat or compact mini-player surfaces.",
+                        description = "Choose how the mini player looks.",
                         selected = miniPlayerStyle,
                         options = listOf("Card", "Flat", "Compact", "Pill"),
                         onSelected = onMiniPlayerStyleChange
@@ -3290,7 +3290,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Mini-player button shape",
-                        description = "Change the play, pause, previous and next control backgrounds independently of the mini-player card.",
+                        description = "Choose the shape behind the mini-player buttons. This is separate from the mini-player background.",
                         selected = miniPlayerControlShape,
                         options = listOf("Circle", "Rounded", "Pill", "None"),
                         onSelected = onMiniPlayerControlShapeChange
@@ -3299,7 +3299,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Mini-player icon set",
-                        description = "Choose classic, chevron or seek-style icons for previous, play/pause and next.",
+                        description = "Choose how the previous, play/pause and next buttons look.",
                         selected = miniPlayerControlIcons,
                         options = listOf("Classic", "Chevron", "Seek"),
                         onSelected = onMiniPlayerControlIconsChange
@@ -3308,7 +3308,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Mini-player progress",
-                        description = "Use a ring, line, fill, or trace playback progress along the song cover's exact outer shape. None hides it.",
+                        description = "Show song progress as a ring, line, fill, or around the edge of the album cover. Choose None to hide it.",
                         selected = miniPlayerProgressStyle,
                         options = listOf("Ring", "Line", "Fill", "Matching cover", "None"),
                         onSelected = onMiniPlayerProgressStyleChange
@@ -3317,7 +3317,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Player artwork shape",
-                        description = "Rounded, square, circular, squircle, flower, cookie, arch or slanted album artwork.",
+                        description = "Choose the shape of the album cover in the player.",
                         selected = playerArtworkShape,
                         options = listOf("Rounded", "Square", "Circle", "Squircle", "Flower", "Cookie", "Arch", "Slanted"),
                         onSelected = onPlayerArtworkShapeChange
@@ -3341,7 +3341,7 @@ private fun AppearanceScreen(
                                     style = DsmusicTheme.typography.bodyLarge
                                 )
                                 Text(
-                                    "Show one active lyric line between the title or visualizer and the action buttons in portrait mode. Karaoke lines advance after the final word completes.",
+                                    "Show the current lyric line between the title or moving graphic and the buttons when your phone is upright. Karaoke moves to the next line after the last word finishes.",
                                     style = DsmusicTheme.typography.bodyMedium,
                                     color = DsmusicTheme.colorScheme.onSurfaceVariant
                                 )
@@ -3359,7 +3359,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Lyrics text size",
-                        description = "Change the size of synced and plain lyric lines.",
+                        description = "Change how large the lyrics appear.",
                         selected = lyricsTextSize,
                         options = listOf("Small", "Standard", "Large"),
                         onSelected = onLyricsTextSizeChange
@@ -3368,7 +3368,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Lyrics colour",
-                        description = "Use the fixed D.S Launcher Home Studio gradient, interface-matched text, or pure white.",
+                        description = "Choose the lyrics colour: D.S Launcher gradient, app theme, or white.",
                         selected = lyricsColorStyle,
                         options = listOf("Home Studio Gradient", "UI Matching", "White"),
                         onSelected = onLyricsColorStyleChange
@@ -3377,7 +3377,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Lyrics alignment",
-                        description = "Keep each line's original alignment, or align all lyric lines to the left or center.",
+                        description = "Keep the original lyric alignment, or place every line on the left or in the centre.",
                         selected = lyricsAlignment,
                         options = listOf("Original", "Left", "Center"),
                         onSelected = onLyricsAlignmentChange
@@ -3386,7 +3386,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Lyrics font",
-                        description = "Choose rounded, neutral sans-serif, serif or monospaced lyric lettering.",
+                        description = "Choose the lettering style used for lyrics.",
                         selected = lyricsFontFamily,
                         options = listOf("Rounded", "Sans", "Serif", "Mono"),
                         onSelected = onLyricsFontFamilyChange
@@ -3401,7 +3401,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Interface font",
-                        description = "Choose one typeface for the entire app: Cursive, Roboto, Sans, Serif or Monospace.",
+                        description = "Choose the font used throughout the app.",
                         selected = uiFontFamily,
                         options = listOf("Cursive", "Roboto", "Sans", "Serif", "Monospace"),
                         onSelected = onUiFontFamilyChange
@@ -3410,7 +3410,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Font weight",
-                        description = "Adjust the weight of every interface text style while preserving its hierarchy.",
+                        description = "Choose how thin or bold the app's text looks.",
                         selected = uiFontWeight,
                         options = listOf("Default", "Lighter", "Bolder"),
                         onSelected = onUiFontWeightChange
@@ -3419,7 +3419,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Letter spacing",
-                        description = "Tighten or widen letter spacing across the interface.",
+                        description = "Make letters closer together or farther apart throughout the app.",
                         selected = uiLetterSpacing,
                         options = listOf("Tight", "Normal", "Wide"),
                         onSelected = onUiLetterSpacingChange
@@ -3448,7 +3448,7 @@ private fun AppearanceScreen(
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
                     title = "Interface corners",
-                    description = "Choose tighter, balanced or rounder shapes across menus, cards, buttons and dialogs.",
+                    description = "Choose how rounded menus, cards, buttons and pop-ups look.",
                     selected = uiCornerStyle,
                     options = listOf("Tight", "Soft", "Round"),
                     onSelected = onUiCornerStyleChange
@@ -3457,7 +3457,7 @@ private fun AppearanceScreen(
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
                     title = "Interface density",
-                    description = "Compact fits more content. Large increases touch-target and layout spacing.",
+                    description = "Compact shows more on each screen. Large adds more space around buttons and items.",
                     selected = uiDensity,
                     options = listOf("Compact", "Comfortable", "Large"),
                     onSelected = onUiDensityChange
@@ -3466,7 +3466,7 @@ private fun AppearanceScreen(
             SettingsGroupCard(listOf {
                 ToggleSettingRow(
                     title = "Tapered song dividers",
-                    description = "Show a tapered line between songs only where a row has no border. It reaches 2.2 dp at the centre and fades to 0 dp at both ends.",
+                    description = "Show a thin line between songs when a row has no border.",
                     checked = taperedSongDividers,
                     onCheckedChange = onTaperedSongDividersChange
                 )
@@ -3479,7 +3479,7 @@ private fun AppearanceScreen(
                 add {
                     SettingsChoiceRow(
                         title = "Navigation labels",
-                        description = "Always show every label, show only the selected tab's label, or hide all labels.",
+                        description = "Always show labels, show a label only for the selected tab, or hide them all.",
                         selected = navLabelsMode,
                         options = listOf("Always", "Selected", "Never"),
                         onSelected = onNavLabelsModeChange
@@ -3488,7 +3488,7 @@ private fun AppearanceScreen(
                 add {
                     SettingsChoiceRow(
                         title = "Dock style",
-                        description = "Floating keeps a compact pill, Docked spans the bottom edge, and Minimal removes the dock surface.",
+                        description = "Choose how the navigation bar looks: floating, full-width at the bottom, or without a background.",
                         selected = navBarStyle,
                         options = listOf("Floating", "Docked", "Minimal"),
                         onSelected = onNavBarStyleChange
@@ -3497,7 +3497,7 @@ private fun AppearanceScreen(
                 add {
                     SettingsChoiceRow(
                         title = "Dock size",
-                        description = "Adjust the navigation touch area and icon scale.",
+                        description = "Choose the height of the navigation bar and the size of its icons.",
                         selected = navBarSize,
                         options = listOf("Compact", "Standard", "Tall"),
                         onSelected = onNavBarSizeChange
@@ -3524,7 +3524,7 @@ private fun CustomAccentEditor(value: String, onApply: (String) -> Unit) {
     ) {
         Text("Custom accent", style = DsmusicTheme.typography.bodyLarge)
         Text(
-            "Enter a six-digit HEX color to use your own app accent.",
+            "Enter a 6-digit colour code to choose your own app highlight colour.",
             style = DsmusicTheme.typography.bodySmall,
             color = DsmusicTheme.colorScheme.onSurfaceVariant
         )
@@ -3579,7 +3579,7 @@ private fun ColorPaletteSelector(selected: String, onSelected: (String) -> Unit)
     ) {
         Text("Accent palette", style = DsmusicTheme.typography.bodyLarge)
         Text(
-            "Choose the app-wide accent. Dynamic colors can still tint the interface from the current artwork.",
+            "Choose the main colour for the app. Colours from the current album cover can also appear in the interface.",
             style = DsmusicTheme.typography.bodySmall,
             color = DsmusicTheme.colorScheme.onSurfaceVariant
         )
@@ -3879,7 +3879,7 @@ private fun SavedLooksEditor(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(
-            "Save the complete visual setup — colors, player, lyrics, typography and navigation — then switch between looks in one tap.",
+            "Save your colours, player style, lyrics, text and navigation together. Switch between saved looks whenever you like.",
             style = DsmusicTheme.typography.bodySmall,
             color = secondary
         )
@@ -3892,7 +3892,7 @@ private fun SavedLooksEditor(
         ) {
             Column(Modifier.weight(1f)) {
                 Text("Save current look", style = DsmusicTheme.typography.titleSmall, color = textColor)
-                Text("Create a reusable appearance preset", style = DsmusicTheme.typography.bodySmall, color = secondary)
+                Text("Save this look so you can use it again", style = DsmusicTheme.typography.bodySmall, color = secondary)
             }
             Text("+", style = DsmusicTheme.typography.headlineSmall, color = accent)
         }
@@ -3936,7 +3936,7 @@ private fun SavedLooksEditor(
             ) {
                 Text("Save this Look", style = DsmusicTheme.typography.titleLarge, color = textColor)
                 Text(
-                    "Your current colors, player layout, controls, lyrics and navigation will be saved together.",
+                    "Your current colours, player style, buttons, lyrics and navigation will be saved together.",
                     style = DsmusicTheme.typography.bodySmall,
                     color = secondary
                 )
@@ -4278,11 +4278,11 @@ private fun DynamicNavStyleRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
         content = {
             Column {
                 Text(
-                    text = "Dynamic Navbar Style",
+                    text = "Compact navigation bar",
                     style = DsmusicTheme.typography.bodyLarge
                 )
                 Text(
-                    text = "Compact height with bold, elevated icons",
+                    text = "Use a shorter navigation bar with larger, bolder icons.",
                     style = DsmusicTheme.typography.bodyMedium,
                     color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
@@ -4332,11 +4332,11 @@ private fun DynamicAlbumThemeRow(checked: Boolean, onToggle: (Boolean) -> Unit) 
         content = {
             Column {
                 Text(
-                    text = "Dynamic colors",
+                    text = "Album cover colours",
                     style = DsmusicTheme.typography.bodyLarge
                 )
                 Text(
-                    text = "Extract theme colors from the currently playing album art",
+                    text = "Use colours from the current album cover throughout the app",
                     style = DsmusicTheme.typography.bodyMedium,
                     color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
@@ -4367,11 +4367,11 @@ private fun AmoledBlackRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
         content = {
             Column {
                 Text(
-                    text = "Pure AMOLED Black",
+                    text = "Pure black background",
                     style = DsmusicTheme.typography.bodyLarge
                 )
                 Text(
-                    text = "Pitch black background in dark mode to save battery",
+                    text = "Use a completely black background in dark mode to save battery",
                     style = DsmusicTheme.typography.bodyMedium,
                     color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
@@ -4430,18 +4430,18 @@ private fun PlaybackScreen(
 
             
             }
-            SettingsAccordionSection("Crossfade") {
+            SettingsAccordionSection("Song transitions") {
             SettingsGroupCard(listOf(
                 { CrossfadeRow(crossfadeEnabled, onCrossfadeToggle, crossfadeDuration, onCrossfadeDurationChange) }
             ))
 
             
             }
-            SettingsAccordionSection("Animation frame rate") {
+            SettingsAccordionSection("Animation smoothness") {
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
-                    title = "Global animation frame rate",
-                    description = "Device follows display refresh. Fixed values cap continuous visual effects. Word-synced karaoke always uses native display VSYNC for accurate word timing; short touch/layout transitions also stay on display VSYNC. Audio playback is unchanged.",
+                    title = "Animation smoothness",
+                    description = "Choose how smoothly animations appear. Device uses your screen's normal setting; lower values use less battery. Karaoke timing and music playback stay the same.",
                     selected = if (playerFrameRate == 0) "Device (Default)" else "$playerFrameRate FPS",
                     options = listOf("Device (Default)", "20 FPS", "30 FPS", "40 FPS", "60 FPS"),
                     onSelected = { selected ->
@@ -4460,9 +4460,9 @@ private fun PlaybackScreen(
 
             
             }
-            SettingsAccordionSection("Playback Bitrate") {
+            SettingsAccordionSection("Playback quality") {
             SettingsGroupCard(listOf(
-                { AudioQualityRow("Playback Bitrate", audioQuality, onAudioQualityChange) }
+                { AudioQualityRow("Playback quality", audioQuality, onAudioQualityChange) }
             ))
 
             
@@ -4474,14 +4474,14 @@ private fun PlaybackScreen(
 
             
             }
-            SettingsAccordionSection("Download Bitrate") {
+            SettingsAccordionSection("Download quality") {
             SettingsGroupCard(listOf(
-                { AudioQualityRow("Download Bitrate", downloadBitrate, onDownloadBitrateChange) }
+                { AudioQualityRow("Download quality", downloadBitrate, onDownloadBitrateChange) }
             ))
 
             
             }
-            SettingsAccordionSection("Audio Focus") {
+            SettingsAccordionSection("Other app sounds") {
             SettingsGroupCard(listOf(
                 { AudioFocusRow(audioFocus, onAudioFocusToggle) }
             ))
@@ -4533,7 +4533,7 @@ private fun AudioQualityRow(
             Column {
                 Text(text = title, style = DsmusicTheme.typography.bodyLarge)
                 Text(
-                    text = "Target bitrate; the closest matching source stream is selected. The source may not offer the exact rate.",
+                    text = "Choose the sound quality. Higher numbers usually give better sound but may use more data or storage.",
                     style = DsmusicTheme.typography.bodyMedium,
                     color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
@@ -4586,7 +4586,7 @@ private fun AudioFormatRow(
             Column {
                 Text(text = title, style = DsmusicTheme.typography.bodyLarge)
                 Text(
-                    text = "Requests this source format without transcoding. If unavailable for a track, choose from the other available M4A, MP3 or Opus streams.",
+                    text = "Choose the file type for downloads. If a song is not available in one type, choose another.",
                     style = DsmusicTheme.typography.bodyMedium,
                     color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
@@ -5009,10 +5009,17 @@ private fun CrossfadeRow(
         onClick = { onToggle(!enabled) },
         verticalAlignment = Alignment.CenterVertically,
         content = {
-            Text(
-                text = stringResource(R.string.setting_crossfade),
-                style = DsmusicTheme.typography.bodyLarge
-            )
+            Column {
+                Text(
+                    text = stringResource(R.string.setting_crossfade),
+                    style = DsmusicTheme.typography.bodyLarge
+                )
+                Text(
+                    text = "Blend the end of one song into the start of the next.",
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
+                )
+            }
         },
         supportingContent = {
             Column {
@@ -5056,10 +5063,17 @@ private fun AudioFocusRow(enabled: Boolean, onToggle: (Boolean) -> Unit) {
     DsmusicListItem(
         onClick = { onToggle(!enabled) },
         content = {
-            Text(
-                text = stringResource(R.string.setting_audio_focus),
-                style = DsmusicTheme.typography.bodyLarge
-            )
+            Column {
+                Text(
+                    text = stringResource(R.string.setting_audio_focus),
+                    style = DsmusicTheme.typography.bodyLarge
+                )
+                Text(
+                    text = "Pause music when another app needs to play sound.",
+                    style = DsmusicTheme.typography.bodyMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
+                )
+            }
         },
         leadingContent = {
             Icon(
@@ -5287,7 +5301,7 @@ private fun CacheSizeRow(
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text("Max $title Size") },
+            title = { Text("Storage limit for $title") },
             text = {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     listOf(100, 500, 1024, 2048, 0).forEach { sizeOption ->
@@ -5357,7 +5371,7 @@ private fun CacheSizeRow(
                     
                     val maxText = if (maxSize == 0) "Unlimited" else if (maxSize >= 1024) "${maxSize / 1024} GB" else "$maxSize MB"
                     Text(
-                        text = "Max: $maxText",
+                        text = "Limit: $maxText",
                         style = DsmusicTheme.typography.bodyMedium,
                         color = DsmusicTheme.colorScheme.onSurfaceVariant
                     )
@@ -5380,7 +5394,7 @@ private fun CacheSizeRow(
             DsmusicIconButton(onClick = onClear) {
                 Icon(
                     imageVector = Icons.Rounded.Delete,
-                    contentDescription = "Clear Cache",
+                    contentDescription = "Clear temporary files",
                     tint = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -5416,7 +5430,7 @@ private fun SongCacheSizeRow(
     onClear: () -> Unit
 ) {
     CacheSizeRow(
-        title = "Song Cache",
+        title = "Temporary songs",
         currentSize = cacheSize,
         maxSize = maxSize,
         onMaxSizeChange = onMaxSizeChange,
@@ -5432,7 +5446,7 @@ private fun ImageCacheSizeRow(
     onClear: () -> Unit
 ) {
     CacheSizeRow(
-        title = "Image Cache",
+        title = "Temporary images",
         currentSize = cacheSize,
         maxSize = maxSize,
         onMaxSizeChange = onMaxSizeChange,
@@ -5659,7 +5673,7 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
                     {
                         DsmusicListItem(
                             headlineContent = { Text("Report a Bug", style = DsmusicTheme.typography.bodyLarge) },
-                            supportingContent = { Text("Open GitHub with pre-filled device information", style = DsmusicTheme.typography.bodyMedium) },
+                            supportingContent = { Text("Open a form to report a problem", style = DsmusicTheme.typography.bodyMedium) },
                             leadingContent = { Icon(Icons.Rounded.BugReport, null, tint = DsmusicTheme.colorScheme.error) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             modifier = Modifier.clickable {
@@ -5695,7 +5709,7 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
                     {
                         DsmusicListItem(
                             headlineContent = { Text("Copy Debug Information", style = DsmusicTheme.typography.bodyLarge) },
-                            supportingContent = { Text("Copy device & app version to clipboard", style = DsmusicTheme.typography.bodyMedium) },
+                            supportingContent = { Text("Copy your device and app version", style = DsmusicTheme.typography.bodyMedium) },
                             leadingContent = { Icon(Icons.Rounded.ContentCopy, null, tint = DsmusicTheme.colorScheme.onSurfaceVariant) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             modifier = Modifier.clickable {
@@ -5708,7 +5722,7 @@ private fun FeedbackScreen(navController: androidx.navigation.NavController) {
                     {
                         DsmusicListItem(
                             headlineContent = { Text("Export Logs", style = DsmusicTheme.typography.bodyLarge) },
-                            supportingContent = { Text("Share raw debug logs to attach to an issue", style = DsmusicTheme.typography.bodyMedium) },
+                            supportingContent = { Text("Share app details to help investigate a problem", style = DsmusicTheme.typography.bodyMedium) },
                             leadingContent = { Icon(Icons.Rounded.Description, null, tint = DsmusicTheme.colorScheme.onSurfaceVariant) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             modifier = Modifier.clickable {
