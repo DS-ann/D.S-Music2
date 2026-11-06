@@ -1031,7 +1031,11 @@ class AudioPlaybackService : MediaSessionService() {
             widgetPlainLyrics = null
             cancelWidgetLyricRefresh()
             updateWidgetState(player.isPlaying)
-            if (DsmusicWidgetProvider.hasLyricsModeWidget(this@AudioPlaybackService)) {
+            // The ViewModel song observer refetches lyrics when it is attached.
+            // The service-only widget fetch is needed only when no Activity ViewModel exists.
+            if (viewModel == null &&
+                DsmusicWidgetProvider.hasLyricsModeWidget(this@AudioPlaybackService)
+            ) {
                 requestWidgetLyrics()
             }
             if (player.isPlaying) {
