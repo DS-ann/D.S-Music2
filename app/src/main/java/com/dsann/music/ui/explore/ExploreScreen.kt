@@ -80,7 +80,6 @@ import com.dsann.music.ui.theme.ListItem
 import com.dsann.music.ui.theme.ListItemDefaults
 import com.dsann.music.ui.theme.DsmusicTheme
 import com.dsann.music.ui.theme.LocalPageTransitionDurationMillis
-import com.dsann.music.ui.theme.LocalPageTransitionDurationMillis
 import com.dsann.music.ui.theme.observeKey
 import com.dsann.music.ui.theme.OutlinedButton
 import com.dsann.music.ui.theme.Snackbar
@@ -108,7 +107,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -759,6 +757,16 @@ fun ExploreScreen(
                 // Let artist/detail navigation from the full player replace Replay,
                 // then naturally return to Replay when the detail stack is closed.
                 if (renderedScreen == "recap") {
+                    Box(
+                        modifier = Modifier.fillMaxSize().graphicsLayer {
+                            val progress = screenSlideProgress.value.coerceIn(0f, 1f)
+                            translationX = when (screenSlidePhase) {
+                                1 -> -screenSlideDirection * progress * size.width
+                                2 -> screenSlideDirection * (1f - progress) * size.width
+                                else -> 0f
+                            }
+                        }
+                    ) {
                     RecapTabContent(
                         nestedScrollConnection = nestedScrollConnection,
                         viewModel = playerSharedViewModel,
@@ -795,6 +803,7 @@ fun ExploreScreen(
                             viewModel.loadArtistByName(artistName)
                         }
                     )
+                    }
                 } else {
                     ExploreTransitionHost(
                     enabled = android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.M
