@@ -2047,7 +2047,7 @@ private fun GestureSettingRow(
         ) {
             Text(title, modifier = Modifier.weight(1f), style = DsmusicTheme.typography.bodyLarge)
             Text(selected.label, color = DsmusicTheme.colorScheme.onSurfaceVariant, style = DsmusicTheme.typography.labelLarge)
-            Icon(Icons.Rounded.ChevronRight, contentDescription = "Change $title", tint = DsmusicTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 6.dp).size(18.dp))
+            Icon(Icons.Rounded.ChevronRight, contentDescription = "Change $title", tint = DsmusicTheme.colorScheme.onSurface, modifier = Modifier.padding(start = 6.dp).size(20.dp))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { action ->
@@ -2158,8 +2158,8 @@ private fun SettingsMainScreen(navController: androidx.navigation.NavController)
                     Icon(
                         Icons.Rounded.ChevronRight,
                         contentDescription = null,
-                        tint = DsmusicTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
+                        tint = DsmusicTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -2307,8 +2307,8 @@ private fun SettingsDashboardTile(
             Icon(
                 Icons.Rounded.ChevronRight,
                 contentDescription = null,
-                tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
-                modifier = Modifier.size(18.dp)
+                tint = DsmusicTheme.colorScheme.onSurface,
+                modifier = Modifier.size(20.dp)
             )
         }
         Text(
@@ -3005,18 +3005,6 @@ private fun AppearanceScreen(
                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
             )
 
-            PlayerCustomizationPreview(
-                layout = playerLayout,
-                artworkShape = playerArtworkShape,
-                miniPlayerStyle = miniPlayerStyle,
-                controlShape = miniPlayerControlShape,
-                buttonStyle = playerButtonStyle,
-                buttons = playerButtons,
-                sessionButtons = sessionButtons,
-                artworkScale = playerArtworkScale,
-                buttonsPill = playerButtonsPill
-            )
-
             SettingsAccordionSection("Your Looks") {
                 SavedLooksEditor(
                     looks = savedLooks,
@@ -3612,251 +3600,6 @@ private fun ColorPaletteSelector(selected: String, onSelected: (String) -> Unit)
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun PlayerCustomizationPreview(
-    layout: String,
-    artworkShape: String,
-    miniPlayerStyle: String,
-    controlShape: String,
-    buttonStyle: String,
-    buttons: List<String>,
-    sessionButtons: List<String>,
-    artworkScale: Float,
-    buttonsPill: Boolean
-) {
-    val accent = DsmusicTheme.colorScheme.primary
-    val previewBackground = Color(0xFF111923)
-    val artworkCorner = when (artworkShape) {
-        "Square" -> RoundedCornerShape(3.dp)
-        "Circle" -> CircleShape
-        "Squircle" -> RoundedCornerShape(26.dp)
-        "Arch" -> RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp, bottomStart = 10.dp, bottomEnd = 10.dp)
-        "Slanted" -> RoundedCornerShape(8.dp)
-        else -> RoundedCornerShape(18.dp)
-    }
-    val shellShape = when (miniPlayerStyle) {
-        "Flat" -> RoundedCornerShape(8.dp)
-        "Compact" -> RoundedCornerShape(12.dp)
-        "Pill" -> CircleShape
-        else -> RoundedCornerShape(22.dp)
-    }
-    // The full-player action buttons follow the dedicated Button presentation
-    // setting. The mini-player control shape is a separate preference.
-    val actionShape = when (buttonStyle) {
-        "Round" -> RoundedCornerShape(10.dp)
-        "Pill" -> CircleShape
-        "None" -> RoundedCornerShape(0.dp)
-        "Square" -> RoundedCornerShape(4.dp)
-        else -> RoundedCornerShape(10.dp)
-    }
-    val miniPlayerActionShape = when (controlShape) {
-        "Circle", "Pill" -> CircleShape
-        "Rounded" -> RoundedCornerShape(10.dp)
-        "None" -> RoundedCornerShape(0.dp)
-        else -> CircleShape
-    }
-    val artworkSize = (if (layout == "Vinyl" || layout == "Cassette") 88.dp else 84.dp) *
-        artworkScale.coerceIn(0.65f, 1f)
-
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("PLAYER PREVIEW", style = DsmusicTheme.typography.labelLarge, color = accent, fontWeight = FontWeight.SemiBold)
-            Text(layout, style = DsmusicTheme.typography.labelSmall, color = DsmusicTheme.colorScheme.onSurfaceVariant)
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth()
-                .clip(shellShape)
-                .background(previewBackground)
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier.size(artworkSize).clip(artworkCorner)
-                    .background(accent.copy(alpha = 0.22f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("DS", color = accent, style = DsmusicTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            }
-            Column(
-                modifier = Modifier.weight(1f).padding(start = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text("Now playing", color = Color.White, style = DsmusicTheme.typography.titleSmall, maxLines = 1)
-                Text("Artist · Album", color = Color.White.copy(alpha = 0.62f), style = DsmusicTheme.typography.bodySmall, maxLines = 1)
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Box(Modifier.weight(0.42f).height(3.dp).clip(CircleShape).background(accent))
-                    Box(Modifier.weight(0.58f).height(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.20f)))
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .clip(if (buttonsPill) CircleShape else RoundedCornerShape(0.dp))
-                        .background(if (buttonsPill) Color.White.copy(alpha = 0.09f) else Color.Transparent)
-                        .padding(horizontal = if (buttonsPill) 6.dp else 0.dp, vertical = if (buttonsPill) 4.dp else 0.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    buttons.forEach { key ->
-                        val shortLabel = when (key) {
-                            "lyrics" -> "LYR"
-                            "video" -> "VID"
-                            "queue" -> "QUEUE"
-                            "share" -> "SHARE"
-                            "download" -> "SAVE"
-                            "like" -> "LIKE"
-                            "dislike" -> "NO"
-                            "sleep" -> "SLEEP"
-                            "shuffle" -> "SHUFFLE"
-                            "repeat" -> "REPEAT"
-                            else -> key.take(4).uppercase()
-                        }
-                        Text(
-                            shortLabel,
-                            modifier = Modifier.clip(actionShape)
-                                .background(if (buttonStyle == "None") Color.Transparent else accent.copy(alpha = 0.17f))
-                                .padding(horizontal = 5.dp, vertical = 4.dp),
-                            color = if (buttonStyle == "None") Color.White.copy(alpha = 0.76f) else accent,
-                            style = DsmusicTheme.typography.labelSmall,
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
-            Box(
-                modifier = Modifier.padding(start = 8.dp).size(36.dp)
-                    .clip(miniPlayerActionShape)
-                    .background(
-                        if (controlShape == "None") Color.Transparent
-                        else accent.copy(alpha = 0.18f)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("▶", color = accent, style = DsmusicTheme.typography.titleMedium)
-            }
-        }
-        Text(
-            "$layout layout · $artworkShape artwork · $miniPlayerStyle mini player · $buttonStyle actions",
-            style = DsmusicTheme.typography.bodySmall,
-            color = DsmusicTheme.colorScheme.onSurfaceVariant
-        )
-
-        // A second preview reflects the exact two actions selected for the
-        // Android media notification and lock-screen MediaSession.
-        val selectedSessionActions = sessionButtons
-            .filter { it in sessionButtonNames.keys }
-            .distinct()
-            .take(2)
-        Column(
-            modifier = Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
-                .background(Color(0xFF17212D))
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "NOTIFICATION & LOCK SCREEN",
-                    style = DsmusicTheme.typography.labelLarge,
-                    color = accent,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    "${selectedSessionActions.size}/2",
-                    style = DsmusicTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.65f)
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(44.dp).clip(RoundedCornerShape(9.dp))
-                        .background(accent.copy(alpha = 0.20f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("DS", color = accent, fontWeight = FontWeight.Bold)
-                }
-                Column(
-                    modifier = Modifier.weight(1f).padding(start = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Text("D.S Music", color = Color.White, style = DsmusicTheme.typography.titleSmall)
-                    Text(
-                        "Now playing · Artist",
-                        color = Color.White.copy(alpha = 0.65f),
-                        style = DsmusicTheme.typography.bodySmall,
-                        maxLines = 1
-                    )
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                selectedSessionActions.getOrNull(0)?.let { SessionPreviewAction(it, accent) }
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("◀", color = Color.White, style = DsmusicTheme.typography.titleMedium)
-                    Text("Ⅱ", color = Color.White, style = DsmusicTheme.typography.titleMedium)
-                    Text("▶", color = Color.White, style = DsmusicTheme.typography.titleMedium)
-                }
-                selectedSessionActions.getOrNull(1)?.let { SessionPreviewAction(it, accent) }
-            }
-            if (selectedSessionActions.isEmpty()) {
-                Text(
-                    "No additional notification or lock-screen actions selected.",
-                    color = Color.White.copy(alpha = 0.65f),
-                    style = DsmusicTheme.typography.bodySmall
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SessionPreviewAction(key: String, accent: Color) {
-    val (symbol, label) = when (key) {
-        "like" -> "♥" to "Like"
-        "shuffle" -> "⇄" to "Shuffle"
-        "repeat" -> "↻" to "Repeat"
-        "dislike" -> "⊖" to "Not for me"
-        "back10" -> "−10s" to "Back 10s"
-        "ahead30" -> "+30s" to "Forward 30s"
-        else -> key to key
-    }
-    Column(
-        modifier = Modifier.width(64.dp).clip(RoundedCornerShape(11.dp))
-            .background(accent.copy(alpha = 0.16f))
-            .padding(horizontal = 4.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
-    ) {
-        Text(symbol, color = accent, style = DsmusicTheme.typography.titleSmall)
-        Text(
-            label,
-            color = Color.White.copy(alpha = 0.88f),
-            style = DsmusicTheme.typography.labelSmall,
-            maxLines = 1
-        )
     }
 }
 
@@ -4903,10 +4646,10 @@ private fun SettingsAccordionSection(
             Icon(
                 imageVector = Icons.Rounded.ChevronRight,
                 contentDescription = if (expanded) "Collapse $text" else "Expand $text",
-                tint = DsmusicTheme.colorScheme.onSurfaceVariant,
+                tint = DsmusicTheme.colorScheme.onSurface,
                 modifier = Modifier
                     .padding(end = 4.dp)
-                    .size(18.dp)
+                    .size(20.dp)
                     .graphicsLayer { rotationZ = arrowRotation }
             )
         }
@@ -5148,7 +4891,7 @@ private fun SleepTimerSection(
                 Icon(
                     imageVector = Icons.Rounded.ChevronRight,
                     contentDescription = null,
-                    tint = DsmusicTheme.colorScheme.onSurfaceVariant
+                    tint = DsmusicTheme.colorScheme.onSurface
                 )
             },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)

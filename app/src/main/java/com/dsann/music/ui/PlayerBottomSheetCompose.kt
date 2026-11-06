@@ -2646,7 +2646,7 @@ private fun MiniPlayerArtworkProgressOverlay(
             backgroundColor.toArgb()
         ) >= 3.0
     ) accentColor else contrastProgressColor
-    val progressTrackColor = contrastProgressColor.copy(alpha = 0.46f)
+    val progressTrackColor = Color.Transparent
 
     // The frame timestamp is read inside Canvas so only the artwork-progress drawing
     // invalidates at display refresh, not the entire mini-player composition.
