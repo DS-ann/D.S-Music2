@@ -99,7 +99,9 @@ data class CachedAudioFacts(
 data class CompleteCachedMediaEntry(
     val cacheKey: String,
     val metadata: CachedMediaMetadata,
-    val cachedBytes: Long
+    val cachedBytes: Long,
+    /** Oldest cached chunk file timestamp, used when older metadata has no cache-added date. */
+    val cacheFileModifiedAtMs: Long = 0L
 )
 
 
@@ -217,7 +219,14 @@ class AudioPlaybackService : MediaSessionService() {
 
                 val spans = currentCache.getCachedSpans(cacheKey)
                 var cachedBytes = 0L
-                for (span in spans) cachedBytes += span.length
+                var oldestCacheFileModifiedAtMs = Long.MAX_VALUE
+                for (span in spans) {
+                    cachedBytes += span.length
+                    val modifiedAt = span.file?.lastModified() ?: 0L
+                    if (modifiedAt > 0L && modifiedAt < oldestCacheFileModifiedAtMs) {
+                        oldestCacheFileModifiedAtMs = modifiedAt
+                    }
+                }
                 if (cachedBytes <= 0L) continue
 
                 val stored = metadataPrefs.getString(cacheMetadataEntryKey(cacheKey), null)
@@ -229,7 +238,16 @@ class AudioPlaybackService : MediaSessionService() {
                 // Do not display partial cache entries: Cache playlist playback is offline-only.
                 if (contentLength <= 0L || !currentCache.isCached(cacheKey, 0L, contentLength)) continue
 
-                entries.add(CompleteCachedMediaEntry(cacheKey, metadata, cachedBytes))
+                entries.add(
+                    CompleteCachedMediaEntry(
+                        cacheKey = cacheKey,
+                        metadata = metadata,
+                        cachedBytes = cachedBytes,
+                        cacheFileModifiedAtMs = oldestCacheFileModifiedAtMs.takeIf {
+                            it != Long.MAX_VALUE
+                        } ?: 0L
+                    )
+                )
             }
 
             entries.sortByDescending { it.cachedBytes }
