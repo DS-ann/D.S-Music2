@@ -3466,7 +3466,7 @@ private fun AppearanceScreen(
             SettingsGroupCard(listOf {
                 ToggleSettingRow(
                     title = "Tapered song dividers",
-                    description = "Show a fine line between songs only where a row has no border. It tapers to 0 dp at both ends and reaches 1.5 dp at the centre.",
+                    description = "Show a tapered line between songs only where a row has no border. It reaches 2.2 dp at the centre and fades to 0 dp at both ends.",
                     checked = taperedSongDividers,
                     onCheckedChange = onTaperedSongDividersChange
                 )
