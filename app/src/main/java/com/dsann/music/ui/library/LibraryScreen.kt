@@ -270,41 +270,33 @@ fun LibraryScreen(
         fragmentActivity?.let { ViewModelProvider(it)[ExploreViewModel::class.java] }
     }
 
-    // Library subsections use the same configurable slide speed as app navigation.
+    // Library categories use one attached horizontal track, with a shared
+    // 100% → 50% → 100% opacity curve at the same configurable transition speed.
     val pageTransitionDurationMillis = LocalPageTransitionDurationMillis.current
     val libraryTabOrder = remember {
         listOf("Playlists", "Songs", "Albums", "Artists", "History", "Podcasts", "Downloaded songs", "Recap")
     }
-    var renderedLibraryTab by rememberSaveable { mutableStateOf(activeTab) }
-    var libraryTabSlideDirection by remember { mutableStateOf(1f) }
-    var libraryTabSlidePhase by remember { mutableStateOf(0) } // 0 idle, 1 exit, 2 enter
-    val libraryTabSlideProgress = remember { androidx.compose.animation.core.Animatable(1f) }
+    var previousLibraryTab by rememberSaveable { mutableStateOf(activeTab) }
+    val libraryTabOpacity = remember { androidx.compose.animation.core.Animatable(1f) }
     LaunchedEffect(activeTab) {
-        if (renderedLibraryTab != activeTab) {
-            val oldIndex = libraryTabOrder.indexOf(renderedLibraryTab).coerceAtLeast(0)
-            val newIndex = libraryTabOrder.indexOf(activeTab).takeIf { it >= 0 } ?: oldIndex + 1
-            libraryTabSlideDirection = if (newIndex >= oldIndex) 1f else -1f
-            libraryTabSlidePhase = 1
-            libraryTabSlideProgress.snapTo(0f)
-            libraryTabSlideProgress.animateTo(
-                1f,
+        if (previousLibraryTab != activeTab) {
+            previousLibraryTab = activeTab
+            val firstHalf = (pageTransitionDurationMillis / 2).coerceAtLeast(1)
+            val secondHalf = (pageTransitionDurationMillis - firstHalf).coerceAtLeast(1)
+            libraryTabOpacity.animateTo(
+                0.5f,
                 androidx.compose.animation.core.tween(
-                    durationMillis = pageTransitionDurationMillis,
-                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                    durationMillis = firstHalf,
+                    easing = androidx.compose.animation.core.LinearEasing
                 )
             )
-            renderedLibraryTab = activeTab
-            libraryTabSlidePhase = 2
-            libraryTabSlideProgress.snapTo(0f)
-            libraryTabSlideProgress.animateTo(
+            libraryTabOpacity.animateTo(
                 1f,
                 androidx.compose.animation.core.tween(
-                    durationMillis = pageTransitionDurationMillis,
-                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                    durationMillis = secondHalf,
+                    easing = androidx.compose.animation.core.LinearEasing
                 )
             )
-            libraryTabSlidePhase = 0
-            libraryTabSlideProgress.snapTo(1f)
         }
     }
 
@@ -314,24 +306,24 @@ fun LibraryScreen(
         androidx.compose.animation.core.Animatable(1f)
     }
     LaunchedEffect(libraryOverlayVisible) {
-        if (libraryOverlayVisible) {
-            libraryBaseOpacity.animateTo(
-                0f,
-                androidx.compose.animation.core.tween(
-                    durationMillis = pageTransitionDurationMillis,
-                    easing = androidx.compose.animation.core.FastOutSlowInEasing
-                )
+        // Keep the underlying page present while the account/history page travels in or out.
+        // It dims to 50% at the midpoint but is never faded to a blank surface.
+        val firstHalf = (pageTransitionDurationMillis / 2).coerceAtLeast(1)
+        val secondHalf = (pageTransitionDurationMillis - firstHalf).coerceAtLeast(1)
+        libraryBaseOpacity.animateTo(
+            0.5f,
+            androidx.compose.animation.core.tween(
+                durationMillis = firstHalf,
+                easing = androidx.compose.animation.core.LinearEasing
             )
-        } else if (libraryBaseOpacity.value < 1f) {
-            kotlinx.coroutines.delay(pageTransitionDurationMillis.toLong())
-            libraryBaseOpacity.animateTo(
-                1f,
-                androidx.compose.animation.core.tween(
-                    durationMillis = pageTransitionDurationMillis,
-                    easing = androidx.compose.animation.core.FastOutSlowInEasing
-                )
+        )
+        libraryBaseOpacity.animateTo(
+            1f,
+            androidx.compose.animation.core.tween(
+                durationMillis = secondHalf,
+                easing = androidx.compose.animation.core.LinearEasing
             )
-        }
+        )
     }
 
     val history by accountViewModel?.history?.collectAsStateWithLifecycle(emptyList()) ?: remember { mutableStateOf(emptyList()) }
@@ -652,16 +644,33 @@ fun LibraryScreen(
                     .nestedScroll(nestedScrollConnection)
                     .clipToBounds()
                     .graphicsLayer {
-                        alpha = libraryBaseOpacity.value.coerceIn(0f, 1f)
-                        val progress = libraryTabSlideProgress.value.coerceIn(0f, 1f)
-                        translationX = when (libraryTabSlidePhase) {
-                            1 -> -libraryTabSlideDirection * progress * size.width
-                            2 -> libraryTabSlideDirection * (1f - progress) * size.width
-                            else -> 0f
-                        }
+                        alpha = (libraryBaseOpacity.value * libraryTabOpacity.value)
+                            .coerceIn(0.5f, 1f)
                     }
             ) {
-                when (renderedLibraryTab) {
+                androidx.compose.animation.AnimatedContent(
+                    targetState = activeTab,
+                    modifier = Modifier.fillMaxSize(),
+                    transitionSpec = {
+                        val oldIndex = libraryTabOrder.indexOf(initialState).coerceAtLeast(0)
+                        val newIndex = libraryTabOrder.indexOf(targetState).takeIf { it >= 0 } ?: oldIndex + 1
+                        val direction = if (newIndex >= oldIndex) 1 else -1
+                        slideInHorizontally(
+                            animationSpec = androidx.compose.animation.core.tween(
+                                durationMillis = pageTransitionDurationMillis,
+                                easing = androidx.compose.animation.core.FastOutSlowInEasing
+                            )
+                        ) { width -> direction * width } togetherWith
+                            slideOutHorizontally(
+                                animationSpec = androidx.compose.animation.core.tween(
+                                    durationMillis = pageTransitionDurationMillis,
+                                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                                )
+                            ) { width -> -direction * width }
+                    },
+                    label = "Library Attached Page Slide"
+                ) { tab ->
+                when (tab) {
                     "Playlists" -> PlaylistsTabContent(
                         nestedScrollConnection,
                         viewModel,
@@ -1274,6 +1283,7 @@ itemsIndexed(
                         },
                         onCacheScreenChanged = { isCacheScreenOpen = it }
                     )
+                }
                 }
             }
         }

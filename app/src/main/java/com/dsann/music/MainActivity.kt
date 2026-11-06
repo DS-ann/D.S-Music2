@@ -396,12 +396,13 @@ class MainActivity : AppCompatActivity() {
                         else -> null
                     }
 
-                    // Root tabs use sequential slides so their large content trees are
-                    // not animated concurrently on Android 6.
+                    // Keep both pages mounted only for the short transition so their edges
+                    // stay attached while the pair travels as one horizontal track.
                     var renderedRootTab by remember { mutableStateOf<String?>(null) }
+                    var incomingRootTab by remember { mutableStateOf<String?>(null) }
                     var rootTabSlideDirection by remember { mutableStateOf(1f) }
-                    var rootTabSlidePhase by remember { mutableStateOf(0) } // 0 idle, 1 exit, 2 enter
                     val rootTabSlideProgress = remember { androidx.compose.animation.core.Animatable(1f) }
+                    val rootTabOpacity = remember { androidx.compose.animation.core.Animatable(1f) }
                     LaunchedEffect(activeCachedRootTab) {
                         val targetRoute = activeCachedRootTab
                         if (targetRoute != null && targetRoute != renderedRootTab) {
@@ -410,35 +411,58 @@ class MainActivity : AppCompatActivity() {
                             val incomingIndex = rootTabIndices[targetRoute] ?: outgoingIndex
                             rootTabSlideDirection = if (incomingIndex >= outgoingIndex) 1f else -1f
                             if (outgoingRoute == null) {
-                                renderedRootTab = targetRoute
-                                rootTabSlidePhase = 0
-                                rootTabSlideProgress.snapTo(1f)
-                            } else {
-                                rootTabSlidePhase = 1
-                                rootTabSlideProgress.snapTo(0f)
-                                rootTabSlideProgress.animateTo(
-                                    1f,
-                                    androidx.compose.animation.core.tween(
-                                        durationMillis = pageTransitionDurationMillis,
-                                        easing = androidx.compose.animation.core.FastOutSlowInEasing
-                                    )
-                                )
                                 if (isLegacyAndroid6) {
                                     visitedRootTabs.clear()
                                     visitedRootTabs.add(targetRoute)
                                 }
                                 renderedRootTab = targetRoute
-                                rootTabSlidePhase = 2
-                                rootTabSlideProgress.snapTo(0f)
-                                rootTabSlideProgress.animateTo(
-                                    1f,
-                                    androidx.compose.animation.core.tween(
-                                        durationMillis = pageTransitionDurationMillis,
-                                        easing = androidx.compose.animation.core.FastOutSlowInEasing
-                                    )
-                                )
-                                rootTabSlidePhase = 0
+                                incomingRootTab = null
                                 rootTabSlideProgress.snapTo(1f)
+                                rootTabOpacity.snapTo(1f)
+                            } else {
+                                if (isLegacyAndroid6 && targetRoute !in visitedRootTabs) {
+                                    visitedRootTabs.add(targetRoute)
+                                }
+                                incomingRootTab = targetRoute
+                                rootTabSlideProgress.snapTo(0f)
+                                rootTabOpacity.snapTo(1f)
+                                val firstHalf = (pageTransitionDurationMillis / 2).coerceAtLeast(1)
+                                val secondHalf = (pageTransitionDurationMillis - firstHalf).coerceAtLeast(1)
+                                kotlinx.coroutines.coroutineScope {
+                                    launch {
+                                        rootTabSlideProgress.animateTo(
+                                            1f,
+                                            androidx.compose.animation.core.tween(
+                                                durationMillis = pageTransitionDurationMillis,
+                                                easing = androidx.compose.animation.core.FastOutSlowInEasing
+                                            )
+                                        )
+                                    }
+                                    launch {
+                                        rootTabOpacity.animateTo(
+                                            0.5f,
+                                            androidx.compose.animation.core.tween(
+                                                durationMillis = firstHalf,
+                                                easing = androidx.compose.animation.core.LinearEasing
+                                            )
+                                        )
+                                        rootTabOpacity.animateTo(
+                                            1f,
+                                            androidx.compose.animation.core.tween(
+                                                durationMillis = secondHalf,
+                                                easing = androidx.compose.animation.core.LinearEasing
+                                            )
+                                        )
+                                    }
+                                }
+                                renderedRootTab = targetRoute
+                                incomingRootTab = null
+                                rootTabSlideProgress.snapTo(1f)
+                                rootTabOpacity.snapTo(1f)
+                                if (isLegacyAndroid6) {
+                                    visitedRootTabs.clear()
+                                    visitedRootTabs.add(targetRoute)
+                                }
                             }
                         }
                     }
@@ -537,21 +561,24 @@ class MainActivity : AppCompatActivity() {
                             // old roots are evicted to reduce repeated layout, draw and memory work;
                             // rememberSaveableStateHolder restores their saveable UI state on return.
                             visitedRootTabs.forEach { cachedRoute ->
-                                val tabIsActive = cachedRoute == renderedRootTab
+                                val isOutgoingTab = cachedRoute == renderedRootTab
+                                val isIncomingTab = cachedRoute == incomingRootTab
+                                val tabIsActive = isOutgoingTab || isIncomingTab
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .graphicsLayer {
-                                            alpha = if (tabIsActive) 1f else 0f
+                                            alpha = if (tabIsActive) rootTabOpacity.value else 0f
                                             val progress = rootTabSlideProgress.value.coerceIn(0f, 1f)
-                                            val slideOffsetFraction = when (rootTabSlidePhase) {
-                                                1 -> -rootTabSlideDirection * progress
-                                                2 -> rootTabSlideDirection * (1f - progress)
+                                            translationX = when {
+                                                isOutgoingTab && incomingRootTab != null ->
+                                                    -rootTabSlideDirection * progress * size.width
+                                                isIncomingTab ->
+                                                    rootTabSlideDirection * (1f - progress) * size.width
                                                 else -> 0f
                                             }
-                                            translationX = if (tabIsActive) slideOffsetFraction * size.width else 0f
                                         }
-                                        .zIndex(if (tabIsActive) 1f else 0f)
+                                        .zIndex(if (isIncomingTab) 2f else if (isOutgoingTab) 1f else 0f)
                                         .pointerInput(tabIsActive) {
                                             if (!tabIsActive) {
                                                 awaitPointerEventScope {

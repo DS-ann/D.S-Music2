@@ -661,37 +661,30 @@ fun ExploreScreen(
             }
         }
 
-    // Swap heavy Explore pages between sequential slides to avoid animating
-    // two large scrolling trees together on Android 6.
+    // AnimatedContent keeps the outgoing and incoming pages side-by-side for the
+    // whole slide. A shared opacity dip reaches 50% at the midpoint, then returns to 100%.
     val pageTransitionDurationMillis = LocalPageTransitionDurationMillis.current
-    var renderedScreen by remember { mutableStateOf(currentScreen) }
-    var screenSlideDirection by remember { mutableStateOf(1f) }
-    var screenSlidePhase by remember { mutableStateOf(0) } // 0 idle, 1 exit, 2 enter
-    val screenSlideProgress = remember { androidx.compose.animation.core.Animatable(1f) }
+    var previousScreen by remember { mutableStateOf(currentScreen) }
+    val pageTransitionOpacity = remember { androidx.compose.animation.core.Animatable(1f) }
     LaunchedEffect(currentScreen) {
-        if (renderedScreen != currentScreen) {
-            screenSlideDirection = if (currentScreen == "home" || currentScreen == "recap") -1f else 1f
-            screenSlidePhase = 1
-            screenSlideProgress.snapTo(0f)
-            screenSlideProgress.animateTo(
-                1f,
+        if (previousScreen != currentScreen) {
+            previousScreen = currentScreen
+            val firstHalf = (pageTransitionDurationMillis / 2).coerceAtLeast(1)
+            val secondHalf = (pageTransitionDurationMillis - firstHalf).coerceAtLeast(1)
+            pageTransitionOpacity.animateTo(
+                0.5f,
                 androidx.compose.animation.core.tween(
-                    durationMillis = pageTransitionDurationMillis,
-                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                    durationMillis = firstHalf,
+                    easing = androidx.compose.animation.core.LinearEasing
                 )
             )
-            renderedScreen = currentScreen
-            screenSlidePhase = 2
-            screenSlideProgress.snapTo(0f)
-            screenSlideProgress.animateTo(
+            pageTransitionOpacity.animateTo(
                 1f,
                 androidx.compose.animation.core.tween(
-                    durationMillis = pageTransitionDurationMillis,
-                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                    durationMillis = secondHalf,
+                    easing = androidx.compose.animation.core.LinearEasing
                 )
             )
-            screenSlidePhase = 0
-            screenSlideProgress.snapTo(1f)
         }
     }
 
@@ -756,80 +749,71 @@ fun ExploreScreen(
             Box(modifier = Modifier.fillMaxSize().nestedScroll(nestedScrollConnection)) {
                 // Let artist/detail navigation from the full player replace Replay,
                 // then naturally return to Replay when the detail stack is closed.
-                if (renderedScreen == "recap") {
-                    Box(
-                        modifier = Modifier.fillMaxSize().graphicsLayer {
-                            val progress = screenSlideProgress.value.coerceIn(0f, 1f)
-                            translationX = when (screenSlidePhase) {
-                                1 -> -screenSlideDirection * progress * size.width
-                                2 -> screenSlideDirection * (1f - progress) * size.width
-                                else -> 0f
-                            }
-                        }
-                    ) {
-                    RecapTabContent(
-                        nestedScrollConnection = nestedScrollConnection,
-                        viewModel = playerSharedViewModel,
-                        onNavigateToExplore = { showReplayScreen = false },
-                        localSongs = localSongs,
-                        onSongMenuClick = { replaySong ->
-                            val videoId = replaySong.videoId?.takeIf { it.isNotBlank() }
-                            if (videoId != null) {
-                                val localPath = replaySong.path ?: replaySong.data
-                                val artwork = replaySong.thumbnailUrl?.takeIf { candidate ->
-                                    val uri = runCatching { android.net.Uri.parse(candidate) }.getOrNull()
-                                    val scheme = uri?.scheme?.lowercase(java.util.Locale.ROOT)
-                                    val uriPath = uri?.path
-                                    (scheme in setOf("http", "https", "content", "android.resource") ||
-                                        (scheme == "file" && uriPath != localPath)) &&
-                                        candidate != replaySong.contentUri.toString() && candidate != localPath
-                                }
-                                selectedSongForMenu = OnlineSong(
-                                    videoId = videoId,
-                                    title = replaySong.title,
-                                    artist = replaySong.artist,
-                                    albumName = replaySong.albumName,
-                                    albumId = replaySong.albumId.takeIf { it > 0L }?.toString(),
-                                    artistId = replaySong.artistId,
-                                    durationMs = replaySong.duration,
-                                    thumbnailUrl = artwork,
-                                    artistRefs = replaySong.artistRefs.toList()
-                                )
-                            } else {
-                                selectedReplayLocalSongForMenu = replaySong
-                            }
-                        },
-                        onArtistClick = { artistName ->
-                            viewModel.loadArtistByName(artistName)
-                        }
-                    )
-                    }
-                } else {
+
                     ExploreTransitionHost(
                     enabled = android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.M
                 ) { sharedTransitionScope ->
                     CompositionLocalProvider(LocalSharedTransitionScope provides sharedTransitionScope) {
                         AnimatedContent(
-                            targetState = renderedScreen,
+                            targetState = currentScreen,
                             modifier = Modifier.fillMaxSize().graphicsLayer {
-                                val progress = screenSlideProgress.value.coerceIn(0f, 1f)
-                                translationX = when (screenSlidePhase) {
-                                    1 -> -screenSlideDirection * progress * size.width
-                                    2 -> screenSlideDirection * (1f - progress) * size.width
-                                    else -> 0f
-                                }
+                                alpha = pageTransitionOpacity.value.coerceIn(0.5f, 1f)
                             },
-                            // Page content changes only while fully transparent. Keeping the
-                            // content transition itself immediate avoids a second active list
-                            // tree during the opacity swap on lower-memory devices.
                             transitionSpec = {
-                                androidx.compose.animation.EnterTransition.None togetherWith
-                                    androidx.compose.animation.ExitTransition.None
+                                val direction = if (targetState == "home" || targetState == "recap") -1 else 1
+                                slideInHorizontally(
+                                    animationSpec = androidx.compose.animation.core.tween(
+                                        durationMillis = pageTransitionDurationMillis,
+                                        easing = androidx.compose.animation.core.FastOutSlowInEasing
+                                    )
+                                ) { width -> direction * width } togetherWith
+                                    slideOutHorizontally(
+                                        animationSpec = androidx.compose.animation.core.tween(
+                                            durationMillis = pageTransitionDurationMillis,
+                                            easing = androidx.compose.animation.core.FastOutSlowInEasing
+                                        )
+                                    ) { width -> -direction * width }
                             },
-                            label = "Explore Opacity Transition"
+                            label = "Explore Attached Page Slide"
                         ) { screen ->
                             CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                                 when (screen) {
+                                    "recap" -> RecapTabContent(
+                                        nestedScrollConnection = nestedScrollConnection,
+                                        viewModel = playerSharedViewModel,
+                                        onNavigateToExplore = { showReplayScreen = false },
+                                        localSongs = localSongs,
+                                        onSongMenuClick = { replaySong ->
+                                            val videoId = replaySong.videoId?.takeIf { it.isNotBlank() }
+                                            if (videoId != null) {
+                                                val localPath = replaySong.path ?: replaySong.data
+                                                val artwork = replaySong.thumbnailUrl?.takeIf { candidate ->
+                                                    val uri = runCatching { android.net.Uri.parse(candidate) }.getOrNull()
+                                                    val scheme = uri?.scheme?.lowercase(java.util.Locale.ROOT)
+                                                    val uriPath = uri?.path
+                                                    (scheme in setOf("http", "https", "content", "android.resource") ||
+                                                        (scheme == "file" && uriPath != localPath)) &&
+                                                        candidate != replaySong.contentUri.toString() && candidate != localPath
+                                                }
+                                                selectedSongForMenu = OnlineSong(
+                                                    videoId = videoId,
+                                                    title = replaySong.title,
+                                                    artist = replaySong.artist,
+                                                    albumName = replaySong.albumName,
+                                                    albumId = replaySong.albumId.takeIf { it > 0L }?.toString(),
+                                                    artistId = replaySong.artistId,
+                                                    durationMs = replaySong.duration,
+                                                    thumbnailUrl = artwork,
+                                                    artistRefs = replaySong.artistRefs.toList()
+                                                )
+                                            } else {
+                                                selectedReplayLocalSongForMenu = replaySong
+                                            }
+                                        },
+                                        onArtistClick = { artistName ->
+                                            viewModel.loadArtistByName(artistName)
+                                        }
+                                    )
                                     "account" -> {
                                         AccountScreen(
                                             viewModel = accountVM,
@@ -2151,7 +2135,7 @@ fun ExploreScreen(
                         }
                     }
                 }
-                }
+                
 
                 // Error Snackbar
                 error?.let { errorMsg ->
