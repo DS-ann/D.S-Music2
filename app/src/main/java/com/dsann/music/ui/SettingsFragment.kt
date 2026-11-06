@@ -187,6 +187,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    // Keep the active nested Settings page across Activity/configuration recreation.
+    // The Settings NavController remains the UI back-stack owner; this route is its
+    // restoration anchor if Compose has to rebuild the nested host.
+    private val _currentSettingsRoute = MutableStateFlow(SettingsRoute.Main.route)
+    val currentSettingsRoute: StateFlow<String> = _currentSettingsRoute.asStateFlow()
+
+    fun setCurrentSettingsRoute(route: String) {
+        if (route.isNotBlank()) _currentSettingsRoute.value = route
+    }
+
     // ── Dark Mode ────────────────────────────────────────────────────────────
     private val _darkMode = MutableStateFlow(
         prefs.getString("theme_mode", "system").let {
@@ -207,35 +217,27 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             "dark" -> {
                 _darkMode.value = true
                 prefs.edit { putBoolean(KEY_DARK_MODE, true) }
-                androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
-                    androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
-                )
             }
             "light" -> {
                 _darkMode.value = false
                 prefs.edit { putBoolean(KEY_DARK_MODE, false) }
-                androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
-                    androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
-                )
             }
             else -> {
                 val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
                 _darkMode.value = systemDark
-                androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
-                    androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-                )
             }
         }
+        // MainActivity observes theme_mode and applies the theme through Compose.
+        // Calling AppCompatDelegate here recreates the Activity unnecessarily and
+        // can reset nested Settings navigation while the user is editing preferences.
     }
 
     fun setDarkMode(enabled: Boolean) {
         _darkMode.value = enabled
         prefs.edit {putBoolean(KEY_DARK_MODE, enabled)}
         prefs.edit {putString("theme_mode", if (enabled) "dark" else "light")}
-        androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
-            if (enabled) androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
-            else androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
-        )
+        // Compose theme reacts to the preference in MainActivity; no Activity
+        // recreation is required to apply this switch.
     }
 
     // ── YouTube Music Cookies ──────────────────────────────────────────────────
@@ -1541,7 +1543,34 @@ fun SettingsScreenContent(
 
     val navController = rememberNavController()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
-    val canPop = currentBackStackEntry?.destination?.route != SettingsRoute.Main.route
+    val currentSettingsRoute = currentBackStackEntry?.destination?.route
+    val canPop = currentSettingsRoute != SettingsRoute.Main.route
+    var settingsRouteRestored by remember(navController) { mutableStateOf(false) }
+
+    // The nested NavController normally restores its complete back stack itself.
+    // If the host is rebuilt without that saved entry (for example during an older
+    // Android theme/configuration change), restore the last open Settings page.
+    LaunchedEffect(navController) {
+        val savedRoute = viewModel.currentSettingsRoute.value
+        val activeRoute = navController.currentDestination?.route
+        if (
+            (activeRoute == null || activeRoute == SettingsRoute.Main.route) &&
+            savedRoute != SettingsRoute.Main.route
+        ) {
+            navController.navigate(savedRoute) {
+                launchSingleTop = true
+            }
+        }
+        settingsRouteRestored = true
+    }
+
+    // Update the restoration anchor only after initial restoration, so the temporary
+    // "main" start destination cannot overwrite the page that was previously open.
+    LaunchedEffect(currentSettingsRoute, settingsRouteRestored) {
+        if (settingsRouteRestored) {
+            currentSettingsRoute?.let(viewModel::setCurrentSettingsRoute)
+        }
+    }
 
     NavHost(
         navController = navController,
