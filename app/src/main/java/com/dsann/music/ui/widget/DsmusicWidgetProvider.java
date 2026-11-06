@@ -260,7 +260,6 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             boolean isPlaying
     ) {
         int[] ids = manager.getAppWidgetIds(new ComponentName(context, providerClass));
-        int playPauseIcon = isPlaying ? R.drawable.ic_pause : R.drawable.ic_play;
         for (int id : ids) {
             try {
                 RemoteViews views = new RemoteViews(context.getPackageName(), layoutId);
@@ -268,7 +267,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                         views,
                         isPlaying,
                         layoutId,
-                        layoutId == R.layout.widget_large ? R.drawable.ic_repeat : R.drawable.ic_repeat
+                        0
                 );
                 setupPendingIntents(context, views, isPlaying, layoutId, providerClass);
                 manager.partiallyUpdateAppWidget(id, views);
@@ -391,7 +390,9 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             setWidgetIcon(views, R.id.widget_toggle_lyrics, R.drawable.ic_lyrics);
         } else if (layoutId == R.layout.widget_large) {
             setWidgetIcon(views, R.id.widget_favorite, R.drawable.ic_favorite_border);
-            setWidgetIcon(views, R.id.widget_repeat, repeatIconResId);
+            if (repeatIconResId != 0) {
+                setWidgetIcon(views, R.id.widget_repeat, repeatIconResId);
+            }
         }
     }
 
@@ -411,7 +412,9 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         try {
             RemoteViews views = hideSkeleton(context, layoutId);
 
-            if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
+            if (layoutId == R.layout.widget_small ||
+                    layoutId == R.layout.widget_medium ||
+                    layoutId == R.layout.widget_large) {
                 views.setTextViewText(
                         R.id.widget_song_title,
                         song != null && song.title != null ? song.title : "D.S Music"
@@ -464,7 +467,9 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             Log.e(TAG, "Failed to update widget " + id, error);
             try {
                 RemoteViews fallback = new RemoteViews(context.getPackageName(), layoutId);
-                if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
+                if (layoutId == R.layout.widget_small ||
+                        layoutId == R.layout.widget_medium ||
+                        layoutId == R.layout.widget_large) {
                     fallback.setTextViewText(
                             R.id.widget_song_title,
                             song != null && song.title != null ? song.title : "D.S Music"
@@ -501,20 +506,25 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         // player sorts its display list; use the same order-independent lookup here.
         com.dsann.music.data.lyrics.LyricLine current = null;
         com.dsann.music.data.lyrics.LyricLine first = null;
+        long currentStartMs = Long.MIN_VALUE;
+        long firstStartMs = Long.MAX_VALUE;
         for (com.dsann.music.data.lyrics.LyricLine line : lyrics) {
             if (line == null || line.isInterlude || line.content == null || line.content.trim().isEmpty()) {
                 continue;
             }
-            if (first == null || line.startTimeMs < first.startTimeMs) first = line;
-            long lineStart = line.startTimeMs;
+            long lineStartMs = line.startTimeMs;
             if (line.words != null && !line.words.isEmpty()) {
                 for (com.dsann.music.data.lyrics.LyricWord word : line.words) {
-                    lineStart = Math.min(lineStart, word.absoluteStartTimeMs);
+                    lineStartMs = Math.min(lineStartMs, word.absoluteStartTimeMs);
                 }
             }
-            if (lineStart <= position &&
-                    (current == null || lineStart > current.startTimeMs)) {
+            if (lineStartMs < firstStartMs) {
+                first = line;
+                firstStartMs = lineStartMs;
+            }
+            if (lineStartMs <= position && lineStartMs > currentStartMs) {
                 current = line;
+                currentStartMs = lineStartMs;
             }
         }
         if (current != null) return current.content;
