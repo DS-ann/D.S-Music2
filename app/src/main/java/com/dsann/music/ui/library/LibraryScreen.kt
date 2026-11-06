@@ -2382,6 +2382,9 @@ private fun LocalPlaylistSongRow(
     viewModel: PlayerSharedViewModel,
     onDismiss: () -> Unit
 ) {
+    val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
+    val isPlaying = currentSong?.id == song.id
+    val playingCoverColor = rememberNowPlayingCoverColor(song.thumbnailUrl, isPlaying)
     DsmusicSurface(
         modifier = Modifier
             .fillMaxWidth()
@@ -2423,6 +2426,13 @@ private fun LocalPlaylistSongRow(
                         Icons.Rounded.MusicNote,
                         null,
                         tint = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (isPlaying) {
+                    NowPlayingCoverIndicator(
+                        isPlaying = true,
+                        coverColor = playingCoverColor,
+                        modifier = Modifier.align(Alignment.Center)
                     )
                 }
             }
@@ -2940,6 +2950,7 @@ private fun SongsTabContent(nestedScrollConnection: androidx.compose.ui.input.ne
     }
 
     val onlineSongs by accountViewModel?.songs?.collectAsStateWithLifecycle(emptyList()) ?: remember { mutableStateOf(emptyList()) }
+    val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         accountViewModel?.refreshAll()
@@ -2978,25 +2989,37 @@ private fun SongsTabContent(nestedScrollConnection: androidx.compose.ui.input.ne
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(onlineSongs) { song ->
+                    val isPlaying = currentSong?.videoId == song.videoId
+                    val playingCoverColor = rememberNowPlayingCoverColor(song.thumbnailUrl, isPlaying)
                     DsmusicListItem(
                         headlineContent = { Text(song.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         supportingContent = { Text(song.artist, color = DsmusicTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         leadingContent = {
-                            if (song.thumbnailUrl?.isNotEmpty() == true) {
-                                androidx.compose.foundation.Image(
-                                    painter = coil.compose.rememberAsyncImagePainter(
-                                        model = libraryArtworkRequestBuilder(LocalContext.current, song.thumbnailUrl)
-                                            .crossfade(false)
-                                            .build()
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(RoundedCornerShape(8.dp)),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Icon(Icons.Rounded.MusicNote, null, modifier = Modifier.size(48.dp))
+                            Box(
+                                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (song.thumbnailUrl?.isNotEmpty() == true) {
+                                    androidx.compose.foundation.Image(
+                                        painter = coil.compose.rememberAsyncImagePainter(
+                                            model = libraryArtworkRequestBuilder(LocalContext.current, song.thumbnailUrl)
+                                                .crossfade(false)
+                                                .build()
+                                        ),
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(Icons.Rounded.MusicNote, null, modifier = Modifier.size(48.dp))
+                                }
+                                if (isPlaying) {
+                                    NowPlayingCoverIndicator(
+                                        isPlaying = true,
+                                        coverColor = playingCoverColor,
+                                        modifier = Modifier.align(Alignment.Center)
+                                    )
+                                }
                             }
                         },
                         colors = ListItemDefaults.colors(containerColor = DsmusicTheme.colorScheme.surfaceContainer),
