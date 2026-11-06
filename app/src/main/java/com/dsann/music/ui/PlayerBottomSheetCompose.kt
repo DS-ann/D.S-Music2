@@ -1803,11 +1803,21 @@ fun PlayerBottomSheetCompose(
 
                                 val miniSizePx = 48.dp.toPx()
                                 val fullSizePx = albumArtSizeDp.toPx()
+                                // The selected mini-cover shapes sit slightly smaller inside
+                                // the unchanged 48 dp slot. Slanted keeps its width and shrinks
+                                // only vertically.
+                                val miniShapeScaleX = miniArtworkWidthScale(playerArtworkShapeName)
+                                val miniShapeScaleY = miniArtworkHeightScale(playerArtworkShapeName)
                                 // One shared cover travels from its exact mini-player anchor
                                 // to the full-player anchor. All motion stays in this draw layer.
                                 val artTransitionProgress = t.coerceIn(0f, 1f)
-                                val normalScale = androidx.compose.ui.util.lerp(
-                                    miniSizePx / fullSizePx,
+                                val normalScaleX = androidx.compose.ui.util.lerp(
+                                    miniSizePx * miniShapeScaleX / fullSizePx,
+                                    1f,
+                                    artTransitionProgress
+                                )
+                                val normalScaleY = androidx.compose.ui.util.lerp(
+                                    miniSizePx * miniShapeScaleY / fullSizePx,
                                     1f,
                                     artTransitionProgress
                                 )
@@ -1863,13 +1873,18 @@ fun PlayerBottomSheetCompose(
                                     (topOffsetDp + (albumArtSlotSizeDp - albumArtSizeDp) / 2f).toPx()
                                 }
 
+                                // Keep the smaller mini artwork centered in its original
+                                // 48 dp slot, removing the inset as it grows to full size.
+                                val miniCenterInsetX = miniSizePx * (1f - miniShapeScaleX) / 2f
+                                val miniCenterInsetY = miniSizePx * (1f - miniShapeScaleY) / 2f
                                 val normalX = androidx.compose.ui.util.lerp(
-                                    xStartPx,
+                                    xStartPx + miniCenterInsetX * (1f - artTransitionProgress),
                                     xEndPx,
                                     artTransitionProgress
                                 )
                                 val normalY = androidx.compose.ui.util.lerp(
-                                    sheetCollapsedTargetYState.value + yStartPx,
+                                    sheetCollapsedTargetYState.value + yStartPx +
+                                        miniCenterInsetY * (1f - artTransitionProgress),
                                     yEndPx,
                                     artTransitionProgress
                                 )
@@ -1886,8 +1901,8 @@ fun PlayerBottomSheetCompose(
 
                                 val dismissOffsetPx = offsetAnimatable.value * (1f - t)
 
-                                scaleX = androidx.compose.ui.util.lerp(normalScale, appBarScale, lyricsT)
-                                scaleY = androidx.compose.ui.util.lerp(normalScale, appBarScale, lyricsT)
+                                scaleX = androidx.compose.ui.util.lerp(normalScaleX, appBarScale, lyricsT)
+                                scaleY = androidx.compose.ui.util.lerp(normalScaleY, appBarScale, lyricsT)
                                 translationX = androidx.compose.ui.util.lerp(normalX, appBarX, lyricsT) + dismissOffsetPx
                                 translationY = androidx.compose.ui.util.lerp(normalY, appBarY, lyricsT) -
                                     currentSheetTranslationY.value
@@ -2284,6 +2299,14 @@ fun PlayerBottomSheetCompose(
 // ==========================================
 // 8. MINI PLAYER ROW INTERNAL CONTENT
 // ==========================================
+
+/** Mini-only artwork sizing; the full-player cover remains at its selected size. */
+private fun miniArtworkWidthScale(shapeName: String): Float =
+    if (shapeName == "Rounded" || shapeName == "Square") 0.9f else 1f
+
+private fun miniArtworkHeightScale(shapeName: String): Float =
+    if (shapeName == "Rounded" || shapeName == "Square" || shapeName == "Slanted") 0.9f else 1f
+
 @Composable
 private fun MiniPlayerContentInternal(
     viewModel: PlayerSharedViewModel,
@@ -2408,6 +2431,10 @@ private fun MiniPlayerContentInternal(
                 Box(
                     modifier = Modifier
                         .size(48.dp)
+                        .graphicsLayer {
+                            scaleX = miniArtworkWidthScale(artworkShapeName)
+                            scaleY = miniArtworkHeightScale(artworkShapeName)
+                        }
                         .clip(miniArtworkShape)
                         .background(DsmusicTheme.colorScheme.surfaceVariant)
                 ) {
@@ -2432,7 +2459,10 @@ private fun MiniPlayerContentInternal(
                     backgroundColor = miniPlayerBackgroundColor,
                     expansionFraction = expansionFraction,
                     centerOnArtworkEdge = true,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(48.dp).graphicsLayer {
+                        scaleX = miniArtworkWidthScale(artworkShapeName)
+                        scaleY = miniArtworkHeightScale(artworkShapeName)
+                    }
                 )
             }
         }
