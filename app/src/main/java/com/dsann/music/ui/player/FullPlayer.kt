@@ -891,7 +891,11 @@ fun FullPlayer(
     // Match the transport button fills to the requested inverted theme palette.
     // The title uses this same color; button glyphs use the contrasting counterpart.
     val playerButtonColor = if (isDark) Color.White else Color.Black
-    val playerButtonContentColor = if (isDark) Color.Black else Color.White
+    val playerButtonContentColor = if (playerButtonStyle == "None") {
+        playerButtonColor
+    } else {
+        if (isDark) Color.Black else Color.White
+    }
     val contentSecondary = contentColor.copy(alpha = 0.6f)
     val playerFrameTimeNanos = rememberAppAnimationFrameTimeNanos(
         active = isPlayerVisible && uiState.isPlaying
