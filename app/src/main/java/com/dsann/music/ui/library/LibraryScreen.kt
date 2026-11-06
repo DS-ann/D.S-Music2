@@ -4122,9 +4122,12 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
                                 videoId = sourceVideoId
                                 isDownloadedOffline = true
                             }
-                            // Prefer the extracted embedded cover whenever MediaStore has no
-                            // reliable album-art row. This is a cached image file URI.
+                            // Prefer an extracted embedded cover. When a downloaded file has
+                            // no readable artwork, use its saved YouTube thumbnail as a fallback.
                             thumbnailUrl = embeddedMetadata?.artworkUri
+                                ?: sourceVideoId?.takeIf { it.isNotBlank() }?.let {
+                                    "https://img.youtube.com/vi/$it/hqdefault.jpg"
+                                }
                         }
                     )
                 }
