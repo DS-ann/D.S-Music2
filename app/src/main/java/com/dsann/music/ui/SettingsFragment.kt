@@ -1515,9 +1515,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     if (!saved) throw IllegalStateException("Could not restore favourites")
                 }
 
-                refreshSettingsFromPreferences()
-
                 withContext(Dispatchers.Main) {
+                    refreshSettingsFromPreferences()
                     onResult(true, "Backup imported: settings, customisation, favourites, playlists and history restored")
                 }
             } catch (e: Exception) {
