@@ -1002,7 +1002,6 @@ fun LibraryScreen(
                                                 text = { Text("Ascending") },
                                                 onClick = {
                                                     downloadSortAscending = true
-                                                    downloadSortMenuExpanded = false
                                                 },
                                                 trailingIcon = {
                                                     if (downloadSortAscending) Icon(
@@ -1016,7 +1015,6 @@ fun LibraryScreen(
                                                 text = { Text("Descending") },
                                                 onClick = {
                                                     downloadSortAscending = false
-                                                    downloadSortMenuExpanded = false
                                                 },
                                                 trailingIcon = {
                                                     if (!downloadSortAscending) Icon(
@@ -4549,7 +4547,6 @@ private fun StreamCacheTabContent(
                         text = { Text("Ascending") },
                         onClick = {
                             cacheSortAscending = true
-                            cacheSortMenuExpanded = false
                         },
                         trailingIcon = {
                             if (cacheSortAscending) Icon(
@@ -4563,7 +4560,6 @@ private fun StreamCacheTabContent(
                         text = { Text("Descending") },
                         onClick = {
                             cacheSortAscending = false
-                            cacheSortMenuExpanded = false
                         },
                         trailingIcon = {
                             if (!cacheSortAscending) Icon(

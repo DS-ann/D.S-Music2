@@ -16,6 +16,8 @@ import android.os.Environment
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,6 +36,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -64,6 +67,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -111,6 +115,12 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
     var currentFolderPath by rememberSaveable { mutableStateOf(storageRootPath) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var sortOrder by rememberSaveable { mutableStateOf(SortOrder.A_Z) }
+    var sortAscending by rememberSaveable { mutableStateOf(true) }
+    val sortDirectionRotation by animateFloatAsState(
+        targetValue = if (sortAscending) 0f else 180f,
+        animationSpec = tween(durationMillis = 220),
+        label = "localMusicSortDirection"
+    )
     var isScanning by remember { mutableStateOf(false) }
     var selectedLocalSongForMenu by remember { mutableStateOf<SongItem?>(null) }
 
@@ -153,11 +163,11 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                         (it.path?.contains(query, ignoreCase = true) == true)
                 }
             }
-            when (sortOrder) {
+            val sortedBySelectedOrder = when (sortOrder) {
                 SortOrder.A_Z -> filtered.sortedWith(
                     Comparator { first, second -> first.title.compareTo(second.title, ignoreCase = true) }
                 )
-                SortOrder.DATE_ADDED -> filtered.sortedByDescending { it.dateAdded }
+                SortOrder.DATE_ADDED -> filtered.sortedBy { it.dateAdded }
                 SortOrder.ARTIST -> filtered.sortedWith(
                     Comparator { first, second ->
                         val artistOrder = first.artist.compareTo(second.artist, ignoreCase = true)
@@ -165,8 +175,9 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                         else first.title.compareTo(second.title, ignoreCase = true)
                     }
                 )
-                SortOrder.DURATION -> filtered.sortedByDescending { it.duration }
+                SortOrder.DURATION -> filtered.sortedBy { it.duration }
             }
+            if (sortAscending) sortedBySelectedOrder else sortedBySelectedOrder.asReversed()
         }
     }
 
@@ -342,6 +353,15 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                         .padding(bottom = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    DsmusicIconButton(
+                        onClick = { sortAscending = !sortAscending }
+                    ) {
+                        Icon(
+                            Icons.Rounded.ArrowUpward,
+                            contentDescription = if (sortAscending) "Sort ascending" else "Sort descending",
+                            modifier = Modifier.rotate(sortDirectionRotation)
+                        )
+                    }
                     SortOrder.entries.forEach { order ->
                         DsmusicFilterChip(
                             selected = sortOrder == order,
