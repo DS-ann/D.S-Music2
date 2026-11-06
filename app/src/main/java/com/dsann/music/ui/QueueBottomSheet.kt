@@ -23,6 +23,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -312,7 +313,7 @@ fun QueueBottomSheetContent(
                                             val liftScale = if (isDragging) 1.05f else 1f
                                             scaleX = liftScale
                                             scaleY = liftScale
-                                            shadowElevation = if (isDragging) 14.dp.toPx() else 0f
+                                            shadowElevation = 0f
                                             shape = RoundedCornerShape(18.dp)
                                         }
                                 ) {
@@ -451,7 +452,7 @@ fun QueueBottomSheetContent(
                                                 val liftScale = if (isDragging) 1.05f else 1f
                                                 scaleX = liftScale
                                                 scaleY = liftScale
-                                                shadowElevation = if (isDragging) 14.dp.toPx() else 0f
+                                                shadowElevation = 0f
                                                 shape = RoundedCornerShape(18.dp)
                                             }
                                     ) {
@@ -500,6 +501,7 @@ fun QueueListItem(
     val swipeOffset = remember(song.id) { Animatable(0f) }
     var swipeDragOffset by remember(song.id) { mutableFloatStateOf(0f) }
     val swipeAnimationScope = rememberCoroutineScope()
+    val rowInteractionSource = remember(song.id) { MutableInteractionSource() }
     val taperedDividersEnabled = rememberTaperedSongDividersEnabled()
 
     Row(
@@ -600,7 +602,12 @@ fun QueueListItem(
         Row(
             modifier = Modifier
                 .weight(1f)
-                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .combinedClickable(
+                    interactionSource = rowInteractionSource,
+                    indication = null,
+                    onClick = onClick,
+                    onLongClick = onLongClick
+                )
                 .padding(vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -828,23 +835,18 @@ class DragDropState(
 
         val fromIndex = currentIndexOfDraggedItem ?: return
         val otherItems = visibleItems.filter { it.key != anchor.key }
-        var targetIndex = fromIndex
 
-        // Moving down: cross the next row's centre before taking its slot.
-        while (true) {
-            val next = otherItems.firstOrNull { it.index == targetIndex + 1 } ?: break
-            val nextCenter = next.offset + next.size / 2f
-            if (pointerY > nextCenter) targetIndex++ else break
-        }
-
-        // Moving up: cross the previous row's centre before taking its slot.
-        while (true) {
-            val previous = otherItems.firstOrNull { it.index == targetIndex - 1 } ?: break
-            val previousCenter = previous.offset + previous.size / 2f
-            if (pointerY < previousCenter) targetIndex-- else break
-        }
-
-        targetIndex = targetIndex.coerceIn(0, lazyListState.layoutInfo.totalItemsCount - 1)
+        // Move through one adjacent slot per acknowledged layout update. A single
+        // pointer sample can span more than one row on fast drags; applying every
+        // crossed index against the pre-layout offsets briefly sends neighbours past
+        // their final slot and makes them jump back on the next frame.
+        val next = otherItems.firstOrNull { it.index == fromIndex + 1 }
+        val previous = otherItems.firstOrNull { it.index == fromIndex - 1 }
+        val targetIndex = when {
+            next != null && pointerY > next.offset + next.size / 2f -> fromIndex + 1
+            previous != null && pointerY < previous.offset + previous.size / 2f -> fromIndex - 1
+            else -> fromIndex
+        }.coerceIn(0, lazyListState.layoutInfo.totalItemsCount - 1)
         if (targetIndex != fromIndex) {
             // Update the canonical index before the next pointer/frame callback.
             // The pending acknowledgement prevents a stale LazyList layout from

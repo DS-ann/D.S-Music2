@@ -315,7 +315,7 @@ fun SlidingQueueDrawer(
                                     val liftScale = if (isDragging) 1.05f else 1f
                                     scaleX = liftScale
                                     scaleY = liftScale
-                                    shadowElevation = if (isDragging) 14.dp.toPx() else 0f
+                                    shadowElevation = 0f
                                     shape = RoundedCornerShape(18.dp)
                                 }
                         ) {
