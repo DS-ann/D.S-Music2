@@ -748,9 +748,11 @@ class AudioPlaybackService : MediaSessionService() {
     private var shouldAutoPlay = false
     private var pendingSeekPos: Long = -1
     
-    // Instant cancellation of stale stream resolutions — prevents race conditions on rapid clicks
+    // Instant cancellation of stale stream resolutions — prevents race conditions on rapid clicks.
     private var resolveJob: Job? = null
-    // Track the unique song ID that the current resolution is targeting
+    // Distinguishes repeated selections of the same ID (A → B → A).
+    private var playbackResolveGeneration: Long = 0L
+    // Track the unique song ID that the current resolution is targeting.
     private var resolveTargetSongId: String? = null
     private var lastPlaybackRecoveryVideoId: String? = null
     private var failedStreamVideoId: String? = null
@@ -1459,6 +1461,10 @@ class AudioPlaybackService : MediaSessionService() {
      * prior to injecting raw HTTP/File resource pointers into ExoPlayer.
      */
     private fun resolveAndLoad(uri: Uri) {
+        val requestGeneration = ++playbackResolveGeneration
+        resolveJob?.cancel()
+        resolveJob = null
+        resolveTargetSongId = null
         viewModel?.setLoading(true)
         originalSourceUri = uri
         if (uri.scheme == "innertube") {
@@ -1472,11 +1478,11 @@ class AudioPlaybackService : MediaSessionService() {
             if (useWebRemixRetry) forceWebRemixOnNextResolveVideoId = null
             if (useCompatibleFallbackRetry) forceCompatibleFallbackOnNextResolveVideoId = null
             
-            // INSTANT CANCELLATION: Kill any in-flight resolution immediately
-            resolveJob?.cancel()
+            // requestGeneration is the authoritative guard against late responses.
             resolveTargetSongId = videoId
             
             resolveJob = serviceScope.launch {
+              try {
                 Log.d(TAG, "Pre-resolving stream ahead of injector injection: $videoId")
                 val activeSong = viewModel?.currentSong?.value?.takeIf { it.videoId == videoId }
 
@@ -1500,7 +1506,7 @@ class AudioPlaybackService : MediaSessionService() {
                     }
                     if (downloadedUri != null) {
                         ensureActive()
-                        if (resolveTargetSongId != videoId) return@launch
+                        if (requestGeneration != playbackResolveGeneration || resolveTargetSongId != videoId) return@launch
                         viewModel?.refreshCurrentSongSource(
                             activeSong.withPlaybackSource(
                                 downloadedUri,
@@ -1562,7 +1568,7 @@ class AudioPlaybackService : MediaSessionService() {
 
                 if (formatChoiceCancelled) {
                     ensureActive()
-                    if (resolveTargetSongId == videoId) {
+                    if (requestGeneration == playbackResolveGeneration && resolveTargetSongId == videoId) {
                         shouldAutoPlay = false
                         viewModel?.setIsPlaying(false)
                         viewModel?.setLoading(false)
@@ -1632,6 +1638,10 @@ class AudioPlaybackService : MediaSessionService() {
                             
                             if (position > 2000L) {
                                 withContext(Dispatchers.Main) {
+                                    if (
+                                        requestGeneration != playbackResolveGeneration ||
+                                        viewModel?.currentSong?.value?.videoId != videoId
+                                    ) return@withContext
                                     Log.d(TAG, "Synced cross-device playback position: ${position}ms asynchronously")
                                     pendingSeekPos = position
                                     // If player already started playing from 0, seek it now
@@ -1652,6 +1662,25 @@ class AudioPlaybackService : MediaSessionService() {
                     com.dsann.music.ui.SnackbarController.showMessage(
                         "Couldn't load this song. Check your connection and tap Play to retry."
                     )
+                }
+              } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    // A resolver exception previously escaped without clearing the loading
+                    // state. Only the latest request may clear its spinner or publish failure.
+                    if (
+                        requestGeneration == playbackResolveGeneration &&
+                        resolveTargetSongId == videoId
+                    ) {
+                        Log.e(TAG, "Stream resolution crashed for $videoId", error)
+                        failedStreamVideoId = videoId
+                        shouldAutoPlay = false
+                        viewModel?.setIsPlaying(false)
+                        viewModel?.setLoading(false)
+                        com.dsann.music.ui.SnackbarController.showMessage(
+                            "Couldn't load this song. Check your connection and tap Play to retry."
+                        )
+                    }
                 }
             }
         } else {
