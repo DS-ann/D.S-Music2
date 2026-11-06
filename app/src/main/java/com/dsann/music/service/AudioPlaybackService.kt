@@ -96,6 +96,13 @@ data class CachedAudioFacts(
     val isComplete: Boolean
 )
 
+data class CompleteCachedMediaEntry(
+    val cacheKey: String,
+    val metadata: CachedMediaMetadata,
+    val cachedBytes: Long
+)
+
+
 data class CurrentAudioFormatDetails(
     val bitrateBps: Int?,
     val sampleRateHz: Int?,
@@ -187,6 +194,48 @@ class AudioPlaybackService : MediaSessionService() {
             }.filter { it.second > 0L }.sortedByDescending { it.second }
             return currentCache.cacheSpace to entries
         }
+        
+        /**
+         * Reads complete cached audio entries in one pass for the Cache playlist.
+         * Metadata preferences and the SimpleCache are opened once; optional artwork and
+         * lyrics are deliberately not prerequisites for displaying a cached audio track.
+         */
+        @JvmStatic
+        @Synchronized
+        fun getCompleteCachedMediaEntries(context: Context): List<CompleteCachedMediaEntry> {
+            val appContext = context.applicationContext
+            val currentCache = getCache(appContext)
+            val metadataPrefs = appContext.getSharedPreferences(
+                PREF_MEDIA_CACHE_METADATA,
+                Context.MODE_PRIVATE
+            )
+            val entries = ArrayList<CompleteCachedMediaEntry>()
+
+            for (cacheKey in currentCache.keys) {
+                val uri = Uri.parse(cacheKey)
+                if (uri.scheme != "http" && uri.scheme != "https") continue
+
+                val spans = currentCache.getCachedSpans(cacheKey)
+                var cachedBytes = 0L
+                for (span in spans) cachedBytes += span.length
+                if (cachedBytes <= 0L) continue
+
+                val stored = metadataPrefs.getString(cacheMetadataEntryKey(cacheKey), null)
+                val metadata = parseCachedMediaMetadata(stored) ?: continue
+                if (metadata.songId.isBlank() || metadata.title.isBlank()) continue
+
+                val contentLength = androidx.media3.datasource.cache.ContentMetadata
+                    .getContentLength(currentCache.getContentMetadata(cacheKey))
+                // Do not display partial cache entries: Cache playlist playback is offline-only.
+                if (contentLength <= 0L || !currentCache.isCached(cacheKey, 0L, contentLength)) continue
+
+                entries.add(CompleteCachedMediaEntry(cacheKey, metadata, cachedBytes))
+            }
+
+            entries.sortByDescending { it.cachedBytes }
+            return entries
+        }
+
 
         /**
          * Validates one already-known cache key without scanning every cached stream.
@@ -332,7 +381,12 @@ class AudioPlaybackService : MediaSessionService() {
         @JvmStatic
         fun getCachedMediaMetadata(context: Context, cacheKey: String): CachedMediaMetadata? {
             val stored = context.getSharedPreferences(PREF_MEDIA_CACHE_METADATA, Context.MODE_PRIVATE)
-                .getString(cacheMetadataEntryKey(cacheKey), null) ?: return null
+                .getString(cacheMetadataEntryKey(cacheKey), null)
+            return parseCachedMediaMetadata(stored)
+        }
+
+        private fun parseCachedMediaMetadata(stored: String?): CachedMediaMetadata? {
+            if (stored.isNullOrBlank()) return null
             return try {
                 val json = org.json.JSONObject(stored)
                 val title = json.optString("title", "").trim()

@@ -4065,43 +4065,14 @@ private data class CacheTabSnapshot(
     val entries: List<CachedSongEntry>
 )
 
-private suspend fun readCacheTabSnapshot(
-    context: Context,
-    lyricsCache: LyricsCacheManager
-): CacheTabSnapshot = withContext(Dispatchers.IO) {
-    val summary = try {
-        AudioPlaybackService.getMediaCacheSnapshot(context)
-    } catch (_: Exception) {
-        0L to emptyList<Pair<String, Long>>()
-    }
+private suspend fun readCacheTabSnapshot(context: Context): CacheTabSnapshot = withContext(Dispatchers.IO) {
     val entriesBySong = LinkedHashMap<String, Pair<CachedSongEntry, Long>>()
-    val metadataRepair = MetadataRepair()
 
-    summary.second.forEach { (key, bytes) ->
-        val metadata = AudioPlaybackService.getCachedMediaMetadata(context, key)
-            ?: return@forEach
-        if (metadata.songId.isBlank() || metadata.title.isBlank()) return@forEach
-
-        val artwork = AudioPlaybackService.getCachedMediaArtworkFile(context, metadata.songId)
-        if (!artwork.isFile || artwork.length() <= 0L) return@forEach
-
-        val track = metadataRepair.repair(
-            metadata.title,
-            metadata.artist,
-            null,
-            metadata.durationMs,
-            null,
-            null
-        )
-        if (!lyricsCache.hasCachedLyrics(track)) return@forEach
-
-        // Keep the Cache playlist genuinely offline: omit partial tracks that would have
-        // to fall back to the network when tapped.
-        val cachedUri = AudioPlaybackService.getCompleteCachedPlaybackUriForKey(
-            context,
-            key
-        )?.toString() ?: return@forEach
-
+    // AudioPlaybackService performs one synchronized pass over SimpleCache and reads
+    // metadata through one SharedPreferences instance. Artwork and lyrics can load
+    // independently; neither should delay or hide a fully cached song in this playlist.
+    AudioPlaybackService.getCompleteCachedMediaEntries(context).forEach { cached ->
+        val metadata = cached.metadata
         val entry = CachedSongEntry(
             songId = metadata.songId,
             title = metadata.title,
@@ -4109,12 +4080,12 @@ private suspend fun readCacheTabSnapshot(
             albumName = metadata.albumName,
             videoId = metadata.videoId,
             durationMs = metadata.durationMs,
-            cachedUri = cachedUri,
+            cachedUri = cached.cacheKey,
             dateAddedMs = metadata.cachedAtMs
         )
         val existing = entriesBySong[metadata.songId]
-        if (existing == null || bytes > existing.second) {
-            entriesBySong[metadata.songId] = entry to bytes
+        if (existing == null || cached.cachedBytes > existing.second) {
+            entriesBySong[metadata.songId] = entry to cached.cachedBytes
         }
     }
 
@@ -4244,11 +4215,11 @@ private fun StreamCacheTabContent(
     // viewport, above the persistent navigation and mini-player overlays.
     LaunchedEffect(context, lyricsCache, rootTabActive) {
         if (!rootTabActive) return@LaunchedEffect
-        var snapshot = readCacheTabSnapshot(context, lyricsCache).entries
+        var snapshot = readCacheTabSnapshot(context).entries
         cacheEntries = snapshot
         while (true) {
             delay(10_000L)
-            val updated = readCacheTabSnapshot(context, lyricsCache).entries
+            val updated = readCacheTabSnapshot(context).entries
             if (updated != snapshot) {
                 snapshot = updated
                 cacheEntries = updated
