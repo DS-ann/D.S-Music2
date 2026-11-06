@@ -105,6 +105,7 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
     import androidx.compose.ui.unit.sp
     import androidx.core.content.ContextCompat
     import com.dsann.music.R
+import com.dsann.music.applyDsmusicNightMode
     import kotlinx.coroutines.launch
     import androidx.core.content.edit
 
@@ -227,9 +228,10 @@ import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
                         5 -> ThemeSelectionPage(
                             pageOffsetProvider = pageOffsetProvider,
                             themeMode = themeMode,
-                            onThemeChanged = { 
+                            onThemeChanged = {
                                 themeMode = it
                                 prefs.edit { putString("theme_mode", it) }
+                                applyDsmusicNightMode(it)
                             }
                         )
                         6 -> NavigationStylePage(
