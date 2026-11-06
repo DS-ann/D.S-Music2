@@ -47,4 +47,39 @@ interface PlaylistDao {
 
     @Query("DELETE FROM history_events")
     suspend fun clearAllHistory()
+
+    @Query("DELETE FROM playlist_songs")
+    suspend fun clearAllPlaylistSongs()
+
+    @Query("DELETE FROM playlists")
+    suspend fun clearAllPlaylists()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPlaylists(playlists: List<PlaylistEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPlaylistSongs(songs: List<PlaylistSongEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertHistoryEvents(events: List<HistoryEventEntity>)
+
+    /**
+     * Restore a complete library snapshot in one transaction. A null history list means
+     * the source backup predates history export, so keep the device's existing history.
+     */
+    @Transaction
+    suspend fun restoreBackupLibrary(
+        playlists: List<PlaylistEntity>,
+        songs: List<PlaylistSongEntity>,
+        historyEvents: List<HistoryEventEntity>?
+    ) {
+        clearAllPlaylistSongs()
+        clearAllPlaylists()
+        insertPlaylists(playlists)
+        insertPlaylistSongs(songs)
+        if (historyEvents != null) {
+            clearAllHistory()
+            insertHistoryEvents(historyEvents)
+        }
+    }
 }
