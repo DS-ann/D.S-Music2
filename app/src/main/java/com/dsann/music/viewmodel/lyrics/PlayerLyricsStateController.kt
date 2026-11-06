@@ -324,9 +324,7 @@ class PlayerLyricsStateController(private val logTag: String) {
                         result.copy(
                             syncedLyrics = null,
                             plainLyrics = null,
-                            isSynced = false,
-                            isWordByWord = false,
-                            isInstrumental = false,
+                            // Keep type metadata even when this inactive provider's payload is released.
                             payloadClearedForMemory = true
                         )
                     else -> result
