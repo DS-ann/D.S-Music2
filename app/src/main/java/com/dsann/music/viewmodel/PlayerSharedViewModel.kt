@@ -518,6 +518,11 @@ class PlayerSharedViewModel @Inject constructor(
         _playerGestureSettings.value = PlayerGestureSettings.fromPreferences(gesturePreferences)
     }
 
+    /** Refresh gesture state after Settings imports a backup. */
+    fun refreshPlayerGestureSettings() {
+        _playerGestureSettings.value = PlayerGestureSettings.fromPreferences(gesturePreferences)
+    }
+
     // Autoplay keeps a 20-track buffer ahead of the current song. Each refill is
     // anchored to the last queued online track so later batches continue the radio chain.
     private val AUTOPLAY_REFILL_THRESHOLD = 20
