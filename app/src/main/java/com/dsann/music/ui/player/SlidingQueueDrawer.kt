@@ -31,6 +31,7 @@ import androidx.compose.ui.zIndex
 import com.dsann.music.R
 import com.dsann.music.model.SongItem
 import com.dsann.music.ui.QueueListItem
+import com.dsann.music.ui.QueueSyncedLyricPreview
 import com.dsann.music.ui.rememberDragDropState
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import kotlin.math.abs
@@ -56,6 +57,7 @@ fun SlidingQueueDrawer(
     isDark: Boolean,
     onSongLongClick: (SongItem) -> Unit,
     onRemoveFromQueue: (SongItem) -> Unit,
+    playerSharedViewModel: PlayerSharedViewModel,
     modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
@@ -274,6 +276,11 @@ fun SlidingQueueDrawer(
                         }
                     }
                 }
+
+                QueueSyncedLyricPreview(
+                    viewModel = playerSharedViewModel,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp)
+                )
 
                 HorizontalDivider(color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 

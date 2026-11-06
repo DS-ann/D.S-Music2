@@ -96,6 +96,10 @@ import com.dsann.music.util.FavoritesManager
 import coil.compose.AsyncImage
 import com.dsann.music.R
 import com.dsann.music.model.SongItem
+import com.dsann.music.data.lyrics.LineSyncedLyricTimeline
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.draw.clip
+import kotlinx.coroutines.delay
 import com.dsann.music.ui.theme.DsmusicAppThemeFromPreferences
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
@@ -243,8 +247,13 @@ fun QueueBottomSheetContent(
                     )
                 }
 
+                QueueSyncedLyricPreview(
+                    viewModel = viewModel,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 4.dp, bottom = 8.dp)
+                )
+
                 HorizontalDivider(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                 )
 
@@ -480,6 +489,85 @@ fun QueueBottomSheetContent(
     }
 }
 
+
+@Composable
+internal fun QueueSyncedLyricPreview(
+    viewModel: PlayerSharedViewModel,
+    modifier: Modifier = Modifier
+) {
+    val lyrics by viewModel.syncedLyrics.collectAsStateWithLifecycle()
+    val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
+    val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
+    val duration by viewModel.duration.collectAsStateWithLifecycle()
+    val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
+    val audioService by viewModel.audioServiceState.collectAsStateWithLifecycle()
+    val timeline = remember(lyrics) {
+        LineSyncedLyricTimeline.build(lyrics.orEmpty())
+    }
+    val songKey = currentSong?.videoId?.takeIf { it.isNotBlank() }
+        ?: currentSong?.path?.takeIf { it.isNotBlank() }
+        ?: currentSong?.id?.toString()
+    val positionProvider = remember(audioService, viewModel) {
+        {
+            audioService?.getCurrentPositionForLyrics()
+                ?: viewModel.currentPosition.value
+        }
+    }
+    val activeLine by produceState<String?>(
+        initialValue = null,
+        songKey,
+        timeline,
+        duration,
+        isPlaying,
+        positionProvider,
+        currentPosition
+    ) {
+        while (true) {
+            val positionMs = positionProvider().coerceAtLeast(0).toLong()
+            val index = LineSyncedLyricTimeline.activeIndexAt(
+                timeline = timeline,
+                positionMs = positionMs,
+                durationMs = duration.toLong().coerceAtLeast(0L)
+            )
+            val nextText = timeline.getOrNull(index)?.line?.content?.trim()
+                ?.takeIf { it.isNotEmpty() }
+            if (value != nextText) value = nextText
+            delay(
+                if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) 84L
+                else if (isPlaying) 48L else 84L
+            )
+        }
+    }
+
+    if (!activeLine.isNullOrBlank()) {
+        Row(
+            modifier = modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(DsmusicTheme.colorScheme.primaryContainer.copy(alpha = 0.54f))
+                .padding(horizontal = 12.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_lyrics),
+                contentDescription = "Current lyric",
+                tint = DsmusicTheme.colorScheme.primary,
+                modifier = Modifier.size(15.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = activeLine.orEmpty(),
+                style = DsmusicTheme.typography.bodySmall.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 17.sp
+                ),
+                color = DsmusicTheme.colorScheme.onSurface,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

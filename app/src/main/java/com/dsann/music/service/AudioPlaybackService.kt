@@ -55,6 +55,7 @@ import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
 import com.dsann.music.data.lyrics.LyricLine
+import com.dsann.music.data.lyrics.LineSyncedLyricTimeline
 import com.dsann.music.R
 import com.dsann.music.model.SongItem
 import com.dsann.music.data.innertube.YouTubeMusic
@@ -3127,28 +3128,28 @@ class AudioPlaybackService : MediaSessionService() {
      * until the next line begins, matching the portrait player's one-active-line model.
      */
     private fun currentWidgetLyricText(positionMs: Long): CharSequence {
-        val synced = widgetSyncedLyrics
-            .asSequence()
-            .filter { !it.isInterlude && it.content.isNotBlank() }
-            .sortedBy { widgetLyricStartMs(it) }
-            .toList()
+        val timeline = LineSyncedLyricTimeline.build(widgetSyncedLyrics)
+        val durationMs = player.duration.takeIf {
+            it > 0L && it != androidx.media3.common.C.TIME_UNSET
+        } ?: 0L
+        val activeIndex = LineSyncedLyricTimeline.activeIndexAt(
+            timeline = timeline,
+            positionMs = positionMs.coerceAtLeast(0L),
+            durationMs = durationMs
+        )
+        val line = timeline.getOrNull(activeIndex)?.line
+        if (line != null) return styleWidgetLyricText(line.content)
 
-        if (synced.isNotEmpty()) {
-            val line = synced.lastOrNull { widgetLyricStartMs(it) <= positionMs }
-                ?: synced.first()
-            return styleWidgetLyricText(line.content)
-        }
-
-        // Plain lyrics have no timestamps. Keep the widget to one complete line
-        // rather than shrinking multiple paragraphs into its compact display area.
-        val plainLine = (widgetPlainLyrics ?: viewModel?.plainLyrics?.value).orEmpty()
+        val plain = (widgetPlainLyrics ?: viewModel?.plainLyrics?.value).orEmpty()
             .lineSequence()
             .map { it.trim() }
-            .firstOrNull { it.isNotEmpty() }
-            .orEmpty()
-        return if (plainLine.isBlank()) "..." else styleWidgetLyricText(plainLine)
+            .filter { it.isNotEmpty() }
+            .take(4)
+            .joinToString("\n")
+        return if (plain.isBlank()) "..." else styleWidgetLyricText(plain)
     }
 
+    /** Widget lyric pages show one complete line, never a word-by-word karaoke sweep. */
     private fun styleWidgetLyricText(text: String): CharSequence {
         val value = text.trim()
         if (value.isEmpty()) return "..."
@@ -3169,8 +3170,11 @@ class AudioPlaybackService : MediaSessionService() {
         output.setSpan(TypefaceSpan(typeface), 0, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         output.setSpan(StyleSpan(Typeface.BOLD), 0, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
 
-        val accentColor = getSharedPreferences("dsmusic_widget_prefs", Context.MODE_PRIVATE)
-            .getInt("widget_lyrics_dynamic_accent", android.graphics.Color.rgb(124, 156, 255))
+        val widgetPrefs = getSharedPreferences("dsmusic_widget_prefs", Context.MODE_PRIVATE)
+        val accentColor = widgetPrefs.getInt(
+            "widget_lyrics_dynamic_accent",
+            android.graphics.Color.rgb(124, 156, 255)
+        )
         val gradientStops = intArrayOf(
             android.graphics.Color.rgb(83, 246, 255),
             android.graphics.Color.rgb(105, 157, 255),
@@ -3178,14 +3182,13 @@ class AudioPlaybackService : MediaSessionService() {
             android.graphics.Color.rgb(255, 112, 205),
             android.graphics.Color.rgb(255, 207, 127)
         )
-
-        fun colorAt(index: Int): Int {
-            val characterPosition = if (value.length <= 1) 0f else index.toFloat() / (value.length - 1)
-            val scaled = characterPosition * (gradientStops.size - 1)
+        for (index in value.indices) {
+            val fraction = if (value.length <= 1) 0f else index.toFloat() / (value.length - 1)
+            val scaled = fraction * (gradientStops.size - 1)
             val lower = scaled.toInt().coerceIn(0, gradientStops.lastIndex)
             val upper = (lower + 1).coerceAtMost(gradientStops.lastIndex)
-            val fraction = (scaled - lower).coerceIn(0f, 1f)
-            return when (colourStyle) {
+            val blend = (scaled - lower).coerceIn(0f, 1f)
+            val color = when (colourStyle) {
                 "White" -> android.graphics.Color.WHITE
                 "UI Matching" -> accentColor
                 else -> {
@@ -3193,21 +3196,16 @@ class AudioPlaybackService : MediaSessionService() {
                     val end = gradientStops[upper]
                     android.graphics.Color.rgb(
                         (android.graphics.Color.red(start) +
-                            (android.graphics.Color.red(end) - android.graphics.Color.red(start)) * fraction).toInt(),
+                            (android.graphics.Color.red(end) - android.graphics.Color.red(start)) * blend).toInt(),
                         (android.graphics.Color.green(start) +
-                            (android.graphics.Color.green(end) - android.graphics.Color.green(start)) * fraction).toInt(),
+                            (android.graphics.Color.green(end) - android.graphics.Color.green(start)) * blend).toInt(),
                         (android.graphics.Color.blue(start) +
-                            (android.graphics.Color.blue(end) - android.graphics.Color.blue(start)) * fraction).toInt()
+                            (android.graphics.Color.blue(end) - android.graphics.Color.blue(start)) * blend).toInt()
                     )
                 }
             }
-        }
-
-        // A complete line uses one steady synced-lyrics colour treatment. No timed
-        // per-word opacity, character fill, or karaoke progress is applied here.
-        for (index in value.indices) {
             output.setSpan(
-                ForegroundColorSpan(colorAt(index)),
+                ForegroundColorSpan(color),
                 index,
                 index + 1,
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
@@ -3216,7 +3214,7 @@ class AudioPlaybackService : MediaSessionService() {
         return output
     }
 
-        private fun isWidgetLyricsPageActive(forceRefresh: Boolean = false): Boolean {
+    private fun isWidgetLyricsPageActive(forceRefresh: Boolean = false): Boolean {
         val now = System.currentTimeMillis()
         if (forceRefresh || now - lastWidgetLyricsModeCheckAtMs >= 1_200L) {
             widgetLyricsPageActiveCached =
@@ -3246,23 +3244,11 @@ class AudioPlaybackService : MediaSessionService() {
             return
         }
 
-        val lines = widgetSyncedLyrics
-            .filter { !it.isInterlude && it.content.isNotBlank() }
-            .sortedBy { widgetLyricStartMs(it) }
-        val activeLine = lines.lastOrNull { widgetLyricStartMs(it) <= positionMs }
-        val nextLineStart = lines.asSequence()
-            .map { widgetLyricStartMs(it) }
-            .filter { it > positionMs + 20L }
-            .minOrNull()
-
-        // A karaoke-origin line has one line window: first word start through last
-        // word end. After that end boundary, keep the full line visible until the
-        // next line's first timestamp, just like ordinary line-synced lyrics.
-        val lastWordEnd = activeLine
-            ?.takeIf { it.words.isNotEmpty() }
-            ?.let { widgetLyricEndMs(it) }
-            ?.takeIf { it > positionMs + 20L }
-        val nextEvent = listOfNotNull(lastWordEnd, nextLineStart).minOrNull()
+        val timeline = LineSyncedLyricTimeline.build(widgetSyncedLyrics)
+        val nextEvent = LineSyncedLyricTimeline.nextBoundaryAfter(
+            timeline = timeline,
+            positionMs = positionMs.coerceAtLeast(0L)
+        )
         if (nextEvent == null) {
             cancelWidgetLyricRefresh()
             return
@@ -3301,9 +3287,9 @@ class AudioPlaybackService : MediaSessionService() {
     private fun currentWidgetRepeatIconResource(): Int = when (
         viewModel?.repeatMode?.value ?: PlayerSharedViewModel.REPEAT_OFF
     ) {
-        PlayerSharedViewModel.REPEAT_ONCE -> R.drawable.ic_repeat_one
-        PlayerSharedViewModel.REPEAT_INFINITY -> R.drawable.ic_repeat_infinity
-        else -> R.drawable.ic_repeat
+        PlayerSharedViewModel.REPEAT_ONCE -> R.drawable.widget_ic_repeat_one
+        PlayerSharedViewModel.REPEAT_INFINITY -> R.drawable.widget_ic_repeat_infinity
+        else -> R.drawable.widget_ic_repeat
     }
 
     fun updateWidgetState(isPlaying: Boolean) {

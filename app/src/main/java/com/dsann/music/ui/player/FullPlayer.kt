@@ -2118,7 +2118,8 @@ fun FullPlayer(
             dynamicAccentColor = dynamicAccentColor,
             isDark = isDark,
             onSongLongClick = { song -> selectedQueueSongForMenu = song },
-            onRemoveFromQueue = { song -> viewModel.removeFromQueue(song.id) }
+            onRemoveFromQueue = { song -> viewModel.removeFromQueue(song.id) },
+            playerSharedViewModel = viewModel
         )
 
         selectedQueueSongForMenu?.let { queueSong ->
