@@ -1115,7 +1115,11 @@ fun FullPlayer(
         val screenHeight = maxHeight
         // The artwork preference scales only the floating cover layer. The reserved
         // artwork slot remains constant so title, slider and transport controls do not move.
-        val artScale = when (playerLayout) {
+        // Keep the reserved slot identical to the shared artwork layer in
+        // PlayerBottomSheetCompose. A mismatch lets the title enter the cover's area.
+        val albumArtScale = when (playerLayout) {
+            "Cover" -> 0.98f
+            "Minimal" -> 0.68f
             "Vinyl", "Cassette" -> 0.82f
             else -> 0.9f
         }
@@ -1176,9 +1180,13 @@ fun FullPlayer(
         // Dense controls are used for landscape and short-height resized player windows.
         val compactLandscape = isLandscapeWindow || screenHeight < 760.dp ||
             isCompactPortraitMultiWindow
+        // Move the title group down and reduce the gap before the action chips while
+        // keeping their shared vertical anchor unchanged. Preserve landscape spacing.
+        val titleToActionsSpacerWeight =
+            if (isLandscapeWindow || isCompactPortraitMultiWindow) 2.25f else 1.5f
+        // Match the exact height factor used to position the shared artwork layer.
+        // Multi-window mode may compact controls, but must not shrink the artwork slot.
         val portraitArtHeightFactor = when {
-            isCompactPortraitMultiWindow && screenHeight < 680.dp -> 0.22f
-            isCompactPortraitMultiWindow -> 0.26f
             screenHeight < 680.dp -> 0.30f
             screenHeight < 760.dp -> 0.34f
             else -> 0.40f
@@ -1188,19 +1196,17 @@ fun FullPlayer(
             screenHeight < 640.dp -> 0.22f
             else -> 0.28f
         }
-        val widePortraitArtHeightFactor = when {
-            isCompactPortraitMultiWindow -> 0.30f
-            screenHeight < 760.dp -> 0.34f
-            else -> 0.50f
-        }
+        val widePortraitArtHeightFactor =
+            if (screenHeight < 760.dp) 0.34f else 0.50f
         val portraitArtHeightLimit = screenHeight * portraitArtHeightFactor
         val albumArtSlotSize = if (isLandscapeWindow) {
-            minOf(screenHeight * landscapeArtHeightFactor, screenWidth * 0.30f) * (artScale / 0.9f)
+            minOf(screenHeight * landscapeArtHeightFactor, screenWidth * 0.30f) *
+                (albumArtScale / 0.9f)
         } else if (useWidePlayer) {
-            minOf(screenHeight * widePortraitArtHeightFactor, screenWidth * 0.42f) * (artScale / 0.9f)
+            minOf(screenHeight * widePortraitArtHeightFactor, screenWidth * 0.42f) *
+                (albumArtScale / 0.9f)
         } else {
-            // Keep the reserved portrait slot proportional to the window, not the cover scale.
-            minOf(screenWidth * artScale, portraitArtHeightLimit)
+            minOf(screenWidth * albumArtScale, portraitArtHeightLimit)
         }
 
         val density = androidx.compose.ui.platform.LocalDensity.current
@@ -1302,7 +1308,12 @@ fun FullPlayer(
             // Reallocate one quarter of the title/visualizer-to-action gap above the
             // title group. The total weighted space stays constant, so action buttons
             // retain their exact vertical position while the group moves down.
-            Spacer(modifier = Modifier.weight(0.75f, fill = true))
+            Spacer(
+                modifier = Modifier.weight(
+                    if (isLandscapeWindow) 0.75f else 1.5f,
+                    fill = true
+                )
+            )
 
             // Keep title and artist centered on the player, independently of the trailing info control.
             Box(
@@ -1430,7 +1441,7 @@ fun FullPlayer(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(if (isCompactPortraitMultiWindow) 3f else 2.25f, fill = true)
+                        .weight(titleToActionsSpacerWeight, fill = true)
                         // Keep the lyric baseline inside its own measured slot. In a resized
                         // window, an almost-zero weighted slot must not paint over the actions row.
                         .then(
@@ -1455,7 +1466,7 @@ fun FullPlayer(
             } else {
                 Spacer(
                     modifier = Modifier.weight(
-                        if (isCompactPortraitMultiWindow) 3f else 2.25f,
+                        titleToActionsSpacerWeight,
                         fill = true
                     )
                 )
