@@ -887,7 +887,7 @@ fun FullPlayer(
     modifier: Modifier = Modifier
 ) {
     val isDark = DsmusicTheme.colorScheme.background.luminance() < 0.5f
-    val contentColor = if (isDark) Color.White else Color(0xFF1C1B1F)
+    val contentColor = if (isDark) Color.White else Color.Black
     // Light mode uses black glyphs on white control surfaces; dark mode reverses them.
     val playerButtonColor = if (isDark) Color.Black else Color.White
     val playerButtonContentColor = if (isDark) Color.White else Color.Black
