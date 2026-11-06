@@ -4108,6 +4108,53 @@ private data class CachedSongEntry(
     val cacheFileModifiedAtMs: Long = 0L
 )
 
+private val attemptedCacheTitleRepairs =
+    java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+private fun isGenericCachedSongTitle(value: String?): Boolean {
+    val title = value?.trim().orEmpty()
+    return title.isBlank() ||
+        title.equals("D.S Music", ignoreCase = true) ||
+        title.equals("SpatialFlow", ignoreCase = true) ||
+        title.equals("Unknown Title", ignoreCase = true) ||
+        title.equals("<unknown>", ignoreCase = true) ||
+        title.equals("Unknown", ignoreCase = true) ||
+        title.equals("Now Playing", ignoreCase = true)
+}
+
+/**
+ * Repairs Cache entries written by older builds with the app name as their track title.
+ * The video ID is already stored with the cached stream, so metadata can be recovered
+ * without re-downloading the audio itself.
+ */
+private suspend fun repairCachedSongTitle(
+    context: Context,
+    entry: CachedSongEntry
+): Boolean {
+    val videoId = entry.videoId.takeIf { it.isNotBlank() } ?: return false
+    if (!attemptedCacheTitleRepairs.add(videoId)) return false
+
+    val result = runCatching {
+        YouTubeMusic.player(videoId, metadataOnly = true).getOrNull()
+    }.getOrNull() ?: return false
+
+    val repairedTitle = result.title.trim()
+    if (isGenericCachedSongTitle(repairedTitle)) return false
+
+    AudioPlaybackService.rememberMediaCacheMetadata(
+        context = context,
+        cacheKey = entry.cachedUri,
+        title = repairedTitle,
+        artist = result.artist.ifBlank { entry.artist },
+        songId = entry.songId,
+        durationMs = entry.durationMs.takeIf { it > 0L } ?: result.durationMs,
+        videoId = videoId,
+        albumName = entry.albumName,
+        thumbnailUrl = ""
+    )
+    return true
+}
+
 private data class CacheTabSnapshot(
     val entries: List<CachedSongEntry>
 )
@@ -4122,7 +4169,7 @@ private suspend fun readCacheTabSnapshot(context: Context): CacheTabSnapshot = w
         val metadata = cached.metadata
         val entry = CachedSongEntry(
             songId = metadata.songId,
-            title = metadata.title,
+            title = metadata.title.takeUnless(::isGenericCachedSongTitle) ?: "Unknown Title",
             artist = metadata.artist.ifBlank { "Unknown artist" },
             albumName = metadata.albumName,
             videoId = metadata.videoId,
@@ -4268,6 +4315,24 @@ private fun StreamCacheTabContent(
         if (!rootTabActive) return@LaunchedEffect
         var snapshot = readCacheTabSnapshot(context).entries
         cacheEntries = snapshot
+
+        // Repair legacy entries in the background. The cached audio bytes are untouched;
+        // only the saved display metadata is corrected from the associated video ID.
+        launch {
+            var repairedAnyTitle = false
+            snapshot.filter { it.title == "Unknown Title" && it.videoId.isNotBlank() }
+                .forEach { entry ->
+                    if (repairCachedSongTitle(context, entry)) {
+                        repairedAnyTitle = true
+                    }
+                }
+            if (repairedAnyTitle) {
+                val repairedSnapshot = readCacheTabSnapshot(context).entries
+                snapshot = repairedSnapshot
+                cacheEntries = repairedSnapshot
+            }
+        }
+
         while (true) {
             delay(10_000L)
             val updated = readCacheTabSnapshot(context).entries
