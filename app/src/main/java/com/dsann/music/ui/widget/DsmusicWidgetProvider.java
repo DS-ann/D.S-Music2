@@ -269,7 +269,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                         layoutId,
                         0
                 );
-                setupPendingIntents(context, views, isPlaying, layoutId, providerClass);
+                setupPendingIntents(context, views, isPlaying, layoutId, providerClass, id);
                 manager.partiallyUpdateAppWidget(id, views);
             } catch (Exception error) {
                 Log.w(TAG, "Could not refresh widget controls for " + id, error);
@@ -332,7 +332,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             for (int id : largeIds) {
                 updateWidgetProgress(
                         appContext, manager, id, update.position, update.duration,
-                        null, R.layout.widget_large);
+                        update.currentLyric, R.layout.widget_large);
             }
         } catch (Exception error) {
             Log.w(TAG, "Widget progress update failed", error);
@@ -354,7 +354,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                     ? (int) (((float) Math.max(0, position) / duration) * 100f)
                     : 0;
             views.setProgressBar(R.id.widget_progress, 100, Math.max(0, Math.min(100, progress)), false);
-            if (layoutId == R.layout.widget_medium) {
+            if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
                 applyLyricsPresentation(context, views, currentLyric);
             }
             manager.partiallyUpdateAppWidget(id, views);
@@ -377,19 +377,19 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         // Set drawable resources explicitly instead of relying on the launcher's
         // interpretation of XML ImageButton defaults or inherited theme tints.
         setWidgetIcon(views, R.id.widget_play_pause,
-                isPlaying ? R.drawable.ic_pause : R.drawable.ic_play);
+                isPlaying ? R.drawable.widget_ic_pause : R.drawable.widget_ic_play);
 
         if (layoutId == R.layout.widget_small ||
                 layoutId == R.layout.widget_medium ||
                 layoutId == R.layout.widget_large) {
-            setWidgetIcon(views, R.id.widget_prev, R.drawable.ic_skip_previous);
-            setWidgetIcon(views, R.id.widget_next, R.drawable.ic_skip_next);
+            setWidgetIcon(views, R.id.widget_prev, R.drawable.widget_ic_previous);
+            setWidgetIcon(views, R.id.widget_next, R.drawable.widget_ic_next);
         }
 
         if (layoutId == R.layout.widget_medium) {
-            setWidgetIcon(views, R.id.widget_toggle_lyrics, R.drawable.ic_lyrics);
+            setWidgetIcon(views, R.id.widget_toggle_lyrics, R.drawable.widget_ic_lyrics);
         } else if (layoutId == R.layout.widget_large) {
-            setWidgetIcon(views, R.id.widget_favorite, R.drawable.ic_favorite_border);
+            setWidgetIcon(views, R.id.widget_favorite, R.drawable.widget_ic_favorite);
             if (repeatIconResId != 0) {
                 setWidgetIcon(views, R.id.widget_repeat, repeatIconResId);
             }
@@ -435,12 +435,14 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                 boolean isLyricsMode = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                         .getBoolean(PREF_LYRICS_MODE + id, false);
                 views.setDisplayedChild(R.id.widget_flipper, isLyricsMode ? 1 : 0);
+            } else if (layoutId == R.layout.widget_large) {
+                applyLyricsPresentation(context, views, currentLyric);
             }
 
             // Apply icon resources, tint, and click actions on every full refresh,
             // including the initial empty-state refresh before a song is selected.
             applyWidgetActionIcons(views, isPlaying, layoutId, repeatIconResId);
-            setupPendingIntents(context, views, isPlaying, layoutId, providerClass);
+            setupPendingIntents(context, views, isPlaying, layoutId, providerClass, id);
             manager.updateAppWidget(id, views);
 
             if (song != null) {
@@ -488,9 +490,11 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                     boolean isLyricsMode = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                             .getBoolean(PREF_LYRICS_MODE + id, false);
                     fallback.setDisplayedChild(R.id.widget_flipper, isLyricsMode ? 1 : 0);
+                } else if (layoutId == R.layout.widget_large) {
+                    applyLyricsPresentation(context, fallback, currentLyric);
                 }
                 applyWidgetActionIcons(fallback, isPlaying, layoutId, repeatIconResId);
-                setupPendingIntents(context, fallback, isPlaying, layoutId, providerClass);
+                setupPendingIntents(context, fallback, isPlaying, layoutId, providerClass, id);
                 manager.updateAppWidget(id, fallback);
             } catch (Exception fallbackError) {
                 Log.e(TAG, "Widget fallback rendering failed for " + id, fallbackError);
@@ -820,7 +824,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         return (bitmap);
     }
 
-    private static void setupPendingIntents(Context context, RemoteViews views, boolean isPlaying, int layoutId, Class<?> providerClass) {
+    private static void setupPendingIntents(Context context, RemoteViews views, boolean isPlaying, int layoutId, Class<?> providerClass, int widgetId) {
         // App Launch Intent (On Art)
         Intent launchIntent = new Intent(context, com.dsann.music.MainActivity.class);
         launchIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -833,7 +837,9 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         if (layoutId == R.layout.widget_medium) {
             Intent toggleIntent = new Intent(context, providerClass);
             toggleIntent.setAction(ACTION_TOGGLE_LYRICS);
-            PendingIntent piToggle = PendingIntent.getBroadcast(context, 20, toggleIntent, 
+            toggleIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
+            PendingIntent piToggle = PendingIntent.getBroadcast(
+                    context, 20_000 + widgetId, toggleIntent,
                     PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
             views.setOnClickPendingIntent(R.id.widget_toggle_lyrics, piToggle);
             views.setOnClickPendingIntent(R.id.widget_lyrics_text, piToggle);
@@ -870,9 +876,12 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         super.onReceive(context, intent);
         if (ACTION_TOGGLE_LYRICS.equals(intent.getAction())) {
             AppWidgetManager manager = AppWidgetManager.getInstance(context);
-            int[] ids = manager.getAppWidgetIds(new ComponentName(context, WidgetMediumProvider.class));
+            int requestedWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1);
+            int[] ids = requestedWidgetId >= 0
+                    ? new int[] { requestedWidgetId }
+                    : manager.getAppWidgetIds(new ComponentName(context, WidgetMediumProvider.class));
             android.content.SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            
+
             for (int id : ids) {
                 // Toggle the saved state
                 boolean currentMode = prefs.getBoolean(PREF_LYRICS_MODE + id, false);

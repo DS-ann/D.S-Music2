@@ -1,10 +1,1 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <color name="widget_background">#27364F</color>
-    <color name="widget_surface_start">#48658D</color>
-    <color name="widget_surface_end">#1B2942</color>
-    <color name="widget_outline">#788FB2</color>
-    <color name="widget_on_background">#F7F9FF</color>
-    <color name="widget_accent_default">#A9C2FF</color>
-    <color name="widget_progress_track">#55FFFFFF</color>
-</resources>
+<?xml version="1.0" encoding="utf-8"?><resources><color name="widget_background">#2C4058</color><color name="widget_surface_start">#506F91</color><color name="widget_surface_end">#203650</color><color name="widget_outline">#7895B9</color><color name="widget_on_background">#F7FAFF</color><color name="widget_accent_default">#A8C9FF</color><color name="widget_progress_track">#65FFFFFF</color></resources>
