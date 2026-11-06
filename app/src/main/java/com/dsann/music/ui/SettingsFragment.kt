@@ -3344,7 +3344,8 @@ private fun AppearanceScreen(
                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
             )
 
-            SettingsAccordionSection("Your Looks") {
+            SettingsAccordionSection("Your looks") {
+
                 SavedLooksEditor(
                     looks = savedLooks,
                     onSave = onSaveLook,
@@ -3354,6 +3355,7 @@ private fun AppearanceScreen(
             }
 
             SettingsAccordionSection("Theme") {
+
             SettingsGroupCard(buildList {
                 add {
                     SettingsChoiceRow(
@@ -3369,8 +3371,9 @@ private fun AppearanceScreen(
             })
 
             
-            }
-            SettingsAccordionSection("Colors") {
+            
+
+
             SettingsGroupCard(listOf {
                 Column {
                     ColorPaletteSelector(
@@ -3392,10 +3395,10 @@ private fun AppearanceScreen(
                     onSelected = onGenreGradientStyleChange
                 )
             })
-
-            
             }
-            SettingsAccordionSection("Artwork size") {
+
+            SettingsAccordionSection("Full screen player") {
+
             SettingsGroupCard(listOf {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Text(
@@ -3417,8 +3420,9 @@ private fun AppearanceScreen(
             })
 
             
-            }
-            SettingsAccordionSection("Player layout") {
+            
+
+
                 SettingsGroupCard(listOf {
                     SettingsChoiceRow(
                         title = "Player layout",
@@ -3428,8 +3432,9 @@ private fun AppearanceScreen(
                         onSelected = onPlayerLayoutChange
                     )
                 })
-            }
-            SettingsAccordionSection("Player buttons") {
+            
+
+
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3457,17 +3462,9 @@ private fun AppearanceScreen(
             )
 
             
-            }
-            SettingsAccordionSection("Notification & lock-screen controls") {
-            SessionButtonsSettings(
-                selected = sessionButtons,
-                onSelectionChanged = onSessionButtonsChange,
-                onMove = onMoveSessionButton
-            )
-
             
-            }
-            SettingsAccordionSection("Title and times") {
+
+
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3516,8 +3513,9 @@ private fun AppearanceScreen(
             ))
 
             
-            }
-            SettingsAccordionSection("Progress bar") {
+            
+
+
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3571,8 +3569,83 @@ private fun AppearanceScreen(
             ))
 
             
+            
+
+SettingsGroupCard(listOf {
+    SettingsChoiceRow(
+        title = "Player background",
+        description = "Choose the player background: album cover, app theme, black, or a soft blend of colours based on the cover.",
+        selected = playerBackgroundStyle,
+        options = listOf("Artwork", "Theme", "Black", "Gradient"),
+        onSelected = onPlayerBackgroundStyleChange
+    )
+})
+
+SettingsGroupCard(listOf {
+    SettingsChoiceRow(
+        title = "Player artwork shape",
+        description = "Choose the shape of the album cover in the player.",
+        selected = playerArtworkShape,
+        options = listOf("Rounded", "Square", "Circle", "Squircle", "Flower", "Cookie", "Arch", "Slanted"),
+        onSelected = onPlayerArtworkShapeChange
+    )
+})
+
+
+                SettingsGroupCard(listOf {
+                    SettingsChoiceRow(
+                        title = "Playing animation",
+                        description = "Show a small animation over the cover of the song playing. Colours adjust to the album cover and your app theme.",
+                        selected = nowPlayingCoverAnimation,
+                        options = NowPlayingCoverAnimationPreference.choices,
+                        onSelected = onNowPlayingCoverAnimationChange
+                    )
+                })
             }
+
+            SettingsAccordionSection("Mini player") {
+SettingsGroupCard(listOf(
+    {
+        SettingsChoiceRow(
+            title = "Mini player style",
+            description = "Choose how the mini player looks.",
+            selected = miniPlayerStyle,
+            options = listOf("Card", "Flat", "Compact", "Pill"),
+            onSelected = onMiniPlayerStyleChange
+        )
+    },
+    {
+        SettingsChoiceRow(
+            title = "Mini-player button shape",
+            description = "Choose the shape behind the mini-player buttons. This is separate from the mini-player background.",
+            selected = miniPlayerControlShape,
+            options = listOf("Circle", "Rounded", "Pill", "None"),
+            onSelected = onMiniPlayerControlShapeChange
+        )
+    },
+    {
+        SettingsChoiceRow(
+            title = "Mini-player icon set",
+            description = "Choose how the previous, play/pause and next buttons look.",
+            selected = miniPlayerControlIcons,
+            options = listOf("Classic", "Chevron", "Seek"),
+            onSelected = onMiniPlayerControlIconsChange
+        )
+    },
+    {
+        SettingsChoiceRow(
+            title = "Mini-player progress",
+            description = "Show song progress as a ring, line, fill, or around the edge of the album cover. Choose None to hide it.",
+            selected = miniPlayerProgressStyle,
+            options = listOf("Ring", "Line", "Fill", "Matching cover", "None"),
+            onSelected = onMiniPlayerProgressStyleChange
+        )
+    }
+))
+            }
+
             SettingsAccordionSection("Visualizer") {
+
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
                     title = "Player animation",
@@ -3591,82 +3664,19 @@ private fun AppearanceScreen(
                     onSelected = onVisualizerColorChange
                 )
             })
-
-            
             }
-            SettingsAccordionSection("Player appearance") {
-            SettingsGroupCard(listOf(
-                {
-                    SettingsChoiceRow(
-                        title = "Player background",
-                        description = "Choose the player background: album cover, app theme, black, or a soft blend of colours based on the cover.",
-                        selected = playerBackgroundStyle,
-                        options = listOf("Artwork", "Theme", "Black", "Gradient"),
-                        onSelected = onPlayerBackgroundStyleChange
-                    )
-                },
-                {
-                    SettingsChoiceRow(
-                        title = "Mini player style",
-                        description = "Choose how the mini player looks.",
-                        selected = miniPlayerStyle,
-                        options = listOf("Card", "Flat", "Compact", "Pill"),
-                        onSelected = onMiniPlayerStyleChange
-                    )
-                },
-                {
-                    SettingsChoiceRow(
-                        title = "Mini-player button shape",
-                        description = "Choose the shape behind the mini-player buttons. This is separate from the mini-player background.",
-                        selected = miniPlayerControlShape,
-                        options = listOf("Circle", "Rounded", "Pill", "None"),
-                        onSelected = onMiniPlayerControlShapeChange
-                    )
-                },
-                {
-                    SettingsChoiceRow(
-                        title = "Mini-player icon set",
-                        description = "Choose how the previous, play/pause and next buttons look.",
-                        selected = miniPlayerControlIcons,
-                        options = listOf("Classic", "Chevron", "Seek"),
-                        onSelected = onMiniPlayerControlIconsChange
-                    )
-                },
-                {
-                    SettingsChoiceRow(
-                        title = "Mini-player progress",
-                        description = "Show song progress as a ring, line, fill, or around the edge of the album cover. Choose None to hide it.",
-                        selected = miniPlayerProgressStyle,
-                        options = listOf("Ring", "Line", "Fill", "Matching cover", "None"),
-                        onSelected = onMiniPlayerProgressStyleChange
-                    )
-                },
-                {
-                    SettingsChoiceRow(
-                        title = "Player artwork shape",
-                        description = "Choose the shape of the album cover in the player.",
-                        selected = playerArtworkShape,
-                        options = listOf("Rounded", "Square", "Circle", "Squircle", "Flower", "Cookie", "Arch", "Slanted"),
-                        onSelected = onPlayerArtworkShapeChange
-                    )
-                }
-            ))
 
-            
-            }
-            SettingsAccordionSection("Now playing cover") {
-                SettingsGroupCard(listOf {
-                    SettingsChoiceRow(
-                        title = "Playing animation",
-                        description = "Show a small animation over the cover of the song playing. Colours adjust to the album cover and your app theme.",
-                        selected = nowPlayingCoverAnimation,
-                        options = NowPlayingCoverAnimationPreference.choices,
-                        onSelected = onNowPlayingCoverAnimationChange
-                    )
-                })
+            SettingsAccordionSection("Notification") {
+
+            SessionButtonsSettings(
+                selected = sessionButtons,
+                onSelectionChanged = onSessionButtonsChange,
+                onMove = onMoveSessionButton
+            )
             }
 
             SettingsAccordionSection("Lyrics") {
+
             SettingsGroupCard(listOf(
                 {
                     DsmusicListItem(
@@ -3732,10 +3742,10 @@ private fun AppearanceScreen(
                     )
                 }
             ))
-
-            
             }
-            SettingsAccordionSection("Text & layout") {
+
+            SettingsAccordionSection("Text and layout") {
+
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
@@ -3810,10 +3820,10 @@ private fun AppearanceScreen(
                     onCheckedChange = onTaperedSongDividersChange
                 )
             })
-
-            
             }
+
             SettingsAccordionSection("Navigation") {
+
             SettingsGroupCard(buildList {
                 add {
                     SettingsChoiceRow(
@@ -3845,678 +3855,7 @@ private fun AppearanceScreen(
                 add { DynamicNavStyleRow(dynamicNavStyle, onDynamicNavStyleChange) }
             })
             }
-            
-        }
-    }
-}
 
-@Composable
-private fun CustomAccentEditor(value: String, onApply: (String) -> Unit) {
-    var draft by remember(value) { mutableStateOf(value) }
-    val valid = draft.trim().let { raw ->
-        val normalized = if (raw.startsWith("#")) raw else "#$raw"
-        normalized.matches(Regex("#[0-9a-fA-F]{6}"))
-    }
-    Column(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text("Custom highlight colour", style = DsmusicTheme.typography.bodyLarge)
-        Text(
-            "Enter a 6-digit colour code to choose your own app highlight colour.",
-            style = DsmusicTheme.typography.bodySmall,
-            color = DsmusicTheme.colorScheme.onSurfaceVariant
-        )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            val parsed = if (valid) runCatching {
-                Color(android.graphics.Color.parseColor(if (draft.startsWith("#")) draft else "#$draft"))
-            }.getOrDefault(DsmusicTheme.colorScheme.primary) else DsmusicTheme.colorScheme.surfaceVariant
-            Box(
-                Modifier.size(34.dp).clip(CircleShape).background(parsed)
-                    .border(1.dp, DsmusicTheme.colorScheme.outlineVariant, CircleShape)
-            )
-            BasicTextField(
-                value = draft,
-                onValueChange = { draft = it.take(7).uppercase() },
-                singleLine = true,
-                textStyle = DsmusicTheme.typography.bodyLarge.copy(color = DsmusicTheme.colorScheme.onSurface),
-                modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
-                    .background(DsmusicTheme.colorScheme.surfaceContainerHigh)
-                    .padding(horizontal = 12.dp, vertical = 11.dp)
-            )
-            Box(
-                Modifier.clip(RoundedCornerShape(50))
-                    .background(if (valid) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.surfaceVariant)
-                    .clickable(enabled = valid) { onApply(if (draft.startsWith("#")) draft else "#$draft") }
-                    .padding(horizontal = 15.dp, vertical = 10.dp)
-            ) {
-                Text("Apply", style = DsmusicTheme.typography.labelLarge, color = if (valid) Color(0xFF0B1220) else DsmusicTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ColorPaletteSelector(selected: String, onSelected: (String) -> Unit) {
-    val palettes = listOf(
-        "Ocean" to Color(0xFF7C9CFF),
-        "Violet" to Color(0xFFB69CFF),
-        "Emerald" to Color(0xFF62C9A2),
-        "Amber" to Color(0xFFFFC36F),
-        "Rose" to Color(0xFFFF8FA3),
-        "Monochrome" to Color(0xFFC9CDD4),
-        "Crimson" to Color(0xFFD94A65),
-        "Teal" to Color(0xFF36B9A8),
-        "Cyan" to Color(0xFF43B8D2),
-        "Indigo" to Color(0xFF6475E9),
-        "Lime" to Color(0xFF9FBF42),
-        "Graphite" to Color(0xFF8A939F)
-    )
-    Column(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Text("App colour palette", style = DsmusicTheme.typography.bodyLarge)
-        Text(
-            "Choose the main colour for the app. Colours from the current album cover can also appear in the interface.",
-            style = DsmusicTheme.typography.bodySmall,
-            color = DsmusicTheme.colorScheme.onSurfaceVariant
-        )
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(13.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            palettes.forEach { (name, color) ->
-                val active = selected == name
-                Column(
-                    Modifier.width(56.dp).clickable { onSelected(name) },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(5.dp)
-                ) {
-                    Box(
-                        Modifier.size(34.dp).clip(CircleShape)
-                            .background(color)
-                            .then(
-                                if (active) Modifier.border(3.dp, DsmusicTheme.colorScheme.onSurface, CircleShape)
-                                else Modifier.border(1.dp, DsmusicTheme.colorScheme.outlineVariant, CircleShape)
-                            )
-                    )
-                    Text(
-                        name,
-                        style = DsmusicTheme.typography.labelSmall,
-                        color = if (active) DsmusicTheme.colorScheme.onSurface else DsmusicTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SavedLooksEditor(
-    looks: List<String>,
-    onSave: (String) -> Unit,
-    onApply: (String) -> Unit,
-    onDelete: (String) -> Unit
-) {
-    var showSaveDialog by remember { mutableStateOf(false) }
-    var lookName by remember { mutableStateOf("") }
-    val accent = DsmusicTheme.colorScheme.primary
-    val surface = DsmusicTheme.colorScheme.surfaceContainerLow
-    val textColor = DsmusicTheme.colorScheme.onSurface
-    val secondary = DsmusicTheme.colorScheme.onSurfaceVariant
-
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Text(
-            "Save your colours, player style, lyrics, text and navigation together. Switch between saved looks whenever you like.",
-            style = DsmusicTheme.typography.bodySmall,
-            color = secondary
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
-                .background(surface).clickable { lookName = ""; showSaveDialog = true }
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text("Save current look", style = DsmusicTheme.typography.titleSmall, color = textColor)
-                Text("Save this look so you can use it again", style = DsmusicTheme.typography.bodySmall, color = secondary)
-            }
-            Text("+", style = DsmusicTheme.typography.headlineSmall, color = accent)
-        }
-        if (looks.isEmpty()) {
-            Text("No saved looks yet. Save your current setup to create your first one.", style = DsmusicTheme.typography.bodySmall, color = secondary)
-        } else {
-            looks.forEach { name ->
-                Row(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                        .background(surface).padding(start = 14.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(name, style = DsmusicTheme.typography.titleSmall, color = textColor, maxLines = 1)
-                        Text("Saved appearance", style = DsmusicTheme.typography.bodySmall, color = secondary)
-                    }
-                    Box(
-                        Modifier.clip(RoundedCornerShape(50)).background(accent.copy(alpha = 0.16f))
-                            .clickable { onApply(name) }.padding(horizontal = 13.dp, vertical = 8.dp)
-                    ) {
-                        Text("Apply", style = DsmusicTheme.typography.labelMedium, color = accent)
-                    }
-                    Box(
-                        Modifier.padding(start = 6.dp).clip(RoundedCornerShape(50))
-                            .clickable { onDelete(name) }.padding(horizontal = 10.dp, vertical = 8.dp)
-                    ) {
-                        Text("Delete", style = DsmusicTheme.typography.labelMedium, color = secondary)
-                    }
-                }
-            }
-        }
-    }
-
-    if (showSaveDialog) {
-        Dialog(onDismissRequest = { showSaveDialog = false }) {
-            Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
-                    .background(DsmusicTheme.colorScheme.surface)
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Text("Save this Look", style = DsmusicTheme.typography.titleLarge, color = textColor)
-                Text(
-                    "Your current colours, player style, buttons, lyrics and navigation will be saved together.",
-                    style = DsmusicTheme.typography.bodySmall,
-                    color = secondary
-                )
-                BasicTextField(
-                    value = lookName,
-                    onValueChange = { lookName = it.take(32) },
-                    singleLine = true,
-                    textStyle = DsmusicTheme.typography.bodyLarge.copy(color = textColor),
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                        .background(surface).padding(horizontal = 14.dp, vertical = 13.dp),
-                    decorationBox = { inner ->
-                        Box {
-                            if (lookName.isEmpty()) {
-                                Text("Look name", color = secondary, style = DsmusicTheme.typography.bodyLarge)
-                            }
-                            inner()
-                        }
-                    }
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.align(Alignment.End)) {
-                    Box(
-                        Modifier.clip(RoundedCornerShape(50)).clickable { showSaveDialog = false }
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
-                    ) { Text("Cancel", color = secondary, style = DsmusicTheme.typography.labelLarge) }
-                    Box(
-                        Modifier.clip(RoundedCornerShape(50))
-                            .background(if (lookName.isBlank()) accent.copy(alpha = 0.28f) else accent)
-                            .clickable(enabled = lookName.isNotBlank()) {
-                                onSave(lookName.trim())
-                                showSaveDialog = false
-                            }
-                            .padding(horizontal = 16.dp, vertical = 10.dp)
-                    ) { Text("Save", color = Color(0xFF0B1220), style = DsmusicTheme.typography.labelLarge) }
-                }
-            }
-        }
-    }
-}
-
-private val sessionButtonNames = linkedMapOf(
-    "like" to "Like",
-    "shuffle" to "Shuffle",
-    "repeat" to "Repeat",
-    "dislike" to "Not for me",
-    "back10" to "Back 10 seconds",
-    "ahead30" to "Forward 30 seconds"
-)
-
-@Composable
-private fun SessionButtonsSettings(
-    selected: List<String>,
-    onSelectionChanged: (List<String>) -> Unit,
-    onMove: (Int, Int) -> Unit
-) {
-    SettingsGroupCard(listOf {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                "Choose up to two actions for the notification and lock screen. Selecting another action when two are active replaces the second one.",
-                style = DsmusicTheme.typography.bodySmall,
-                color = DsmusicTheme.colorScheme.onSurfaceVariant
-            )
-            val ordered = selected.filter { it in sessionButtonNames.keys }
-            ordered.forEachIndexed { index, key ->
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    com.dsann.music.ui.theme.Checkbox(
-                        checked = true,
-                        onCheckedChange = { enabled ->
-                            if (!enabled) onSelectionChanged(ordered - key)
-                        }
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(sessionButtonNames[key] ?: key, Modifier.weight(1f), style = DsmusicTheme.typography.bodyMedium)
-                    DsmusicTextButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) { Text("↑") }
-                    DsmusicTextButton(onClick = { onMove(index, index + 1) }, enabled = index < ordered.lastIndex) { Text("↓") }
-                }
-            }
-            sessionButtonNames.filterKeys { it !in ordered }.forEach { (key, label) ->
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    com.dsann.music.ui.theme.Checkbox(
-                        checked = false,
-                        onCheckedChange = { enabled ->
-                            if (enabled) {
-                                val nextSelection = if (ordered.size < 2) {
-                                    ordered + key
-                                } else {
-                                    // Keep the first selected action and replace the
-                                    // second slot so a full selector never blocks changes.
-                                    ordered.dropLast(1) + key
-                                }
-                                onSelectionChanged(nextSelection)
-                            }
-                        }
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(label, Modifier.weight(1f), style = DsmusicTheme.typography.bodyMedium,
-                        color = DsmusicTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            Text(ordered.size.toString() + "/2 selected", color = DsmusicTheme.colorScheme.primary, style = DsmusicTheme.typography.labelSmall)
-            if (ordered != listOf("like", "shuffle")) {
-                DsmusicTextButton(
-                    onClick = { onSelectionChanged(listOf("like", "shuffle")) }
-                ) { Text("Restore default order") }
-            }
-        }
-    })
-}
-
-private val playerButtonNames = linkedMapOf(
-    "lyrics" to "Lyrics",
-    "video" to "Video",
-    "queue" to "Up next",
-    "share" to "Share",
-    "download" to "Download",
-    "like" to "Like",
-    "dislike" to "Not for me",
-    "sleep" to "Sleep timer",
-    "shuffle" to "Shuffle",
-    "repeat" to "Repeat"
-)
-
-@Composable
-private fun PlayerButtonsSettings(
-    selected: List<String>,
-    onSelectionChanged: (List<String>) -> Unit,
-    onMove: (Int, Int) -> Unit
-) {
-    SettingsGroupCard(listOf {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                "Choose 3 to 6 actions and arrange their order in the player.",
-                style = DsmusicTheme.typography.bodySmall,
-                color = DsmusicTheme.colorScheme.onSurfaceVariant
-            )
-            val orderedSelected = selected.filter { it in playerButtonNames.keys }
-            Text(
-                "Shown in player · in this order",
-                style = DsmusicTheme.typography.labelMedium,
-                color = DsmusicTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
-            )
-            // Render the selected actions from the saved list, not the master lookup map.
-            // Iterating playerButtonNames here used to keep the original display order even
-            // when the stored order changed, making the reorder controls appear broken.
-            orderedSelected.forEachIndexed { index, key ->
-                val label = playerButtonNames[key] ?: key
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    com.dsann.music.ui.theme.Checkbox(
-                        checked = true,
-                        onCheckedChange = { enabled ->
-                            if (!enabled && orderedSelected.size > 3) {
-                                onSelectionChanged(orderedSelected - key)
-                            }
-                        }
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(label, Modifier.weight(1f), style = DsmusicTheme.typography.bodyMedium)
-                    DsmusicTextButton(
-                        onClick = { onMove(index, index - 1) },
-                        enabled = index > 0
-                    ) { Text("↑") }
-                    DsmusicTextButton(
-                        onClick = { onMove(index, index + 1) },
-                        enabled = index < orderedSelected.lastIndex
-                    ) { Text("↓") }
-                }
-            }
-
-            val availableActions = playerButtonNames.filterKeys { it !in orderedSelected }
-            if (availableActions.isNotEmpty()) {
-                Text(
-                    "Available actions",
-                    style = DsmusicTheme.typography.labelMedium,
-                    color = DsmusicTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
-                )
-                availableActions.forEach { (key, label) ->
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        com.dsann.music.ui.theme.Checkbox(
-                            checked = false,
-                            enabled = orderedSelected.size < 6,
-                            onCheckedChange = { enabled ->
-                                if (enabled && orderedSelected.size < 6) {
-                                    onSelectionChanged(orderedSelected + key)
-                                }
-                            }
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            label,
-                            Modifier.weight(1f),
-                            style = DsmusicTheme.typography.bodyMedium,
-                            color = DsmusicTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-            Text(
-                "${selected.size}/6 selected",
-                color = DsmusicTheme.colorScheme.primary,
-                style = DsmusicTheme.typography.labelSmall
-            )
-            DsmusicTextButton(onClick = {
-                onSelectionChanged(listOf("lyrics", "video", "queue", "share", "download"))
-            }) { Text("Restore default buttons") }
-        }
-    })
-}
-
-@Composable
-private fun ToggleSettingRow(
-    title: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, style = DsmusicTheme.typography.bodyLarge)
-            Text(description, style = DsmusicTheme.typography.bodySmall, color = DsmusicTheme.colorScheme.onSurfaceVariant)
-        }
-        DsmusicSwitch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-
-@Composable
-private fun SettingsChoiceRow(
-    title: String,
-    description: String,
-    selected: String,
-    options: List<String>,
-    onSelected: (String) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        BasicText(
-            title,
-            style = DsmusicTheme.typography.bodyLarge.copy(
-                color = DsmusicTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium
-            )
-        )
-        BasicText(
-            description,
-            style = DsmusicTheme.typography.bodySmall.copy(
-                color = DsmusicTheme.colorScheme.onSurfaceVariant
-            )
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            options.forEach { option ->
-                val active = selected == option
-                val pillShape = RoundedCornerShape(50)
-                Box(
-                    modifier = Modifier
-                        .clip(pillShape)
-                        .background(
-                            if (active) DsmusicTheme.colorScheme.primary.copy(alpha = 0.17f)
-                            else DsmusicTheme.colorScheme.surfaceContainerHigh
-                        )
-                        .then(
-                            if (active) Modifier.border(
-                                1.dp,
-                                DsmusicTheme.colorScheme.primary.copy(alpha = 0.65f),
-                                pillShape
-                            ) else Modifier
-                        )
-                        .clickable { onSelected(option) }
-                        .padding(horizontal = 13.dp, vertical = 9.dp)
-                ) {
-                    BasicText(
-                        text = option,
-                        style = DsmusicTheme.typography.labelMedium.copy(
-                            color = if (active) DsmusicTheme.colorScheme.primary
-                                else DsmusicTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium
-                        ),
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DsmusicSwitch(
-    checked: Boolean,
-    onCheckedChange: ((Boolean) -> Unit)?,
-    modifier: Modifier = Modifier
-) {
-    val trackColor = if (checked) DsmusicTheme.colorScheme.primary
-        else DsmusicTheme.colorScheme.surfaceVariant
-    val thumbColor = if (checked) DsmusicTheme.colorScheme.onPrimary
-        else DsmusicTheme.colorScheme.onSurfaceVariant
-
-    Box(
-        modifier = modifier
-            .size(width = 44.dp, height = 26.dp)
-            .clip(RoundedCornerShape(50))
-            .background(trackColor)
-            .clickable(enabled = onCheckedChange != null) {
-                onCheckedChange?.invoke(!checked)
-            }
-            .padding(horizontal = 3.dp),
-        contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
-    ) {
-        Box(
-            Modifier
-                .size(20.dp)
-                .clip(CircleShape)
-                .background(thumbColor)
-        )
-    }
-}
-
-@Composable
-private fun DynamicNavStyleRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
-    DsmusicListItem(
-        onClick = { onToggle(!checked) },
-        content = {
-            Column {
-                Text(
-                    text = "Compact navigation bar",
-                    style = DsmusicTheme.typography.bodyLarge
-                )
-                Text(
-                    text = "Use a shorter navigation bar with larger, bolder icons.",
-                    style = DsmusicTheme.typography.bodyMedium,
-                    color = DsmusicTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        trailingContent = {
-            DsmusicSwitch(
-                checked = checked,
-                onCheckedChange = onToggle
-            )
-        },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-    )
-}
-
-@Composable
-private fun HideNavLabelsRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
-    DsmusicListItem(
-        onClick = { onToggle(!checked) },
-        content = {
-            Column {
-                Text(
-                    text = "Hide Navigation Labels",
-                    style = DsmusicTheme.typography.bodyLarge
-                )
-                Text(
-                    text = "Remove text labels from the bottom navigation bar",
-                    style = DsmusicTheme.typography.bodyMedium,
-                    color = DsmusicTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        trailingContent = {
-            DsmusicSwitch(
-                checked = checked,
-                onCheckedChange = onToggle
-            )
-        },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-    )
-}
-
-@Composable
-private fun DynamicAlbumThemeRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
-    DsmusicListItem(
-        onClick = { onToggle(!checked) },
-        content = {
-            Column {
-                Text(
-                    text = "Album cover colours",
-                    style = DsmusicTheme.typography.bodyLarge
-                )
-                Text(
-                    text = "Use colours from the current album cover throughout the app",
-                    style = DsmusicTheme.typography.bodyMedium,
-                    color = DsmusicTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        leadingContent = {
-            Icon(
-                imageVector = Icons.Rounded.Palette,
-                contentDescription = null,
-                tint = if (checked) DsmusicTheme.colorScheme.primary else DsmusicTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp)
-            )
-        },
-        trailingContent = {
-            DsmusicSwitch(
-                checked = checked,
-                onCheckedChange = onToggle
-            )
-        },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-    )
-}
-
-@Composable
-private fun AmoledBlackRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
-    DsmusicListItem(
-        onClick = { onToggle(!checked) },
-        content = {
-            Column {
-                Text(
-                    text = "Pure black background",
-                    style = DsmusicTheme.typography.bodyLarge
-                )
-                Text(
-                    text = "Use a completely black background in dark mode to save battery",
-                    style = DsmusicTheme.typography.bodyMedium,
-                    color = DsmusicTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        trailingContent = {
-            DsmusicSwitch(
-                checked = checked,
-                onCheckedChange = onToggle
-            )
-        },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-    )
-}
-
-@Composable
-private fun PlaybackScreen(
-    navController: androidx.navigation.NavController,
-    crossfadeEnabled: Boolean,
-    onCrossfadeToggle: (Boolean) -> Unit,
-    crossfadeDuration: Float,
-    onCrossfadeDurationChange: (Float) -> Unit,
-    audioFocus: Boolean,
-    onAudioFocusToggle: (Boolean) -> Unit,
-    autoplayEnabled: Boolean,
-    onAutoplayToggle: (Boolean) -> Unit,
-    sleepTimerEndTime: Long,
-    sleepTimerMode: PlayerSharedViewModel.SleepTimerMode,
-    onStartSleepTimer: (Int) -> Unit,
-    onCancelSleepTimer: () -> Unit,
-    onSetEndOfSong: (Boolean) -> Unit,
-    audioQuality: String,
-    onAudioQualityChange: (String) -> Unit,
-    downloadAudioFormat: String,
-    onDownloadAudioFormatChange: (String) -> Unit,
-    downloadBitrate: String,
-    onDownloadBitrateChange: (String) -> Unit,
-    playerFrameRate: Int,
-    onPlayerFrameRateChange: (Int) -> Unit,
-) {
-    Scaffold(
-        topBar = { SettingsDetailTopBar("Playback") { navController.popBackStack() } }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 120.dp)
-        ) {
             SettingsAccordionSection("Autoplay") {
             SettingsGroupCard(listOf(
                 { AutoplayRow(autoplayEnabled, onAutoplayToggle) }
