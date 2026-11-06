@@ -259,6 +259,13 @@ class MainActivity : AppCompatActivity() {
 
                 Scaffold(
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                    // The portrait dock floats above the screen. Keep the host behind
+                    // its outline transparent so no full-width slab appears around it.
+                    containerColor = if (!useNavigationRail && !isLandscapeLayout) {
+                        androidx.compose.ui.graphics.Color.Transparent
+                    } else {
+                        DsmusicTheme.colorScheme.background
+                    },
                     bottomBarOverlay = true,
                     bottomBar = {
                         if (!useNavigationRail) {
