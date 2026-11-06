@@ -3169,8 +3169,9 @@ class AudioPlaybackService : MediaSessionService() {
             else -> "sans-serif"
         }
         val output = SpannableString(value)
-        val typeface = Typeface.create(family, Typeface.NORMAL)
-        output.setSpan(TypefaceSpan(typeface), 0, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        // TypefaceSpan(Typeface) was added in API 28. Use the legacy family-name
+        // constructor so widget lyrics remain safe on Android 6 (API 23).
+        output.setSpan(TypefaceSpan(family), 0, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         output.setSpan(StyleSpan(Typeface.BOLD), 0, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
 
         val widgetPrefs = getSharedPreferences("dsmusic_widget_prefs", Context.MODE_PRIVATE)
