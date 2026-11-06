@@ -1961,8 +1961,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val loader = applicationContext.imageLoader
             selectedUrls.forEach { url ->
-                // Match the exact compact Explore cache key used by visible cards.
-                // API 23's shared request builder caps this to the same 60px decode target.
+                // Prefetch a useful detail-size copy on every Android version.
+                // Visible cards still request their own layout-specific decode size.
                 val request = buildExploreImageRequest(
                     applicationContext,
                     url,
