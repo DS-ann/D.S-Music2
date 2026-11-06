@@ -332,9 +332,8 @@ class MainActivity : AppCompatActivity() {
                                 .graphicsLayer {
                                     val baseTranslation = animatedBaseTranslationState.value
                                         .coerceIn(0f, totalSlideDistPx)
-                                    // Root navigation stays anchored while the player expands.
-                                    // The player sheet is drawn above this dock and covers it in
-                                    // fullscreen; stale expansion progress cannot hide it afterward.
+                                    // The dock overlays tab content, but is hidden as soon as the
+                                    // full player starts opening so it cannot cover the player surface.
                                     this.translationY = baseTranslation
                                     this.alpha = if (
                                         !showBottomBar || isPlayerBackActive ||
