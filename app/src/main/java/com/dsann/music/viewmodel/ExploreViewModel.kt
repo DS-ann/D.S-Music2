@@ -1456,8 +1456,12 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun loadArtist(browseId: String, fallbackThumbnailUrl: String? = null) {
-        lastDetailRetry = { loadArtist(browseId, fallbackThumbnailUrl) }
+    fun loadArtist(
+        browseId: String,
+        fallbackThumbnailUrl: String? = null,
+        fallbackArtistName: String? = null
+    ) {
+        lastDetailRetry = { loadArtist(browseId, fallbackThumbnailUrl, fallbackArtistName) }
         val requestId = beginDetailLoad()
         detailLoadJob = viewModelScope.launch {
             try {
@@ -1476,11 +1480,42 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                         prefetchThumbnails(res.sections.flatMap { it.items.take(4) })
                     }
                     result.onFailure { failure ->
+                        val nameFallback = fallbackArtistName?.trim()?.takeIf {
+                            it.isNotBlank() && !it.equals("Unknown Artist", ignoreCase = true)
+                        }
+                        if (nameFallback != null) {
+                            // Avoid cancelling this request from inside itself. The generation
+                            // change makes its finally block leave the new search's loading state alone.
+                            detailLoadJob = null
+                            loadArtistByName(nameFallback, fallbackThumbnailUrl)
+                        } else {
+                            _uiState.update {
+                                it.copy(
+                                    error = "Failed to load artist",
+                                    detailOfflineError = NetworkFailureClassifier.isNoInternetFailure(
+                                        failure,
+                                        getApplication<Application>()
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                if (requestId == detailLoadGeneration) {
+                    val nameFallback = fallbackArtistName?.trim()?.takeIf {
+                        it.isNotBlank() && !it.equals("Unknown Artist", ignoreCase = true)
+                    }
+                    if (nameFallback != null) {
+                        detailLoadJob = null
+                        loadArtistByName(nameFallback, fallbackThumbnailUrl)
+                    } else {
                         _uiState.update {
                             it.copy(
-                                error = "Failed to load artist",
+                                error = error.message ?: "Could not load artist",
                                 detailOfflineError = NetworkFailureClassifier.isNoInternetFailure(
-                                    failure,
+                                    error,
                                     getApplication<Application>()
                                 )
                             )
