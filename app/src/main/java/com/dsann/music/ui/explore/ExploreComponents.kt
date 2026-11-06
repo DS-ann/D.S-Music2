@@ -68,6 +68,7 @@ import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.ThumbUp
 import androidx.compose.material.icons.rounded.ThumbUpOffAlt
@@ -300,7 +301,10 @@ fun HomeFeedSkeleton() {
  * Contextual welcome banner dynamically responding to internal application time states.
  */
 @Composable
-fun WelcomeGreetingBanner(userName: String?) {
+fun WelcomeGreetingBanner(
+    userName: String?,
+    onReplayClick: (() -> Unit)? = null
+) {
     val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
     val greeting = remember(hour) {
         when (hour) { in 0..11 -> "Good Morning"; in 12..16 -> "Good Afternoon"; else -> "Good Evening" }
@@ -319,19 +323,37 @@ fun WelcomeGreetingBanner(userName: String?) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                painter = painterResource(id = iconResId),
-                contentDescription = null,
-                tint = DsmusicTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = greeting,
-                style = DsmusicTheme.typography.titleMedium,
-                color = DsmusicTheme.colorScheme.onSurfaceVariant
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    painter = painterResource(id = iconResId),
+                    contentDescription = null,
+                    tint = DsmusicTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = greeting,
+                    style = DsmusicTheme.typography.titleMedium,
+                    color = DsmusicTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (onReplayClick != null) {
+                DsmusicIconButton(onClick = onReplayClick) {
+                    Icon(
+                        imageVector = Icons.Rounded.Replay,
+                        contentDescription = "Replay",
+                        tint = DsmusicTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
