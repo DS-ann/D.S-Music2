@@ -14,8 +14,8 @@ import com.google.gson.JsonParser
 object AdvancedLyricsParser {
     const val WORD_PREFIX = "DSMUSIC-WORDS:"
     const val LYRICS_PLUS_PREFIX = "DSMUSIC-LYRICSPLUS\n"
-    private const val LEGACY_WORD_PREFIX = "SPATIALFLOW-WORDS:"
-    private const val LEGACY_LYRICS_PLUS_PREFIX = "SPATIALFLOW-LYRICSPLUS\n"
+    private val legacyWordPrefix = Regex("""^[A-Z0-9]+-WORDS:""")
+    private val legacyLyricsPlusPrefix = Regex("""^[A-Z0-9]+-LYRICSPLUS\n""")
 
     enum class WordKind { QRC, YRC, KRC }
 
@@ -33,18 +33,20 @@ object AdvancedLyricsParser {
     fun recognizes(content: String): Boolean =
         content.startsWith(WORD_PREFIX) ||
             content.startsWith(LYRICS_PLUS_PREFIX) ||
-            content.startsWith(LEGACY_WORD_PREFIX) ||
-            content.startsWith(LEGACY_LYRICS_PLUS_PREFIX)
+            legacyWordPrefix.containsMatchIn(content) ||
+            legacyLyricsPlusPrefix.containsMatchIn(content)
 
     /** Returns null only when this is a format we do not own; a malformed wrapped payload returns an empty list. */
     fun parse(content: String): List<LyricLine>? {
+        val oldWordPrefix = legacyWordPrefix.find(content)?.value
+        val oldLyricsPrefix = legacyLyricsPlusPrefix.find(content)?.value
         return when {
             content.startsWith(WORD_PREFIX) -> parseWrappedWords(content, WORD_PREFIX)
-            content.startsWith(LEGACY_WORD_PREFIX) -> parseWrappedWords(content, LEGACY_WORD_PREFIX)
+            oldWordPrefix != null -> parseWrappedWords(content, oldWordPrefix)
             content.startsWith(LYRICS_PLUS_PREFIX) ->
                 parseLyricsPlus(content.removePrefix(LYRICS_PLUS_PREFIX))
-            content.startsWith(LEGACY_LYRICS_PLUS_PREFIX) ->
-                parseLyricsPlus(content.removePrefix(LEGACY_LYRICS_PLUS_PREFIX))
+            oldLyricsPrefix != null ->
+                parseLyricsPlus(content.removePrefix(oldLyricsPrefix))
             else -> null
         }
     }

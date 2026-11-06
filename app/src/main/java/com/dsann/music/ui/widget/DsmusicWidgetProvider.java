@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Handler;
@@ -20,6 +21,8 @@ import com.bumptech.glide.request.target.AppWidgetTarget;
 import com.dsann.music.R;
 import com.dsann.music.model.SongItem;
 
+import java.io.File;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -40,8 +43,47 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
     private static final String ACTION_NEXT = "com.dsann.music.ACTION_NEXT";
     private static final String ACTION_TOGGLE_LYRICS = "com.dsann.music.ACTION_TOGGLE_LYRICS";
     
-    private static final String PREFS_NAME = "spatialflow_widget_prefs";
+    private static final String PREFS_NAME = "dsmusic_widget_prefs";
     private static final String PREF_LYRICS_MODE = "lyrics_mode_";
+
+    /**
+     * Carries widget lyrics-page choices to the current preference file.
+     * The previous file is located by its own widget setting keys.
+     */
+    private static void migrateWidgetPreferences(Context context) {
+        SharedPreferences target = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        if (target.getBoolean("_dsmusic_storage_migrated", false)) return;
+
+        File directory = new File(context.getApplicationInfo().dataDir, "shared_prefs");
+        File[] files = directory.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                String filename = file.getName();
+                if (!filename.endsWith(".xml") || filename.equals(PREFS_NAME + ".xml")) continue;
+
+                String sourceName = filename.substring(0, filename.length() - 4);
+                SharedPreferences source = context.getSharedPreferences(sourceName, Context.MODE_PRIVATE);
+                SharedPreferences.Editor destination = target.edit();
+                SharedPreferences.Editor cleanup = source.edit();
+                boolean copied = false;
+
+                for (Map.Entry<String, ?> entry : source.getAll().entrySet()) {
+                    String key = entry.getKey();
+                    Object value = entry.getValue();
+                    if (!key.startsWith(PREF_LYRICS_MODE) || !(value instanceof Boolean)) continue;
+                    if (!target.contains(key)) destination.putBoolean(key, (Boolean) value);
+                    cleanup.remove(key);
+                    copied = true;
+                }
+
+                if (copied && destination.commit()) {
+                    cleanup.commit();
+                    if (source.getAll().isEmpty()) file.delete();
+                }
+            }
+        }
+        target.edit().putBoolean("_dsmusic_storage_migrated", true).apply();
+    }
 
     // Keep RemoteViews/AppWidgetManager Binder work away from the activity's main looper.
     // A single worker also preserves update order across rapid playback/lyrics callbacks.
@@ -73,6 +115,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
+        migrateWidgetPreferences(context);
         int layoutId = R.layout.widget_medium;
         Class<?> providerClass = WidgetMediumProvider.class;
         if (this instanceof WidgetSmallProvider) {
@@ -702,6 +745,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        migrateWidgetPreferences(context);
         super.onReceive(context, intent);
         if (ACTION_TOGGLE_LYRICS.equals(intent.getAction())) {
             AppWidgetManager manager = AppWidgetManager.getInstance(context);

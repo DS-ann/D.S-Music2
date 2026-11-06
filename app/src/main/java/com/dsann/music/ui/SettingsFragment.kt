@@ -1509,7 +1509,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 }
 
                 if (favoritesToRestore != null) {
-                    val favoritesPrefs = context.getSharedPreferences("spatialflow_favorites", Context.MODE_PRIVATE)
+                    val favoritesPrefs = context.getSharedPreferences("dsmusic_favorites", Context.MODE_PRIVATE)
                     val saved = favoritesPrefs.edit()
                         .putStringSet("favorite_song_ids", favoritesToRestore)
                         .commit()

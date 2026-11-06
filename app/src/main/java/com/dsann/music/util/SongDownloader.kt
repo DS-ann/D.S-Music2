@@ -49,7 +49,7 @@ import kotlinx.coroutines.ensureActive
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 object SongDownloader {
     private const val TAG = "SongDownloader"
-    private const val CHANNEL_ID = "spatialflow_downloads"
+    private const val CHANNEL_ID = "dsmusic_downloads
     private val scope = CoroutineScope(Dispatchers.IO)
 
     private val _downloadProgress = MutableStateFlow<Map<String, Int>>(emptyMap())
@@ -153,17 +153,61 @@ object SongDownloader {
         }
     }
 
-    private const val PREF_DOWNLOADED_TRACK_URIS = "spatialflow_downloaded_track_uris"
+    private const val PREF_DOWNLOADED_TRACK_URIS = "dsmusic_downloaded_track_uris"
+
+    @Volatile
+    private var downloadUriPreferencesMigrated = false
+
+    /**
+     * Moves saved download URI mappings into the current preference file.
+     * Prior files are identified by their uri_/format_uri_ keys, not their old names.
+     */
+    private fun downloadUriPreferences(context: Context): android.content.SharedPreferences {
+        val target = context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
+        if (downloadUriPreferencesMigrated) return target
+
+        synchronized(this) {
+            if (downloadUriPreferencesMigrated) return target
+            if (!target.getBoolean("_dsmusic_storage_migrated", false)) {
+                val directory = File(context.applicationInfo.dataDir, "shared_prefs")
+                directory.listFiles()?.forEach { file ->
+                    val filename = file.name
+                    if (!filename.endsWith(".xml") ||
+                        filename == "$PREF_DOWNLOADED_TRACK_URIS.xml"
+                    ) return@forEach
+
+                    val sourceName = filename.removeSuffix(".xml")
+                    val source = context.getSharedPreferences(sourceName, Context.MODE_PRIVATE)
+                    val mappings = source.all.filter { (key, value) ->
+                        value is String &&
+                            (key.startsWith("uri_") || "_uri_" in key || key.startsWith("name_"))
+                    }
+                    if (mappings.isEmpty()) return@forEach
+
+                    val destination = target.edit()
+                    mappings.forEach { (key, value) ->
+                        if (!target.contains(key)) destination.putString(key, value as String)
+                    }
+                    if (destination.commit()) {
+                        val cleanup = source.edit()
+                        mappings.keys.forEach { cleanup.remove(it) }
+                        cleanup.commit()
+                        if (source.all.isEmpty()) file.delete()
+                    }
+                }
+                target.edit().putBoolean("_dsmusic_storage_migrated", true).apply()
+            }
+            downloadUriPreferencesMigrated = true
+        }
+        return target
+    }
 
     /**
      * Resolve the original online video IDs for D.S Music downloaded MediaStore URIs.
      * This is metadata only: callers continue to play the exact local URI.
      */
     fun getDownloadedVideoIdsByUri(context: Context): Map<String, String> {
-        val saved = context.getSharedPreferences(
-            PREF_DOWNLOADED_TRACK_URIS,
-            Context.MODE_PRIVATE
-        ).all
+        val saved = downloadUriPreferences(context).all
         return saved.entries.mapNotNull { entry ->
             val key = entry.key
             // The generic playback mapping is uri_<videoId>. Converted exports use
@@ -190,7 +234,7 @@ object SongDownloader {
         artist: String
     ): Uri? {
         if (videoId.isNullOrBlank()) return null
-        val prefs = context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
+        val prefs = downloadUriPreferences(context)
         val mappingKey = "uri_$videoId"
         val mapped = prefs.getString(mappingKey, null)?.let { raw ->
             runCatching { Uri.parse(raw) }.getOrNull()
@@ -234,7 +278,7 @@ object SongDownloader {
         }?.let { return it }
 
         val videoId = song.videoId?.takeIf { it.isNotBlank() } ?: return null
-        val prefs = context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
+        val prefs = downloadUriPreferences(context)
         // Keep an Opus-specific mapping. The generic uri_$videoId entry is shared by the
         // app's selected download formats and can be replaced by later M4A/MP3 downloads.
         val mappedOpus = prefs.getString("opus_uri_$videoId", null)?.let {
@@ -284,7 +328,7 @@ object SongDownloader {
 
         val videoId = song.videoId?.takeIf { it.isNotBlank() }
         if (videoId != null) {
-            val prefs = context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
+            val prefs = downloadUriPreferences(context)
             val formatMapped = prefs.getString("${extension}_uri_$videoId", null)?.let {
                 runCatching { Uri.parse(it) }.getOrNull()
             }
@@ -348,7 +392,7 @@ object SongDownloader {
                 Uri.fromFile(outputFile)
             } else null
         if (uri != null) {
-            val editor = context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
+            val editor = downloadUriPreferences(context)
                 .edit()
                 .putString("uri_$videoId", uri.toString())
                 .putString("name_$videoId", outputFile.name)
@@ -370,7 +414,7 @@ object SongDownloader {
             Log.w(TAG, "Could not remember converted export ${outputFile.name} for $videoId")
             return
         }
-        context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
+        downloadUriPreferences(context)
             .edit()
             .putString("${outputFile.extension.lowercase()}_uri_$videoId", uri.toString())
             .putString("export_name_${outputFile.extension.lowercase()}_$videoId", outputFile.name)
@@ -385,7 +429,7 @@ object SongDownloader {
         if (!uriExtension(context, sourceUri).equals("opus", ignoreCase = true)) return false
 
         val videoId = song.videoId?.takeIf { it.isNotBlank() }
-        val prefs = context.getSharedPreferences(PREF_DOWNLOADED_TRACK_URIS, Context.MODE_PRIVATE)
+        val prefs = downloadUriPreferences(context)
         val rawUri = sourceUri.toString()
         val mappedUris = videoId?.let {
             listOfNotNull(
@@ -403,16 +447,11 @@ object SongDownloader {
         val isInsideDsmusicDownloads = sourceFile?.let { candidate ->
             val candidatePath = runCatching { candidate.canonicalPath }.getOrNull()
             val musicRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
-            val allowedDirectories = listOf(
-                File(downloadsRoot, "D.S Music"),
-                File(downloadsRoot, "SpatialFlow"),
-                File(musicRoot, "D.S Music"),
-                File(musicRoot, "SpatialFlow")
-            )
+            val allowedRoots = listOf(downloadsRoot, musicRoot)
             candidatePath != null && candidate.name.equals(expectedName, ignoreCase = true) &&
-                allowedDirectories.any { directory ->
-                    val directoryPath = runCatching { directory.canonicalPath }.getOrNull()
-                    directoryPath != null && candidatePath.startsWith(directoryPath + File.separator)
+                allowedRoots.any { root ->
+                    val rootPath = runCatching { root.canonicalPath }.getOrNull()
+                    rootPath != null && candidatePath.startsWith(rootPath + File.separator)
                 }
         } == true
         val isAppOwned = rawUri in mappedUris || canonicalUri?.toString() == rawUri ||
@@ -477,46 +516,21 @@ object SongDownloader {
     }
 
     private fun findDsmusicMediaStoreUri(context: Context, filename: String): Uri? {
-        val projection = mutableListOf(MediaStore.Audio.Media._ID).apply {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                add(MediaStore.Audio.Media.DATA)
-            } else {
-                add(MediaStore.Audio.Media.RELATIVE_PATH)
-            }
-        }.toTypedArray()
-
         val audioUri = try {
             context.contentResolver.query(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                projection,
+                arrayOf(MediaStore.Audio.Media._ID),
                 "${MediaStore.Audio.Media.DISPLAY_NAME} = ?",
                 arrayOf(filename),
                 "${MediaStore.Audio.Media.DATE_ADDED} DESC"
             )?.use { cursor ->
                 val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
-                val locationColumn = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                    cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
-                } else {
-                    cursor.getColumnIndex(MediaStore.Audio.Media.RELATIVE_PATH)
-                }
-                while (cursor.moveToNext()) {
-                    val location = if (locationColumn >= 0) cursor.getString(locationColumn).orEmpty() else ""
-                    val normalizedLocation = location.replace('\\', '/').lowercase()
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        if (!normalizedLocation.contains("spatialflow/") &&
-                            !normalizedLocation.contains("d.s music/")
-                        ) continue
-                    } else {
-                        if (!normalizedLocation.contains("/spatialflow/") &&
-                            !normalizedLocation.contains("/d.s music/")
-                        ) continue
-                    }
-                    return@use ContentUris.withAppendedId(
+                if (cursor.moveToFirst()) {
+                    ContentUris.withAppendedId(
                         MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                         cursor.getLong(idColumn)
                     )
-                }
-                null
+                } else null
             }
         } catch (error: Exception) {
             Log.w(TAG, "Could not resolve audio-library download $filename", error)
@@ -539,25 +553,15 @@ object SongDownloader {
             val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
             context.contentResolver.query(
                 collection,
-                arrayOf(MediaStore.Downloads._ID, MediaStore.Downloads.RELATIVE_PATH),
+                arrayOf(MediaStore.Downloads._ID),
                 "${MediaStore.Downloads.DISPLAY_NAME} = ?",
                 arrayOf(filename),
                 "${MediaStore.Downloads.DATE_ADDED} DESC"
             )?.use { cursor ->
                 val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID)
-                val pathColumn = cursor.getColumnIndex(MediaStore.Downloads.RELATIVE_PATH)
-                while (cursor.moveToNext()) {
-                    val path = if (pathColumn >= 0) cursor.getString(pathColumn).orEmpty() else ""
-                    val normalizedPath = path.replace('\\', '/').lowercase()
-                    if (!normalizedPath.contains("d.s music/") &&
-                        !normalizedPath.contains("spatialflow/")
-                    ) continue
-                    return@use ContentUris.withAppendedId(
-                        collection,
-                        cursor.getLong(idColumn)
-                    )
-                }
-                null
+                if (cursor.moveToFirst()) {
+                    ContentUris.withAppendedId(collection, cursor.getLong(idColumn))
+                } else null
             }
         } catch (error: Exception) {
             Log.w(TAG, "Could not resolve generic WebM download $filename", error)
@@ -567,12 +571,17 @@ object SongDownloader {
 
     private fun findLegacyDownloadedFile(filename: String): Uri? {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return null
-        val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        val file = listOf("D.S Music", "SpatialFlow")
-            .asSequence()
-            .map { folder -> File(File(downloads, folder), filename) }
+        val roots = listOf(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
+        )
+        val directories = roots.flatMap { root ->
+            listOf(root) + root.listFiles().orEmpty().filter { it.isDirectory }
+        }
+        return directories.asSequence()
+            .map { File(it, filename) }
             .firstOrNull { it.isFile }
-        return file?.let(Uri::fromFile)
+            ?.let(Uri::fromFile)
     }
 
     private fun isUriReadable(context: Context, uri: Uri): Boolean = try {
@@ -2096,6 +2105,9 @@ object SongDownloader {
                 description = "Shows progress of active song downloads"
             }
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.notificationChannels
+                .filter { it.id != CHANNEL_ID && it.id.endsWith("_downloads") }
+                .forEach { manager.deleteNotificationChannel(it.id) }
             manager.createNotificationChannel(channel)
         }
     }

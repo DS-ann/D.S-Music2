@@ -84,7 +84,6 @@ private fun usableCacheTrackTitle(value: String?): String? {
     val candidate = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     return candidate.takeUnless {
         it.equals("D.S Music", ignoreCase = true) ||
-            it.equals("SpatialFlow", ignoreCase = true) ||
             it.equals("Unknown Title", ignoreCase = true) ||
             it.equals("<unknown>", ignoreCase = true) ||
             it.equals("Unknown", ignoreCase = true) ||
@@ -96,7 +95,6 @@ private fun usableCacheTrackArtist(value: String?): String? {
     val candidate = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     return candidate.takeUnless {
         it.equals("D.S Music", ignoreCase = true) ||
-            it.equals("SpatialFlow", ignoreCase = true) ||
             it.equals("Unknown Artist", ignoreCase = true) ||
             it.equals("<unknown>", ignoreCase = true) ||
             it.equals("Unknown", ignoreCase = true) ||
@@ -3854,7 +3852,7 @@ class AudioPlaybackService : MediaSessionService() {
             notificationArtwork?.let(notificationBuilder::setLargeIcon)
 
             // The first two selected session actions sit either side of the three
-            // transport buttons, matching Prism's notification/session ordering.
+            // transport buttons, matching the configured media-session action ordering.
             notificationBuilder.clearActions()
             val selectedNotificationButtons = configuredSessionButtons().take(2)
             selectedNotificationButtons.getOrNull(0)?.let { key ->
