@@ -1833,7 +1833,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     fun reloadRestoredPreferences() {
         loadSearchHistory()
         val pinnedSongs = getPinnedSpeedDialSongs()
-        val notInterested = prefs.getStringSet("not_interested_ids", emptySet()).orEmpty()
+        val notInterested = prefs.getStringSet("not_interested_ids", mutableSetOf<String>()).orEmpty()
         _uiState.update { state ->
             val filteredSections = state.homeSections.map { section ->
                 section.copy(items = section.items.filterNot { item ->
