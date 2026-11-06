@@ -169,28 +169,41 @@ fun QueueBottomSheetContent(
     val songList by viewModel.songListFlow.collectAsStateWithLifecycle()
     val currentSongIndex by viewModel.currentSongIndexFlow.collectAsStateWithLifecycle()
 
-    val displayedSongs = songList
+    var previewSongs by remember { mutableStateOf<List<SongItem>?>(null) }
+    val displayedSongs = previewSongs ?: songList
+    val playingSongId = songList.getOrNull(currentSongIndex)?.id
+    val displayedCurrentSongIndex = playingSongId?.let { id ->
+        displayedSongs.indexOfFirst { it.id == id }.takeIf { it >= 0 }
+    } ?: currentSongIndex
 
     val lazyListState = rememberLazyListState()
     val dragDropState = rememberDragDropState(
         lazyListState = lazyListState,
-        onDragFinished = { viewModel.syncQueueWithPlaybackService() }
+        onDragFinished = { from, to, commit ->
+            if (commit && from in songList.indices && to in songList.indices && from != to) {
+                // Commit the preview exactly once, after the finger is released.
+                viewModel.reorderQueue(from, to, syncPlaybackService = false)
+                viewModel.syncQueueWithPlaybackService()
+            }
+            previewSongs = null
+        }
     ) { from, to ->
-        // Keep Media3's native queue untouched while the finger is moving. Rebuilding
-        // its preloaded next item on every crossed row makes the target row flash.
-        viewModel.reorderQueue(from, to, syncPlaybackService = false)
+        // Preview only: this list belongs to the queue UI. The ViewModel and Media3
+        // queue remain unchanged until onDragFinished commits the final destination.
+        val source = previewSongs ?: songList
+        previewSongs = com.dsann.music.util.OrderUtils.move(source, from, to)
     }
     ClearRecentDraggedItemAnimationSkip(dragDropState)
 
     // Auto-scroll to currently playing track on initial load
     LaunchedEffect(currentSongIndex) {
         if (dragDropState.currentIndexOfDraggedItem != null) return@LaunchedEffect
-        if (currentSongIndex in displayedSongs.indices) {
-            val distance = abs(lazyListState.firstVisibleItemIndex - currentSongIndex)
+        if (displayedCurrentSongIndex in displayedSongs.indices) {
+            val distance = abs(lazyListState.firstVisibleItemIndex - displayedCurrentSongIndex)
             if (distance > 24) {
-                lazyListState.scrollToItem(currentSongIndex)
+                lazyListState.scrollToItem(displayedCurrentSongIndex)
             } else {
-                lazyListState.animateScrollToItem(currentSongIndex)
+                lazyListState.animateScrollToItem(displayedCurrentSongIndex)
             }
         }
     }
@@ -297,7 +310,7 @@ fun QueueBottomSheetContent(
                                 key = { _, song -> song.id },
                                 contentType = { _, _ -> "queue-song" }
                             ) { index, song ->
-                                val isPlaying = (index == currentSongIndex)
+                                val isPlaying = (index == displayedCurrentSongIndex)
                                 val shapes = ListItemDefaults.segmentedShapes(index = index, count = displayedSongs.size)
                                 
                                 val isDragging = song.id == dragDropState.draggedItemKey
@@ -441,7 +454,7 @@ fun QueueBottomSheetContent(
                                     key = { _, song -> song.id },
                                     contentType = { _, _ -> "queue-song" }
                                 ) { index, song ->
-                                    val isPlaying = (index == currentSongIndex)
+                                    val isPlaying = (index == displayedCurrentSongIndex)
                                     val shapes = ListItemDefaults.segmentedShapes(index = index, count = displayedSongs.size)
                                     
                                     val isDragging = song.id == dragDropState.draggedItemKey
@@ -839,13 +852,12 @@ class DragDropState(
     private val scope: CoroutineScope,
     private val edgeScrollThresholdPx: Float,
     private val maxAutoScrollSpeedPxPerSecond: Float,
-    private val onDragFinished: () -> Unit,
+    private val onDragFinished: (Int, Int, Boolean) -> Unit,
     private val onMove: (Int, Int) -> Unit
 ) {
     var draggedDistance by mutableFloatStateOf(0f)
     var initiallyDraggedElement by mutableStateOf<LazyListItemInfo?>(null)
     var currentIndexOfDraggedItem by mutableStateOf<Int?>(null)
-    private var queueChangedDuringDrag = false
     private var pointerY = 0f
     private var pendingMoveTargetIndex: Int? = null
     var recentlyDraggedItemKey: Any? by mutableStateOf(null)
@@ -869,7 +881,6 @@ class DragDropState(
 
     private fun beginDrag(item: LazyListItemInfo, initialIndex: Int, initialPointerY: Float) {
         stopAutoScroll()
-        queueChangedDuringDrag = false
         draggedDistance = 0f
         initiallyDraggedElement = item
         currentIndexOfDraggedItem = initialIndex
@@ -895,18 +906,26 @@ class DragDropState(
         )
     }
 
-    fun onDragInterrupted() {
-        val shouldSyncQueue = queueChangedDuringDrag
-        recentlyDraggedItemKey = initiallyDraggedElement?.key.takeIf { shouldSyncQueue }
-        queueChangedDuringDrag = false
+    fun onDragInterrupted(commit: Boolean) {
+        val originalIndex = initiallyDraggedElement?.index ?: -1
+        val targetIndex = currentIndexOfDraggedItem ?: originalIndex
+        val shouldCommit = commit &&
+            originalIndex >= 0 &&
+            targetIndex >= 0 &&
+            originalIndex != targetIndex
+
+        recentlyDraggedItemKey = initiallyDraggedElement?.key.takeIf { shouldCommit }
         stopAutoScroll()
+
+        // The callback commits at most once. On cancellation it only discards the
+        // local preview; the canonical queue was never mutated during the drag.
+        onDragFinished(originalIndex, targetIndex, shouldCommit)
+
         initiallyDraggedElement = null
         currentIndexOfDraggedItem = null
         pendingMoveTargetIndex = null
         draggedDistance = 0f
         pointerY = 0f
-        // Rebuild Media3's native queue once, after the visual reorder is complete.
-        if (shouldSyncQueue) onDragFinished()
     }
 
     /**
@@ -951,7 +970,6 @@ class DragDropState(
             // Update the canonical index before the next pointer/frame callback.
             // The pending acknowledgement prevents a stale LazyList layout from
             // issuing the same move twice or bouncing the item back.
-            queueChangedDuringDrag = true
             currentIndexOfDraggedItem = targetIndex
             pendingMoveTargetIndex = targetIndex
             onMove(fromIndex, targetIndex)
@@ -1049,7 +1067,7 @@ internal fun ClearRecentDraggedItemAnimationSkip(dragDropState: DragDropState) {
 @Composable
 fun rememberDragDropState(
     lazyListState: LazyListState,
-    onDragFinished: () -> Unit = {},
+    onDragFinished: (Int, Int, Boolean) -> Unit = { _, _, _ -> },
     onMove: (Int, Int) -> Unit
 ): DragDropState {
     val scope = rememberCoroutineScope()
@@ -1064,7 +1082,7 @@ fun rememberDragDropState(
             scope = scope,
             edgeScrollThresholdPx = edgeScrollThresholdPx,
             maxAutoScrollSpeedPxPerSecond = maxAutoScrollSpeedPxPerSecond,
-            onDragFinished = { currentOnDragFinished.value() },
+            onDragFinished = { from, to, commit -> currentOnDragFinished.value(from, to, commit) },
             onMove = { from, to -> currentOnMove.value(from, to) }
         )
     }
@@ -1076,8 +1094,8 @@ fun Modifier.dragContainer(dragDropState: DragDropState, enabled: Boolean): Modi
         Modifier.pointerInput(dragDropState) {
             detectDragGesturesAfterLongPress(
                 onDragStart = { offset -> dragDropState.onDragStart(offset) },
-                onDragEnd = { dragDropState.onDragInterrupted() },
-                onDragCancel = { dragDropState.onDragInterrupted() },
+                onDragEnd = { dragDropState.onDragInterrupted(commit = true) },
+                onDragCancel = { dragDropState.onDragInterrupted(commit = false) },
                 onDrag = { change, dragAmount ->
                     change.consume()
                     dragDropState.onDrag(dragAmount)

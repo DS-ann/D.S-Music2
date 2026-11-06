@@ -172,23 +172,41 @@ fun SlidingQueueDrawer(
             val boxScope = this
             val lazyListState = rememberLazyListState()
             val queueScope = rememberCoroutineScope()
-            
+            var previewSongs by remember { mutableStateOf<List<SongItem>?>(null) }
+            val displayedSongs = previewSongs ?: songList
+            val playingSongId = songList.getOrNull(currentSongIndex)?.id
+            val displayedCurrentSongIndex = playingSongId?.let { id ->
+                displayedSongs.indexOfFirst { it.id == id }.takeIf { it >= 0 }
+            } ?: currentSongIndex
+
             val dragDropState = rememberDragDropState(
                 lazyListState = lazyListState,
-                onDragFinished = onReorderFinished
+                onDragFinished = { from, to, commit ->
+                    if (commit && from in songList.indices && to in songList.indices && from != to) {
+                        // Apply the final order once, after the drag gesture ends.
+                        onReorderQueue(from, to)
+                        onReorderFinished()
+                    }
+                    previewSongs = null
+                }
             ) { from, to ->
-                onReorderQueue(from, to)
+                // Reorder only the rendered preview while the user's finger is down.
+                previewSongs = com.dsann.music.util.OrderUtils.move(
+                    previewSongs ?: songList,
+                    from,
+                    to
+                )
             }
             ClearRecentDraggedItemAnimationSkip(dragDropState)
 
             // Scroll active track into view on first open
             LaunchedEffect(isQueueExpanded) {
-                if (isQueueExpanded && currentSongIndex in songList.indices) {
-                    val distance = abs(lazyListState.firstVisibleItemIndex - currentSongIndex)
+                if (isQueueExpanded && displayedCurrentSongIndex in displayedSongs.indices) {
+                    val distance = abs(lazyListState.firstVisibleItemIndex - displayedCurrentSongIndex)
                     if (distance > 24) {
-                        lazyListState.scrollToItem(currentSongIndex)
+                        lazyListState.scrollToItem(displayedCurrentSongIndex)
                     } else {
-                        lazyListState.animateScrollToItem(currentSongIndex)
+                        lazyListState.animateScrollToItem(displayedCurrentSongIndex)
                     }
                 }
             }
@@ -245,10 +263,10 @@ fun SlidingQueueDrawer(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(18.dp))
                                     .background(DsmusicTheme.colorScheme.primaryContainer)
-                                    .clickable(enabled = currentSongIndex in songList.indices) {
+                                    .clickable(enabled = displayedCurrentSongIndex in displayedSongs.indices) {
                                         queueScope.launch {
                                             if (currentSongIndex in songList.indices) {
-                                                lazyListState.animateScrollToItem(currentSongIndex)
+                                                lazyListState.animateScrollToItem(displayedCurrentSongIndex)
                                             }
                                         }
                                     }
@@ -296,12 +314,12 @@ fun SlidingQueueDrawer(
                     verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
                 ) {
                     itemsIndexed(
-                        items = songList,
+                        items = displayedSongs,
                         key = { _, song -> song.id },
                         contentType = { _, _ -> "queue-song" }
                     ) { index, song ->
-                        val isPlaying = (index == currentSongIndex)
-                        val shapes = ListItemDefaults.segmentedShapes(index = index, count = songList.size)
+                        val isPlaying = (index == displayedCurrentSongIndex)
+                        val shapes = ListItemDefaults.segmentedShapes(index = index, count = displayedSongs.size)
                         val isDragging = song.id == dragDropState.draggedItemKey
                         val displacement = if (isDragging) dragDropState.elementDisplacement ?: 0f else 0f
 
