@@ -473,22 +473,35 @@ class MainActivity : AppCompatActivity() {
 
                     val systemBottomInset = WindowInsets.navigationBars.asPaddingValues()
                         .calculateBottomPadding()
-                    // Portrait phone tabs occupy the full viewport beneath the floating
-                    // mini-player and navigation dock. Their own scrollables already provide
-                    // trailing content space, so keep the visual layout behind both overlays.
                     val finalPadding = 0.dp
                     val miniPlayerHeight = if (
                         configuration.screenWidthDp > configuration.screenHeightDp
                     ) MiniPlayerHeight * 0.8f else MiniPlayerHeight
-                    // Keep the existing bottom scroll reserve for a portrait tablet rail.
-                    // On portrait phones, the mini-player is an overlay and the tab content
-                    // continues behind it instead of being shortened above the player.
+
+                    // Reserve one shared, full-height overlay region for every page while
+                    // the collapsed mini-player is visible. The reserve mirrors the sheet's
+                    // bottom anchor: mini-player height + its gap + the dock/system inset.
+                    // This makes the end of every scrollable page reachable above the player,
+                    // including phones, nested destinations and both orientations.
+                    val configuredNavHeight = when (navBarSize) {
+                        "Compact" -> 56.dp
+                        "Tall" -> 76.dp
+                        else -> 68.dp
+                    }
+                    val bottomDockInset = when {
+                        useNavigationRail -> systemBottomInset
+                        currentRoute in rootTabRoutes ->
+                            (if (dynamicNavStyle) 64.dp else configuredNavHeight) + systemBottomInset
+                        else -> 0.dp
+                    }
+                    val miniPlayerBottomGap = if (useNavigationRail) 8.dp else 4.dp
                     val miniPlayerScrollReserve = if (
-                        useNavigationRail && !isLandscapeLayout &&
-                            currentSong != null &&
-                            currentRoute != null && currentRoute in rootTabRoutes
+                        currentSong != null &&
+                            !isPlayerBackActive &&
+                            currentRoute != null &&
+                            currentRoute != "onboarding"
                     ) {
-                        miniPlayerHeight + 8.dp + systemBottomInset
+                        miniPlayerHeight + miniPlayerBottomGap + bottomDockInset
                     } else 0.dp
 
                     Box(
