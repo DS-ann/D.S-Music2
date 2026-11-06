@@ -432,7 +432,8 @@ private fun PortraitSyncedLyricPreview(
     contentColor: Color,
     lyricsColorStyle: String,
     compact: Boolean,
-    onLineBoundsChanged: (Rect?) -> Unit
+    onLineBoundsChanged: (Rect?) -> Unit,
+    onLineNeedsMoreSpace: () -> Unit
 ) {
     val displayLines = remember(lyrics) {
         lyrics.mapIndexedNotNull { index, line ->
@@ -547,64 +548,106 @@ private fun PortraitSyncedLyricPreview(
 
     if (!activeLineText.isNullOrBlank()) {
         val baseFontSize = if (compact) 13f else 16f
-        val textStyle = DsmusicTheme.typography.bodyLarge.copy(
+        // Use one text metric configuration on every Android version. Explicit line
+        // height gives the glyphs vertical room without adding API-specific font padding.
+        val previewTextStyle = DsmusicTheme.typography.bodyLarge.copy(
             fontWeight = FontWeight.SemiBold,
             fontSize = baseFontSize.sp,
+            lineHeight = (baseFontSize * 1.5f).sp,
+            platformStyle = androidx.compose.ui.text.PlatformTextStyle(
+                includeFontPadding = false
+            ),
             brush = if (lyricsColorStyle == "Home Studio Gradient") {
                 dsmusicHomeStudioGradientBrush()
             } else {
                 null
             }
         )
-        // Android 6's native text metrics can clip the top of glyphs when font padding
-        // is omitted. The full lyrics renderer opts into legacy font padding already;
-        // apply the same safeguard to this portrait one-line preview on API 23 only.
-        val previewTextStyle = if (
-            android.os.Build.VERSION.SDK_INT == android.os.Build.VERSION_CODES.M
-        ) {
-            textStyle.copy(
-                platformStyle = androidx.compose.ui.text.PlatformTextStyle(
-                    includeFontPadding = true
-                )
-            )
-        } else {
-            textStyle
-        }
         BoxWithConstraints(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
             contentAlignment = Alignment.Center
         ) {
             val textMeasurer = rememberTextMeasurer()
-            val availableWidthPx = with(LocalDensity.current) {
+            val density = LocalDensity.current
+            val availableWidthPx = with(density) {
                 maxWidth.roundToPx()
             }.coerceAtLeast(1)
-            // Measure only when the lyric or available width changes, not on playback
-            // clock polls. Shrink by half-point steps until the complete line fits.
-            val fittedFontSize = remember(
+            val availableHeightPx = with(density) {
+                maxHeight.roundToPx()
+            }.coerceAtLeast(1)
+
+            // Check the preferred size before rendering. If the current weighted slot
+            // is too short, the parent reallocates space from the spacer above the title.
+            val preferredLineHeightPx = remember(
                 activeLineText,
                 availableWidthPx,
                 lyricsColorStyle,
                 contentColor,
                 compact
             ) {
-                var candidateSize = baseFontSize
-                while (candidateSize > 7f) {
-                    val measured = textMeasurer.measure(
-                        text = activeLineText.orEmpty(),
-                        style = previewTextStyle.copy(fontSize = candidateSize.sp),
-                        constraints = Constraints(maxWidth = availableWidthPx),
-                        softWrap = false,
-                        maxLines = 1,
-                        overflow = TextOverflow.Clip
-                    )
-                    if (!measured.hasVisualOverflow) break
-                    candidateSize -= 0.5f
-                }
-                candidateSize.coerceAtLeast(7f).sp
+                textMeasurer.measure(
+                    text = activeLineText.orEmpty(),
+                    style = previewTextStyle,
+                    constraints = Constraints(maxWidth = availableWidthPx),
+                    softWrap = false,
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip
+                ).size.height
             }
-            Text(
+            LaunchedEffect(activeLineText, availableHeightPx, preferredLineHeightPx, compact) {
+                if (
+                    !compact &&
+                    !activeLineText.isNullOrBlank() &&
+                    preferredLineHeightPx > availableHeightPx
+                ) {
+                    onLineNeedsMoreSpace()
+                }
+            }
+
+            // Fit to both the real width and height of the lyric slot. This prevents
+            // clipping even when the player is shown in a short or resized window.
+            val fittedText = remember(
+                activeLineText,
+                availableWidthPx,
+                availableHeightPx,
+                lyricsColorStyle,
+                contentColor,
+                compact
+            ) {
+                var candidateSize = baseFontSize
+                fun measureAt(size: Float) = textMeasurer.measure(
+                    text = activeLineText.orEmpty(),
+                    style = previewTextStyle.copy(
+                        fontSize = size.sp,
+                        lineHeight = (size * 1.5f).sp
+                    ),
+                    constraints = Constraints(
+                        maxWidth = availableWidthPx,
+                        maxHeight = availableHeightPx
+                    ),
+                    softWrap = false,
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip
+                )
+                var measured = measureAt(candidateSize)
+                while (measured.hasVisualOverflow && candidateSize > 7f) {
+                    candidateSize = (candidateSize - 0.5f).coerceAtLeast(7f)
+                    measured = measureAt(candidateSize)
+                }
+                candidateSize to !measured.hasVisualOverflow
+            }
+            LaunchedEffect(activeLineText, fittedText.second) {
+                if (activeLineText.isNullOrBlank() || !fittedText.second) {
+                    onLineBoundsChanged(null)
+                }
+            }
+
+            if (fittedText.second) Text(
                 text = activeLineText.orEmpty(),
-                style = previewTextStyle.copy(fontSize = fittedFontSize),
+                style = previewTextStyle.copy(
+                    fontSize = fittedText.first.sp,
+                    lineHeight = (fittedText.first * 1.5f).sp
+                ),
                 color = if (lyricsColorStyle == "Home Studio Gradient") Color.Unspecified else contentColor,
                 maxLines = 1,
                 softWrap = false,
@@ -1534,24 +1577,7 @@ fun FullPlayer(
                         // taller than its weighted slot. Let it draw into the surrounding
                         // spacer instead of cropping glyph edges; the bounds-based collision
                         // check above still keeps the line clear of the action buttons.
-                        .then(
-                            if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) {
-                                Modifier
-                            } else {
-                                Modifier.clipToBounds()
-                            }
-                        )
-                        .then(
-                            if (isCompactPortraitMultiWindow) Modifier.heightIn(min = 36.dp)
-                            else Modifier
-                        )
-                        .offset(
-                            y = when {
-                                compactPortraitLyrics && compactPortraitAfterCollision -> (-8).dp
-                                compactPortraitLyrics -> 0.dp
-                                else -> (-5).dp
-                            }
-                        ),
+                        .clipToBounds(),
                     contentAlignment = Alignment.Center
                 ) {
                     PortraitSyncedLyricPreview(
@@ -1566,6 +1592,11 @@ fun FullPlayer(
                             if (portraitLyricLineBounds != bounds) {
                                 portraitLyricLineBounds = bounds
                             }
+                        },
+                        onLineNeedsMoreSpace = {
+                            if (!compactPortraitLyrics) {
+                                compactPortraitAfterCollision = true
+                            }
                         }
                     )
                 }
@@ -1577,11 +1608,8 @@ fun FullPlayer(
                     )
                 )
             }
-            // Give the lyric line a visible buffer before the action chips in compact
-            // portrait multi-window layouts; this is intentionally absent on phones.
-            if (isCompactPortraitMultiWindow) {
-                Spacer(modifier = Modifier.height(8.dp))
-            }
+            // Keep a consistent clearance between the clipped lyric slot and controls.
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Reorderable action chips. The selected order is saved by Customize.
             Row(
