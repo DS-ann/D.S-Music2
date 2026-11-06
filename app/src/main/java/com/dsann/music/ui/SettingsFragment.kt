@@ -459,6 +459,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit { putString("player_background_style", safe) }
     }
 
+    private val _nowPlayingCoverAnimation = MutableStateFlow(
+        prefs.getString(NowPlayingCoverAnimationPreference.KEY, "Bars")
+            ?.takeIf { it in NowPlayingCoverAnimationPreference.choices } ?: "Bars"
+    )
+    val nowPlayingCoverAnimation: StateFlow<String> = _nowPlayingCoverAnimation.asStateFlow()
+
+    fun setNowPlayingCoverAnimation(value: String) {
+        val safe = value.takeIf { it in NowPlayingCoverAnimationPreference.choices } ?: "Bars"
+        _nowPlayingCoverAnimation.value = safe
+        NowPlayingCoverAnimationPreference.set(context, safe)
+    }
+
     private val _miniPlayerStyle = MutableStateFlow(
         prefs.getString("mini_player_style", "Card") ?: "Card"
     )
@@ -1397,6 +1409,7 @@ fun SettingsScreenContent(
     val playerArtworkScale by viewModel.playerArtworkScale.collectAsStateWithLifecycle()
     val playerButtonsPill by viewModel.playerButtonsPill.collectAsStateWithLifecycle()
     val playerBackgroundStyle by viewModel.playerBackgroundStyle.collectAsStateWithLifecycle()
+    val nowPlayingCoverAnimation by viewModel.nowPlayingCoverAnimation.collectAsStateWithLifecycle()
     val miniPlayerStyle by viewModel.miniPlayerStyle.collectAsStateWithLifecycle()
     val miniPlayerControlShape by viewModel.miniPlayerControlShape.collectAsStateWithLifecycle()
     val miniPlayerControlIcons by viewModel.miniPlayerControlIcons.collectAsStateWithLifecycle()
@@ -1659,6 +1672,8 @@ fun SettingsScreenContent(
                 onPlayerButtonsPillChange = { viewModel.setPlayerButtonsPill(it) },
                 playerBackgroundStyle = playerBackgroundStyle,
                 onPlayerBackgroundStyleChange = { viewModel.setPlayerBackgroundStyle(it) },
+                nowPlayingCoverAnimation = nowPlayingCoverAnimation,
+                onNowPlayingCoverAnimationChange = { viewModel.setNowPlayingCoverAnimation(it) },
                 miniPlayerStyle = miniPlayerStyle,
                 onMiniPlayerStyleChange = { viewModel.setMiniPlayerStyle(it) },
                 miniPlayerControlShape = miniPlayerControlShape,
@@ -2918,6 +2933,8 @@ private fun AppearanceScreen(
     onPlayerButtonsPillChange: (Boolean) -> Unit,
     playerBackgroundStyle: String,
     onPlayerBackgroundStyleChange: (String) -> Unit,
+    nowPlayingCoverAnimation: String,
+    onNowPlayingCoverAnimationChange: (String) -> Unit,
     miniPlayerStyle: String,
     onMiniPlayerStyleChange: (String) -> Unit,
     miniPlayerControlShape: String,
@@ -3315,6 +3332,18 @@ private fun AppearanceScreen(
 
             
             }
+            SettingsAccordionSection("Now playing cover") {
+                SettingsGroupCard(listOf {
+                    SettingsChoiceRow(
+                        title = "Playing animation",
+                        description = "Show a small animation over the cover of the song playing. Colours adjust to the album cover and your app theme.",
+                        selected = nowPlayingCoverAnimation,
+                        options = NowPlayingCoverAnimationPreference.choices,
+                        onSelected = onNowPlayingCoverAnimationChange
+                    )
+                })
+            }
+
             SettingsAccordionSection("Lyrics") {
             SettingsGroupCard(listOf(
                 {
