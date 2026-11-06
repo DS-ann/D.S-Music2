@@ -1220,7 +1220,7 @@ fun FullPlayer(
         var portraitActionRowBounds by remember(screenWidth, screenHeight, currentSongId) {
             mutableStateOf<Rect?>(null)
         }
-        var compactPortraitAfterCollision by remember(screenWidth, screenHeight, currentSongId) {
+        var compactPortraitLayout by remember(screenWidth, screenHeight, currentSongId) {
             mutableStateOf(false)
         }
         val collisionClearancePx = with(LocalDensity.current) { 8.dp.toPx() }
@@ -1239,7 +1239,7 @@ fun FullPlayer(
                 !showSyncedLyricsInPlayer ||
                 syncedLyrics.isNullOrEmpty()
             ) {
-                compactPortraitAfterCollision = false
+                compactPortraitLayout = false
                 portraitLyricLineBounds = null
             } else {
                 val lyricBounds = portraitLyricLineBounds
@@ -1252,15 +1252,16 @@ fun FullPlayer(
                         lyricBounds.bottom + collisionClearancePx > actionBounds.top &&
                             lyricBounds.top < actionBounds.bottom
                     if (horizontalOverlap && verticalCollision) {
-                        // Latch for this song/window size. Compaction must not toggle
-                        // off again after the moved line clears the measured collision.
-                        compactPortraitAfterCollision = true
+                        // Latch the denser layout for this song/window size after either
+                        // a height shortage or a lyric/action collision; do not toggle it off
+                        // again when the updated geometry clears the original condition.
+                        compactPortraitLayout = true
                     }
                 }
             }
         }
         val compactPortraitLyrics = !isLandscapeWindow &&
-            (isCompactPortraitMultiWindow || compactPortraitAfterCollision)
+            (isCompactPortraitMultiWindow || compactPortraitLayout)
 
         // When the queue opens on a tablet-sized landscape layout, reserve its left pane
         // instead of letting the queue cover the player controls.
@@ -1575,8 +1576,7 @@ fun FullPlayer(
                         .weight(titleToActionsSpacerWeight, fill = true)
                         // Android 6 can measure the legacy-font lyric line a few pixels
                         // taller than its weighted slot. Let it draw into the surrounding
-                        // spacer instead of cropping glyph edges; the bounds-based collision
-                        // check above still keeps the line clear of the action buttons.
+                        // spacer above the title; the fixed gap below keeps it clear of controls.
                         .clipToBounds(),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1595,7 +1595,7 @@ fun FullPlayer(
                         },
                         onLineNeedsMoreSpace = {
                             if (!compactPortraitLyrics) {
-                                compactPortraitAfterCollision = true
+                                compactPortraitLayout = true
                             }
                         }
                     )
