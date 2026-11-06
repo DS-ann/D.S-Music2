@@ -4,6 +4,7 @@ import com.dsann.music.ui.theme.DsmusicIconButton
 import com.dsann.music.ui.theme.DsmusicSurface
 import com.dsann.music.ui.theme.DsmusicTextButton
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
@@ -1004,6 +1005,10 @@ fun FullPlayer(
     var selectedQueueSongForMenu by remember { mutableStateOf<SongItem?>(null) }
     var lastLyricsFetchSongId by remember { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
+    // The player may be hosted in a resizable split-screen/freeform window on tablets.
+    // Re-evaluate this with the window constraints so the compact layout follows resizing.
+    val isMultiWindowMode = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N &&
+        (context as? Activity)?.isInMultiWindowMode == true
     
     // Sliding Queue Drawer State
     val isQueueExpanded by viewModel.isQueueExpanded.collectAsStateWithLifecycle()
@@ -1117,6 +1122,11 @@ fun FullPlayer(
         val isLandscapeWindow = screenWidth > screenHeight
         val useWidePlayer = screenWidth >= 840.dp ||
             (screenWidth >= 600.dp && isLandscapeWindow)
+        // A portrait tablet window can be much shorter or narrower than the full display.
+        // Keep the standard phone/full-screen layout untouched; compact only resized windows.
+        val isCompactPortraitMultiWindow = isMultiWindowMode &&
+            !isLandscapeWindow &&
+            (screenWidth < 720.dp || screenHeight < 900.dp)
         // When the queue opens on a tablet-sized landscape layout, reserve its left pane
         // instead of letting the queue cover the player controls.
         val animatedQueueDockInset by animateDpAsState(
@@ -1164,8 +1174,11 @@ fun FullPlayer(
         }
 
         // Dense controls are used for landscape and short-height resized player windows.
-        val compactLandscape = isLandscapeWindow || screenHeight < 760.dp
+        val compactLandscape = isLandscapeWindow || screenHeight < 760.dp ||
+            isCompactPortraitMultiWindow
         val portraitArtHeightFactor = when {
+            isCompactPortraitMultiWindow && screenHeight < 680.dp -> 0.22f
+            isCompactPortraitMultiWindow -> 0.26f
             screenHeight < 680.dp -> 0.30f
             screenHeight < 760.dp -> 0.34f
             else -> 0.40f
@@ -1175,7 +1188,11 @@ fun FullPlayer(
             screenHeight < 640.dp -> 0.22f
             else -> 0.28f
         }
-        val widePortraitArtHeightFactor = if (screenHeight < 760.dp) 0.34f else 0.50f
+        val widePortraitArtHeightFactor = when {
+            isCompactPortraitMultiWindow -> 0.30f
+            screenHeight < 760.dp -> 0.34f
+            else -> 0.50f
+        }
         val portraitArtHeightLimit = screenHeight * portraitArtHeightFactor
         val albumArtSlotSize = if (isLandscapeWindow) {
             minOf(screenHeight * landscapeArtHeightFactor, screenWidth * 0.30f) * (artScale / 0.9f)
@@ -1413,8 +1430,17 @@ fun FullPlayer(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(2.25f, fill = true)
-                        .offset(y = (-5).dp),
+                        .weight(if (isCompactPortraitMultiWindow) 3f else 2.25f, fill = true)
+                        // Keep the lyric baseline inside its own measured slot. In a resized
+                        // window, an almost-zero weighted slot must not paint over the actions row.
+                        .then(
+                            if (isCompactPortraitMultiWindow) {
+                                Modifier.heightIn(min = 36.dp).clipToBounds()
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .offset(y = if (isCompactPortraitMultiWindow) 0.dp else (-5).dp),
                     contentAlignment = Alignment.Center
                 ) {
                     PortraitSyncedLyricPreview(
@@ -1427,7 +1453,17 @@ fun FullPlayer(
                     )
                 }
             } else {
-                Spacer(modifier = Modifier.weight(2.25f, fill = true))
+                Spacer(
+                    modifier = Modifier.weight(
+                        if (isCompactPortraitMultiWindow) 3f else 2.25f,
+                        fill = true
+                    )
+                )
+            }
+            // Give the lyric line a visible buffer before the action chips in compact
+            // portrait multi-window layouts; this is intentionally absent on phones.
+            if (isCompactPortraitMultiWindow) {
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
             // Reorderable action chips. The selected order is saved by Customize.
