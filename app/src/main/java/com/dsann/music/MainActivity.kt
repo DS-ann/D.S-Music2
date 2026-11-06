@@ -203,6 +203,11 @@ class MainActivity : AppCompatActivity() {
                 "light" -> false
                 else -> systemDark
             }
+            // Theme changes are handled by Compose without recreating MainActivity.
+            // Re-apply system-bar icon contrast whenever the selected theme changes.
+            LaunchedEffect(isDarkTheme) {
+                setupSystemBars()
+            }
 
             val currentSong by playerViewModel.currentSong.collectAsStateWithLifecycle()
             val playerBackgroundColor by playerViewModel.playerBackgroundColor.collectAsStateWithLifecycle()
@@ -1093,7 +1098,14 @@ class MainActivity : AppCompatActivity() {
             window.isNavigationBarContrastEnforced = false
         }
 
-        val isDarkMode = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        val selectedThemeMode = getSharedPreferences("AppSettings", MODE_PRIVATE)
+            .getString("theme_mode", "system")
+        val isDarkMode = when (selectedThemeMode) {
+            "dark" -> true
+            "light" -> false
+            else -> (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
+        }
         WindowInsetsControllerCompat(window, window.decorView).apply {
             isAppearanceLightStatusBars = !isDarkMode
             isAppearanceLightNavigationBars = !isDarkMode
