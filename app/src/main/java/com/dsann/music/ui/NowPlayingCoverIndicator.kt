@@ -153,11 +153,11 @@ fun NowPlayingCoverIndicator(
     // Retain the last rendered phase when playback pauses. A plain StateFlow frame
     // clock resets while inactive, so keep this small value outside Compose state.
     val frozenPhase = remember(coverColor) { floatArrayOf(0.32f) }
-    val phase = if (isMotionAllowed && frameTime.value > 0L) {
+    val phase = (if (isMotionAllowed && frameTime.value > 0L) {
         (frameTime.value % 1_600_000_000L).toFloat() / 1_600_000_000f
     } else {
         frozenPhase[0]
-    }.also { if (isMotionAllowed) frozenPhase[0] = it }
+    }).also { if (isMotionAllowed) frozenPhase[0] = it }
 
     val themeColor = DsmusicTheme.colorScheme.primary
     val artworkColor = coverColor ?: themeColor
