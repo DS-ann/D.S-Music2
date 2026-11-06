@@ -150,11 +150,14 @@ fun NowPlayingCoverIndicator(
     // Keep the current-track badge visible while paused, but stop its frame subscription.
     val isMotionAllowed = isAnimating && LocalRootTabActive.current
     val frameTime = rememberAppAnimationFrameTimeNanos(active = isMotionAllowed)
+    // Retain the last rendered phase when playback pauses. A plain StateFlow frame
+    // clock resets while inactive, so keep this small value outside Compose state.
+    val frozenPhase = remember(coverColor) { floatArrayOf(0.32f) }
     val phase = if (isMotionAllowed && frameTime.value > 0L) {
         (frameTime.value % 1_600_000_000L).toFloat() / 1_600_000_000f
     } else {
-        0.32f
-    }
+        frozenPhase[0]
+    }.also { if (isMotionAllowed) frozenPhase[0] = it }
 
     val themeColor = DsmusicTheme.colorScheme.primary
     val artworkColor = coverColor ?: themeColor
@@ -193,7 +196,7 @@ fun NowPlayingCoverIndicator(
                     drawArc(
                         color = foreground,
                         startAngle = -90f,
-                        sweepAngle = if (isMotionAllowed) 235f + 110f * motion else 285f,
+                        sweepAngle = 235f + 110f * motion,
                         useCenter = false,
                         topLeft = Offset(center.x - radius, center.y - radius),
                         size = Size(radius * 2f, radius * 2f),
@@ -201,9 +204,7 @@ fun NowPlayingCoverIndicator(
                     )
                 }
                 "Pulse" -> {
-                    val pulse = if (isMotionAllowed) {
-                        0.18f + 0.12f * (0.5f + 0.5f * sin(motion * 2f * PI.toFloat()))
-                    } else 0.24f
+                    val pulse = 0.18f + 0.12f * (0.5f + 0.5f * sin(motion * 2f * PI.toFloat()))
                     drawCircle(
                         color = secondary.copy(alpha = 0.42f),
                         radius = shortest * (0.30f + pulse),
@@ -237,15 +238,11 @@ fun NowPlayingCoverIndicator(
                     }
                 }
                 else -> {
-                    val heights = if (isMotionAllowed) {
-                        floatArrayOf(
-                            0.38f + 0.46f * (0.5f + 0.5f * sin(motion * 2f * PI.toFloat())),
-                            0.42f + 0.50f * (0.5f + 0.5f * sin((motion + 0.34f) * 2f * PI.toFloat())),
-                            0.34f + 0.52f * (0.5f + 0.5f * sin((motion + 0.68f) * 2f * PI.toFloat()))
-                        )
-                    } else {
-                        floatArrayOf(0.52f, 0.92f, 0.40f)
-                    }
+                    val heights = floatArrayOf(
+                        0.38f + 0.46f * (0.5f + 0.5f * sin(motion * 2f * PI.toFloat())),
+                        0.42f + 0.50f * (0.5f + 0.5f * sin((motion + 0.34f) * 2f * PI.toFloat())),
+                        0.34f + 0.52f * (0.5f + 0.5f * sin((motion + 0.68f) * 2f * PI.toFloat()))
+                    )
                     val barWidth = shortest * 0.19f
                     val gap = shortest * 0.10f
                     val totalWidth = barWidth * 3f + gap * 2f
