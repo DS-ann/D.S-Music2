@@ -2492,7 +2492,9 @@ private fun MiniPlayerContentInternal(
         }
 
         // Keep a visible gap so adjacent rounded backgrounds never merge into one shape.
+        // Shift the complete transport-control group left without moving song information.
         Row(
+            modifier = Modifier.offset(x = (-5).dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
