@@ -4,7 +4,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** Internal karaoke timing baseline; the adjustment UI treats this as 0 ms. */
-internal const val DEFAULT_KARAOKE_TIMING_BASE_OFFSET_MS = 20L
+internal const val DEFAULT_KARAOKE_TIMING_BASE_OFFSET_MS = 0L
 
 /**
  * Frame-paced presentation clock for word-synchronized lyrics.

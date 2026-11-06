@@ -1171,7 +1171,7 @@ fun HomeSectionRow(
                 val rows = section.items.take(9).chunked(3)
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                    horizontalAlignment = Alignment.Start,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     rows.forEach { rowItems ->
