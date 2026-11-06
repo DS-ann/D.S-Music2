@@ -23,7 +23,6 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -93,7 +92,7 @@ import com.dsann.music.util.FavoritesManager
 import coil.compose.AsyncImage
 import com.dsann.music.R
 import com.dsann.music.model.SongItem
-import com.dsann.music.ui.theme.DsmusicAppTheme
+import com.dsann.music.ui.theme.DsmusicAppThemeFromPreferences
 import com.dsann.music.ui.player.rememberAppAnimationFrameTimeNanos
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
@@ -133,7 +132,11 @@ class QueueBottomSheet : BottomSheetDialogFragment() {
     ): View {
         return ComposeView(requireContext()).apply {
             setContent {
-                DsmusicAppTheme(darkTheme = isSystemInDarkTheme()) {
+                val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
+                val playerBackgroundColor by viewModel.playerBackgroundColor.collectAsStateWithLifecycle()
+                DsmusicAppThemeFromPreferences(
+                    dynamicAlbumColor = if (currentSong != null) playerBackgroundColor else null
+                ) {
                     QueueBottomSheetContent(
                         viewModel = viewModel,
                         onSongLongClick = { song ->

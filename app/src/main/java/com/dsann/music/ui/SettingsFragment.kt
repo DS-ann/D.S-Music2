@@ -212,33 +212,32 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setThemeMode(mode: String) {
         val safe = mode.lowercase().takeIf { it in listOf("system", "light", "dark") } ?: "system"
-        _themeMode.value = safe
-        prefs.edit { putString("theme_mode", safe) }
-        when (safe) {
-            "dark" -> {
-                _darkMode.value = true
-                prefs.edit { putBoolean(KEY_DARK_MODE, true) }
-            }
-            "light" -> {
-                _darkMode.value = false
-                prefs.edit { putBoolean(KEY_DARK_MODE, false) }
-            }
-            else -> {
-                val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-                _darkMode.value = systemDark
-            }
+        val resolvedDark = when (safe) {
+            "dark" -> true
+            "light" -> false
+            else -> (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
         }
-        // MainActivity observes theme_mode and applies the theme through Compose.
-        // Calling AppCompatDelegate here recreates the Activity unnecessarily and
-        // can reset nested Settings navigation while the user is editing preferences.
+        // Update both persisted keys together so independently composed surfaces
+        // cannot observe a half-updated theme selection.
+        prefs.edit {
+            putString("theme_mode", safe)
+            putBoolean(KEY_DARK_MODE, resolvedDark)
+        }
+        _themeMode.value = safe
+        _darkMode.value = resolvedDark
+        // MainActivity applies the selection through Compose without recreating the Activity.
     }
 
     fun setDarkMode(enabled: Boolean) {
+        val mode = if (enabled) "dark" else "light"
+        prefs.edit {
+            putString("theme_mode", mode)
+            putBoolean(KEY_DARK_MODE, enabled)
+        }
+        _themeMode.value = mode
         _darkMode.value = enabled
-        prefs.edit {putBoolean(KEY_DARK_MODE, enabled)}
-        prefs.edit {putString("theme_mode", if (enabled) "dark" else "light")}
-        // Compose theme reacts to the preference in MainActivity; no Activity
-        // recreation is required to apply this switch.
+        // Compose theme reacts to the preference without Activity recreation.
     }
 
     // ── YouTube Music Cookies ──────────────────────────────────────────────────

@@ -31,20 +31,24 @@ import androidx.core.view.WindowCompat.getInsetsController
  */
 @Composable
 fun <T> SharedPreferences.observeKey(key: String, defaultValue: T): State<T> {
-    val state = remember(this, key) { mutableStateOf(defaultValue) }
-    DisposableEffect(this, key) {
-        fun readValue(prefs: SharedPreferences): T {
-            @Suppress("UNCHECKED_CAST")
-            return when (defaultValue) {
-                is Boolean -> prefs.getBoolean(key, defaultValue) as T
-                is String -> (prefs.getString(key, defaultValue) ?: defaultValue) as T
-                is Float -> prefs.getFloat(key, defaultValue) as T
-                is Int -> prefs.getInt(key, defaultValue) as T
-                is Long -> prefs.getLong(key, defaultValue) as T
-                else -> defaultValue
-            }
+    fun readValue(prefs: SharedPreferences): T {
+        @Suppress("UNCHECKED_CAST")
+        return when (defaultValue) {
+            is Boolean -> prefs.getBoolean(key, defaultValue) as T
+            is String -> (prefs.getString(key, defaultValue) ?: defaultValue) as T
+            is Float -> prefs.getFloat(key, defaultValue) as T
+            is Int -> prefs.getInt(key, defaultValue) as T
+            is Long -> prefs.getLong(key, defaultValue) as T
+            else -> defaultValue
         }
+    }
 
+    // Seed from the stored value immediately. Starting with a generic default and
+    // correcting it in DisposableEffect caused a visible wrong-theme frame.
+    val state = remember(this, key, defaultValue) {
+        mutableStateOf(readValue(this@observeKey))
+    }
+    DisposableEffect(this, key, defaultValue) {
         state.value = readValue(this@observeKey)
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, changedKey ->
             if (changedKey == key) state.value = readValue(prefs)
@@ -348,6 +352,33 @@ fun DsmusicAppTheme(
             content = content
         )
     }
+}
+
+@Composable
+fun rememberDsmusicDarkTheme(): Boolean {
+    val context = LocalContext.current
+    val prefs = remember(context) {
+        context.getSharedPreferences("AppSettings", android.content.Context.MODE_PRIVATE)
+    }
+    val themeMode by prefs.observeKey("theme_mode", "system")
+    val systemDark = isSystemInDarkTheme()
+    return when (themeMode.lowercase()) {
+        "dark" -> true
+        "light" -> false
+        else -> systemDark
+    }
+}
+
+@Composable
+fun DsmusicAppThemeFromPreferences(
+    dynamicAlbumColor: Int? = null,
+    content: @Composable () -> Unit
+) {
+    DsmusicAppTheme(
+        darkTheme = rememberDsmusicDarkTheme(),
+        dynamicAlbumColor = dynamicAlbumColor,
+        content = content
+    )
 }
 
 internal tailrec fun android.content.Context.findActivity(): Activity? = when (this) {

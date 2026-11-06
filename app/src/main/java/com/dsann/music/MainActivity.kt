@@ -110,7 +110,7 @@ import com.dsann.music.ui.library.LocalMusicScreen
 import com.dsann.music.ui.theme.DsmusicNavigationBar
 import com.dsann.music.ui.theme.DsmusicNavigationDestination
 import com.dsann.music.ui.theme.DsmusicAppTheme
-import com.dsann.music.ui.theme.observeKey
+import com.dsann.music.ui.theme.rememberDsmusicDarkTheme
 import com.dsann.music.ui.onboarding.OnboardingScreen
 import android.content.Context
 import com.dsann.music.update.GitHubReleaseClient
@@ -196,13 +196,7 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             val prefs = remember { getSharedPreferences("AppSettings", Context.MODE_PRIVATE) }
-            val themeMode by prefs.observeKey("theme_mode", "system")
-            val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
-            val isDarkTheme = when (themeMode) {
-                "dark" -> true
-                "light" -> false
-                else -> systemDark
-            }
+            val isDarkTheme = rememberDsmusicDarkTheme()
             // Theme changes are handled by Compose without recreating MainActivity.
             // Re-apply system-bar icon contrast whenever the selected theme changes.
             LaunchedEffect(isDarkTheme) {
@@ -520,6 +514,9 @@ class MainActivity : AppCompatActivity() {
                                     start = railInset.coerceAtLeast(0.dp),
                                     bottom = (finalPadding + miniPlayerScrollReserve).coerceAtLeast(0.dp)
                                 )
+                                // Keep transparent page regions on the selected app palette;
+                                // this ends above the floating dock and does not paint its gutter.
+                                .background(DsmusicTheme.colorScheme.background)
                         ) {
                             // Only the active tab and the recent cache stay composed. On Android 6,
                             // old roots are evicted to reduce repeated layout, draw and memory work;

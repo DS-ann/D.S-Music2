@@ -9,7 +9,6 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -52,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -900,7 +900,7 @@ internal fun LyricsErrorState(
     message: String,
     onRetry: () -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = DsmusicTheme.colorScheme.background.luminance() < 0.5f
     val textColor = if (isDark) {
         Color.White.copy(alpha = 0.85f)
     } else {
