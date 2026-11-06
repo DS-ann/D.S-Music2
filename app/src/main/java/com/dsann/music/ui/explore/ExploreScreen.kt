@@ -1615,7 +1615,7 @@ fun ExploreScreen(
                                                                             item = item,
                                                                             isCurrentlyPlaying = item is SearchItem.Song &&
                                                                                 item.song.videoId == currentPlayingVideoId,
-                                                                            isLoading = item is SearchItem.Song && isLoadingStream &&
+                                                                            isLoading = item is SearchItem.Song && currentTrackIsLoading &&
                                                                                 item.song.videoId == currentPlayingVideoId,
                                                                             isPlaybackActive = isPlaybackActive,
                                                                             onSongMenuClick = { selectedSongForMenu = it },
@@ -2917,11 +2917,8 @@ private fun ExploreCustomizerDialog(
                         ) { item ->
                             SearchResultItem(
                                 item = item,
-                                isCurrentlyPlaying = item is SearchItem.Song &&
-                                    item.song.videoId == currentPlayingVideoId,
-                                isLoading = item is SearchItem.Song &&
-                                    item.song.videoId == currentPlayingVideoId && currentTrackIsLoading,
-                                isPlaybackActive = isPlaybackActive,
+                                isCurrentlyPlaying = false,
+                                isLoading = false,
                                 onCollectionMenuClick = onCollectionMenuClick,
                                 onClick = { onSuggestionItemClick(item) }
                             )
