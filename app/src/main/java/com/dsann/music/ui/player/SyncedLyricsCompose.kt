@@ -611,7 +611,9 @@ private fun LyricLineItem(
 
     Column(modifier = commonModifier) {
         // ── Main Text Box ──
-        Box {
+        // Keep glyph overhangs inside the visible row on every Android version.
+        // Apply the same inset to the dim base and karaoke overlay so their geometry stays aligned.
+        Box(modifier = Modifier.padding(horizontal = 6.dp)) {
             // Base Dim Text
             Text(
                 text = mainContent,
@@ -658,7 +660,7 @@ private fun LyricLineItem(
 
         // ── Bracket Text Box ──
         if (bracketContent != null) {
-            Box(modifier = Modifier.padding(top = 4.dp)) {
+            Box(modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 4.dp)) {
                 // Base Dim Text
                 Text(
                     text = bracketContent,
@@ -716,6 +718,7 @@ private fun LyricLineItem(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 6.dp)
                     .padding(top = 4.dp)
             ) {
                 Text(
