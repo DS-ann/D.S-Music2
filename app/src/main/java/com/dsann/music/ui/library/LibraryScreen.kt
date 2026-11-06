@@ -3385,7 +3385,8 @@ private data class ReplayMonthSummary(
 fun RecapTabContent(
     nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection,
     viewModel: PlayerSharedViewModel,
-    onNavigateToExplore: () -> Unit
+    onNavigateToExplore: () -> Unit,
+    onArtistClick: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val events by viewModel.listeningHistoryEventsFlow.collectAsStateWithLifecycle(emptyList())
@@ -3799,7 +3800,7 @@ fun RecapTabContent(
                         ) {
                             items(topArtists, key = { it.name }) { artist ->
                                 Column(
-                                    Modifier.width(104.dp),
+                                    Modifier.width(104.dp).clickable { onArtistClick(artist.name) },
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     val image = viewModel.artistProfileMap[artist.name]
@@ -3885,10 +3886,71 @@ fun RecapTabContent(
                             color = DsmusicTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    DsmusicIconButton(
+                        onClick = { showReplaySongActions(context, toSongItem(item), viewModel) }
+                    ) {
+                        Icon(Icons.Rounded.MoreVert, contentDescription = "Song options")
+                    }
                 }
             }
         }
     }
+}
+
+private fun showReplaySongActions(
+    context: Context,
+    song: SongItem,
+    viewModel: PlayerSharedViewModel
+) {
+    val activity = getActivityFromContext(context) as? androidx.fragment.app.FragmentActivity ?: return
+    val fragmentManager = activity.supportFragmentManager
+    if (fragmentManager.isStateSaved) return
+
+    val tag = "ReplaySongActions-${song.id}"
+    if (fragmentManager.findFragmentByTag(tag) != null) return
+
+    val sheet = com.dsann.music.ui.SongActionsBottomSheet.newInstance(
+        song = song,
+        showAddToQueue = true,
+        showDelete = false
+    )
+    sheet.setActionListener(object : com.dsann.music.ui.SongActionsBottomSheet.ActionListener {
+        override fun onPlayNext(songItem: SongItem) {
+            viewModel.addToQueueNext(songItem)
+        }
+
+        override fun onAddToQueue(songItem: SongItem) {
+            viewModel.addToQueue(songItem)
+        }
+
+        override fun onDelete(songItem: SongItem) = Unit
+        override fun onEdit(songItem: SongItem) = Unit
+
+        override fun onPlay(songItem: SongItem) {
+            viewModel.playSong(songItem)
+        }
+
+        override fun onFavorite(songItem: SongItem, isFav: Boolean) {
+            com.dsann.music.util.FavoritesManager(context).setFavorite(songItem.id, isFav)
+        }
+
+        override fun onShare(songItem: SongItem) {
+            runCatching {
+                val target = songItem.videoId?.takeIf { it.isNotBlank() }
+                    ?.let { "https://music.youtube.com/watch?v=$it" }
+                    ?: songItem.contentUri.toString()
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(
+                        Intent.EXTRA_TEXT,
+                        "Listen to ${songItem.title} by ${songItem.artist}: $target"
+                    )
+                }
+                activity.startActivity(Intent.createChooser(shareIntent, "Share Song"))
+            }
+        }
+    })
+    sheet.show(fragmentManager, tag)
 }
 
 private fun accountViewModelRefreshReplay(context: Context) {
@@ -3997,14 +4059,15 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
                         mediaId
                     )
 
-                    // MediaStore does not consistently index M4A cover atoms, and Android
-                    // 6 does not reliably expose OpusTags through MediaMetadataRetriever.
-                    // Read container-native tags on IO and hand the UI a cached cover URI.
-                    val hasEmbeddedContainerTags =
-                        displayName.endsWith(".m4a", ignoreCase = true) ||
-                            displayName.endsWith(".opus", ignoreCase = true) ||
-                            displayName.endsWith(".ogg", ignoreCase = true)
-                    val embeddedMetadata = if (isDownloadedFile && hasEmbeddedContainerTags) {
+                    // MediaStore often omits artwork for downloaded files. Read embedded tags
+                    // for every format produced by D.S Music; the reader uses native MP4/Opus
+                    // parsing where needed and MediaMetadataRetriever for the other formats.
+                    val downloadExtension = displayName.substringAfterLast('.', "").lowercase(java.util.Locale.ROOT)
+                    val hasReadableDownloadedMetadata = downloadExtension in setOf(
+                        "mp3", "m4a", "mp4", "m4b", "m4p",
+                        "opus", "ogg", "flac", "aac", "wav", "mka", "webm"
+                    )
+                    val embeddedMetadata = if (isDownloadedFile && hasReadableDownloadedMetadata) {
                         com.dsann.music.util.DownloadedAudioMetadataReader.read(
                             context = context,
                             filePath = path,
@@ -4059,8 +4122,8 @@ internal suspend fun scanLocalFiles(context: Context, viewModel: PlayerSharedVie
                                 videoId = sourceVideoId
                                 isDownloadedOffline = true
                             }
-                            // Prefer the embedded cover from the M4A file to a missing/stale
-                            // MediaStore album-art row. This is a normal file URI, not the M4A URI.
+                            // Prefer the extracted embedded cover whenever MediaStore has no
+                            // reliable album-art row. This is a cached image file URI.
                             thumbnailUrl = embeddedMetadata?.artworkUri
                         }
                     )
