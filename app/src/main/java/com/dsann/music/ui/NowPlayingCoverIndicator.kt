@@ -119,7 +119,8 @@ fun rememberNowPlayingCoverColor(
                                 ?: palette.lightVibrantSwatch?.rgb
                                 ?: palette.darkVibrantSwatch?.rgb
                                 ?: palette.mutedSwatch?.rgb
-                                ?: palette.dominantColor
+                                ?: palette.swatches.maxByOrNull { it.population }?.rgb
+                                ?: android.graphics.Color.GRAY
                             Color(colorInt)
                         }
                     }
