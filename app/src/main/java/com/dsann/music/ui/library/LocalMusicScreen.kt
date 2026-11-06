@@ -42,7 +42,6 @@ import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shuffle
 import com.dsann.music.ui.theme.Button
@@ -69,6 +68,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -290,7 +290,7 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
                     }
                 }
             ) {
-                Icon(Icons.Rounded.Refresh, contentDescription = "Refresh local music")
+                Icon(painter = painterResource(id = com.dsann.music.R.drawable.ic_refresh), contentDescription = "Refresh local music")
             }
         }
 

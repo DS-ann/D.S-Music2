@@ -68,7 +68,6 @@ import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Radio
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.ThumbUp
@@ -360,7 +359,7 @@ fun WelcomeGreetingBanner(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.Refresh,
+                            painter = painterResource(id = com.dsann.music.R.drawable.ic_refresh),
                             contentDescription = "Listening Recap",
                             tint = DsmusicTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(22.dp)
