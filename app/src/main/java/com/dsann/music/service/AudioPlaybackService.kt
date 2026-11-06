@@ -942,6 +942,7 @@ class AudioPlaybackService : MediaSessionService() {
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                cancelQueuePreload()
                 Log.d(TAG, "⚡ NATIVE GAPLESS TRANSITION COMPLETED! Resynchronizing UI.")
                 
                 // Sleep Timer Interception flags
@@ -998,7 +999,7 @@ class AudioPlaybackService : MediaSessionService() {
                             vm.setSleepTimerMode(PlayerSharedViewModel.SleepTimerMode.OFF)
                         }
 
-                        handler.postDelayed({ preloadNextSongIntoQueue() }, 300)
+                        scheduleQueuePreload(300L)
                     }
                 }
             }
@@ -1217,6 +1218,7 @@ class AudioPlaybackService : MediaSessionService() {
             handler.removeCallbacks(progressUpdateRunnable)
         }
         stopProgressFrameUpdates()
+        cancelQueuePreload()
         handler.removeCallbacks(widgetRefreshAfterWakeRunnable)
         handler.removeCallbacks(widgetWakeFollowUpRunnable)
         if (screenWakeReceiverRegistered) {
@@ -1369,6 +1371,7 @@ class AudioPlaybackService : MediaSessionService() {
 
     @JvmOverloads
     fun loadAudio(uri: Uri, startPosition: Long = -1) {
+        cancelQueuePreload()
         if (!isPlayerInitialized) {
             pendingPlaybackRequest = PendingPlaybackRequest(uri, startPosition, autoPlay = false)
             return
@@ -1419,6 +1422,7 @@ class AudioPlaybackService : MediaSessionService() {
 
     @JvmOverloads
     fun loadAndPlay(uri: Uri, startPosition: Long = -1) {
+        cancelQueuePreload()
         if (!isPlayerInitialized) {
             pendingPlaybackRequest = PendingPlaybackRequest(uri, startPosition, autoPlay = true)
             viewModel?.setLoading(true)
@@ -1532,7 +1536,7 @@ class AudioPlaybackService : MediaSessionService() {
                     }
                     if (cachedUri != null) {
                         ensureActive()
-                        if (resolveTargetSongId != videoId) return@launch
+                        if (requestGeneration != playbackResolveGeneration || resolveTargetSongId != videoId) return@launch
                         activeSong?.let { song ->
                             viewModel?.refreshCurrentSongSource(
                                 song.withPlaybackSource(
@@ -1605,7 +1609,7 @@ class AudioPlaybackService : MediaSessionService() {
 
                 // Guard: If user clicked another song while we were resolving, abort silently
                 ensureActive()
-                if (resolveTargetSongId != videoId) {
+                if (requestGeneration != playbackResolveGeneration || resolveTargetSongId != videoId) {
                     Log.d(TAG, "Stale resolution for $videoId discarded (target changed to $resolveTargetSongId)")
                     return@launch
                 }
@@ -1696,88 +1700,147 @@ class AudioPlaybackService : MediaSessionService() {
      * The Ultimate Solution: Proactively builds the native ExoPlayer queue by resolving the NEXT track
      * in background and adding it to the pipeline BEFORE the current track completes.
      */
-    private fun preloadNextSongIntoQueue() {
-        val vm = viewModel ?: return
+    private fun cancelQueuePreload() {
+        scheduledQueuePreload?.let { task ->
+            if (::handler.isInitialized) handler.removeCallbacks(task)
+        }
+        scheduledQueuePreload = null
+        nextQueuePreloadGeneration += 1L
+        nextQueuePreloadJob?.cancel()
+        nextQueuePreloadJob = null
+    }
 
-        // Top up the queue while there is still enough time to finish the network request.
-        // This check runs after playback starts, queue edits, and every native track transition.
+    private fun scheduleQueuePreload(delayMs: Long) {
+        cancelQueuePreload()
+        if (!::handler.isInitialized) return
+        val task = Runnable {
+            scheduledQueuePreload = null
+            preloadNextSongIntoQueue()
+        }
+        scheduledQueuePreload = task
+        handler.postDelayed(task, delayMs)
+    }
+
+    private fun isQueuePreloadCurrent(
+        generation: Long,
+        vm: PlayerSharedViewModel,
+        currentSongId: Long,
+        queueSnapshot: List<Long>,
+        shuffleEnabled: Boolean,
+        repeatMode: Int
+    ): Boolean {
+        return generation == nextQueuePreloadGeneration &&
+            vm.currentSong.value?.id == currentSongId &&
+            vm.songList.value.map { it.id } == queueSnapshot &&
+            vm.isShuffleEnabled.value == shuffleEnabled &&
+            vm.repeatMode.value == repeatMode
+    }
+
+    /**
+     * Resolve the next source in the background, but only inject it if the active song and
+     * queue are still exactly the ones this preload was created for.
+     */
+    private fun preloadNextSongIntoQueue() {
+        cancelQueuePreload()
+        val vm = viewModel ?: return
         vm.maybeRefillAutoplayQueue()
 
+        val currentSong = vm.currentSong.value ?: return
         val songs = vm.songList.value
         if (songs.isEmpty()) return
-        
-        // Shuffle-aware next index prediction
-        val nextIndex = vm.getNextSongIndex() 
+
+        // Capture one shuffle choice; never re-roll while validating this preload.
+        val nextIndex = vm.getNextSongIndex()
         if (nextIndex < 0 || nextIndex >= songs.size) {
-            // Keep the existing radio extension, but respect the listener's Autoplay setting.
-            if (!isAutoplayEnabled()) return
-            val sourceVideoId = vm.getAutoplaySeedVideoId()
-            if (!sourceVideoId.isNullOrBlank()) {
-                // Use the same de-duplicated request the end-of-queue transition awaits.
-                // The last queue item may be a local copy of an online-backed track.
-                vm.prefetchAutoplayRecommendations(sourceVideoId)
+            if (isAutoplayEnabled()) {
+                vm.getAutoplaySeedVideoId()?.takeIf { it.isNotBlank() }
+                    ?.let { vm.prefetchAutoplayRecommendations(it) }
             }
             return
         }
-        
+
         val nextSong = songs[nextIndex]
-        Log.d(TAG, "Initializing proactive queue preloading for native transition: ${nextSong.title}")
-        
-        serviceScope.launch {
-            var nextUri = nextSong.contentUri
-            
-            // 1. Check dynamic cache & resolve if online source
-            val targetVideoId = nextSong.videoId
-            if (
-                !nextSong.isCachedTrack &&
-                !nextSong.isDownloadedOffline &&
-                !targetVideoId.isNullOrEmpty()
-            ) {
-                val resolvedUrl = withContext(Dispatchers.IO) {
-                    YouTubeMusic.getStreamUrl(targetVideoId).getOrNull()
-                }
-                if (!resolvedUrl.isNullOrEmpty()) {
-                    nextUri = resolvedUrl.toUri()
-                    Log.d(TAG, "Next track stream URL pre-resolved successfully")
-                    
-                    // First-chunk byte pre-caching: download first 512KB into SimpleCache
-                    preCacheFirstChunk(resolvedUrl)
-                }
-            }
-            
-            // 2. Warm-inject into ExoPlayer Natively with mediaId for accurate resync
-            withContext(Dispatchers.Main) {
-                if (crossfadeDurationMs > 0) {
-                    if (nextPlayer == null) {
-                        nextPlayer = buildExoPlayer()
-                    configurePlayerAudio(nextPlayer!!)
+        val activeSongId = currentSong.id
+        val queueSnapshot = songs.map { it.id }
+        val shuffleEnabled = vm.isShuffleEnabled.value
+        val repeatMode = vm.repeatMode.value
+        val generation = nextQueuePreloadGeneration
+        Log.d(TAG, "Preparing next-track preload: ${nextSong.title} after ${currentSong.title}")
+
+        nextQueuePreloadJob = serviceScope.launch {
+            try {
+                var nextUri = nextSong.contentUri
+                val targetVideoId = nextSong.videoId
+                if (
+                    !nextSong.isCachedTrack &&
+                    !nextSong.isDownloadedOffline &&
+                    !targetVideoId.isNullOrEmpty()
+                ) {
+                    val resolvedUrl = withContext(Dispatchers.IO) {
+                        YouTubeMusic.getStreamUrl(targetVideoId).getOrNull()
                     }
-                    val nextItem = buildMediaItem(nextUri, nextSong.title, nextSong.artist, nextSong.id.toString())
-                    if (nextSong.isCachedTrack) {
-                        nextPlayer?.setMediaSource(buildCacheOnlyMediaSource(nextItem))
-                    } else {
-                        nextPlayer?.setMediaItem(nextItem)
+                    ensureActive()
+                    if (!isQueuePreloadCurrent(
+                            generation, vm, activeSongId, queueSnapshot, shuffleEnabled, repeatMode
+                        )
+                    ) return@launch
+                    if (!resolvedUrl.isNullOrEmpty()) {
+                        nextUri = resolvedUrl.toUri()
+                        preCacheFirstChunk(resolvedUrl)
                     }
-                    nextPlayer?.prepare()
-                    nextPlayer?.playWhenReady = false
-                    nextPlayer?.volume = 0f
-                    Log.d(TAG, "⚡ SUCCESSFULLY HOT-QUEUED NEXT SONG INTO CROSSFADE PLAYER! READY FOR OVERLAP TRANSITION.")
-                } else {
-                    if (player.mediaItemCount < 2) {
-                        val nextItem = buildMediaItem(nextUri, nextSong.title, nextSong.artist, nextSong.id.toString())
+                }
+
+                withContext(Dispatchers.Main) {
+                    if (!isQueuePreloadCurrent(
+                            generation, vm, activeSongId, queueSnapshot, shuffleEnabled, repeatMode
+                        )
+                    ) return@withContext
+                    if (player.currentMediaItem?.mediaId != activeSongId.toString()) {
+                        Log.d(TAG, "Skipped preload because the active Media3 item changed")
+                        return@withContext
+                    }
+
+                    if (crossfadeDurationMs > 0) {
+                        if (nextPlayer == null) {
+                            nextPlayer = buildExoPlayer()
+                            configurePlayerAudio(nextPlayer!!)
+                        }
+                        nextPlayer?.stop()
+                        nextPlayer?.clearMediaItems()
+                        val nextItem = buildMediaItem(
+                            nextUri, nextSong.title, nextSong.artist, nextSong.id.toString()
+                        )
+                        if (nextSong.isCachedTrack) {
+                            nextPlayer?.setMediaSource(buildCacheOnlyMediaSource(nextItem))
+                        } else {
+                            nextPlayer?.setMediaItem(nextItem)
+                        }
+                        nextPlayer?.prepare()
+                        nextPlayer?.playWhenReady = false
+                        nextPlayer?.volume = 0f
+                        Log.d(TAG, "Preloaded next song into the crossfade player")
+                    } else if (player.mediaItemCount < 2) {
+                        val nextItem = buildMediaItem(
+                            nextUri, nextSong.title, nextSong.artist, nextSong.id.toString()
+                        )
                         if (nextSong.isCachedTrack) {
                             player.addMediaSource(buildCacheOnlyMediaSource(nextItem))
                         } else {
                             player.addMediaItem(nextItem)
                         }
-                        Log.d(TAG, "⚡ SUCCESSFULLY HOT-QUEUED NEXT SONG INTO NATIVE PIPELINE! READY FOR ZERO-GAP TRANSITION.")
+                        Log.d(TAG, "Preloaded next song into the native queue")
                     }
                 }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w(TAG, "Next-track preload failed for ${nextSong.title}; active playback is unchanged", error)
             }
         }
     }
 
     fun refreshNativeQueue() {
+        cancelQueuePreload()
         // Clear out any currently preloaded next song
         if (crossfadeDurationMs > 0) {
             nextPlayer?.stop()
@@ -2678,9 +2741,7 @@ class AudioPlaybackService : MediaSessionService() {
             }
 
             // Proactively stack the next song for gapless transition
-            handler.postDelayed({
-                preloadNextSongIntoQueue()
-            }, 200)
+            scheduleQueuePreload(200L)
         } catch (e: Exception) {
             viewModel?.setLoading(false)
             Log.e(TAG, "Failed to load audio: ${e.message}")
@@ -3347,7 +3408,7 @@ class AudioPlaybackService : MediaSessionService() {
                     }
                 }
                 // Preload the next song into the newly initialized nextPlayer
-                handler.postDelayed({ preloadNextSongIntoQueue() }, 300)
+                scheduleQueuePreload(300L)
             }
         }
     }

@@ -245,6 +245,27 @@ fun AccountSettingsSection(
                                     )
                                 }
                             }
+                            if (isLoggedIn) {
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(RoundedCornerShape(13.dp))
+                                        .background(DsmusicTheme.colorScheme.error)
+                                        .clickable {
+                                            viewModel.logout()
+                                            onClose()
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.PowerSettingsNew,
+                                        contentDescription = "Log out",
+                                        tint = DsmusicTheme.colorScheme.onError,
+                                        modifier = Modifier.size(21.dp)
+                                    )
+                                }
+                            }
                         }
                         Text(
                             text = "Your music space, your identity.",
@@ -460,21 +481,7 @@ fun AccountSettingsSection(
         item {
             Spacer(modifier = Modifier.height(16.dp))
             
-            if (isLoggedIn) {
-                DsmusicButton(
-                    onClick = { viewModel.logout(); onClose() },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = DsmusicTheme.colorScheme.errorContainer,
-                        contentColor = DsmusicTheme.colorScheme.onErrorContainer
-                    ),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Icon(Icons.Rounded.PowerSettingsNew, null)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("Disconnect Account", fontWeight = FontWeight.Bold)
-                }
-            } else {
+            if (!isLoggedIn) {
                 DsmusicButton(
                     onClick = onNavigateToSignIn,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
