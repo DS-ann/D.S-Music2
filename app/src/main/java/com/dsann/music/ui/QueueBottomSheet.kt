@@ -743,6 +743,7 @@ class DragDropState(
     private var autoScrollJob: Job? = null
     private var autoScrollDeltaPx: Float = 0f
     private var pendingMoveTargetIndex: Int? = null
+    private var dragItemStridePx: Float = 0f
 
     val draggedItemKey: Any?
         get() = initiallyDraggedElement?.key
@@ -754,11 +755,24 @@ class DragDropState(
                 ?.let { item -> anchor.offset.toFloat() + draggedDistance - item.offset }
         }
 
+    private fun captureDragItemStride(item: LazyListItemInfo) {
+        val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
+        val itemCenter = item.offset + item.size / 2f
+        val nextItem = visibleItems.firstOrNull { it.index == item.index + 1 }
+        val previousItem = visibleItems.firstOrNull { it.index == item.index - 1 }
+        dragItemStridePx = when {
+            nextItem != null -> abs((nextItem.offset + nextItem.size / 2f) - itemCenter)
+            previousItem != null -> abs(itemCenter - (previousItem.offset + previousItem.size / 2f))
+            else -> item.size.toFloat()
+        }.coerceAtLeast(item.size.toFloat())
+    }
+
     fun onDragStart(offset: Offset) {
         stopAutoScroll()
         queueChangedDuringDrag = false
         pendingMoveTargetIndex = null
         draggedDistance = 0f
+        dragItemStridePx = 0f
         initiallyDraggedElement = null
         currentIndexOfDraggedItem = null
         lazyListState.layoutInfo.visibleItemsInfo
@@ -766,6 +780,7 @@ class DragDropState(
             ?.also {
                 initiallyDraggedElement = it
                 currentIndexOfDraggedItem = it.index
+                captureDragItemStride(it)
             }
     }
 
@@ -775,9 +790,11 @@ class DragDropState(
         queueChangedDuringDrag = false
         pendingMoveTargetIndex = null
         draggedDistance = 0f
+        dragItemStridePx = 0f
         val item = lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
         initiallyDraggedElement = item
         currentIndexOfDraggedItem = item?.index
+        item?.let(::captureDragItemStride)
     }
 
     fun onDragInterrupted() {
@@ -787,6 +804,7 @@ class DragDropState(
         currentIndexOfDraggedItem = null
         pendingMoveTargetIndex = null
         draggedDistance = 0f
+        dragItemStridePx = 0f
         stopAutoScroll()
         // The list has been reordered in Compose already. Rebuild Media3's native
         // next-item preload only once after the user releases the drag handle.
@@ -801,6 +819,9 @@ class DragDropState(
     private fun moveDraggedItemToPointer() {
         val anchor = initiallyDraggedElement ?: return
         val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
+        // The dragged row itself is not placement-animated, so its layout slot is stable.
+        // Neighbour rows are animated and their transient offsets must not be used as drop
+        // targets: doing so can alternately move a song forward and backward around a midpoint.
         val draggedItem = visibleItems.firstOrNull { it.key == anchor.key } ?: return
         val fromIndex = draggedItem.index
         currentIndexOfDraggedItem = fromIndex
@@ -809,14 +830,25 @@ class DragDropState(
             if (fromIndex != pendingTarget) return
             pendingMoveTargetIndex = null
         }
+
         val currentCenter = anchor.offset + draggedDistance + anchor.size / 2f
-        val targetItem = visibleItems.minByOrNull { item ->
-            kotlin.math.abs((item.offset + item.size / 2f) - currentCenter)
-        } ?: return
-        if (targetItem.index != fromIndex) {
+        val slotCenter = draggedItem.offset + draggedItem.size / 2f
+        val stride = dragItemStridePx.takeIf { it > 0f } ?: draggedItem.size.toFloat()
+        // A 58% threshold adds a small hysteresis band. The row that slides into the
+        // vacated slot cannot immediately become a reverse target while its placement
+        // animation is still settling.
+        val threshold = stride * 0.58f
+        val totalItems = lazyListState.layoutInfo.totalItemsCount
+        val targetIndex = when {
+            currentCenter > slotCenter + threshold && fromIndex < totalItems - 1 -> fromIndex + 1
+            currentCenter < slotCenter - threshold && fromIndex > 0 -> fromIndex - 1
+            else -> fromIndex
+        }
+
+        if (targetIndex != fromIndex) {
             queueChangedDuringDrag = true
-            pendingMoveTargetIndex = targetItem.index
-            onMove(fromIndex, targetItem.index)
+            pendingMoveTargetIndex = targetIndex
+            onMove(fromIndex, targetIndex)
         }
     }
 

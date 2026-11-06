@@ -2091,7 +2091,10 @@ fun FullPlayer(
             isShuffleEnabled = isShuffleEnabled,
             repeatMode = repeatMode,
             sleepTimerMode = sleepTimerMode,
-            onReorderQueue = { from, to -> viewModel.reorderQueue(from, to) },
+            onReorderQueue = { from, to ->
+                viewModel.reorderQueue(from, to, syncPlaybackService = false)
+            },
+            onReorderFinished = { viewModel.syncQueueWithPlaybackService() },
             onPlaySongAtIndex = { index -> viewModel.playSongAtIndex(index) },
             onToggleShuffle = { viewModel.toggleShuffle() },
             onToggleLoopMode = { viewModel.toggleLoopMode() },

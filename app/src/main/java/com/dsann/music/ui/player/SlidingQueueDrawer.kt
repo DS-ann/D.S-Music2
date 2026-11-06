@@ -46,6 +46,7 @@ fun SlidingQueueDrawer(
     repeatMode: Int,
     sleepTimerMode: PlayerSharedViewModel.SleepTimerMode,
     onReorderQueue: (Int, Int) -> Unit,
+    onReorderFinished: () -> Unit = {},
     onPlaySongAtIndex: (Int) -> Unit,
     onToggleShuffle: () -> Unit,
     onToggleLoopMode: () -> Unit,
@@ -169,7 +170,10 @@ fun SlidingQueueDrawer(
             val lazyListState = rememberLazyListState()
             val queueScope = rememberCoroutineScope()
             
-            val dragDropState = rememberDragDropState(lazyListState = lazyListState) { from, to ->
+            val dragDropState = rememberDragDropState(
+                lazyListState = lazyListState,
+                onDragFinished = onReorderFinished
+            ) { from, to ->
                 onReorderQueue(from, to)
             }
 
@@ -294,7 +298,17 @@ fun SlidingQueueDrawer(
 
                         Box(
                             modifier = Modifier
-                                .then(if (isDragging) Modifier else Modifier.animateItem())
+                                .then(
+                                    if (isDragging) Modifier
+                                    else Modifier.animateItem(
+                                        fadeInSpec = null,
+                                        fadeOutSpec = null,
+                                        placementSpec = spring(
+                                            dampingRatio = Spring.DampingRatioNoBouncy,
+                                            stiffness = Spring.StiffnessMediumLow
+                                        )
+                                    )
+                                )
                                 .zIndex(if (isDragging) 1f else 0f)
                                 .graphicsLayer {
                                     translationY = displacement
