@@ -2024,7 +2024,11 @@ class PlayerSharedViewModel @Inject constructor(
 
     // ========== QUEUE MANAGEMENT ==========
 
-    fun reorderQueue(fromIndex: Int, toIndex: Int) {
+    fun reorderQueue(
+        fromIndex: Int,
+        toIndex: Int,
+        syncPlaybackService: Boolean = true
+    ) {
         val songs = _songList.value
         val newList = com.dsann.music.util.OrderUtils.move(songs, fromIndex, toIndex)
         if (newList === songs) return
@@ -2036,6 +2040,11 @@ class PlayerSharedViewModel @Inject constructor(
         )
         _songList.value = newList
         if (_repeatMode.value == REPEAT_ONCE) resetRepeatOnceCycleFromCurrent()
+        if (syncPlaybackService) audioService?.refreshNativeQueue()
+    }
+
+    /** Sync the final drag-reordered list to Media3 once the gesture has ended. */
+    fun syncQueueWithPlaybackService() {
         audioService?.refreshNativeQueue()
     }
 

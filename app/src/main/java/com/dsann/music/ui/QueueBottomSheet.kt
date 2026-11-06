@@ -16,6 +16,10 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -164,8 +168,13 @@ fun QueueBottomSheetContent(
     val displayedSongs = songList
 
     val lazyListState = rememberLazyListState()
-    val dragDropState = rememberDragDropState(lazyListState = lazyListState) { from, to ->
-        viewModel.reorderQueue(from, to)
+    val dragDropState = rememberDragDropState(
+        lazyListState = lazyListState,
+        onDragFinished = { viewModel.syncQueueWithPlaybackService() }
+    ) { from, to ->
+        // Keep Media3's native queue untouched while the finger is moving. Rebuilding
+        // its preloaded next item on every crossed row makes the target row flash.
+        viewModel.reorderQueue(from, to, syncPlaybackService = false)
     }
 
     // Auto-scroll to currently playing track on initial load
@@ -286,7 +295,17 @@ fun QueueBottomSheetContent(
 
                                 Box(
                                     modifier = Modifier
-                                        .then(if (isDragging) Modifier else Modifier.animateItem())
+                                        .then(
+                                            if (isDragging) Modifier
+                                            else Modifier.animateItem(
+                                                fadeInSpec = null,
+                                                fadeOutSpec = null,
+                                                placementSpec = spring(
+                                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                                    stiffness = Spring.StiffnessMediumLow
+                                                )
+                                            )
+                                        )
                                         .zIndex(if (isDragging) 1f else 0f)
                                         .graphicsLayer {
                                             translationY = displacement
@@ -415,7 +434,17 @@ fun QueueBottomSheetContent(
 
                                     Box(
                                         modifier = Modifier
-                                            .then(if (isDragging) Modifier else Modifier.animateItem())
+                                            .then(
+                                            if (isDragging) Modifier
+                                            else Modifier.animateItem(
+                                                fadeInSpec = null,
+                                                fadeOutSpec = null,
+                                                placementSpec = spring(
+                                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                                    stiffness = Spring.StiffnessMediumLow
+                                                )
+                                            )
+                                        )
                                             .zIndex(if (isDragging) 1f else 0f)
                                             .graphicsLayer {
                                                 translationY = displacement
@@ -468,24 +497,92 @@ fun QueueListItem(
     val latestIndex = rememberUpdatedState(index)
     val latestSwipeRemove = rememberUpdatedState(onSwipeRemove)
     val swipeThresholdPx = with(LocalDensity.current) { 88.dp.toPx() }
+    val swipeOffset = remember(song.id) { Animatable(0f) }
+    var swipeDragOffset by remember(song.id) { mutableFloatStateOf(0f) }
+    val swipeAnimationScope = rememberCoroutineScope()
     val taperedDividersEnabled = rememberTaperedSongDividersEnabled()
 
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                val distance = abs(swipeOffset.value + swipeDragOffset)
+                translationX = swipeOffset.value + swipeDragOffset
+                // A small fade and compression make the row feel like it is leaving,
+                // while the horizontal translation remains the primary dismissal cue.
+                val fade = (distance / (swipeThresholdPx * 3f)).coerceIn(0f, 0.65f)
+                alpha = 1f - fade
+                scaleY = 1f - fade * 0.06f
+            }
             .pointerInput(song.id, swipeThresholdPx) {
+                val dismissalWidthPx = size.width.toFloat().coerceAtLeast(swipeThresholdPx)
                 var horizontalTravel = 0f
+                var dismissing = false
                 detectHorizontalDragGestures(
-                    onDragStart = { horizontalTravel = 0f },
+                    onDragStart = {
+                        horizontalTravel = 0f
+                        if (!dismissing) swipeDragOffset = 0f
+                    },
                     onHorizontalDrag = { change, dragAmount ->
-                        horizontalTravel += dragAmount
-                        change.consume()
+                        if (!dismissing) {
+                            horizontalTravel += dragAmount
+                            change.consume()
+                            swipeDragOffset = (swipeDragOffset + dragAmount).coerceIn(
+                                -dismissalWidthPx,
+                                dismissalWidthPx
+                            )
+                        }
                     },
                     onDragEnd = {
-                        if (abs(horizontalTravel) >= swipeThresholdPx) latestSwipeRemove.value()
+                        val releasedOffset = swipeDragOffset
+                        when {
+                            !dismissing && abs(horizontalTravel) >= swipeThresholdPx -> {
+                                dismissing = true
+                                val direction = if (horizontalTravel < 0f) -1f else 1f
+                                val targetOffset = direction * (dismissalWidthPx + swipeThresholdPx)
+                                swipeAnimationScope.launch {
+                                    swipeOffset.snapTo(releasedOffset)
+                                    swipeDragOffset = 0f
+                                    swipeOffset.animateTo(
+                                        targetOffset,
+                                        animationSpec = tween(durationMillis = 190)
+                                    )
+                                    latestSwipeRemove.value()
+                                }
+                            }
+                            !dismissing -> {
+                                swipeAnimationScope.launch {
+                                    swipeOffset.snapTo(releasedOffset)
+                                    swipeDragOffset = 0f
+                                    swipeOffset.animateTo(
+                                        0f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioNoBouncy,
+                                            stiffness = Spring.StiffnessMedium
+                                        )
+                                    )
+                                }
+                            }
+                        }
                         horizontalTravel = 0f
                     },
-                    onDragCancel = { horizontalTravel = 0f }
+                    onDragCancel = {
+                        horizontalTravel = 0f
+                        if (!dismissing) {
+                            val releasedOffset = swipeDragOffset
+                            swipeAnimationScope.launch {
+                                swipeOffset.snapTo(releasedOffset)
+                                swipeDragOffset = 0f
+                                swipeOffset.animateTo(
+                                    0f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    )
+                                )
+                            }
+                        }
+                    }
                 )
             }
             .clip(shapes.shape)
@@ -636,9 +733,11 @@ class DragDropState(
     private val scope: CoroutineScope,
     private val frameTimeNanos: State<Long>,
     private val onFrameLoopActiveChanged: (Boolean) -> Unit,
+    private val onDragFinished: () -> Unit,
     private val onMove: (Int, Int) -> Unit
 ) {
     var draggedDistance by mutableFloatStateOf(0f)
+    private var queueChangedDuringDrag = false
     var initiallyDraggedElement by mutableStateOf<LazyListItemInfo?>(null)
     var currentIndexOfDraggedItem by mutableStateOf<Int?>(null)
     private var autoScrollJob: Job? = null
@@ -657,6 +756,7 @@ class DragDropState(
 
     fun onDragStart(offset: Offset) {
         stopAutoScroll()
+        queueChangedDuringDrag = false
         pendingMoveTargetIndex = null
         draggedDistance = 0f
         initiallyDraggedElement = null
@@ -672,6 +772,7 @@ class DragDropState(
     /** Start from the exact LazyColumn row that owns the drag handle. */
     fun onDragStartAtIndex(index: Int) {
         stopAutoScroll()
+        queueChangedDuringDrag = false
         pendingMoveTargetIndex = null
         draggedDistance = 0f
         val item = lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
@@ -680,11 +781,16 @@ class DragDropState(
     }
 
     fun onDragInterrupted() {
+        val shouldSyncQueue = queueChangedDuringDrag
+        queueChangedDuringDrag = false
         initiallyDraggedElement = null
         currentIndexOfDraggedItem = null
         pendingMoveTargetIndex = null
         draggedDistance = 0f
         stopAutoScroll()
+        // The list has been reordered in Compose already. Rebuild Media3's native
+        // next-item preload only once after the user releases the drag handle.
+        if (shouldSyncQueue) onDragFinished()
     }
 
     /**
@@ -708,6 +814,7 @@ class DragDropState(
             kotlin.math.abs((item.offset + item.size / 2f) - currentCenter)
         } ?: return
         if (targetItem.index != fromIndex) {
+            queueChangedDuringDrag = true
             pendingMoveTargetIndex = targetItem.index
             onMove(fromIndex, targetItem.index)
         }
@@ -785,20 +892,22 @@ class DragDropState(
 @Composable
 fun rememberDragDropState(
     lazyListState: LazyListState,
+    onDragFinished: () -> Unit = {},
     onMove: (Int, Int) -> Unit
 ): DragDropState {
     val scope = rememberCoroutineScope()
     val frameClockActive = remember(lazyListState) { mutableStateOf(false) }
     val frameTimeNanos = rememberAppAnimationFrameTimeNanos(active = frameClockActive.value)
-    // Keep the active move callback fresh while preserving drag state across recompositions.
-    // Capturing onMove inside remember(lazyListState) can retain an obsolete callback.
+    // Keep callbacks fresh while preserving drag state across recompositions.
     val currentOnMove = rememberUpdatedState(onMove)
+    val currentOnDragFinished = rememberUpdatedState(onDragFinished)
     return remember(lazyListState, frameTimeNanos) {
         DragDropState(
             lazyListState,
             scope,
             frameTimeNanos,
-            { active -> frameClockActive.value = active }
+            { active -> frameClockActive.value = active },
+            { currentOnDragFinished.value() }
         ) { from, to ->
             currentOnMove.value(from, to)
         }
