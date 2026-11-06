@@ -552,7 +552,32 @@ fun LocalMusicScreen(viewModel: PlayerSharedViewModel) {
             localQueue = visibleSongsInView,
             selectedSongIndex = visibleSongsInView.indexOfFirst { it.id == selectedSong.id },
             playerSharedViewModel = viewModel,
-            onDismissRequest = { selectedLocalSongForMenu = null }
+            onDismissRequest = { selectedLocalSongForMenu = null },
+            onDeleteSong = { localSong ->
+                scope.launch {
+                    val deleted = withContext(Dispatchers.IO) {
+                        val rowsDeleted = runCatching {
+                            context.contentResolver.delete(localSong.contentUri, null, null)
+                        }.getOrDefault(0)
+                        if (rowsDeleted > 0) {
+                            true
+                        } else {
+                            val rawPath = (localSong.path ?: localSong.data).orEmpty()
+                            if (rawPath.isBlank()) {
+                                false
+                            } else {
+                                val file = java.io.File(rawPath)
+                                !file.exists() || file.delete()
+                            }
+                        }
+                    }
+                    scanLocalFiles(context, viewModel)
+                    com.dsann.music.ui.SnackbarController.showMessage(
+                        if (deleted) "Deleted: ${localSong.title}"
+                        else "Could not delete ${localSong.title}. The file may require storage permission."
+                    )
+                }
+            }
         )
     }
 }
