@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Widget Specific Colors - Fallbacks -->
-    <color name="widget_background">#1D1B20</color> <!-- Surface Container High Dark -->
-    <color name="widget_on_background">#E6E1E5</color>
+    <color name="widget_background">#202A3B</color>
+    <color name="widget_surface_start">#354660</color>
+    <color name="widget_surface_end">#141D2C</color>
+    <color name="widget_outline">#657A9A</color>
+    <color name="widget_on_background">#F4F6FB</color>
+    <color name="widget_accent_default">#91B1FF</color>
+    <color name="widget_progress_track">#4DFFFFFF</color>
 </resources>

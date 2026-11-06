@@ -2,172 +2,202 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_background">
+    android:background="@drawable/widget_background"
+    android:clipToOutline="true">
 
-    <!-- The "Aura" background - blurred album art -->
     <ImageView
         android:id="@+id/widget_aura"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:alpha="0.4"
+        android:alpha="0.34"
         android:background="@drawable/widget_background"
         android:clipToOutline="true"
         android:scaleType="centerCrop"
         android:visibility="visible" />
 
-    <!-- Album Art - Enlarged -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/widget_scrim" />
+
+    <ImageView
+        android:layout_width="25dp"
+        android:layout_height="25dp"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="8dp"
+        android:alpha="0.92"
+        android:contentDescription="D.S Music"
+        android:src="@drawable/ic_launcher_foreground" />
+
     <ImageView
         android:id="@+id/widget_album_art"
-        android:layout_width="100dp"
-        android:layout_height="100dp"
+        android:layout_width="86dp"
+        android:layout_height="86dp"
         android:layout_alignParentStart="true"
         android:layout_centerVertical="true"
-        android:layout_margin="12dp"
+        android:layout_marginStart="12dp"
         android:background="@drawable/shape_album_art_round"
         android:clipToOutline="true"
         android:scaleType="centerCrop"
         android:src="@drawable/default_album_art" />
 
-    <!-- ViewFlipper for Player Mode vs Lyrics Mode -->
     <ViewFlipper
         android:id="@+id/widget_flipper"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_centerVertical="true"
         android:layout_toEndOf="@id/widget_album_art"
-        android:layout_marginEnd="16dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="48dp"
         android:autoStart="false">
 
-        
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center"
-            android:orientation="vertical">
+            android:gravity="center_vertical"
+            android:orientation="vertical"
+            android:paddingVertical="2dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="NOW PLAYING"
+                android:textColor="#BFD0EE"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.12"
+                android:includeFontPadding="false" />
 
             <TextView
                 android:id="@+id/widget_song_title"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
                 android:ellipsize="end"
+                android:gravity="start"
                 android:maxLines="1"
                 android:text="Song Title"
-                android:textColor="@color/white"
-                android:textSize="19sp"
+                android:textColor="@color/widget_on_background"
+                android:textSize="17sp"
                 android:textStyle="bold"
-                android:gravity="center" />
+                android:includeFontPadding="false" />
 
             <TextView
                 android:id="@+id/widget_artist_name"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:alpha="0.8"
+                android:layout_marginTop="3dp"
+                android:alpha="0.82"
                 android:ellipsize="end"
+                android:gravity="start"
                 android:maxLines="1"
                 android:text="Artist Name"
-                android:textColor="@color/white"
-                android:textSize="15sp"
-                android:gravity="center" />
+                android:textColor="@color/widget_on_background"
+                android:textSize="12sp"
+                android:includeFontPadding="false" />
 
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:gravity="center"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <ImageButton
                     android:id="@+id/widget_prev"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:background="@android:color/transparent"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@drawable/widget_control_background"
+                    android:contentDescription="Previous"
+                    android:padding="9dp"
                     android:scaleType="fitCenter"
                     android:src="@drawable/ic_skip_previous" />
 
                 <ImageButton
                     android:id="@+id/widget_play_pause"
-                    android:layout_width="60dp"
-                    android:layout_height="60dp"
-                    android:layout_marginStart="12dp"
-                    android:layout_marginEnd="12dp"
-                    android:background="@android:color/transparent"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/widget_control_background"
+                    android:contentDescription="Play or Pause"
+                    android:padding="10dp"
                     android:scaleType="fitCenter"
                     android:src="@drawable/ic_play" />
 
                 <ImageButton
                     android:id="@+id/widget_next"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:background="@android:color/transparent"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@drawable/widget_control_background"
+                    android:contentDescription="Next"
+                    android:padding="9dp"
                     android:scaleType="fitCenter"
                     android:src="@drawable/ic_skip_next" />
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Slide 2: Lyrics Section -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center"
-            android:orientation="vertical">
+            android:gravity="center_vertical"
+            android:orientation="vertical"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="LIVE LYRICS"
+                android:textColor="#BFD0EE"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.12"
+                android:includeFontPadding="false" />
 
             <TextView
                 android:id="@+id/widget_lyrics_text"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:ellipsize="end"
+                android:fontFamily="sans"
+                android:gravity="start|center_vertical"
+                android:includeFontPadding="false"
+                android:lineSpacingExtra="2dp"
+                android:maxLines="3"
                 android:text="..."
-                android:textColor="@color/white"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:alpha="0.7"
-                android:maxLines="4"
-                android:gravity="start"
-                android:layout_marginStart="8dp"
-                android:layout_marginEnd="8dp" />
+                android:textColor="@color/widget_on_background"
+                android:textSize="19sp"
+                android:textStyle="bold" />
         </LinearLayout>
-
     </ViewFlipper>
 
-    <!-- Waveform Progress -->
     <ProgressBar
         android:id="@+id/widget_progress"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="4dp"
+        android:layout_height="3dp"
         android:layout_alignParentBottom="true"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
         android:layout_marginBottom="8dp"
-        android:progress="30"
+        android:progress="0"
         android:progressDrawable="@drawable/widget_progress_bar" />
 
-    <!-- OVERLAYS (Logo and Toggle) - Placed at the end to be on TOP of the Z-order -->
-    
-    <!-- App Logo Top Left -->
-    <ImageView
-        android:layout_width="30dp"
-        android:layout_height="30dp"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentStart="true"
-        android:layout_marginTop="4dp"
-        android:layout_marginStart="12dp"
-        android:src="@drawable/ic_launcher_foreground"
-        android:alpha="0.9"
-        android:contentDescription="D.S Music logo" />
-
-    <!-- Lyrics Toggle Top Right - Moved to TOP Z-order to prevent clicks being intercepted -->
     <ImageButton
         android:id="@+id/widget_toggle_lyrics"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:layout_alignParentTop="true"
         android:layout_alignParentEnd="true"
-        android:layout_marginTop="0dp"
-        android:layout_marginEnd="0dp"
-        android:background="@android:color/transparent"
-        android:src="@drawable/ic_lyrics"
+        android:layout_marginTop="7dp"
+        android:layout_marginEnd="8dp"
+        android:background="@drawable/widget_control_background"
+        android:contentDescription="Toggle lyrics"
+        android:padding="10dp"
         android:scaleType="centerInside"
-        android:padding="16dp"
-        android:alpha="1.0" />
-
+        android:src="@drawable/ic_lyrics" />
 </RelativeLayout>
