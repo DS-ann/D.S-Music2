@@ -160,7 +160,7 @@ internal fun SyncedLyricsCompose(
     val isKaraokeMode = remember(lyrics) {
         lyrics.any { !it.isInterlude && it.isWordByWord && it.words.isNotEmpty() }
     }
-    // The UI's neutral timing value is 0 ms; karaoke playback uses a fixed +50 ms
+    // The UI's neutral timing value is 0 ms; karaoke playback uses a fixed +20 ms
     // internal baseline so this compensation is invisible in the adjustment controls.
     val timedPositionProvider: () -> Int = remember(currentPositionProvider, isKaraokeMode) {
         if (isKaraokeMode) {

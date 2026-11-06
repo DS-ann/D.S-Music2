@@ -1060,13 +1060,13 @@ fun PlayerBottomSheetCompose(
                 }
             }
         }
-        // The dark mini-player capsule should sit deeper in the theme than the full player.
-        // Light mode keeps the artwork-tinted surface bright and clean.
+        // Dark mode uses the midpoint between the current light (0.88) and dark (0.10) values.
+        // Light mode retains its existing bright artwork-tinted surface.
         val miniPlayerBackgroundColor = remember(dynamicBgColor, isDark) {
             if (isDark) {
                 val hsl = FloatArray(3)
                 androidx.core.graphics.ColorUtils.colorToHSL(dynamicBgColor.toArgb(), hsl)
-                hsl[2] = hsl[2].coerceAtMost(0.10f)
+                hsl[2] = 0.49f
                 Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
             } else {
                 val hsl = FloatArray(3)
