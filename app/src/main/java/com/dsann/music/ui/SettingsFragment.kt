@@ -58,6 +58,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -4581,81 +4582,189 @@ private fun AboutScreen(
     Scaffold(
         topBar = { SettingsDetailTopBar("About") { navController.popBackStack() } }
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 120.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(paddingValues),
+            contentAlignment = Alignment.TopCenter
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Icon(
-                painter = painterResource(R.drawable.ic_launcher_art),
-                contentDescription = null,
-                tint = androidx.compose.ui.graphics.Color.Unspecified,
-                modifier = Modifier.size(120.dp)
-            )
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Text(
-                text = stringResource(R.string.app_name),
-                style = DsmusicTheme.typography.displaySmall,
-                color = DsmusicTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp
-            )
-            
-            // Version Pills
-            Row(
-                modifier = Modifier.padding(top = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 620.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 12.dp, bottom = 124.dp),
+                verticalArrangement = Arrangement.spacedBy(22.dp)
             ) {
-                DsmusicSurface(
-                    shape = CircleShape,
-                    color = DsmusicTheme.colorScheme.surfaceContainerHigh
-                ) {
+                AboutBrandCard()
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = BuildConfig.VERSION_NAME,
-                        style = DsmusicTheme.typography.labelMedium,
+                        "UPDATES & RELEASES",
+                        style = DsmusicTheme.typography.labelLarge,
+                        color = DsmusicTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
-                        color = DsmusicTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        letterSpacing = 1.1.sp
+                    )
+                    Text(
+                        "See what is new or check for the latest version.",
+                        style = DsmusicTheme.typography.bodySmall,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        DsmusicButton(
+                            onClick = onCheckUpdate,
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Icon(Icons.Rounded.Update, null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Updates", style = DsmusicTheme.typography.labelLarge)
+                        }
+                        DsmusicOutlinedButton(
+                            onClick = onWhatsNew,
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Icon(Icons.Rounded.Info, null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("What's New", style = DsmusicTheme.typography.labelLarge)
+                        }
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "THE DEVELOPER",
+                        style = DsmusicTheme.typography.labelLarge,
+                        color = DsmusicTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.1.sp
+                    )
+                    CreditsCard(onOpenUrl)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AboutBrandCard() {
+    val shape = RoundedCornerShape(28.dp)
+    val primaryContainer = DsmusicTheme.colorScheme.primaryContainer
+    val secondaryContainer = DsmusicTheme.colorScheme.secondaryContainer
+    val contentColor = DsmusicTheme.colorScheme.onPrimaryContainer
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(primaryContainer, secondaryContainer)
+                )
+            )
+            .border(1.dp, DsmusicTheme.colorScheme.primary.copy(alpha = 0.22f), shape)
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 8.dp, end = 8.dp)
+                .size(112.dp)
+                .clip(CircleShape)
+                .background(contentColor.copy(alpha = 0.045f))
+        )
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(22.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(82.dp)
+                        .clip(RoundedCornerShape(23.dp))
+                        .background(DsmusicTheme.colorScheme.surface.copy(alpha = 0.82f))
+                        .border(
+                            1.dp,
+                            DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                            RoundedCornerShape(23.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_launcher_art),
+                        contentDescription = "D.S Music app icon",
+                        tint = Color.Unspecified,
+                        modifier = Modifier.size(70.dp)
+                    )
+                }
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "ABOUT THE APP",
+                        style = DsmusicTheme.typography.labelSmall,
+                        color = contentColor.copy(alpha = 0.76f),
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.2.sp
+                    )
+                    Spacer(Modifier.height(5.dp))
+                    Text(
+                        stringResource(R.string.app_name),
+                        style = DsmusicTheme.typography.headlineLarge,
+                        color = contentColor,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        "Explore, organise and play your music in one place.",
+                        style = DsmusicTheme.typography.bodySmall,
+                        color = contentColor.copy(alpha = 0.82f)
                     )
                 }
             }
-            
-            // Action Buttons
-            com.dsann.music.ui.theme.ButtonGroup(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 32.dp)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                DsmusicButton(
-                    onClick = onCheckUpdate,
-                    modifier = Modifier.weight(1f).height(48.dp)
+                DsmusicSurface(
+                    shape = CircleShape,
+                    color = contentColor.copy(alpha = 0.11f),
+                    contentColor = contentColor,
+                    showBorder = false
                 ) {
-                    Icon(Icons.Rounded.Update, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Updates", style = DsmusicTheme.typography.labelLarge)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Rounded.Info,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "VERSION ${BuildConfig.VERSION_NAME}",
+                            style = DsmusicTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = contentColor
+                        )
+                    }
                 }
-                DsmusicButton(
-                    onClick = onWhatsNew,
-                    modifier = Modifier.weight(1f).height(48.dp)
-                ) {
-                    Icon(Icons.Rounded.Info, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("What's New", style = DsmusicTheme.typography.labelLarge)
-                }
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "MADE FOR MUSIC",
+                    style = DsmusicTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                    color = contentColor.copy(alpha = 0.7f)
+                )
             }
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            // Credits Card
-            CreditsCard(onOpenUrl)
         }
     }
 }
@@ -5268,72 +5377,80 @@ private fun ImageCacheSizeRow(
 
 @Composable
 private fun CreditsCard(onOpenUrl: (String) -> Unit) {
-    Column {
-        DsmusicCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = DsmusicTheme.colorScheme.surfaceContainerLow
-            )
+    DsmusicCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = DsmusicTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .padding(32.dp)
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 coil.compose.AsyncImage(
                     model = "https://github.com/DS-ann.png",
                     contentDescription = "Debarghya Sannigrahi",
                     modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape),
+                        .size(66.dp)
+                        .clip(CircleShape)
+                        .border(
+                            1.dp,
+                            DsmusicTheme.colorScheme.outlineVariant,
+                            CircleShape
+                        ),
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop
                 )
-                
-                Text(
-                    text = "Debarghya Sannigrahi",
-                    style = DsmusicTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = DsmusicTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(top = 16.dp)
-                )
-                Text(
-                    text = "D.S Music Developer",
-                    style = DsmusicTheme.typography.bodyMedium,
-                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-                
-                Row(
-                    modifier = Modifier.padding(top = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    SocialIconButton(icon = R.drawable.ic_github, onClick = { onOpenUrl("https://github.com/DS-ann/D.S-Music2") })
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Debarghya Sannigrahi",
+                        style = DsmusicTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = DsmusicTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        "D.S Music Developer",
+                        style = DsmusicTheme.typography.bodySmall,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
                 }
+                Icon(
+                    painter = painterResource(R.drawable.ic_github),
+                    contentDescription = "GitHub",
+                    tint = DsmusicTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(25.dp)
+                )
+            }
+
+            DsmusicOutlinedButton(
+                onClick = { onOpenUrl("https://github.com/DS-ann/D.S-Music2") },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_github),
+                    contentDescription = null,
+                    modifier = Modifier.size(19.dp),
+                    tint = DsmusicTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.width(9.dp))
+                Text("View GitHub project", style = DsmusicTheme.typography.labelLarge)
+                Spacer(Modifier.weight(1f))
+                Icon(
+                    Icons.Rounded.OpenInNew,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = DsmusicTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
 }
-
-@Composable
-private fun SocialIconButton(icon: Int, onClick: () -> Unit) {
-    DsmusicIconButton(
-        onClick = onClick,
-        modifier = Modifier
-            .size(48.dp)
-            .border(1.dp, DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), CircleShape)
-    ) {
-        Icon(
-            painter = painterResource(id = icon),
-            contentDescription = null,
-            modifier = Modifier.size(24.dp),
-            tint = DsmusicTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-// SocialButton is replaced by ButtonGroup clickableItem
 
 // ── App Logo ────────────────────────────────────────────────────────────────
 
