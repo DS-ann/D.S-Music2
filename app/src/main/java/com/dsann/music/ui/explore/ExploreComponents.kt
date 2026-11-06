@@ -68,7 +68,7 @@ import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Radio
-import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.ThumbUp
 import androidx.compose.material.icons.rounded.ThumbUpOffAlt
@@ -303,7 +303,7 @@ fun HomeFeedSkeleton() {
 @Composable
 fun WelcomeGreetingBanner(
     userName: String?,
-    onReplayClick: (() -> Unit)? = null
+    onRecapClick: (() -> Unit)? = null
 ) {
     val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
     val greeting = remember(hour) {
@@ -344,13 +344,33 @@ fun WelcomeGreetingBanner(
                     color = DsmusicTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (onReplayClick != null) {
-                DsmusicIconButton(onClick = onReplayClick) {
+            if (onRecapClick != null) {
+                Row(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(DsmusicTheme.colorScheme.primaryContainer)
+                        .clickable(onClick = onRecapClick)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
                     Icon(
-                        imageVector = Icons.Rounded.Replay,
-                        contentDescription = "Replay",
-                        tint = DsmusicTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp)
+                        imageVector = Icons.Rounded.GraphicEq,
+                        contentDescription = null,
+                        tint = DsmusicTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(19.dp)
+                    )
+                    Text(
+                        text = "Listening Recap",
+                        style = DsmusicTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = DsmusicTheme.colorScheme.onPrimaryContainer
+                    )
+                    Icon(
+                        imageVector = Icons.Rounded.ChevronRight,
+                        contentDescription = null,
+                        tint = DsmusicTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
