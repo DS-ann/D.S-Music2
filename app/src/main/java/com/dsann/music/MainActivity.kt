@@ -286,8 +286,10 @@ class MainActivity : AppCompatActivity() {
                         val bottomNavHeightPx = with(density) { bottomNavHeight.toPx() }
                         val totalSlideDistPx = bottomNavHeightPx + navigationBarsHeightPx
 
-                        // Keep navigation anchored while the player expands and while content scrolls.
-                        val baseTargetTranslation = if (showBottomBar) 0f else totalSlideDistPx
+                        // The dock overlays the tab viewport. Hide it immediately while the
+                        // full player is opening so the dock never paints over the player surface.
+                        val baseTargetTranslation =
+                            if (showBottomBar && !isPlayerBackActive) 0f else totalSlideDistPx
 
                         val animatedBaseTranslationState = animateFloatAsState(
                             targetValue = baseTargetTranslation,
@@ -334,7 +336,10 @@ class MainActivity : AppCompatActivity() {
                                     // The player sheet is drawn above this dock and covers it in
                                     // fullscreen; stale expansion progress cannot hide it afterward.
                                     this.translationY = baseTranslation
-                                    this.alpha = if (baseTranslation >= totalSlideDistPx - 1f) 0f else 1f
+                                    this.alpha = if (
+                                        !showBottomBar || isPlayerBackActive ||
+                                        baseTranslation >= totalSlideDistPx - 1f
+                                    ) 0f else 1f
                                 }
                                 .height(navBarHeight + bottomPadding)
                                 .onGloballyPositioned { coordinates ->
@@ -469,54 +474,22 @@ class MainActivity : AppCompatActivity() {
 
                     val systemBottomInset = WindowInsets.navigationBars.asPaddingValues()
                         .calculateBottomPadding()
-                    // The portrait dock is overlaid on the page. Stop the page's opaque
-                    // background above the dock and system navigation inset so the area
-                    // outside the outlined dock stays transparent.
-                    val portraitDockHeight = if (dynamicNavStyle) {
-                        64.dp
-                    } else {
-                        when (navBarSize) {
-                            "Compact" -> 56.dp
-                            "Tall" -> 76.dp
-                            else -> 68.dp
-                        }
-                    }
-                    // Reserve the full portrait dock footprint, including the OS inset.
-                    // The dock itself still paints its own surface and outline.
-                    val baseTargetPadding = if (
-                        !useNavigationRail && !isLandscapeLayout && showBottomBar
-                    ) {
-                        portraitDockHeight + systemBottomInset
-                    } else {
-                        0.dp
-                    }
-
-                    val animatedBasePaddingState = animateDpAsState(
-                        targetValue = baseTargetPadding,
-                        animationSpec = if (isLegacyAndroid6) snap() else spring(
-                            dampingRatio = 0.85f,
-                            stiffness = Spring.StiffnessLow
-                        ),
-                        label = "BottomNavPadding"
-                    )
-
-                    // Final padding does not scale down during expansion to prevent massive Layout invalidation.
-                    // The player sheet covers the NavHost anyway, so keep the measured dock padding stable.
-                    val finalPadding = animatedBasePaddingState.value
+                    // Portrait phone tabs occupy the full viewport beneath the floating
+                    // mini-player and navigation dock. Their own scrollables already provide
+                    // trailing content space, so keep the visual layout behind both overlays.
+                    val finalPadding = 0.dp
                     val miniPlayerHeight = if (
                         configuration.screenWidthDp > configuration.screenHeightDp
                     ) MiniPlayerHeight * 0.8f else MiniPlayerHeight
-                    // Portrait's mini-player spans the full screen width, so reserve its
-                    // height from the scroll viewport to keep the final rows reachable.
-                    // In landscape the player is a centered half-width capsule: the left and
-                    // right portions of the bottom row remain visible and must keep rendering
-                    // the underlying tab content instead of becoming a full-width blank strip.
+                    // Keep the existing bottom scroll reserve for a portrait tablet rail.
+                    // On portrait phones, the mini-player is an overlay and the tab content
+                    // continues behind it instead of being shortened above the player.
                     val miniPlayerScrollReserve = if (
-                        !isLandscapeLayout &&
+                        useNavigationRail && !isLandscapeLayout &&
                             currentSong != null &&
                             currentRoute != null && currentRoute in rootTabRoutes
                     ) {
-                        miniPlayerHeight + if (useNavigationRail) 8.dp + systemBottomInset else 4.dp
+                        miniPlayerHeight + 8.dp + systemBottomInset
                     } else 0.dp
 
                     Box(
