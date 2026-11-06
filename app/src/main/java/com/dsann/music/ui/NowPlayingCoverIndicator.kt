@@ -182,7 +182,7 @@ fun NowPlayingCoverIndicator(
         Canvas(Modifier.fillMaxSize().padding(5.dp)) {
             val shortest = size.minDimension
             val center = Offset(size.width / 2f, size.height / 2f)
-            val motion = if (isMotionAllowed) phase else 0.32f
+            val motion = phase
             when (style) {
                 "Ring" -> {
                     val stroke = (shortest * 0.13f).coerceAtLeast(1.35f)
