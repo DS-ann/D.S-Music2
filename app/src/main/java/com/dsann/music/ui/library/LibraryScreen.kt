@@ -6,6 +6,8 @@ package com.dsann.music.ui.library
 
 import com.dsann.music.ui.rememberTaperedSongDividersEnabled
 import com.dsann.music.ui.taperedSongDivider
+import com.dsann.music.ui.NowPlayingCoverIndicator
+import com.dsann.music.ui.rememberNowPlayingCoverColor
 
 import com.dsann.music.ui.theme.DsmusicPageHeading
 import com.dsann.music.ui.LocalRootTabActive
@@ -1474,6 +1476,7 @@ fun SongListItem(
 ) {
     val context = LocalContext.current
     val artModel = remember(song.id, song.thumbnailUrl, song.albumId, song.path) { song.getAlbumArtUri() ?: R.drawable.ic_music_note }
+    val playingCoverColor = rememberNowPlayingCoverColor(artModel, isPlaying, artworkRequestSizePx.coerceAtMost(96))
     // The lazy list reuses rows while playback/favourite state changes. Keep the
     // immutable Coil request stable instead of rebuilding it during each row recompose.
     val artworkRequest = remember(context, artModel) {
@@ -1553,14 +1556,23 @@ fun SongListItem(
             }
             Spacer(Modifier.width(8.dp))
         }
-        AsyncImage(
-            model = artworkRequest,
-            contentDescription = "Album Art",
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(10.dp)),
-            contentScale = ContentScale.Crop
-        )
+        Box(modifier = Modifier.size(48.dp)) {
+            AsyncImage(
+                model = artworkRequest,
+                contentDescription = "Album Art",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(10.dp)),
+                contentScale = ContentScale.Crop
+            )
+            if (isPlaying) {
+                NowPlayingCoverIndicator(
+                    isPlaying = true,
+                    coverColor = playingCoverColor,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+        }
 
         Column(
             modifier = Modifier
@@ -1593,14 +1605,7 @@ fun SongListItem(
                 modifier = Modifier.padding(end = 7.dp).size(17.dp)
             )
         }
-        if (isPlaying) {
-            Icon(
-                imageVector = Icons.Rounded.PlayArrow,
-                contentDescription = "Now Playing",
-                tint = accent,
-                modifier = Modifier.size(21.dp)
-            )
-        }
+
     }
 }
 
