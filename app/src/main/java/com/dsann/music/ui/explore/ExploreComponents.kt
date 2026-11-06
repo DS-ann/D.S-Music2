@@ -1170,11 +1170,14 @@ fun HomeSectionRow(
             section.title.contains("speed dial", ignoreCase = true) -> {
                 val rows = section.items.take(9).chunked(3)
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     rows.forEach { rowItems ->
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Keep the three-column grid, but make each Speed Dial cover
+                        // 30% smaller in both dimensions and center the compact grid.
+                        Row(modifier = Modifier.fillMaxWidth(0.7f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             rowItems.forEach { item ->
                                 val title = when (item) {
                                     is SearchItem.Song -> item.song.title
