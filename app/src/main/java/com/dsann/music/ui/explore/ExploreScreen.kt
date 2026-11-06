@@ -1886,10 +1886,7 @@ fun ExploreScreen(
                                                                         ) {
                                                                             WelcomeGreetingBanner(
                                                                                 userName = userProfile?.name,
-                                                                                onReplayClick = if (
-                                                                                    !isSearchDestination &&
-                                                                                    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R
-                                                                                ) {
+                                                                                onReplayClick = if (!isSearchDestination) {
                                                                                     { showReplayScreen = true }
                                                                                 } else null
                                                                             )
