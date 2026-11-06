@@ -676,7 +676,14 @@ class MainActivity : AppCompatActivity() {
                                             durationMillis = pageTransitionDurationMillis,
                                             easing = androidx.compose.animation.core.FastOutSlowInEasing
                                         )
-                                    ) { width -> direction * width }
+                                    ) { width -> direction * width } +
+                                        androidx.compose.animation.fadeIn(
+                                            initialAlpha = 0.5f,
+                                            animationSpec = androidx.compose.animation.core.tween(
+                                                durationMillis = pageTransitionDurationMillis,
+                                                easing = androidx.compose.animation.core.FastOutSlowInEasing
+                                            )
+                                        )
                                 },
                                 exitTransition = {
                                     val initialRoute = initialState.destination.route.orEmpty()
@@ -696,7 +703,14 @@ class MainActivity : AppCompatActivity() {
                                             durationMillis = pageTransitionDurationMillis,
                                             easing = androidx.compose.animation.core.FastOutSlowInEasing
                                         )
-                                    ) { width -> -direction * width }
+                                    ) { width -> -direction * width } +
+                                        androidx.compose.animation.fadeOut(
+                                            targetAlpha = 0.5f,
+                                            animationSpec = androidx.compose.animation.core.tween(
+                                                durationMillis = pageTransitionDurationMillis,
+                                                easing = androidx.compose.animation.core.FastOutSlowInEasing
+                                            )
+                                        )
                                 },
                                 popEnterTransition = {
                                     val initialRoute = initialState.destination.route.orEmpty()
@@ -716,7 +730,14 @@ class MainActivity : AppCompatActivity() {
                                             durationMillis = pageTransitionDurationMillis,
                                             easing = androidx.compose.animation.core.FastOutSlowInEasing
                                         )
-                                    ) { width -> direction * width }
+                                    ) { width -> direction * width } +
+                                        androidx.compose.animation.fadeIn(
+                                            initialAlpha = 0.5f,
+                                            animationSpec = androidx.compose.animation.core.tween(
+                                                durationMillis = pageTransitionDurationMillis,
+                                                easing = androidx.compose.animation.core.FastOutSlowInEasing
+                                            )
+                                        )
                                 },
                                 popExitTransition = {
                                     val initialRoute = initialState.destination.route.orEmpty()
@@ -736,7 +757,14 @@ class MainActivity : AppCompatActivity() {
                                             durationMillis = pageTransitionDurationMillis,
                                             easing = androidx.compose.animation.core.FastOutSlowInEasing
                                         )
-                                    ) { width -> -direction * width }
+                                    ) { width -> -direction * width } +
+                                        androidx.compose.animation.fadeOut(
+                                            targetAlpha = 0.5f,
+                                            animationSpec = androidx.compose.animation.core.tween(
+                                                durationMillis = pageTransitionDurationMillis,
+                                                easing = androidx.compose.animation.core.FastOutSlowInEasing
+                                            )
+                                        )
                                 },
 
                             ) {
