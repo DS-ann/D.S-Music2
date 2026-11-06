@@ -98,6 +98,7 @@ import com.dsann.music.ui.SettingsViewModel
 import com.dsann.music.ui.explore.QueueSongActionsBottomSheet
 import com.dsann.music.R
 import com.dsann.music.data.lyrics.LyricLine
+import com.dsann.music.data.lyrics.LineSyncedLyricTimeline
 import com.dsann.music.data.lyrics.LyricsResult
 import com.dsann.music.model.SongItem
 import com.dsann.music.viewmodel.PlayerSharedViewModel
@@ -435,13 +436,11 @@ private fun PortraitSyncedLyricPreview(
     onLineBoundsChanged: (Rect?) -> Unit,
     onLineNeedsMoreSpace: () -> Unit
 ) {
-    val displayLines = remember(lyrics) {
-        lyrics.mapIndexedNotNull { index, line ->
-            if (line.isInterlude || line.content.isBlank()) null else index to line
-        }.sortedWith(
-            compareBy<Pair<Int, LyricLine>> { it.second.startTimeMs }
-                .thenBy { it.first }
-        ).map { it.second }
+    val displayTimeline = remember(lyrics) {
+        LineSyncedLyricTimeline.build(lyrics)
+    }
+    val displayLines = remember(displayTimeline) {
+        displayTimeline.map { it.line }
     }
     val isKaraokeLyrics = remember(displayLines) {
         displayLines.any { it.isWordByWord && it.words.isNotEmpty() }
@@ -461,35 +460,20 @@ private fun PortraitSyncedLyricPreview(
         ?: currentSong?.path?.takeIf { it.isNotBlank() }
         ?: currentSong?.id?.toString()
     val songDurationMs = currentSong?.duration?.takeIf { it > 0L }
-    // Precompute each line's switch boundary once. When the outgoing line has a
-    // known final word and there is a silent gap before the next line, transition at
-    // the midpoint of that gap. Plain line-synced LRC has no explicit line-end time,
-    // so it continues to use the next line's timestamp rather than inventing a gap.
-    val lineCompletionTimes = remember(displayLines) {
-        displayLines.mapIndexed { index, line ->
-            val lastWordEndMs = line.words
-                .maxOfOrNull { it.absoluteStartTimeMs + it.durationMs }
-                ?.takeIf { it > 0L }
-            val nextLineStartMs = displayLines.getOrNull(index + 1)?.startTimeMs
-            when {
-                nextLineStartMs == null -> lastWordEndMs ?: Long.MAX_VALUE
-                lastWordEndMs != null && nextLineStartMs > lastWordEndMs ->
-                    lastWordEndMs + (nextLineStartMs - lastWordEndMs) / 2L
-                lastWordEndMs != null -> lastWordEndMs
-                else -> nextLineStartMs
-            }
-        }
+    // Queue, widgets and portrait preview share this same first-word/last-word
+    // boundary calculation, so karaoke sources advance as whole synced lines.
+    val lineCompletionTimes = remember(displayTimeline) {
+        displayTimeline.map { it.completionTimeMs }
     }
-    val finalWordEndMs = remember(displayLines) {
-        displayLines.lastOrNull()?.words
-            ?.maxOfOrNull { it.absoluteStartTimeMs + it.durationMs }
-            ?.takeIf { it > 0L }
+    val finalWordEndMs = remember(displayTimeline) {
+        displayTimeline.lastOrNull()?.lastWordEndMs
     }
 
     val activeLineText by produceState<String?>(
         initialValue = null,
         songKey,
         displayLines,
+        displayTimeline,
         lineCompletionTimes,
         finalWordEndMs,
         songDurationMs,
@@ -510,7 +494,7 @@ private fun PortraitSyncedLyricPreview(
                 (songDurationMs != null && positionMs >= songDurationMs) ||
                     (finalWordEndMs != null && positionMs > finalWordEndMs + 1000L)
 
-            if (positionMs < displayLines.first().startTimeMs || hasPassedFinalLine) {
+            if (positionMs < displayTimeline.first().startTimeMs || hasPassedFinalLine) {
                 targetIndex = -1
             } else {
                 if (targetIndex < 0 || positionMs < previousPositionMs) {

@@ -98,7 +98,6 @@ import com.dsann.music.R
 import com.dsann.music.model.SongItem
 import com.dsann.music.data.lyrics.LineSyncedLyricTimeline
 import androidx.compose.runtime.produceState
-import androidx.compose.ui.draw.clip
 import kotlinx.coroutines.delay
 import com.dsann.music.ui.theme.DsmusicAppThemeFromPreferences
 import com.dsann.music.viewmodel.PlayerSharedViewModel
