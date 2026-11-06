@@ -52,6 +52,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.LocalPageTransitionDurationMillis
 import com.dsann.music.ui.theme.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -64,6 +65,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.ColorFilter
@@ -217,6 +219,9 @@ class MainActivity : AppCompatActivity() {
                 val dynamicNavStyle by navigationSettings.dynamicNavStyle.collectAsStateWithLifecycle()
                 val navBarStyle by navigationSettings.navBarStyle.collectAsStateWithLifecycle()
                 val navBarSize by navigationSettings.navBarSize.collectAsStateWithLifecycle()
+                val pageTransitionSpeed by navigationSettings.pageTransitionSpeed.collectAsStateWithLifecycle()
+                val pageTransitionDurationMillis = (300f / pageTransitionSpeed.coerceIn(0.5f, 1.5f))
+                    .toInt().coerceIn(200, 600)
                 // Read synchronously before building NavHost. An observeKey(default=false)
                 // subscription briefly routes returning users to Welcome before preferences load.
                 val hasSeenOnboarding = remember(prefs) {
@@ -225,6 +230,8 @@ class MainActivity : AppCompatActivity() {
 
                 val currentNavController = rememberNavController()
                 val rootTabRoutes = remember { setOf("explore", "search", "library", "local_music", "settings") }
+                val rootTabOrder = remember { listOf("explore", "search", "library", "local_music", "settings") }
+                val rootTabIndices = remember { rootTabOrder.withIndex().associate { it.value to it.index } }
                 val rootTabStateHolder = rememberSaveableStateHolder()
                 // Keep every visited root tab composed so returning to Library, Explore,
                 // or Settings does not rebuild the whole screen. CachedRootTabLifecycle suspends
@@ -362,6 +369,9 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 ) { paddingValues ->
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        LocalPageTransitionDurationMillis provides pageTransitionDurationMillis
+                    ) {
                     val navBackStackEntry by currentNavController.currentBackStackEntryAsState()
                     val currentDestination = navBackStackEntry?.destination
                     val currentRoute = currentDestination?.route
@@ -386,46 +396,50 @@ class MainActivity : AppCompatActivity() {
                         else -> null
                     }
 
-                    // Root tabs are retained for state restoration, but are swapped only
-                    // after the outgoing tab has fully faded to zero. This produces a true
-                    // 100% -> 0% -> 100% opacity hand-off instead of two tabs crossfading.
-                    // Start with no rendered root; the first resolved destination
-                    // is installed at zero opacity and then faded in.
+                    // Root tabs use sequential slides so their large content trees are
+                    // not animated concurrently on Android 6.
                     var renderedRootTab by remember { mutableStateOf<String?>(null) }
-                    val rootTabOpacity = remember {
-                        androidx.compose.animation.core.Animatable(1f)
-                    }
+                    var rootTabSlideDirection by remember { mutableStateOf(1f) }
+                    var rootTabSlidePhase by remember { mutableStateOf(0) } // 0 idle, 1 exit, 2 enter
+                    val rootTabSlideProgress = remember { androidx.compose.animation.core.Animatable(1f) }
                     LaunchedEffect(activeCachedRootTab) {
-                        if (activeCachedRootTab != null && activeCachedRootTab != renderedRootTab) {
-                            if (renderedRootTab != null) {
-                                rootTabOpacity.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = androidx.compose.animation.core.tween(
-                                        durationMillis = 48,
-                                        easing = androidx.compose.animation.core.LinearEasing
+                        val targetRoute = activeCachedRootTab
+                        if (targetRoute != null && targetRoute != renderedRootTab) {
+                            val outgoingRoute = renderedRootTab
+                            val outgoingIndex = outgoingRoute?.let { rootTabIndices[it] } ?: 0
+                            val incomingIndex = rootTabIndices[targetRoute] ?: outgoingIndex
+                            rootTabSlideDirection = if (incomingIndex >= outgoingIndex) 1f else -1f
+                            if (outgoingRoute == null) {
+                                renderedRootTab = targetRoute
+                                rootTabSlidePhase = 0
+                                rootTabSlideProgress.snapTo(1f)
+                            } else {
+                                rootTabSlidePhase = 1
+                                rootTabSlideProgress.snapTo(0f)
+                                rootTabSlideProgress.animateTo(
+                                    1f,
+                                    androidx.compose.animation.core.tween(
+                                        durationMillis = pageTransitionDurationMillis,
+                                        easing = androidx.compose.animation.core.FastOutSlowInEasing
                                     )
                                 )
-                            } else {
-                                // First app entry has no outgoing page to fade.
-                                rootTabOpacity.snapTo(0f)
-                            }
-
-                            if (isLegacyAndroid6) {
-                                // Keep only the outgoing tree alive until it reaches zero,
-                                // then replace it. Never compose two complete root pages
-                                // together on the low-memory API 23 path.
-                                visitedRootTabs.clear()
-                                visitedRootTabs.add(activeCachedRootTab)
-                            }
-                            renderedRootTab = activeCachedRootTab
-                            rootTabOpacity.snapTo(0f)
-                            rootTabOpacity.animateTo(
-                                targetValue = 1f,
-                                animationSpec = androidx.compose.animation.core.tween(
-                                    durationMillis = 48,
-                                    easing = androidx.compose.animation.core.LinearEasing
+                                if (isLegacyAndroid6) {
+                                    visitedRootTabs.clear()
+                                    visitedRootTabs.add(targetRoute)
+                                }
+                                renderedRootTab = targetRoute
+                                rootTabSlidePhase = 2
+                                rootTabSlideProgress.snapTo(0f)
+                                rootTabSlideProgress.animateTo(
+                                    1f,
+                                    androidx.compose.animation.core.tween(
+                                        durationMillis = pageTransitionDurationMillis,
+                                        easing = androidx.compose.animation.core.FastOutSlowInEasing
+                                    )
                                 )
-                            )
+                                rootTabSlidePhase = 0
+                                rootTabSlideProgress.snapTo(1f)
+                            }
                         }
                     }
 
@@ -517,6 +531,7 @@ class MainActivity : AppCompatActivity() {
                                 // Keep transparent page regions on the selected app palette;
                                 // this ends above the floating dock and does not paint its gutter.
                                 .background(DsmusicTheme.colorScheme.background)
+                                .clipToBounds()
                         ) {
                             // Only the active tab and the recent cache stay composed. On Android 6,
                             // old roots are evicted to reduce repeated layout, draw and memory work;
@@ -527,9 +542,14 @@ class MainActivity : AppCompatActivity() {
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .graphicsLayer {
-                                            alpha = if (tabIsActive) {
-                                                rootTabOpacity.value.coerceIn(0f, 1f)
-                                            } else 0f
+                                            alpha = if (tabIsActive) 1f else 0f
+                                            val progress = rootTabSlideProgress.value.coerceIn(0f, 1f)
+                                            val slideOffsetFraction = when (rootTabSlidePhase) {
+                                                1 -> -rootTabSlideDirection * progress
+                                                2 -> rootTabSlideDirection * (1f - progress)
+                                                else -> 0f
+                                            }
+                                            translationX = if (tabIsActive) slideOffsetFraction * size.width else 0f
                                         }
                                         .zIndex(if (tabIsActive) 1f else 0f)
                                         .pointerInput(tabIsActive) {
@@ -606,55 +626,90 @@ class MainActivity : AppCompatActivity() {
                                 }
                             }
 
-                            val routeIndices = remember {
-                                mapOf(
-                                    "explore" to 0,
-                                    "search" to 1,
-                                    "library" to 2,
-                                    "local_music" to 3,
-                                    "settings" to 4
-                                )
-                            }
-
                             NavHost(
                                 navController = currentNavController,
                                 startDestination = if (hasSeenOnboarding) "explore" else "onboarding",
                                 modifier = Modifier.fillMaxSize(),
-                                // Non-root destinations use the same sequential opacity
-                                // mapping as the cached root tabs: outgoing 1 -> 0, then incoming 0 -> 1.
+                                // Page pushes enter from the right; Back navigation enters from the left.
                                 enterTransition = {
-                                    androidx.compose.animation.fadeIn(
+                                    val initialRoute = initialState.destination.route.orEmpty()
+                                    val targetRoute = targetState.destination.route.orEmpty()
+                                    val initialIndex = rootTabIndices[initialRoute]
+                                    val targetIndex = rootTabIndices[targetRoute]
+                                    val direction = when {
+                                        initialIndex != null && targetIndex != null ->
+                                            if (targetIndex >= initialIndex) 1 else -1
+                                        initialRoute == "onboarding" -> 1
+                                        initialIndex != null -> 1
+                                        targetIndex != null -> -1
+                                        else -> 1
+                                    }
+                                    androidx.compose.animation.slideInHorizontally(
                                         animationSpec = androidx.compose.animation.core.tween(
-                                            durationMillis = 48,
-                                            delayMillis = 48,
-                                            easing = androidx.compose.animation.core.LinearEasing
+                                            durationMillis = pageTransitionDurationMillis,
+                                            easing = androidx.compose.animation.core.FastOutSlowInEasing
                                         )
-                                    )
+                                    ) { width -> direction * width }
                                 },
                                 exitTransition = {
-                                    androidx.compose.animation.fadeOut(
+                                    val initialRoute = initialState.destination.route.orEmpty()
+                                    val targetRoute = targetState.destination.route.orEmpty()
+                                    val initialIndex = rootTabIndices[initialRoute]
+                                    val targetIndex = rootTabIndices[targetRoute]
+                                    val direction = when {
+                                        initialIndex != null && targetIndex != null ->
+                                            if (targetIndex >= initialIndex) 1 else -1
+                                        initialRoute == "onboarding" -> 1
+                                        initialIndex != null -> 1
+                                        targetIndex != null -> -1
+                                        else -> 1
+                                    }
+                                    androidx.compose.animation.slideOutHorizontally(
                                         animationSpec = androidx.compose.animation.core.tween(
-                                            durationMillis = 48,
-                                            easing = androidx.compose.animation.core.LinearEasing
+                                            durationMillis = pageTransitionDurationMillis,
+                                            easing = androidx.compose.animation.core.FastOutSlowInEasing
                                         )
-                                    )
+                                    ) { width -> -direction * width }
                                 },
                                 popEnterTransition = {
-                                    androidx.compose.animation.fadeIn(
+                                    val initialRoute = initialState.destination.route.orEmpty()
+                                    val targetRoute = targetState.destination.route.orEmpty()
+                                    val initialIndex = rootTabIndices[initialRoute]
+                                    val targetIndex = rootTabIndices[targetRoute]
+                                    val direction = when {
+                                        initialIndex != null && targetIndex != null ->
+                                            if (targetIndex >= initialIndex) 1 else -1
+                                        initialRoute == "onboarding" -> 1
+                                        initialIndex != null -> 1
+                                        targetIndex != null -> -1
+                                        else -> 1
+                                    }
+                                    androidx.compose.animation.slideInHorizontally(
                                         animationSpec = androidx.compose.animation.core.tween(
-                                            durationMillis = 48,
-                                            delayMillis = 48,
-                                            easing = androidx.compose.animation.core.LinearEasing
+                                            durationMillis = pageTransitionDurationMillis,
+                                            easing = androidx.compose.animation.core.FastOutSlowInEasing
                                         )
-                                    )
+                                    ) { width -> direction * width }
                                 },
                                 popExitTransition = {
-                                    androidx.compose.animation.fadeOut(
+                                    val initialRoute = initialState.destination.route.orEmpty()
+                                    val targetRoute = targetState.destination.route.orEmpty()
+                                    val initialIndex = rootTabIndices[initialRoute]
+                                    val targetIndex = rootTabIndices[targetRoute]
+                                    val direction = when {
+                                        initialIndex != null && targetIndex != null ->
+                                            if (targetIndex >= initialIndex) 1 else -1
+                                        initialRoute == "onboarding" -> 1
+                                        initialIndex != null -> 1
+                                        targetIndex != null -> -1
+                                        else -> 1
+                                    }
+                                    androidx.compose.animation.slideOutHorizontally(
                                         animationSpec = androidx.compose.animation.core.tween(
-                                            durationMillis = 48,
-                                            easing = androidx.compose.animation.core.LinearEasing
+                                            durationMillis = pageTransitionDurationMillis,
+                                            easing = androidx.compose.animation.core.FastOutSlowInEasing
                                         )
-                                    )
+                                    ) { width -> -direction * width }
                                 },
 
                             ) {
@@ -848,6 +903,7 @@ class MainActivity : AppCompatActivity() {
                             }.fillMaxSize()
                         )
                         AudioFormatChoiceDialogHost()
+                    }
                     }
                 }
 

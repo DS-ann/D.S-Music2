@@ -101,6 +101,7 @@ import com.dsann.music.ui.theme.LinearProgressIndicator
 import com.dsann.music.ui.theme.ListItem
 import com.dsann.music.ui.theme.ListItemDefaults
 import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.LocalPageTransitionDurationMillis
 import com.dsann.music.ui.theme.RadioButton
 import com.dsann.music.ui.theme.Scaffold
 import com.dsann.music.ui.theme.Slider
@@ -628,13 +629,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private val _scrubberStyle = MutableStateFlow(
         prefs.getString("scrubber_style", "Waveform")
-            ?.let { if (it == "Wave") "Waveform" else it }
-            ?.takeIf { it in listOf("Hairline", "Bold", "Thumb", "Waveform") }
+            ?.let {
+                when (it) {
+                    "Wave" -> "Waveform"
+                    "Thumb" -> "Medium"
+                    else -> it
+                }
+            }
+            ?.takeIf { it in listOf("Hairline", "Bold", "Medium", "Waveform") }
             ?: "Waveform"
     )
     val scrubberStyle: StateFlow<String> = _scrubberStyle.asStateFlow()
     fun setScrubberStyle(value: String) {
-        val safe = value.takeIf { it in listOf("Hairline", "Bold", "Thumb", "Waveform") } ?: "Waveform"
+        val normalized = if (value == "Thumb") "Medium" else value
+        val safe = normalized.takeIf { it in listOf("Hairline", "Bold", "Medium", "Waveform") } ?: "Waveform"
         _scrubberStyle.value = safe
         prefs.edit { putString("scrubber_style", safe) }
     }
@@ -998,6 +1006,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _playerFrameRate = MutableStateFlow(AppAnimationFrameRateController.load(context))
     val playerFrameRate: StateFlow<Int> = _playerFrameRate.asStateFlow()
 
+    private val _pageTransitionSpeed = MutableStateFlow(
+        prefs.getFloat("page_transition_speed", 1f).coerceIn(0.5f, 1.5f)
+    )
+    val pageTransitionSpeed: StateFlow<Float> = _pageTransitionSpeed.asStateFlow()
+
+    fun setPageTransitionSpeed(value: Float) {
+        val safe = if (value.isFinite()) value.coerceIn(0.5f, 1.5f) else 1f
+        _pageTransitionSpeed.value = safe
+        prefs.edit { putFloat("page_transition_speed", safe) }
+    }
+
     fun setAudioQuality(quality: String) {
         val normalized = com.dsann.music.data.innertube.NewPipeStreamExtractor
             .normalizeAudioQuality(quality)
@@ -1292,9 +1311,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         _playerTitleScroll.value = prefs.getBoolean("player_title_scroll", true)
         _playerTimes.value = prefs.getString("player_times", "Both")
             ?.takeIf { it in listOf("Both", "Elapsed", "Time left", "None") } ?: "Both"
+        _pageTransitionSpeed.value = prefs.getFloat("page_transition_speed", 1f).coerceIn(0.5f, 1.5f)
         _scrubberStyle.value = prefs.getString("scrubber_style", "Waveform")
-            ?.let { if (it == "Wave") "Waveform" else it }
-            ?.takeIf { it in listOf("Hairline", "Bold", "Thumb", "Waveform") } ?: "Waveform"
+            ?.let {
+                when (it) {
+                    "Wave" -> "Waveform"
+                    "Thumb" -> "Medium"
+                    else -> it
+                }
+            }
+            ?.takeIf { it in listOf("Hairline", "Bold", "Medium", "Waveform") } ?: "Waveform"
         _scrubberColor.value = prefs.getString("scrubber_color", "Accent") ?: "Accent"
         _visualizerStyle.value = (prefs.getString("player_visualizer", "Off") ?: "Off")
             .let { if (it == "Ring") "Oval" else it }
@@ -1747,6 +1773,7 @@ fun SettingsScreenContent(
     val downloadAudioFormat by viewModel.downloadAudioFormat.collectAsStateWithLifecycle()
     val downloadBitrate by viewModel.downloadBitrate.collectAsStateWithLifecycle()
     val playerFrameRate by viewModel.playerFrameRate.collectAsStateWithLifecycle()
+    val pageTransitionSpeed by viewModel.pageTransitionSpeed.collectAsStateWithLifecycle()
     val pauseHistory by viewModel.pauseHistory.collectAsStateWithLifecycle()
     val downloadFolder by viewModel.downloadFolder.collectAsStateWithLifecycle()
     val songCacheMaxSize by viewModel.songCacheMaxSize.collectAsStateWithLifecycle()
@@ -1832,6 +1859,7 @@ fun SettingsScreenContent(
 
     LaunchedEffect(Unit) { viewModel.calculateCacheSize() }
 
+    val pageTransitionDurationMillis = LocalPageTransitionDurationMillis.current
     val navController = rememberNavController()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentSettingsRoute = currentBackStackEntry?.destination?.route
@@ -1866,40 +1894,38 @@ fun SettingsScreenContent(
     NavHost(
         navController = navController,
         startDestination = SettingsRoute.Main.route,
-        // Use the app-wide sequential opacity hand-off for nested Settings pages.
+        // Open settings sections with a right-to-left slide; Back reverses it.
         enterTransition = {
-            androidx.compose.animation.fadeIn(
+            androidx.compose.animation.slideInHorizontally(
                 androidx.compose.animation.core.tween(
-                    durationMillis = 48,
-                    delayMillis = 48,
-                    easing = androidx.compose.animation.core.LinearEasing
+                    durationMillis = pageTransitionDurationMillis,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
                 )
-            )
+            ) { it }
         },
         exitTransition = {
-            androidx.compose.animation.fadeOut(
+            androidx.compose.animation.slideOutHorizontally(
                 androidx.compose.animation.core.tween(
-                    durationMillis = 48,
-                    easing = androidx.compose.animation.core.LinearEasing
+                    durationMillis = pageTransitionDurationMillis,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
                 )
-            )
+            ) { -it }
         },
         popEnterTransition = {
-            androidx.compose.animation.fadeIn(
+            androidx.compose.animation.slideInHorizontally(
                 androidx.compose.animation.core.tween(
-                    durationMillis = 48,
-                    delayMillis = 48,
-                    easing = androidx.compose.animation.core.LinearEasing
+                    durationMillis = pageTransitionDurationMillis,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
                 )
-            )
+            ) { -it }
         },
         popExitTransition = {
-            androidx.compose.animation.fadeOut(
+            androidx.compose.animation.slideOutHorizontally(
                 androidx.compose.animation.core.tween(
-                    durationMillis = 48,
-                    easing = androidx.compose.animation.core.LinearEasing
+                    durationMillis = pageTransitionDurationMillis,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
                 )
-            )
+            ) { it }
         }
     ) {
         composable(SettingsRoute.Main.route) {
@@ -2108,6 +2134,8 @@ fun SettingsScreenContent(
                 onDownloadBitrateChange = { viewModel.setDownloadBitrate(it) },
                 playerFrameRate = playerFrameRate,
                 onPlayerFrameRateChange = { viewModel.setPlayerFrameRate(it) },
+                pageTransitionSpeed = pageTransitionSpeed,
+                onPageTransitionSpeedChange = { viewModel.setPageTransitionSpeed(it) },
             )
         }
         composable(SettingsRoute.About.route) {
@@ -3522,7 +3550,7 @@ private fun AppearanceScreen(
                         title = "Progress style",
                         description = "Choose how song progress looks: a thin line, thick line, marker or moving wave.",
                         selected = scrubberStyle,
-                        options = listOf("Hairline", "Bold", "Thumb", "Waveform"),
+                        options = listOf("Hairline", "Bold", "Medium", "Waveform"),
                         onSelected = onScrubberStyleChange
                     )
                 },
@@ -4495,6 +4523,8 @@ private fun PlaybackScreen(
     onDownloadBitrateChange: (String) -> Unit,
     playerFrameRate: Int,
     onPlayerFrameRateChange: (Int) -> Unit,
+    pageTransitionSpeed: Float,
+    onPageTransitionSpeedChange: (Float) -> Unit,
 ) {
     Scaffold(
         topBar = { SettingsDetailTopBar("Playback") { navController.popBackStack() } }
@@ -4546,6 +4576,42 @@ private fun PlaybackScreen(
                         )
                     }
                 )
+            })
+            SettingsGroupCard(listOf {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Page transition speed", style = DsmusicTheme.typography.bodyMedium)
+                            Text(
+                                "Control how quickly pages and tabs slide.",
+                                style = DsmusicTheme.typography.bodySmall,
+                                color = DsmusicTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            String.format(java.util.Locale.US, "%.2f×", pageTransitionSpeed),
+                            style = DsmusicTheme.typography.labelLarge,
+                            color = DsmusicTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Slider(
+                        value = pageTransitionSpeed,
+                        onValueChange = onPageTransitionSpeedChange,
+                        valueRange = 0.5f..1.5f,
+                        steps = 3,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    )
+                    Text(
+                        "0.5× is slower · 1.5× is faster",
+                        style = DsmusicTheme.typography.bodySmall,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             })
 
             

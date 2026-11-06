@@ -79,6 +79,8 @@ import com.dsann.music.ui.theme.IconButton
 import com.dsann.music.ui.theme.ListItem
 import com.dsann.music.ui.theme.ListItemDefaults
 import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.LocalPageTransitionDurationMillis
+import com.dsann.music.ui.theme.LocalPageTransitionDurationMillis
 import com.dsann.music.ui.theme.observeKey
 import com.dsann.music.ui.theme.OutlinedButton
 import com.dsann.music.ui.theme.Snackbar
@@ -106,6 +108,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -640,7 +644,7 @@ fun ExploreScreen(
     }
 
     val currentScreen =
-        remember(detailStack, isLoadingDetail, detailOfflineError, isAccountVisible, showCreditsForSong) {
+        remember(detailStack, isLoadingDetail, detailOfflineError, isAccountVisible, showCreditsForSong, showReplayScreen) {
             when {
                 detailOfflineError -> "offline"
                 isLoadingDetail -> "loading"
@@ -654,34 +658,42 @@ fun ExploreScreen(
                         DetailType.SECTION -> "section"
                     }
                 }
-
+                showReplayScreen -> "recap"
                 else -> "home"
             }
         }
 
-    // Swap heavy Explore pages only after the outgoing page reaches zero opacity.
-    // This preserves the requested 100% -> 0% -> 100% motion without composing two
-    // large LazyColumn trees at once on Android 6.
+    // Swap heavy Explore pages between sequential slides to avoid animating
+    // two large scrolling trees together on Android 6.
+    val pageTransitionDurationMillis = LocalPageTransitionDurationMillis.current
     var renderedScreen by remember { mutableStateOf(currentScreen) }
-    val screenOpacity = remember { androidx.compose.animation.core.Animatable(1f) }
+    var screenSlideDirection by remember { mutableStateOf(1f) }
+    var screenSlidePhase by remember { mutableStateOf(0) } // 0 idle, 1 exit, 2 enter
+    val screenSlideProgress = remember { androidx.compose.animation.core.Animatable(1f) }
     LaunchedEffect(currentScreen) {
         if (renderedScreen != currentScreen) {
-            screenOpacity.animateTo(
-                targetValue = 0f,
-                animationSpec = androidx.compose.animation.core.tween(
-                    durationMillis = 140,
-                    easing = androidx.compose.animation.core.LinearEasing
+            screenSlideDirection = if (currentScreen == "home" || currentScreen == "recap") -1f else 1f
+            screenSlidePhase = 1
+            screenSlideProgress.snapTo(0f)
+            screenSlideProgress.animateTo(
+                1f,
+                androidx.compose.animation.core.tween(
+                    durationMillis = pageTransitionDurationMillis,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
                 )
             )
             renderedScreen = currentScreen
-            screenOpacity.snapTo(0f)
-            screenOpacity.animateTo(
-                targetValue = 1f,
-                animationSpec = androidx.compose.animation.core.tween(
-                    durationMillis = 140,
-                    easing = androidx.compose.animation.core.LinearEasing
+            screenSlidePhase = 2
+            screenSlideProgress.snapTo(0f)
+            screenSlideProgress.animateTo(
+                1f,
+                androidx.compose.animation.core.tween(
+                    durationMillis = pageTransitionDurationMillis,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
                 )
             )
+            screenSlidePhase = 0
+            screenSlideProgress.snapTo(1f)
         }
     }
 
@@ -737,7 +749,7 @@ fun ExploreScreen(
     // Solid D.S Launcher surface: no animated mesh, blur, or parallax layer behind long lists.
     val backgroundColor = DsmusicTheme.colorScheme.background
 
-    Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
+    Box(modifier = Modifier.fillMaxSize().background(backgroundColor).clipToBounds()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -746,7 +758,7 @@ fun ExploreScreen(
             Box(modifier = Modifier.fillMaxSize().nestedScroll(nestedScrollConnection)) {
                 // Let artist/detail navigation from the full player replace Replay,
                 // then naturally return to Replay when the detail stack is closed.
-                if (showReplayScreen && currentScreen == "home") {
+                if (renderedScreen == "recap") {
                     RecapTabContent(
                         nestedScrollConnection = nestedScrollConnection,
                         viewModel = playerSharedViewModel,
@@ -780,7 +792,6 @@ fun ExploreScreen(
                             }
                         },
                         onArtistClick = { artistName ->
-                            showReplayScreen = false
                             viewModel.loadArtistByName(artistName)
                         }
                     )
@@ -792,7 +803,12 @@ fun ExploreScreen(
                         AnimatedContent(
                             targetState = renderedScreen,
                             modifier = Modifier.fillMaxSize().graphicsLayer {
-                                alpha = screenOpacity.value.coerceIn(0f, 1f)
+                                val progress = screenSlideProgress.value.coerceIn(0f, 1f)
+                                translationX = when (screenSlidePhase) {
+                                    1 -> -screenSlideDirection * progress * size.width
+                                    2 -> screenSlideDirection * (1f - progress) * size.width
+                                    else -> 0f
+                                }
                             },
                             // Page content changes only while fully transparent. Keeping the
                             // content transition itself immediate avoids a second active list

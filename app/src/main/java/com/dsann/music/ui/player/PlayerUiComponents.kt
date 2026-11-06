@@ -432,7 +432,7 @@ internal fun WavySliderWithLabels(
             thumbRadius = when (scrubberThumbStyle) {
                 "Dot", "Ring" -> 7.dp
                 "None" -> 2.dp
-                else -> if (scrubberStyle == "Thumb") 5.dp else 3.dp
+                else -> if (scrubberStyle == "Medium") 7.dp else 3.dp
             },
             thumbStyle = scrubberThumbStyle,
             waveAmplitudeWhenPlaying = if (waveEnabled) 6.dp else 0.dp,

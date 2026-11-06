@@ -115,6 +115,8 @@ import com.dsann.music.ui.theme.IconButton
 import com.dsann.music.ui.theme.ListItem
 import com.dsann.music.ui.theme.ListItemDefaults
 import com.dsann.music.ui.theme.DsmusicTheme
+import com.dsann.music.ui.theme.LocalPageTransitionDurationMillis
+import com.dsann.music.ui.theme.LocalPageTransitionDurationMillis
 import com.dsann.music.ui.theme.ModalBottomSheet
 import com.dsann.music.ui.theme.OutlinedButton
 import com.dsann.music.ui.theme.OutlinedTextField
@@ -141,6 +143,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -268,30 +272,41 @@ fun LibraryScreen(
         fragmentActivity?.let { ViewModelProvider(it)[ExploreViewModel::class.java] }
     }
 
-    // Library's local tabs are pages too: swap them only at zero opacity so the
-    // outgoing and incoming LazyColumn/grid trees are never animated together.
-    var renderedLibraryTab by rememberSaveable { mutableStateOf(activeTab) }
-    val libraryTabOpacity = remember {
-        androidx.compose.animation.core.Animatable(1f)
+    // Library subsections use the same configurable slide speed as app navigation.
+    val pageTransitionDurationMillis = LocalPageTransitionDurationMillis.current
+    val libraryTabOrder = remember {
+        listOf("Playlists", "Songs", "Albums", "Artists", "History", "Podcasts", "Downloaded songs", "Recap")
     }
+    var renderedLibraryTab by rememberSaveable { mutableStateOf(activeTab) }
+    var libraryTabSlideDirection by remember { mutableStateOf(1f) }
+    var libraryTabSlidePhase by remember { mutableStateOf(0) } // 0 idle, 1 exit, 2 enter
+    val libraryTabSlideProgress = remember { androidx.compose.animation.core.Animatable(1f) }
     LaunchedEffect(activeTab) {
         if (renderedLibraryTab != activeTab) {
-            libraryTabOpacity.animateTo(
-                targetValue = 0f,
-                animationSpec = androidx.compose.animation.core.tween(
-                    durationMillis = 140,
-                    easing = androidx.compose.animation.core.LinearEasing
+            val oldIndex = libraryTabOrder.indexOf(renderedLibraryTab).coerceAtLeast(0)
+            val newIndex = libraryTabOrder.indexOf(activeTab).takeIf { it >= 0 } ?: oldIndex + 1
+            libraryTabSlideDirection = if (newIndex >= oldIndex) 1f else -1f
+            libraryTabSlidePhase = 1
+            libraryTabSlideProgress.snapTo(0f)
+            libraryTabSlideProgress.animateTo(
+                1f,
+                androidx.compose.animation.core.tween(
+                    durationMillis = pageTransitionDurationMillis,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
                 )
             )
             renderedLibraryTab = activeTab
-            libraryTabOpacity.snapTo(0f)
-            libraryTabOpacity.animateTo(
-                targetValue = 1f,
-                animationSpec = androidx.compose.animation.core.tween(
-                    durationMillis = 140,
-                    easing = androidx.compose.animation.core.LinearEasing
+            libraryTabSlidePhase = 2
+            libraryTabSlideProgress.snapTo(0f)
+            libraryTabSlideProgress.animateTo(
+                1f,
+                androidx.compose.animation.core.tween(
+                    durationMillis = pageTransitionDurationMillis,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
                 )
             )
+            libraryTabSlidePhase = 0
+            libraryTabSlideProgress.snapTo(1f)
         }
     }
 
@@ -303,20 +318,19 @@ fun LibraryScreen(
     LaunchedEffect(libraryOverlayVisible) {
         if (libraryOverlayVisible) {
             libraryBaseOpacity.animateTo(
-                targetValue = 0f,
-                animationSpec = androidx.compose.animation.core.tween(
-                    durationMillis = 140,
-                    easing = androidx.compose.animation.core.LinearEasing
+                0f,
+                androidx.compose.animation.core.tween(
+                    durationMillis = pageTransitionDurationMillis,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
                 )
             )
         } else if (libraryBaseOpacity.value < 1f) {
-            // Let the overlay finish fading out before revealing the Library page.
-            kotlinx.coroutines.delay(140L)
+            kotlinx.coroutines.delay(pageTransitionDurationMillis.toLong())
             libraryBaseOpacity.animateTo(
-                targetValue = 1f,
-                animationSpec = androidx.compose.animation.core.tween(
-                    durationMillis = 140,
-                    easing = androidx.compose.animation.core.LinearEasing
+                1f,
+                androidx.compose.animation.core.tween(
+                    durationMillis = pageTransitionDurationMillis,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
                 )
             )
         }
@@ -638,9 +652,15 @@ fun LibraryScreen(
                     .fillMaxSize()
                     .then(if (hideLibraryChrome) Modifier.statusBarsPadding() else Modifier)
                     .nestedScroll(nestedScrollConnection)
+                    .clipToBounds()
                     .graphicsLayer {
-                        alpha = (libraryTabOpacity.value * libraryBaseOpacity.value)
-                            .coerceIn(0f, 1f)
+                        alpha = libraryBaseOpacity.value.coerceIn(0f, 1f)
+                        val progress = libraryTabSlideProgress.value.coerceIn(0f, 1f)
+                        translationX = when (libraryTabSlidePhase) {
+                            1 -> -libraryTabSlideDirection * progress * size.width
+                            2 -> libraryTabSlideDirection * (1f - progress) * size.width
+                            else -> 0f
+                        }
                     }
             ) {
                 when (renderedLibraryTab) {
@@ -1263,19 +1283,18 @@ itemsIndexed(
         // Overlay AccountScreen
         AnimatedVisibility(
             visible = showAccountScreen && accountViewModel != null,
-            enter = fadeIn(
+            enter = slideInHorizontally(
                 animationSpec = androidx.compose.animation.core.tween(
-                    durationMillis = 140,
-                    delayMillis = 140,
-                    easing = androidx.compose.animation.core.LinearEasing
+                    durationMillis = pageTransitionDurationMillis,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
                 )
-            ),
-            exit = fadeOut(
+            ) { it },
+            exit = slideOutHorizontally(
                 animationSpec = androidx.compose.animation.core.tween(
-                    durationMillis = 140,
-                    easing = androidx.compose.animation.core.LinearEasing
+                    durationMillis = pageTransitionDurationMillis,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
                 )
-            ),
+            ) { it },
             modifier = Modifier.fillMaxSize()
         ) {
             if (accountViewModel != null) {
@@ -1296,19 +1315,18 @@ itemsIndexed(
         // Overlay HistoryScreen
         AnimatedVisibility(
             visible = showHistoryScreen,
-            enter = fadeIn(
+            enter = slideInHorizontally(
                 animationSpec = androidx.compose.animation.core.tween(
-                    durationMillis = 140,
-                    delayMillis = 140,
-                    easing = androidx.compose.animation.core.LinearEasing
+                    durationMillis = pageTransitionDurationMillis,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
                 )
-            ),
-            exit = fadeOut(
+            ) { it },
+            exit = slideOutHorizontally(
                 animationSpec = androidx.compose.animation.core.tween(
-                    durationMillis = 140,
-                    easing = androidx.compose.animation.core.LinearEasing
+                    durationMillis = pageTransitionDurationMillis,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
                 )
-            ),
+            ) { it },
             modifier = Modifier.fillMaxSize()
         ) {
             HistoryScreen(
@@ -1437,8 +1455,20 @@ itemsIndexed(
         // Overlay SongCreditsScreen
         AnimatedVisibility(
             visible = showCreditsForSong != null,
-            enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
-            exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
+            enter = slideInHorizontally(
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = pageTransitionDurationMillis,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                ),
+                initialOffsetX = { it }
+            ),
+            exit = slideOutHorizontally(
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = pageTransitionDurationMillis,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                ),
+                targetOffsetX = { it }
+            ),
             modifier = Modifier.fillMaxSize()
         ) {
             showCreditsForSong?.let { song ->
