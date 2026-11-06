@@ -1932,7 +1932,8 @@ fun LocalSongActionsBottomSheet(
     playerSharedViewModel: PlayerSharedViewModel,
     onDismissRequest: () -> Unit,
     onDeleteSong: (SongItem) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showDeleteAction: Boolean = true
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -2063,7 +2064,7 @@ fun LocalSongActionsBottomSheet(
                     localSongMode = true,
                     showInfoAction = true,
                     onShowInfoAction = { showInfo = true },
-                    showStandaloneDelete = true
+                    showStandaloneDelete = showDeleteAction
                 )
             }
         }

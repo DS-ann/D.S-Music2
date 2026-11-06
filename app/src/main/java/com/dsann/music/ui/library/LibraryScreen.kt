@@ -184,7 +184,6 @@ import com.dsann.music.service.CachedMediaMetadata
 import com.dsann.music.util.SongDownloader
 import com.dsann.music.model.toSongItem
 import com.dsann.music.ui.YouTubeMusicPlaylistPickerDialog
-import com.dsann.music.ui.SongActionsBottomSheet
 import com.dsann.music.ui.explore.AccountScreen
 import com.dsann.music.ui.explore.OnlineSongBottomSheet
 import com.dsann.music.ui.explore.SongCreditsScreen
@@ -3386,9 +3385,14 @@ fun RecapTabContent(
     nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection,
     viewModel: PlayerSharedViewModel,
     onNavigateToExplore: () -> Unit,
-    onArtistClick: (String) -> Unit = {}
+    onArtistClick: (String) -> Unit = {},
+    localSongs: List<SongItem> = emptyList(),
+    onSongMenuClick: (SongItem) -> Unit = {}
 ) {
     val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        if (localSongs.isEmpty()) scanLocalFiles(context, viewModel)
+    }
     val events by viewModel.listeningHistoryEventsFlow.collectAsStateWithLifecycle(emptyList())
     val years = remember(events) {
         events.map { event ->
@@ -3438,7 +3442,15 @@ fun RecapTabContent(
                     id = id,
                     title = latest.title,
                     artist = latest.artist,
-                    thumbnailUrl = latest.thumbnailUrl,
+                    // History can store a downloaded audio path here. Keep only real remote
+                    // artwork URLs; local tracks resolve their embedded/MediaStore cover below.
+                    thumbnailUrl = rows.asSequence()
+                        .sortedByDescending { it.timestamp }
+                        .mapNotNull { it.thumbnailUrl?.takeIf { url ->
+                            url.startsWith("http://", ignoreCase = true) ||
+                                url.startsWith("https://", ignoreCase = true)
+                        } }
+                        .firstOrNull(),
                     totalMs = rows.sumOf { it.duration.coerceAtLeast(0L) },
                     sessions = rows.size,
                     lastTimestamp = rows.maxOfOrNull { it.timestamp } ?: latest.timestamp
@@ -3512,27 +3524,39 @@ fun RecapTabContent(
     }
 
     fun toSongItem(summary: ReplaySongSummary): SongItem {
+        // Online downloads retain their YouTube ID, while device tracks use the
+        // MediaStore ID. Resolve either form to the scanned SongItem to preserve
+        // its real file path, album ID, embedded cover and downloaded-source metadata.
+        val localSong = localSongs.firstOrNull {
+            !it.videoId.isNullOrBlank() && it.videoId == summary.id
+        } ?: summary.id.toLongOrNull()?.let { localId ->
+            localSongs.firstOrNull { it.id == localId }
+        }
+        if (localSong != null) {
+            return localSong.withPlaybackSource(
+                uri = localSong.contentUri,
+                cached = localSong.isCachedTrack,
+                downloaded = localSong.isDownloadedOffline
+            ).apply {
+                if (thumbnailUrl.isNullOrBlank()) {
+                    thumbnailUrl = summary.thumbnailUrl
+                }
+            }
+        }
+        val remoteArtwork = summary.thumbnailUrl?.takeIf {
+            it.startsWith("http://", ignoreCase = true) ||
+                it.startsWith("https://", ignoreCase = true)
+        }
         val localId = summary.id.toLongOrNull()
         return if (localId != null) {
             SongItem(
-                localId,
-                summary.title,
-                summary.artist,
-                -1L,
-                null,
-                summary.totalMs,
-                summary.lastTimestamp
-            ).apply {
-                thumbnailUrl = summary.thumbnailUrl
-            }
+                localId, summary.title, summary.artist, -1L, null,
+                summary.totalMs, summary.lastTimestamp
+            ).apply { thumbnailUrl = remoteArtwork }
         } else {
             SongItem.createOnlineSong(
-                videoId = summary.id,
-                title = summary.title,
-                artist = summary.artist,
-                streamUrl = null,
-                durationMs = summary.totalMs,
-                thumbnailUrl = summary.thumbnailUrl
+                videoId = summary.id, title = summary.title, artist = summary.artist,
+                streamUrl = null, durationMs = summary.totalMs, thumbnailUrl = remoteArtwork
             )
         }
     }
@@ -3842,13 +3866,45 @@ fun RecapTabContent(
                 )
             }
             itemsIndexed(topSongs, key = { _, item -> item.id }) { index, item ->
+                val replaySong = remember(item.id, localSongs) { toSongItem(item) }
+                val artworkCandidate = remember(replaySong.id, replaySong.thumbnailUrl, replaySong.path, replaySong.data, replaySong.contentUri) {
+                    replaySong.thumbnailUrl?.takeIf { candidate ->
+                        val uri = runCatching { android.net.Uri.parse(candidate) }.getOrNull()
+                        val scheme = uri?.scheme?.lowercase(java.util.Locale.ROOT)
+                        val uriPath = uri?.path
+                        val isImageSource = scheme in setOf("http", "https", "content", "android.resource") ||
+                            (scheme == "file" && uriPath != replaySong.path && uriPath != replaySong.data)
+                        isImageSource && candidate != replaySong.path && candidate != replaySong.data &&
+                            candidate != replaySong.contentUri.toString()
+                    }
+                }
+                // Downloaded history can contain the audio path instead of its artwork.
+                // Resolve embedded cover data off the main thread as a fallback.
+                val embeddedArtwork by produceState<ByteArray?>(
+                    initialValue = null, replaySong.id, replaySong.path, replaySong.data,
+                    replaySong.contentUri, artworkCandidate
+                ) {
+                    if (artworkCandidate == null) {
+                        value = withContext(Dispatchers.IO) { replaySong.getEmbeddedPicture(context) }
+                    }
+                }
+                val albumArtwork = replaySong.albumId.takeIf { it > 0L }?.let {
+                    "content://media/external/audio/albumart/$it"
+                }
+                val artworkModel: Any? = artworkCandidate ?: embeddedArtwork ?: albumArtwork
+
                 Row(
-                    modifier = Modifier.fillMaxWidth().clickable {
-                        val queue = topSongs.map { summary -> toSongItem(summary) }
-                        viewModel.setShuffleEnabled(false)
-                        viewModel.setSongList(queue)
-                        viewModel.playSongAtIndex(index)
-                    }.padding(horizontal = 16.dp, vertical = 5.dp),
+                    modifier = Modifier.fillMaxWidth()
+                        .combinedClickable(
+                            onClick = {
+                                val queue = topSongs.map { summary -> toSongItem(summary) }
+                                viewModel.setShuffleEnabled(false)
+                                viewModel.setSongList(queue)
+                                viewModel.playSongAtIndex(index)
+                            },
+                            onLongClick = { onSongMenuClick(replaySong) }
+                        )
+                        .padding(horizontal = 16.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -3859,9 +3915,9 @@ fun RecapTabContent(
                             else DsmusicTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.SemiBold
                     )
-                    if (!item.thumbnailUrl.isNullOrBlank()) {
+                    if (artworkModel != null) {
                         AsyncImage(
-                            model = libraryArtworkRequestBuilder(context, item.thumbnailUrl).crossfade(false).build(),
+                            model = artworkModel,
                             contentDescription = null,
                             modifier = Modifier.size(52.dp).clip(RoundedCornerShape(10.dp)),
                             contentScale = ContentScale.Crop
@@ -3880,77 +3936,12 @@ fun RecapTabContent(
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text((item.totalMs / 60_000L).toString() + " min", style = DsmusicTheme.typography.labelMedium)
-                        Text(
-                            item.sessions.toString() + " plays",
-                            style = DsmusicTheme.typography.labelSmall,
-                            color = DsmusicTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    DsmusicIconButton(
-                        onClick = { showReplaySongActions(context, toSongItem(item), viewModel) }
-                    ) {
-                        Icon(Icons.Rounded.MoreVert, contentDescription = "Song options")
+                        Text(item.sessions.toString() + " plays", style = DsmusicTheme.typography.labelSmall, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
         }
     }
-}
-
-private fun showReplaySongActions(
-    context: Context,
-    song: SongItem,
-    viewModel: PlayerSharedViewModel
-) {
-    val activity = getActivityFromContext(context) as? androidx.fragment.app.FragmentActivity ?: return
-    val fragmentManager = activity.supportFragmentManager
-    if (fragmentManager.isStateSaved) return
-
-    val tag = "ReplaySongActions-${song.id}"
-    if (fragmentManager.findFragmentByTag(tag) != null) return
-
-    val sheet = com.dsann.music.ui.SongActionsBottomSheet.newInstance(
-        song = song,
-        showAddToQueue = true,
-        showDelete = false
-    )
-    sheet.setActionListener(object : com.dsann.music.ui.SongActionsBottomSheet.ActionListener {
-        override fun onPlayNext(songItem: SongItem) {
-            viewModel.addToQueueNext(songItem)
-        }
-
-        override fun onAddToQueue(songItem: SongItem) {
-            viewModel.addToQueue(songItem)
-        }
-
-        override fun onDelete(songItem: SongItem) = Unit
-        override fun onEdit(songItem: SongItem) = Unit
-
-        override fun onPlay(songItem: SongItem) {
-            viewModel.playSong(songItem)
-        }
-
-        override fun onFavorite(songItem: SongItem, isFav: Boolean) {
-            com.dsann.music.util.FavoritesManager(context).setFavorite(songItem.id, isFav)
-        }
-
-        override fun onShare(songItem: SongItem) {
-            runCatching {
-                val target = songItem.videoId?.takeIf { it.isNotBlank() }
-                    ?.let { "https://music.youtube.com/watch?v=$it" }
-                    ?: songItem.contentUri.toString()
-                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(
-                        Intent.EXTRA_TEXT,
-                        "Listen to ${songItem.title} by ${songItem.artist}: $target"
-                    )
-                }
-                activity.startActivity(Intent.createChooser(shareIntent, "Share Song"))
-            }
-        }
-    })
-    sheet.show(fragmentManager, tag)
 }
 
 private fun accountViewModelRefreshReplay(context: Context) {

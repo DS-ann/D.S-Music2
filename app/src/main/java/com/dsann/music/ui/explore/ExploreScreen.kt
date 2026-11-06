@@ -223,6 +223,7 @@ fun ExploreScreen(
     val currentMood = uiState.currentMood
     val currentOnlineSong = uiState.currentOnlineSong
     val currentPlayerSong by playerSharedViewModel.currentSong.collectAsStateWithLifecycle()
+    val localSongs by playerSharedViewModel.localSongs.collectAsStateWithLifecycle(emptyList())
     val isPlaybackActive by playerSharedViewModel.isPlaying.collectAsStateWithLifecycle()
     val isPlayerLoading by playerSharedViewModel.isLoading.collectAsStateWithLifecycle()
     // Use the player-owned track for highlights, regardless of whether it came from
@@ -266,6 +267,7 @@ fun ExploreScreen(
     var showReplayScreen by rememberSaveable { mutableStateOf(false) }
     var showSearchGenreBrowser by rememberSaveable { mutableStateOf(false) }
     var selectedSongForMenu by remember { mutableStateOf<OnlineSong?>(null) }
+    var selectedReplayLocalSongForMenu by remember { mutableStateOf<SongItem?>(null) }
     var selectedCollectionForMenu by remember { mutableStateOf<SearchItem?>(null) }
     var selectedCollectionMenuSongs by remember { mutableStateOf<List<OnlineSong>?>(null) }
     var selectedCollectionMenuContinuation by remember { mutableStateOf<String?>(null) }
@@ -749,6 +751,34 @@ fun ExploreScreen(
                         nestedScrollConnection = nestedScrollConnection,
                         viewModel = playerSharedViewModel,
                         onNavigateToExplore = { showReplayScreen = false },
+                        localSongs = localSongs,
+                        onSongMenuClick = { replaySong ->
+                            val videoId = replaySong.videoId?.takeIf { it.isNotBlank() }
+                            if (videoId != null) {
+                                val localPath = replaySong.path ?: replaySong.data
+                                val artwork = replaySong.thumbnailUrl?.takeIf { candidate ->
+                                    val uri = runCatching { android.net.Uri.parse(candidate) }.getOrNull()
+                                    val scheme = uri?.scheme?.lowercase(java.util.Locale.ROOT)
+                                    val uriPath = uri?.path
+                                    (scheme in setOf("http", "https", "content", "android.resource") ||
+                                        (scheme == "file" && uriPath != localPath)) &&
+                                        candidate != replaySong.contentUri.toString() && candidate != localPath
+                                }
+                                selectedSongForMenu = OnlineSong(
+                                    videoId = videoId,
+                                    title = replaySong.title,
+                                    artist = replaySong.artist,
+                                    albumName = replaySong.albumName,
+                                    albumId = replaySong.albumId.takeIf { it > 0L }?.toString(),
+                                    artistId = replaySong.artistId,
+                                    durationMs = replaySong.duration,
+                                    thumbnailUrl = artwork,
+                                    artistRefs = replaySong.artistRefs.toList()
+                                )
+                            } else {
+                                selectedReplayLocalSongForMenu = replaySong
+                            }
+                        },
                         onArtistClick = { artistName ->
                             showReplayScreen = false
                             viewModel.loadArtistByName(artistName)
@@ -2108,6 +2138,18 @@ fun ExploreScreen(
 
                 // Song 3-Dot Menu Bottom Sheet (Premium Overhaul like YTM)
                 // Song 3-Dot Menu Bottom Sheet (Premium Overhaul like YTM)
+                selectedReplayLocalSongForMenu?.let { song ->
+                    LocalSongActionsBottomSheet(
+                        song = song,
+                        localQueue = listOf(song),
+                        selectedSongIndex = 0,
+                        playerSharedViewModel = playerSharedViewModel,
+                        onDismissRequest = { selectedReplayLocalSongForMenu = null },
+                        onDeleteSong = {},
+                        showDeleteAction = false
+                    )
+                }
+
                 selectedSongForMenu?.let { song ->
                     val isPinned = uiState.pinnedSpeedDialIds.contains(song.videoId)
                     OnlineSongBottomSheet(
