@@ -554,6 +554,10 @@ private fun PortraitSyncedLyricPreview(
             fontWeight = FontWeight.SemiBold,
             fontSize = baseFontSize.sp,
             lineHeight = (baseFontSize * 1.5f).sp,
+            lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
+                alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
+                trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.None
+            ),
             platformStyle = androidx.compose.ui.text.PlatformTextStyle(
                 includeFontPadding = false
             ),
@@ -1574,9 +1578,9 @@ fun FullPlayer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(titleToActionsSpacerWeight, fill = true)
-                        // Android 6 can measure the legacy-font lyric line a few pixels
-                        // taller than its weighted slot. Let it draw into the surrounding
-                        // spacer above the title; the fixed gap below keeps it clear of controls.
+                        // Keep the lyric inside its measured slot on every Android version.
+                        // If its preferred height does not fit, the parent reallocates space
+                        // before the preview reduces its font size.
                         .clipToBounds(),
                     contentAlignment = Alignment.Center
                 ) {
