@@ -240,9 +240,7 @@ fun LibraryScreen(
     var activeTab by rememberSaveable { mutableStateOf("Playlists") }
     LaunchedEffect(activeTab) {
         // Migrate removed destinations and hide Listening Recap on Android 10 and lower.
-        if (activeTab == "Device Files" ||
-            (activeTab == "Recap" && Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q)
-        ) {
+        if (activeTab == "Device Files" || activeTab == "Recap") {
             activeTab = "Playlists"
         }
     }
@@ -603,11 +601,7 @@ fun LibraryScreen(
                     "Artists" to "Artists",
                     "History" to "History",
                     "Podcasts" to "Podcasts"
-                ) + if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    listOf("Recap" to "Recap")
-                } else {
-                    emptyList()
-                }
+                )
 
                 Row(
                     modifier = Modifier
@@ -637,14 +631,6 @@ fun LibraryScreen(
                     }
                 }
 
-                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
-                    Text(
-                        text = "Recap is not supported on your version of Android.",
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 4.dp),
-                        style = DsmusicTheme.typography.bodySmall,
-                        color = DsmusicTheme.colorScheme.onSurfaceVariant
-                    )
-                }
 
                 }
 
@@ -3412,7 +3398,7 @@ private data class ReplayMonthSummary(
 )
 
 @Composable
-private fun RecapTabContent(
+fun RecapTabContent(
     nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection,
     viewModel: PlayerSharedViewModel,
     onNavigateToExplore: () -> Unit
@@ -3582,17 +3568,29 @@ private fun RecapTabContent(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item(key = "replay-header") {
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                Text(
-                    "Replay",
-                    style = DsmusicTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold
-                )
-                Text(
-                    "Your listening, recapped on this device",
-                    style = DsmusicTheme.typography.bodyMedium,
-                    color = DsmusicTheme.colorScheme.onSurfaceVariant
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                DsmusicIconButton(onClick = onNavigateToExplore) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = "Back to Explore"
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Replay",
+                        style = DsmusicTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        "Your listening, recapped on this device",
+                        style = DsmusicTheme.typography.bodyMedium,
+                        color = DsmusicTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
         item(key = "replay-periods") {
