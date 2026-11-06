@@ -228,9 +228,23 @@ class PlayerLyricsStateController(private val logTag: String) {
                 }.thenBy { it.confidence }
             )
 
-        // Keep quality priority: karaoke first, then line-synchronized, then plain text.
+        // Karaoke source priority is fixed: LyricsPlus first, KuGou second, Bini third.
+        // Other karaoke sources remain eligible after these three, with confidence as the tie-break.
+        fun preferKaraokeSource(items: List<LyricsResult>): LyricsResult? =
+            items.minWithOrNull(
+                compareBy<LyricsResult> {
+                    when {
+                        it.providerName.equals("LyricsPlus", ignoreCase = true) -> 0
+                        it.providerName.equals("KuGou", ignoreCase = true) -> 1
+                        it.providerName.equals("Bini", ignoreCase = true) -> 2
+                        else -> 3
+                    }
+                }.thenByDescending { it.confidence }
+            )
+
+        // Preserve the quality hierarchy: karaoke, then line-synchronized, then plain text.
         val karaokeCandidates = candidates.filter { it.isWordByWord }
-        if (karaokeCandidates.isNotEmpty()) return preferKugouWithinTier(karaokeCandidates)
+        if (karaokeCandidates.isNotEmpty()) return preferKaraokeSource(karaokeCandidates)
 
         val syncedCandidates = candidates.filter { it.isSynced }
         if (syncedCandidates.isNotEmpty()) return preferKugouWithinTier(syncedCandidates)
@@ -354,9 +368,27 @@ class PlayerLyricsStateController(private val logTag: String) {
                 } else {
                     val best = determineBestResult(currentMap)
                     if (best != null && best.hasLyrics()) {
-                        if (best.providerName.equals(DEFAULT_PROVIDER, ignoreCase = true)) {
-                            _selectedProvider.value = DEFAULT_PROVIDER
-                            clearInactiveProviderPayloads(currentMap, DEFAULT_PROVIDER)
+                        // Do not lock KuGou while LyricsPlus is still being checked.
+                        // Once the highest available karaoke source is confirmed, release
+                        // the inactive payloads to keep lyrics memory usage bounded.
+                        val confirmedKaraokeSource = when {
+                            best.isWordByWord &&
+                                best.providerName.equals("LyricsPlus", ignoreCase = true) ->
+                                "LyricsPlus"
+                            best.isWordByWord &&
+                                best.providerName.equals("KuGou", ignoreCase = true) &&
+                                currentMap.containsKey("LyricsPlus") ->
+                                "KuGou"
+                            best.isWordByWord &&
+                                best.providerName.equals("Bini", ignoreCase = true) &&
+                                currentMap.containsKey("LyricsPlus") &&
+                                currentMap.containsKey("KuGou") ->
+                                "Bini"
+                            else -> null
+                        }
+                        if (confirmedKaraokeSource != null) {
+                            _selectedProvider.value = confirmedKaraokeSource
+                            clearInactiveProviderPayloads(currentMap, confirmedKaraokeSource)
                             _providerResults.value = currentMap
                         }
                         _syncedLyrics.value = null

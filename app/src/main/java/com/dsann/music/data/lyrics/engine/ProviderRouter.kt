@@ -245,11 +245,18 @@ class ProviderRouter(
 
     private fun isBetterResult(newResult: LyricsResult, newConfidence: Float, current: LyricsResult): Boolean {
         val currentConfidence = current.confidence
-        
+
+        // When both results are karaoke, honour the requested source order before confidence.
+        if (newResult.isWordByWord && current.isWordByWord) {
+            val newRank = karaokeProviderRank(newResult.providerName)
+            val currentRank = karaokeProviderRank(current.providerName)
+            if (newRank != currentRank) return newRank < currentRank
+        }
+
         val isNewAppleMusic = newResult.providerName?.contains("Apple Music", ignoreCase = true) == true
         val isCurrentAppleMusic = current.providerName?.contains("Apple Music", ignoreCase = true) == true
 
-        // ✨ Apple Music Word-by-Word is the absolute gold standard
+        // Keep Apple Music's preference when no higher-ranked requested karaoke source is competing.
         if (isNewAppleMusic && newResult.isWordByWord) {
             return true
         }
@@ -257,7 +264,7 @@ class ProviderRouter(
             return false
         }
 
-        // Word-by-word always beats non-word-by-word
+        // Word-by-word always beats non-word-by-word.
         if (newResult.isWordByWord && !current.isWordByWord) {
             return true
         }
@@ -265,7 +272,7 @@ class ProviderRouter(
             return false
         }
 
-        // Synced beats unsynced
+        // Synced beats unsynced.
         if (newResult.isSynced && !current.isSynced) {
             return true
         }
@@ -273,8 +280,15 @@ class ProviderRouter(
             return currentConfidence < 0.45f && newConfidence > currentConfidence + 0.2f
         }
 
-        // Same tier: higher confidence wins
+        // Same tier: higher confidence wins.
         return newConfidence > currentConfidence
+    }
+
+    private fun karaokeProviderRank(providerName: String?): Int = when {
+        providerName.equals("LyricsPlus", ignoreCase = true) -> 0
+        providerName.equals("KuGou", ignoreCase = true) -> 1
+        providerName.equals("Bini", ignoreCase = true) -> 2
+        else -> 3
     }
 
     fun shutdown() {

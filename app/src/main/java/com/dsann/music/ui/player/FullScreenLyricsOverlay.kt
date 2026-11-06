@@ -603,13 +603,13 @@ private fun ProvidersSelector(
     // Provider order is static. Rank once per result-map update rather than once per row.
     val knownProviders = remember {
         listOf(
+            "LyricsPlus",
+            "KuGou",
+            "Bini",
             "Apple Music (Better Lyrics)",
             "Apple Music",
-            "Bini",
             "QQ Music",
             "NetEase Music",
-            "KuGou",
-            "LyricsPlus",
             "YouTube Music",
             "YouTube (Paxsenix)",
             "Spotify",
@@ -817,7 +817,7 @@ private fun getSegmentedShape(index: Int, count: Int): androidx.compose.ui.graph
 }
 
 
-/** Karaoke > line-synchronized > plain; prefer KuGou within a quality tier, then confidence. */
+/** Karaoke > line-synchronized > plain; karaoke priority is LyricsPlus, KuGou, then Bini. */
 private fun bestLyricsProviderResult(results: Collection<LyricsResult>): LyricsResult? =
     results.asSequence()
         .filter { it.hasLyrics() && it.confidence >= 0f }
@@ -829,6 +829,13 @@ private fun bestLyricsProviderResult(results: Collection<LyricsResult>): LyricsR
                     !it.isInstrumental && it.hasLyrics() -> 1
                     else -> 0
                 }
-            }.thenBy { it.providerName.equals("KuGou", ignoreCase = true) }
-                .thenBy { it.confidence }
+            }.thenBy {
+                when {
+                    it.isWordByWord && it.providerName.equals("LyricsPlus", ignoreCase = true) -> 3
+                    it.isWordByWord && it.providerName.equals("KuGou", ignoreCase = true) -> 2
+                    it.isWordByWord && it.providerName.equals("Bini", ignoreCase = true) -> 1
+                    !it.isWordByWord && it.providerName.equals("KuGou", ignoreCase = true) -> 1
+                    else -> 0
+                }
+            }.thenBy { it.confidence }
         )

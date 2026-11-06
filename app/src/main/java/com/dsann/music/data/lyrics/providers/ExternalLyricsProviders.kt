@@ -386,7 +386,7 @@ class BiniLyricsProvider(client: OkHttpClient) : LyricsProvider {
     private val http = lyricsHttp(client)
 
     override fun getName(): String = "Bini"
-    override fun getPriority(): Int = 4
+    override fun getPriority(): Int = 5
 
     override fun search(track: TrackMetadata): LyricsResult? {
         fun query(includeDuration: Boolean): HttpUrl =
