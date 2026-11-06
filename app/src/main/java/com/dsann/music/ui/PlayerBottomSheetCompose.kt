@@ -2347,7 +2347,15 @@ private fun MiniPlayerContentInternal(
         "Pill" -> RoundedCornerShape(percent = 50)
         else -> CircleShape
     }
-    val miniControlBackgroundColor = if (isDark) Color(0x1AFFFFFF) else Color(0x0D000000)
+    // Contrast palette: black controls on the light artwork tint, white controls on the dark tint.
+    val playerButtonColor = if (isDark) Color.White else Color.Black
+    // A shape of "None" has no filled control surface, so keep its glyphs on the title color.
+    val playerButtonContentColor = if (controlShapeName == "None") {
+        playerButtonColor
+    } else {
+        if (isDark) Color.Black else Color.White
+    }
+    val miniControlBackgroundColor = playerButtonColor
     val controlBackground: Modifier = if (controlShapeName == "None") {
         Modifier
     } else {
@@ -2374,8 +2382,9 @@ private fun MiniPlayerContentInternal(
         android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val artworkSize = if (compactLandscape) 48.dp else 60.dp
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
-    val contentColor = if (isDark) Color.White else Color(0xFF1C1B1F)
-    val contentSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1C1B1F).copy(alpha = 0.6f)
+    // Keep the song title on the same color as the filled transport buttons.
+    val contentColor = playerButtonColor
+    val contentSecondary = contentColor.copy(alpha = 0.6f)
     Row(
         modifier = modifier
             .fillMaxSize()
@@ -2468,20 +2477,20 @@ private fun MiniPlayerContentInternal(
                     Icon(
                         painter = painterResource(R.drawable.ic_skip_previous),
                         contentDescription = "Previous",
-                        tint = contentColor,
+                        tint = playerButtonContentColor,
                         modifier = Modifier.size(24.dp)
                     )
                 } else if (controlIconSet == "Seek") {
                     MiniPlayerSeekGlyph(
                         isForward = false,
-                        tint = contentColor,
+                        tint = playerButtonContentColor,
                         modifier = Modifier.size(26.dp)
                     )
                 } else {
                     Icon(
                         imageVector = Icons.Rounded.ChevronLeft,
                         contentDescription = "Previous",
-                        tint = contentColor,
+                        tint = playerButtonContentColor,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -2504,7 +2513,7 @@ private fun MiniPlayerContentInternal(
                     Icon(
                         painter = painterResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play),
                         contentDescription = "Play/Pause",
-                        tint = contentColor,
+                        tint = playerButtonContentColor,
                         modifier = Modifier.size(20.dp)
                     )
                 } else if (controlIconSet == "Seek") {
@@ -2514,7 +2523,7 @@ private fun MiniPlayerContentInternal(
                     ) {
                         androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
                             drawCircle(
-                                color = contentColor,
+                                color = playerButtonContentColor,
                                 style = androidx.compose.ui.graphics.drawscope.Stroke(
                                     width = 1.8.dp.toPx()
                                 )
@@ -2523,7 +2532,7 @@ private fun MiniPlayerContentInternal(
                         Icon(
                             imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                             contentDescription = "Play/Pause",
-                            tint = contentColor,
+                            tint = playerButtonContentColor,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -2531,7 +2540,7 @@ private fun MiniPlayerContentInternal(
                     Icon(
                         imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                         contentDescription = "Play/Pause",
-                        tint = contentColor,
+                        tint = playerButtonContentColor,
                         modifier = Modifier.size(23.dp)
                     )
                 }
@@ -2545,20 +2554,20 @@ private fun MiniPlayerContentInternal(
                     Icon(
                         painter = painterResource(R.drawable.ic_skip_next),
                         contentDescription = "Next",
-                        tint = contentColor,
+                        tint = playerButtonContentColor,
                         modifier = Modifier.size(24.dp)
                     )
                 } else if (controlIconSet == "Seek") {
                     MiniPlayerSeekGlyph(
                         isForward = true,
-                        tint = contentColor,
+                        tint = playerButtonContentColor,
                         modifier = Modifier.size(26.dp)
                     )
                 } else {
                     Icon(
                         imageVector = Icons.Rounded.ChevronRight,
                         contentDescription = "Next",
-                        tint = contentColor,
+                        tint = playerButtonContentColor,
                         modifier = Modifier.size(24.dp)
                     )
                 }
