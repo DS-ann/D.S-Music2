@@ -180,6 +180,7 @@ fun QueueBottomSheetContent(
         // its preloaded next item on every crossed row makes the target row flash.
         viewModel.reorderQueue(from, to, syncPlaybackService = false)
     }
+    ClearRecentDraggedItemAnimationSkip(dragDropState)
 
     // Auto-scroll to currently playing track on initial load
     LaunchedEffect(currentSongIndex) {
@@ -305,7 +306,7 @@ fun QueueBottomSheetContent(
                                 Box(
                                     modifier = Modifier
                                         .then(
-                                            if (dragDropState.isDragging) Modifier
+                                            if (dragDropState.isDragging || dragDropState.recentlyDraggedItemKey == song.id) Modifier
                                             else Modifier.animateItem(
                                                 fadeInSpec = null,
                                                 fadeOutSpec = null,
@@ -449,7 +450,7 @@ fun QueueBottomSheetContent(
                                     Box(
                                         modifier = Modifier
                                             .then(
-                                            if (dragDropState.isDragging) Modifier
+                                            if (dragDropState.isDragging || dragDropState.recentlyDraggedItemKey == song.id) Modifier
                                             else Modifier.animateItem(
                                                 fadeInSpec = null,
                                                 fadeOutSpec = null,
@@ -847,6 +848,8 @@ class DragDropState(
     private var queueChangedDuringDrag = false
     private var pointerY = 0f
     private var pendingMoveTargetIndex: Int? = null
+    var recentlyDraggedItemKey: Any? by mutableStateOf(null)
+        private set
     private var autoScrollDirection = 0f
     private var autoScrollIntensity = 0f
     private var autoScrollJob: Job? = null
@@ -894,6 +897,7 @@ class DragDropState(
 
     fun onDragInterrupted() {
         val shouldSyncQueue = queueChangedDuringDrag
+        recentlyDraggedItemKey = initiallyDraggedElement?.key.takeIf { shouldSyncQueue }
         queueChangedDuringDrag = false
         stopAutoScroll()
         initiallyDraggedElement = null
@@ -911,6 +915,10 @@ class DragDropState(
      * A pending move is acknowledged only when LazyColumn reports the dragged
      * song at its new stable-key index.
      */
+    fun clearRecentlyDraggedItemKey(key: Any?) {
+        if (recentlyDraggedItemKey == key) recentlyDraggedItemKey = null
+    }
+
     private fun moveDraggedItemToPointer() {
         val anchor = initiallyDraggedElement ?: return
         val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
@@ -1023,6 +1031,18 @@ class DragDropState(
         autoScrollIntensity = 0f
         autoScrollJob?.cancel()
         autoScrollJob = null
+    }
+}
+
+@Composable
+internal fun ClearRecentDraggedItemAnimationSkip(dragDropState: DragDropState) {
+    val recentlyDraggedKey = dragDropState.recentlyDraggedItemKey
+    LaunchedEffect(dragDropState, recentlyDraggedKey) {
+        val key = recentlyDraggedKey ?: return@LaunchedEffect
+        // Let the released row snap directly to its final slot for one composed frame.
+        // Re-enabling animateItem before that frame can replay its old (pre-drag) position.
+        withFrameNanos { _ -> Unit }
+        dragDropState.clearRecentlyDraggedItemKey(key)
     }
 }
 

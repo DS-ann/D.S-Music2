@@ -178,6 +178,7 @@ fun SlidingQueueDrawer(
             ) { from, to ->
                 onReorderQueue(from, to)
             }
+            ClearRecentDraggedItemAnimationSkip(dragDropState)
 
             // Scroll active track into view on first open
             LaunchedEffect(isQueueExpanded) {
@@ -306,7 +307,7 @@ fun SlidingQueueDrawer(
                         Box(
                             modifier = Modifier
                                 .then(
-                                    if (dragDropState.isDragging) Modifier
+                                    if (dragDropState.isDragging || dragDropState.recentlyDraggedItemKey == song.id) Modifier
                                     else Modifier.animateItem(
                                         fadeInSpec = null,
                                         fadeOutSpec = null,
