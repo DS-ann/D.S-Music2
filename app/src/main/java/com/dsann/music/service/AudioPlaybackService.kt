@@ -725,8 +725,7 @@ class AudioPlaybackService : MediaSessionService() {
             }
             val frameBucket = if (intervalNanos > 0L) frameTimeNanos / intervalNanos else frameTimeNanos
             if (intervalNanos == 0L || frameBucket != lastUiFrameBucket) {
-                val positionMs = player.currentPosition
-                    .coerceAtLeast(0L)
+                val positionMs = getStablePlaybackPositionMs()
                     .coerceAtMost(Int.MAX_VALUE.toLong())
                     .toInt()
                 viewModel?.setCurrentPosition(positionMs)
@@ -767,6 +766,12 @@ class AudioPlaybackService : MediaSessionService() {
     private var lastTelemetryUpdateAtMs: Long = 0L
     private var shouldAutoPlay = false
     private var pendingSeekPos: Long = -1
+
+    // Media3 can briefly report 0 while a remote stream buffers, recovers, or swaps
+    // audio/video sources. Keep the last valid head for the selected song until an
+    // explicit seek or a real song change establishes a new position.
+    private var stablePositionTrackKey: String? = null
+    private var stablePlaybackPositionMs: Long = 0L
     
     // Instant cancellation of stale stream resolutions — prevents race conditions on rapid clicks.
     private var resolveJob: Job? = null
@@ -817,7 +822,7 @@ class AudioPlaybackService : MediaSessionService() {
             // Publish the pause/resume anchor immediately. While playing, the service then
             // publishes position snapshots using the same selected frame rate as Compose.
             viewModel?.setCurrentPosition(
-                player.currentPosition.coerceAtLeast(0L)
+                getStablePlaybackPositionMs()
                     .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             )
             telemetryManager.onPlaybackStateChanged(isPlaying)
@@ -825,7 +830,7 @@ class AudioPlaybackService : MediaSessionService() {
                 handler.removeCallbacks(progressUpdateRunnable)
                 handler.post(progressUpdateRunnable)
                 startProgressFrameUpdates()
-                scheduleNextWidgetLyricRefresh(player.currentPosition.coerceAtLeast(0L))
+                scheduleNextWidgetLyricRefresh(getStablePlaybackPositionMs())
             } else {
                 cancelWidgetLyricRefresh()
                 handler.removeCallbacks(progressUpdateRunnable)
@@ -870,6 +875,7 @@ class AudioPlaybackService : MediaSessionService() {
                     }
                     val targetPosition = duration?.let { requestedPosition.coerceAtMost((it - 1L).coerceAtLeast(0L)) }
                         ?: requestedPosition
+                    rememberPlaybackPosition(targetPosition)
                     player.seekTo(targetPosition)
                     pendingSeekPos = -1
                 }
@@ -894,7 +900,7 @@ class AudioPlaybackService : MediaSessionService() {
             val videoId = song?.videoId?.takeIf { it.isNotBlank() }
 
             if (viewModel?.isVideoMode?.value == true && !videoId.isNullOrBlank()) {
-                val videoPosition = player.currentPosition.coerceAtLeast(0L)
+                val videoPosition = getStablePlaybackPositionMs()
                 viewModel?.setVideoModeState(false)
                 viewModel?.setLoading(true)
                 Log.w(TAG, "Video decoder/stream failed for $videoId; restoring audio-only playback", error)
@@ -919,7 +925,7 @@ class AudioPlaybackService : MediaSessionService() {
                     com.dsann.music.ui.SnackbarController.showMessage("Trying a more compatible audio stream…")
                 }
 
-                val resumePosition = player.currentPosition.coerceAtLeast(0L)
+                val resumePosition = getStablePlaybackPositionMs()
                 handler.postDelayed({
                     if (viewModel?.currentSong?.value?.videoId == videoId) {
                         // Invalidate both application-level and NewPipe URL/player caches before
@@ -954,13 +960,21 @@ class AudioPlaybackService : MediaSessionService() {
             newPosition: Player.PositionInfo,
             reason: Int
         ) {
+            val newPositionMs = newPosition.positionMs.coerceAtLeast(0L)
+            val positionSnapshot = if (reason == Player.DISCONTINUITY_REASON_SEEK) {
+                // An explicit seek is authoritative, including a seek back to 0:00.
+                rememberPlaybackPosition(newPositionMs)
+                newPositionMs
+            } else {
+                getStablePlaybackPositionMs()
+            }
             viewModel?.setCurrentPosition(
-                newPosition.positionMs.coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                positionSnapshot.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             )
             if (isWidgetLyricsPageActive()) {
                 // Paused seeks do not run the playback progress loop. Update the widget
                 // immediately so its displayed line follows the seek just like the player.
-                val seekPosition = newPosition.positionMs.coerceAtLeast(0L)
+                val seekPosition = positionSnapshot
                 handler.post {
                     updateWidgetProgress(seekPosition, player.duration.coerceAtLeast(0L))
                     scheduleNextWidgetLyricRefresh(seekPosition)
@@ -1034,6 +1048,12 @@ class AudioPlaybackService : MediaSessionService() {
                     }
                 }
             }
+            // Synchronize after the ViewModel has accepted any media-item transition.
+            // The helper resets only when the selected song ID changes, not for an
+            // audio/video source replacement of the same song.
+            viewModel?.setCurrentPosition(
+                getStablePlaybackPositionMs().coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            )
             // A user-selected track can replace the current item without changing the
             // playing/paused state, so onIsPlayingChanged is not guaranteed to run.
             cancelCurrentTrackCache()
@@ -1138,6 +1158,7 @@ class AudioPlaybackService : MediaSessionService() {
                 }
                 pendingSeekToPosition?.let { position ->
                     pendingSeekToPosition = null
+                    rememberPlaybackPosition(position)
                     player.seekTo(position)
                 }
 
@@ -1211,7 +1232,7 @@ class AudioPlaybackService : MediaSessionService() {
         if (DsmusicWidgetProvider.hasAnyWidgets(applicationContext) && isPlayerInitialized) {
             // MediaSessionService stops itself when a paused task is removed. Persist the
             // selected song, queue and exact playback head before that normal teardown.
-            val position = player.currentPosition.coerceAtLeast(0L)
+            val position = getStablePlaybackPositionMs()
             viewModel?.setCurrentPosition(
                 position.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             )
@@ -1708,6 +1729,7 @@ class AudioPlaybackService : MediaSessionService() {
                                     pendingSeekPos = position
                                     // If player already started playing from 0, seek it now
                                     if (player.playbackState == Player.STATE_READY) {
+                                        rememberPlaybackPosition(position)
                                         player.seekTo(position)
                                         pendingSeekPos = -1
                                     }
@@ -2148,14 +2170,14 @@ class AudioPlaybackService : MediaSessionService() {
         val activeSong = viewModel?.currentSong?.value
         val failedVideoId = failedStreamVideoId
         if (!failedVideoId.isNullOrBlank() && activeSong?.videoId == failedVideoId) {
-            loadAndPlay("innertube://$failedVideoId".toUri(), player.currentPosition.coerceAtLeast(0L))
+            loadAndPlay("innertube://$failedVideoId".toUri(), getStablePlaybackPositionMs())
             return
         }
 
         if (player.playerError != null) {
             val retryUri = viewModel?.songUri?.value ?: originalSourceUri ?: currentSourceUri
             if (retryUri != null) {
-                loadAndPlay(retryUri, player.currentPosition.coerceAtLeast(0L))
+                loadAndPlay(retryUri, getStablePlaybackPositionMs())
                 return
             }
         }
@@ -2229,8 +2251,10 @@ class AudioPlaybackService : MediaSessionService() {
     fun seekTo(position: Int) {
         if (!isPlayerInitialized) {
             pendingSeekToPosition = position.toLong()
+            rememberPlaybackPosition(position.toLong())
             return
         }
+        rememberPlaybackPosition(position.toLong())
         player.seekTo(position.toLong())
     }
 
@@ -2727,6 +2751,47 @@ class AudioPlaybackService : MediaSessionService() {
     fun isPlaying(): Boolean = player.isPlaying
     fun getCurrentSourceUri(): Uri? = originalSourceUri ?: currentSourceUri
 
+    private fun playbackPositionTrackKey(): String? {
+        val song = viewModel?.currentSong?.value ?: widgetRestoredSong
+        return song?.let { "${it.id}:${it.videoId.orEmpty()}" }
+            ?: if (isPlayerInitialized) player.currentMediaItem?.mediaId?.takeIf { it.isNotBlank() } else null
+    }
+
+    private fun rememberPlaybackPosition(positionMs: Long) {
+        val trackKey = playbackPositionTrackKey()
+        if (trackKey != null) stablePositionTrackKey = trackKey
+        stablePlaybackPositionMs = positionMs.coerceAtLeast(0L)
+    }
+
+    private fun getStablePlaybackPositionMs(acceptZeroFromPlayer: Boolean = false): Long {
+        val song = viewModel?.currentSong?.value ?: widgetRestoredSong
+        val trackKey = playbackPositionTrackKey()
+        if (trackKey != null && trackKey != stablePositionTrackKey) {
+            val isInitialPositionSnapshot = stablePositionTrackKey == null
+            stablePositionTrackKey = trackKey
+            stablePlaybackPositionMs = if (isInitialPositionSnapshot) {
+                viewModel?.currentPosition?.value?.toLong()?.coerceAtLeast(0L) ?: 0L
+            } else {
+                0L
+            }
+        }
+
+        if (isPlayerInitialized) {
+            val mediaId = player.currentMediaItem?.mediaId
+            val expectedSongId = song?.id?.toString()
+            val mediaItemMatchesSong = !mediaId.isNullOrBlank() &&
+                (expectedSongId == null || mediaId == expectedSongId || mediaId == "$expectedSongId-audio")
+            if (mediaItemMatchesSong && player.playbackState != Player.STATE_IDLE) {
+                val livePosition = player.currentPosition.coerceAtLeast(0L)
+                if (livePosition > 0L || acceptZeroFromPlayer) {
+                    stablePlaybackPositionMs = livePosition
+                }
+            }
+        }
+
+        return stablePlaybackPositionMs.coerceAtLeast(0L)
+    }
+
     private fun loadAudioInternal(uri: Uri, keepPlayingUntilReady: Boolean = false) {
         cancelCurrentTrackCache()
         cacheAssetsSongId = null
@@ -2763,6 +2828,9 @@ class AudioPlaybackService : MediaSessionService() {
             
             val mediaItem = buildMediaItem(uri)
             val requestedStartPosition = pendingSeekPos
+            if (requestedStartPosition >= 0L) {
+                rememberPlaybackPosition(requestedStartPosition)
+            }
             // A Cache playlist item is cache-only only while it is still using its exact
             // cached URI. Switching that item to a freshly resolved video/audio stream must use
             // the network source, not an offline-only CacheDataSource.
@@ -2856,7 +2924,7 @@ class AudioPlaybackService : MediaSessionService() {
         progressUpdateRunnable = object : Runnable {
             override fun run() {
                 if (player.playbackState != Player.STATE_IDLE && player.playbackState != Player.STATE_ENDED) {
-                    val pos = player.currentPosition
+                    val pos = getStablePlaybackPositionMs()
                     val dur = player.duration
                     // API 23 intentionally does not run a Choreographer publisher. Publish a
                     // 4 Hz shared snapshot here for elapsed-time labels and non-draw consumers;
@@ -3757,6 +3825,7 @@ class AudioPlaybackService : MediaSessionService() {
         if (!isPlayerInitialized || videoUrl.isBlank()) return
         val song = viewModel?.currentSong?.value
         val videoUri = videoUrl.toUri()
+        rememberPlaybackPosition(startPositionMs)
 
         cancelCurrentTrackCache()
         cacheAssetsSongId = null
@@ -3827,6 +3896,7 @@ class AudioPlaybackService : MediaSessionService() {
         val songId = song?.id?.toString().orEmpty()
         val videoUri = videoUrl.toUri()
         val audioUri = audioUrl.toUri()
+        rememberPlaybackPosition(startPositionMs)
 
         cancelCurrentTrackCache()
         cacheAssetsSongId = null
@@ -4123,10 +4193,8 @@ class AudioPlaybackService : MediaSessionService() {
 
     private fun captureVideoModePosition(vm: PlayerSharedViewModel): Long {
         val fallbackPosition = vm.currentPosition.value.toLong().coerceAtLeast(0L)
-        if (!isPlayerInitialized || player.currentMediaItem == null || player.playbackState == Player.STATE_IDLE) {
-            return fallbackPosition
-        }
-        return player.currentPosition.coerceAtLeast(0L)
+        if (!isPlayerInitialized) return fallbackPosition
+        return getStablePlaybackPositionMs()
     }
 
     /**
@@ -4135,10 +4203,9 @@ class AudioPlaybackService : MediaSessionService() {
      * must not use that coarse UI snapshot as its audio clock.
      */
     fun getCurrentPositionForLyrics(): Int? {
-        if (!isPlayerInitialized || player.currentMediaItem == null ||
-            player.playbackState == Player.STATE_IDLE
-        ) return null
-        return player.currentPosition.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+        if (!isPlayerInitialized) return null
+        return getStablePlaybackPositionMs()
+            .coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
     }
 
     fun getPlaybackSpeedForLyrics(): Float {
