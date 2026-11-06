@@ -888,7 +888,11 @@ fun FullPlayer(
 ) {
     val isDark = isSystemInDarkTheme()
     val contentColor = if (isDark) Color.White else Color(0xFF1C1B1F)
-    val contentSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1C1B1F).copy(alpha = 0.6f)
+    // Match the transport button fills to the requested inverted theme palette.
+    // The title uses this same color; button glyphs use the contrasting counterpart.
+    val playerButtonColor = if (isDark) Color.White else Color.Black
+    val playerButtonContentColor = if (isDark) Color.Black else Color.White
+    val contentSecondary = contentColor.copy(alpha = 0.6f)
     val playerFrameTimeNanos = rememberAppAnimationFrameTimeNanos(
         active = isPlayerVisible && uiState.isPlaying
     )
@@ -1347,7 +1351,7 @@ fun FullPlayer(
                         style = DsmusicTheme.typography.headlineMediumEmphasized,
                         fontSize = titleSize,
                         fontWeight = titleWeight,
-                        color = contentColor,
+                        color = playerButtonColor,
                         maxLines = 1,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         modifier = Modifier
@@ -1726,12 +1730,10 @@ fun FullPlayer(
             } else {
                 Modifier.height(transportSize)
             }
-            val sideControlColor = if (noTransportBackground) Color.Transparent
-                else contentColor.copy(alpha = if (isDark) 0.08f else 0.06f)
-            val sideIconColor = if (noTransportBackground) dynamicAccentColor else contentColor
-            val centerControlColor = if (noTransportBackground) Color.Transparent else dynamicAccentColor
-            val centerIconColor = if (noTransportBackground) dynamicAccentColor
-                else if (isDark) Color(0xFF1C1B1F) else Color.White
+            val sideControlColor = if (noTransportBackground) Color.Transparent else playerButtonColor
+            val sideIconColor = playerButtonContentColor
+            val centerControlColor = if (noTransportBackground) Color.Transparent else playerButtonColor
+            val centerIconColor = playerButtonContentColor
 
             // D.S Launcher-style transport controls: flat rounded touch targets with
             // independent sizing and no Material ButtonGroup indicator/elevation layers.
