@@ -1095,59 +1095,308 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     // ── Backup & Restore ──────────────────────────────────────────────────────
+    private data class BackupPreferences(
+        val values: com.google.gson.JsonObject,
+        val types: com.google.gson.JsonObject
+    )
+
+    private fun encodePreferences(
+        source: SharedPreferences,
+        includeKeys: Set<String>? = null,
+        excludedKeys: Set<String> = emptySet()
+    ): BackupPreferences {
+        val values = com.google.gson.JsonObject()
+        val types = com.google.gson.JsonObject()
+
+        source.all.forEach { (key, value) ->
+            if (key in excludedKeys || (includeKeys != null && key !in includeKeys)) {
+                return@forEach
+            }
+            when (value) {
+                is Boolean -> {
+                    values.addProperty(key, value)
+                    types.addProperty(key, "boolean")
+                }
+                is Float -> {
+                    values.addProperty(key, value)
+                    types.addProperty(key, "float")
+                }
+                is Int -> {
+                    values.addProperty(key, value)
+                    types.addProperty(key, "int")
+                }
+                is Long -> {
+                    values.addProperty(key, value)
+                    types.addProperty(key, "long")
+                }
+                is String -> {
+                    values.addProperty(key, value)
+                    types.addProperty(key, "string")
+                }
+                is Set<*> -> {
+                    val stringValues = value.filterIsInstance<String>()
+                    if (stringValues.size == value.size) {
+                        val array = com.google.gson.JsonArray()
+                        stringValues.sorted().forEach(array::add)
+                        values.add(key, array)
+                        types.addProperty(key, "string_set")
+                    }
+                }
+            }
+        }
+        return BackupPreferences(values, types)
+    }
+
+    /**
+     * Restore typed SharedPreferences values. The type manifest prevents newer Float
+     * settings from being silently converted to Int. When importing an old v1 backup,
+     * the existing preference type and the JSON number shape are used as fallbacks.
+     */
+    private fun restorePreferences(
+        target: SharedPreferences,
+        values: com.google.gson.JsonObject,
+        types: com.google.gson.JsonObject?,
+        excludedKeys: Set<String> = emptySet()
+    ) {
+        val editor = target.edit()
+        values.entrySet().forEach { (key, element) ->
+            if (key in excludedKeys) return@forEach
+            if (element.isJsonNull) {
+                editor.remove(key)
+                return@forEach
+            }
+
+            val declaredType = types?.get(key)
+                ?.takeIf { !it.isJsonNull && it.isJsonPrimitive }
+                ?.asString
+            when {
+                declaredType == "string_set" || element.isJsonArray -> {
+                    if (element.isJsonArray) {
+                        val set = element.asJsonArray.mapNotNull { item ->
+                            item.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
+                                ?.asString
+                        }.toSet()
+                        editor.putStringSet(key, set)
+                    }
+                }
+                element.isJsonPrimitive -> {
+                    val primitive = element.asJsonPrimitive
+                    when (declaredType ?: when {
+                        primitive.isBoolean -> "boolean"
+                        primitive.isString -> "string"
+                        primitive.isNumber -> when (target.all[key]) {
+                            is Float -> "float"
+                            is Long -> "long"
+                            else -> {
+                                val numberText = primitive.asNumber.toString()
+                                if (numberText.contains('.') || numberText.contains('e', true)) "float" else "int"
+                            }
+                        }
+                        else -> ""
+                    }) {
+                        "boolean" -> if (primitive.isBoolean) editor.putBoolean(key, primitive.asBoolean)
+                        "float" -> if (primitive.isNumber) editor.putFloat(key, primitive.asFloat)
+                        "int" -> if (primitive.isNumber) editor.putInt(key, primitive.asInt)
+                        "long" -> if (primitive.isNumber) editor.putLong(key, primitive.asLong)
+                        "string" -> if (primitive.isString) editor.putString(key, primitive.asString)
+                    }
+                }
+            }
+        }
+        if (!editor.commit()) {
+            throw IllegalStateException("Could not save restored preferences")
+        }
+    }
+
+    private val excludedBackupPreferenceKeys = setOf(
+        // Authentication cookies are credentials. The receiving device must sign in separately.
+        "yt_cookies"
+    )
+
+    private val exploreBackupPreferenceKeys = setOf(
+        "search_history_list",
+        "search_history",
+        "speed_dial_songs_json",
+        "not_interested_ids",
+        "recent_artists_list",
+        "last_played_artist"
+    )
+
+    /** Refresh every settings StateFlow after a restore so the open screen reflects it immediately. */
+    private fun refreshSettingsFromPreferences() {
+        val themeMode = prefs.getString("theme_mode", "system")
+            ?.lowercase()?.takeIf { it in listOf("system", "light", "dark") } ?: "system"
+        _themeMode.value = themeMode
+        _darkMode.value = if (themeMode == "system") {
+            (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        } else {
+            themeMode == "dark"
+        }
+
+        _crossfadeEnabled.value = prefs.getBoolean(KEY_CROSSFADE_ENABLED, false)
+        _crossfadeDuration.value = prefs.getFloat(KEY_CROSSFADE_DURATION, 3f)
+        _mediaCacheEnabled.value = prefs.getBoolean(KEY_MEDIA_CACHE_ENABLED, true)
+        _mediaCacheLimitGb.value = prefs.getInt(KEY_MEDIA_CACHE_LIMIT_GB, 1).coerceIn(1, 10)
+        _audioFocus.value = prefs.getBoolean(KEY_AUDIO_FOCUS, true)
+        _autoplayEnabled.value = prefs.getBoolean(KEY_AUTOPLAY_ENABLED, true)
+        _amoledBlack.value = prefs.getBoolean(KEY_AMOLED_BLACK, false)
+        _hideNavLabels.value = prefs.getBoolean("hide_nav_labels", false)
+        _navLabelsMode.value = prefs.getString(
+            "nav_label_mode",
+            if (_hideNavLabels.value) "Never" else "Always"
+        )?.takeIf { it in listOf("Always", "Selected", "Never") } ?: "Always"
+        _dynamicNavStyle.value = prefs.getBoolean("dynamic_nav_style", false)
+        _navBarStyle.value = prefs.getString("nav_bar_style", "Floating")
+            ?.takeIf { it in listOf("Floating", "Docked", "Minimal") } ?: "Floating"
+        _navBarSize.value = prefs.getString("nav_bar_size", "Standard")
+            ?.takeIf { it in listOf("Compact", "Standard", "Tall") } ?: "Standard"
+        _dynamicAlbumTheme.value = prefs.getBoolean(KEY_DYNAMIC_ALBUM_THEME, false)
+        _appearancePreset.value = prefs.getString(KEY_APPEARANCE_PRESET, "Ocean") ?: "Ocean"
+        _customAccentColor.value = prefs.getString("custom_accent_color", "#7C9CFF") ?: "#7C9CFF"
+        _genreGradientStyle.value = prefs.getString("genre_card_gradient_style", "Theme")
+            ?.takeIf { it in listOf("Theme", "Aurora", "Ocean", "Sunset", "Forest", "Berry") } ?: "Theme"
+        _uiCornerStyle.value = prefs.getString("ui_corner_style", "Soft")
+            ?.takeIf { it in listOf("Tight", "Soft", "Round") } ?: "Soft"
+        _playerArtworkShape.value = prefs.getString(KEY_PLAYER_ARTWORK_SHAPE, "Rounded") ?: "Rounded"
+        _playerBackgroundStyle.value = prefs.getString("player_background_style", "Artwork") ?: "Artwork"
+        _nowPlayingCoverAnimation.value = prefs.getString(NowPlayingCoverAnimationPreference.KEY, "Bars")
+            ?.takeIf { it in NowPlayingCoverAnimationPreference.choices } ?: "Bars"
+        _miniPlayerStyle.value = prefs.getString("mini_player_style", "Card") ?: "Card"
+        _miniPlayerControlShape.value = prefs.getString("mini_player_control_shape", "Circle") ?: "Circle"
+        _miniPlayerControlIcons.value = prefs.getString("mini_player_control_icons", "Classic") ?: "Classic"
+        _miniPlayerProgressStyle.value = prefs.getString("mini_player_progress", "Ring") ?: "Ring"
+        _playerLayout.value = prefs.getString("player_layout", "Standard")
+            ?.takeIf { it in listOf("Standard", "Vinyl", "Cassette") } ?: "Standard"
+        _playerArtworkScale.value = prefs.getFloat("player_artwork_scale", 1f).coerceIn(0.65f, 1f)
+        _playerButtons.value = readPlayerButtons()
+        _sessionButtons.value = readSessionButtons()
+        _playerTitleAlign.value = prefs.getString("player_title_align", "Left")
+            ?.takeIf { it in listOf("Left", "Centered") } ?: "Left"
+        _playerTitleSize.value = prefs.getString("player_title_size", "Medium")
+            ?.takeIf { it in listOf("Small", "Medium", "Large") } ?: "Medium"
+        _playerTitleWeight.value = prefs.getString("player_title_weight", "Bold")
+            ?.takeIf { it in listOf("Light", "Regular", "Bold") } ?: "Bold"
+        _playerTitleScroll.value = prefs.getBoolean("player_title_scroll", true)
+        _playerTimes.value = prefs.getString("player_times", "Both")
+            ?.takeIf { it in listOf("Both", "Elapsed", "Time left", "None") } ?: "Both"
+        _scrubberStyle.value = prefs.getString("scrubber_style", "Waveform")
+            ?.let { if (it == "Wave") "Waveform" else it }
+            ?.takeIf { it in listOf("Hairline", "Bold", "Thumb", "Waveform") } ?: "Waveform"
+        _scrubberColor.value = prefs.getString("scrubber_color", "Accent") ?: "Accent"
+        _visualizerStyle.value = (prefs.getString("player_visualizer", "Off") ?: "Off")
+            .let { if (it == "Ring") "Oval" else it }
+            .takeIf { it in listOf("Off", "Bars", "Wave", "Oval", "Pulse", "Glow") } ?: "Off"
+        _playerButtonsPill.value = prefs.getBoolean("player_buttons_pill", true)
+        _playerButtonStyle.value = when (prefs.getString("player_button_style", "Pill") ?: "Pill") {
+            "Rounded" -> "Round"
+            "Minimal" -> "None"
+            "Round", "Pill", "None", "Square" -> prefs.getString("player_button_style", "Pill") ?: "Pill"
+            else -> "Pill"
+        }
+        _scrubberThickness.value = 1.5f
+        _scrubberThumbStyle.value = prefs.getString("scrubber_thumb_style", "Auto") ?: "Auto"
+        _visualizerColor.value = prefs.getString("visualizer_color", "Accent") ?: "Accent"
+        _lyricsTextSize.value = prefs.getString("lyrics_text_size", "Standard") ?: "Standard"
+        _showSyncedLyricsInPlayer.value = prefs.getBoolean("show_synced_lyrics_in_player", true)
+        _lyricsAlignment.value = prefs.getString("lyrics_alignment", "Original") ?: "Original"
+        _lyricsColorStyle.value = when (prefs.getString("lyrics_color_style", "Home Studio Gradient")) {
+            "Dynamic (Gradient)" -> "Home Studio Gradient"
+            "UI Matching" -> "UI Matching"
+            "White" -> "White"
+            else -> "Home Studio Gradient"
+        }
+        _lyricsFontFamily.value = prefs.getString("lyrics_font_family", "Rounded") ?: "Rounded"
+        _uiDensity.value = prefs.getString("ui_density", "Comfortable") ?: "Comfortable"
+        _taperedSongDividers.value = prefs.getBoolean(KEY_TAPERED_SONG_DIVIDERS, false)
+        _uiFontFamily.value = when (prefs.getString("ui_font_family", "Roboto") ?: "Roboto") {
+            "Cursive" -> "Cursive"
+            "Sans", "Google Sans Flex" -> "Sans"
+            "Serif" -> "Serif"
+            "Monospace" -> "Monospace"
+            else -> "Roboto"
+        }
+        _uiFontScale.value = prefs.getFloat("ui_font_scale", 1f).coerceIn(0.85f, 1.30f)
+        _uiFontWeight.value = prefs.getString("ui_font_weight", "Default") ?: "Default"
+        _uiLetterSpacing.value = prefs.getString("ui_letter_spacing", "Normal") ?: "Normal"
+        _savedAppearanceLooks.value = readSavedAppearanceLooks()
+        _ignoreShortAudio.value = prefs.getBoolean(KEY_IGNORE_SHORT_AUDIO, false)
+        _ignoreShortAudioDuration.value = prefs.getFloat(KEY_IGNORE_SHORT_AUDIO_DURATION, 30f)
+        _dataSaver.value = prefs.getBoolean(KEY_DATA_SAVER, false)
+        _audioQuality.value = com.dsann.music.data.innertube.NewPipeStreamExtractor
+            .normalizeAudioQuality(prefs.getString(KEY_AUDIO_QUALITY, "256 kbps"))
+        _downloadAudioFormat.value = com.dsann.music.data.innertube.NewPipeStreamExtractor
+            .normalizeDownloadAudioFormat(prefs.getString(KEY_DOWNLOAD_FORMAT, "m4a"))
+        _downloadBitrate.value = com.dsann.music.data.innertube.NewPipeStreamExtractor
+            .normalizeAudioQuality(prefs.getString(KEY_DOWNLOAD_BITRATE, "256 kbps"))
+        _playerFrameRate.value = AppAnimationFrameRateController.load(context)
+        _pauseHistory.value = prefs.getBoolean("pause_history", false)
+        _libraryPaths.value = (prefs.getString(KEY_LIBRARY_PATHS, "") ?: "")
+            .split("||").filter { it.isNotEmpty() }
+        _hiddenFolders.value = (prefs.getString(KEY_HIDDEN_FOLDERS, "") ?: "")
+            .split("||").filter { it.isNotEmpty() }
+        _downloadFolder.value = prefs.getString("download_folder", null)
+        _songCacheMaxSize.value = prefs.getInt("song_cache_max_size", 1024)
+        _imageCacheMaxSize.value = prefs.getInt("image_cache_max_size", 512)
+
+        com.dsann.music.service.AudioPlaybackService.updateMediaCacheSettings(context)
+        calculateCacheSize()
+    }
+
     fun exportBackup(context: Context, uri: Uri, onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val settingsMap = prefs.all
-                val favManager = com.dsann.music.util.FavoritesManager(context)
-                val favoritesList = favManager.favoriteIds.toList()
+                val settings = encodePreferences(
+                    prefs,
+                    excludedKeys = excludedBackupPreferenceKeys
+                )
+                val explorePrefs = context.getSharedPreferences("explore_prefs", Context.MODE_PRIVATE)
+                val explore = encodePreferences(
+                    explorePrefs,
+                    includeKeys = exploreBackupPreferenceKeys
+                )
+
+                val favoritesList = com.dsann.music.util.FavoritesManager(context)
+                    .favoriteIds.toList().sorted()
 
                 val db = com.dsann.music.data.db.MusicDatabase.getDatabase(context)
                 val playlistDao = db.playlistDao()
-
-                // Read playlists and songs using Flow.first() extension
                 val playlists = playlistDao.getAllPlaylists().first()
-                val playlistSongsList = mutableListOf<com.dsann.music.data.db.PlaylistSongEntity>()
-                playlists.forEach { playlist: com.dsann.music.data.db.PlaylistEntity ->
-                    val songs = playlistDao.getSongsForPlaylist(playlist.id).first()
-                    playlistSongsList.addAll(songs)
+                val playlistSongs = mutableListOf<com.dsann.music.data.db.PlaylistSongEntity>()
+                playlists.forEach { playlist ->
+                    playlistSongs.addAll(playlistDao.getSongsForPlaylist(playlist.id).first())
                 }
+                val historyEvents = playlistDao.getAllHistoryEventsFlow().first()
 
+                val gson = com.google.gson.Gson()
                 val backupObject = com.google.gson.JsonObject().apply {
-                    addProperty("version", 1)
+                    addProperty("format", "com.dsann.music.backup")
+                    addProperty("version", 2)
+                    addProperty("exported_at", System.currentTimeMillis())
+                    add("settings", settings.values)
+                    add("settings_types", settings.types)
+                    add("explore_preferences", explore.values)
+                    add("explore_preferences_types", explore.types)
 
-                    val settingsObj = com.google.gson.JsonObject()
-                    settingsMap.forEach { (key, value) ->
-                        when (value) {
-                            is Boolean -> settingsObj.addProperty(key, value)
-                            is Float -> settingsObj.addProperty(key, value)
-                            is Int -> settingsObj.addProperty(key, value)
-                            is Long -> settingsObj.addProperty(key, value)
-                            is String -> settingsObj.addProperty(key, value)
-                        }
-                    }
-                    add("settings", settingsObj)
+                    val favoritesArray = com.google.gson.JsonArray()
+                    favoritesList.forEach(favoritesArray::add)
+                    add("favorites", favoritesArray)
 
-                    val favArray = com.google.gson.JsonArray()
-                    favoritesList.forEach { favArray.add(it) }
-                    add("favorites", favArray)
-
-                    val gson = com.google.gson.Gson()
                     add("playlists", gson.toJsonTree(playlists))
-                    add("playlist_songs", gson.toJsonTree(playlistSongsList))
+                    add("playlist_songs", gson.toJsonTree(playlistSongs))
+                    add("history_events", gson.toJsonTree(historyEvents))
                 }
 
-                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    outputStream.write(backupObject.toString().toByteArray())
-                }
+                val output = context.contentResolver.openOutputStream(uri, "wt")
+                    ?: throw IllegalStateException("Could not open the selected backup file")
+                output.use { it.write(backupObject.toString().toByteArray(Charsets.UTF_8)) }
 
                 withContext(Dispatchers.Main) {
-                    onResult(true, "Backup exported successfully")
+                    onResult(true, "Backup exported with settings, favourites, playlists and listening history")
                 }
             } catch (e: Exception) {
                 android.util.Log.e("SettingsViewModel", "Failed to export backup", e)
                 withContext(Dispatchers.Main) {
-                    onResult(false, "Failed to export: ${e.localizedMessage}")
+                    onResult(false, "Failed to export: \${e.localizedMessage ?: "Unknown error"}")
                 }
             }
         }
@@ -1157,104 +1406,122 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val jsonString = context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    inputStream.bufferedReader().use { it.readText() }
-                } ?: throw Exception("Could not read backup file")
+                    inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                } ?: throw IllegalStateException("Could not read backup file")
+                if (jsonString.length > 50_000_000) {
+                    throw IllegalArgumentException("Backup file is too large")
+                }
 
                 val gson = com.google.gson.Gson()
-                val backupObject = gson.fromJson(jsonString, com.google.gson.JsonObject::class.java)
-
-                if (backupObject.has("settings")) {
-                    val settingsObj = backupObject.getAsJsonObject("settings")
-                    prefs.edit {
-                        settingsObj.entrySet().forEach { (key, jsonElement) ->
-                            if (jsonElement.isJsonPrimitive) {
-                                val prim = jsonElement.asJsonPrimitive
-                                if (prim.isBoolean) putBoolean(key, prim.asBoolean)
-                                else if (prim.isNumber) {
-                                    val num = prim.asNumber
-                                    when (key) {
-                                        KEY_CROSSFADE_DURATION, KEY_TARGET_LUFS -> putFloat(key, num.toFloat())
-                                        else -> {
-                                            try {
-                                                putInt(key, num.toInt())
-                                            } catch (_: Exception) {
-                                                putFloat(key, num.toFloat())
-                                            }
-                                        }
-                                    }
-                                }
-                                else if (prim.isString) putString(key, prim.asString)
-                            }
-                        }
-                    }
-
-                    _darkMode.value = prefs.getBoolean(KEY_DARK_MODE, true)
-                    _amoledBlack.value = prefs.getBoolean(KEY_AMOLED_BLACK, false)
-                    _dynamicAlbumTheme.value = prefs.getBoolean(KEY_DYNAMIC_ALBUM_THEME, false)
-                    _appearancePreset.value = prefs.getString(KEY_APPEARANCE_PRESET, "Ocean") ?: "Ocean"
-                    _playerArtworkShape.value = prefs.getString(KEY_PLAYER_ARTWORK_SHAPE, "Rounded") ?: "Rounded"
-                    _autoplayEnabled.value = prefs.getBoolean(KEY_AUTOPLAY_ENABLED, true)
-                    _crossfadeEnabled.value = prefs.getBoolean(KEY_CROSSFADE_ENABLED, false)
-                    _crossfadeDuration.value = prefs.getFloat(KEY_CROSSFADE_DURATION, 3f)
-                    _audioFocus.value = prefs.getBoolean(KEY_AUDIO_FOCUS, true)
-                    _dataSaver.value = prefs.getBoolean(KEY_DATA_SAVER, false)
-                    _audioQuality.value =
-                        com.dsann.music.data.innertube.NewPipeStreamExtractor
-                            .normalizeAudioQuality(prefs.getString(KEY_AUDIO_QUALITY, "256 kbps"))
-                    _downloadAudioFormat.value =
-                        com.dsann.music.data.innertube.NewPipeStreamExtractor
-                            .normalizeDownloadAudioFormat(prefs.getString(KEY_DOWNLOAD_FORMAT, "m4a"))
-                    _downloadBitrate.value =
-                        com.dsann.music.data.innertube.NewPipeStreamExtractor
-                            .normalizeAudioQuality(prefs.getString(KEY_DOWNLOAD_BITRATE, "256 kbps"))
-                    _playerFrameRate.value = AppAnimationFrameRateController.load(context)
-                    _pauseHistory.value = prefs.getBoolean("pause_history", false)
-                    _downloadFolder.value = prefs.getString("download_folder", null)
-                    _songCacheMaxSize.value = prefs.getInt("song_cache_max_size", 1024)
-                    _imageCacheMaxSize.value = prefs.getInt("image_cache_max_size", 512)
+                val parsed = com.google.gson.JsonParser().parse(jsonString)
+                if (!parsed.isJsonObject) {
+                    throw IllegalArgumentException("This is not a valid D.S Music backup file")
+                }
+                val backupObject = parsed.asJsonObject
+                val format = backupObject.get("format")?.takeIf { it.isJsonPrimitive }?.asString
+                if (format != null && format != "com.dsann.music.backup") {
+                    throw IllegalArgumentException("This backup was created by a different app")
+                }
+                val version = backupObject.get("version")?.takeIf { it.isJsonPrimitive }?.asInt ?: 1
+                if (version !in 1..2) {
+                    throw IllegalArgumentException("This backup version is not supported")
                 }
 
-                if (backupObject.has("favorites")) {
-                    val favArray = backupObject.getAsJsonArray("favorites")
-                    val favManager = com.dsann.music.util.FavoritesManager(context)
-                    favArray.forEach { element ->
-                        val idStr = element.asString
-                        idStr.toLongOrNull()?.let { idLong ->
-                            favManager.setFavorite(idLong, true)
-                        }
-                    }
-                }
-
+                // Parse and validate the complete library before modifying any local data.
                 val db = com.dsann.music.data.db.MusicDatabase.getDatabase(context)
                 val playlistDao = db.playlistDao()
+                val hasPlaylists = backupObject.has("playlists")
+                val hasPlaylistSongs = backupObject.has("playlist_songs")
+                val hasHistory = backupObject.has("history_events")
+                val hasLibraryData = hasPlaylists || hasPlaylistSongs || hasHistory
 
-                if (backupObject.has("playlists")) {
-                    val typeTokenPlaylists = object :
-                        com.google.gson.reflect.TypeToken<List<com.dsann.music.data.db.PlaylistEntity>>() {}.type
-                    val playlistsList: List<com.dsann.music.data.db.PlaylistEntity> =
-                        gson.fromJson(backupObject.get("playlists"), typeTokenPlaylists)
+                val existingPlaylists = if (hasLibraryData && (!hasPlaylists || !hasPlaylistSongs)) {
+                    playlistDao.getAllPlaylists().first()
+                } else emptyList()
 
-                    playlistsList.forEach { playlist ->
-                        playlistDao.insertPlaylist(playlist)
+                val playlistType = object : com.google.gson.reflect.TypeToken<List<com.dsann.music.data.db.PlaylistEntity>>() {}.type
+                val songType = object : com.google.gson.reflect.TypeToken<List<com.dsann.music.data.db.PlaylistSongEntity>>() {}.type
+                val historyType = object : com.google.gson.reflect.TypeToken<List<com.dsann.music.data.db.HistoryEventEntity>>() {}.type
+
+                val playlists: List<com.dsann.music.data.db.PlaylistEntity> = if (hasPlaylists) {
+                    gson.fromJson(backupObject.get("playlists"), playlistType)
+                        ?: throw IllegalArgumentException("The backup playlist list is invalid")
+                } else existingPlaylists
+
+                val playlistSongs: List<com.dsann.music.data.db.PlaylistSongEntity> = if (hasPlaylistSongs) {
+                    gson.fromJson(backupObject.get("playlist_songs"), songType)
+                        ?: throw IllegalArgumentException("The backup playlist songs are invalid")
+                } else {
+                    existingPlaylists.flatMap { playlist ->
+                        playlistDao.getSongsForPlaylist(playlist.id).first()
                     }
                 }
 
-                if (backupObject.has("playlist_songs")) {
-                    val typeTokenSongs = object : com.google.gson.reflect.TypeToken<List<com.dsann.music.data.db.PlaylistSongEntity>>() {}.type
-                    val songsList: List<com.dsann.music.data.db.PlaylistSongEntity> = gson.fromJson(backupObject.get("playlist_songs"), typeTokenSongs)
+                val historyEvents: List<com.dsann.music.data.db.HistoryEventEntity>? = if (hasHistory) {
+                    gson.fromJson(backupObject.get("history_events"), historyType)
+                        ?: throw IllegalArgumentException("The backup listening history is invalid")
+                } else null
 
-                    songsList.forEach { song ->
-                        playlistDao.insertPlaylistSong(song)
+                val favoritesToRestore: Set<String>? = if (backupObject.has("favorites")) {
+                    val favoritesElement = backupObject.get("favorites")
+                    if (!favoritesElement.isJsonArray) {
+                        throw IllegalArgumentException("The backup favourites list is invalid")
                     }
+                    favoritesElement.asJsonArray.mapNotNull { element ->
+                        element.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
+                            ?.asString?.takeIf { it.isNotBlank() }
+                    }.toSet()
+                } else null
+
+                val settingsObject = backupObject.get("settings")
+                    ?.takeIf { it.isJsonObject }?.asJsonObject
+                val settingsTypes = backupObject.get("settings_types")
+                    ?.takeIf { it.isJsonObject }?.asJsonObject
+                val exploreObject = backupObject.get("explore_preferences")
+                    ?.takeIf { it.isJsonObject }?.asJsonObject
+                val exploreTypes = backupObject.get("explore_preferences_types")
+                    ?.takeIf { it.isJsonObject }?.asJsonObject
+
+                if (hasLibraryData) {
+                    playlistDao.restoreBackupLibrary(playlists, playlistSongs, historyEvents)
                 }
+
+                if (settingsObject != null) {
+                    restorePreferences(
+                        prefs,
+                        settingsObject,
+                        settingsTypes,
+                        excludedKeys = excludedBackupPreferenceKeys
+                    )
+                }
+
+                if (exploreObject != null) {
+                    val explorePrefs = context.getSharedPreferences("explore_prefs", Context.MODE_PRIVATE)
+                    val editor = explorePrefs.edit()
+                    exploreBackupPreferenceKeys.forEach(editor::remove)
+                    if (!editor.commit()) {
+                        throw IllegalStateException("Could not prepare Explore preferences for restore")
+                    }
+                    restorePreferences(explorePrefs, exploreObject, exploreTypes)
+                }
+
+                if (favoritesToRestore != null) {
+                    val favoritesPrefs = context.getSharedPreferences("spatialflow_favorites", Context.MODE_PRIVATE)
+                    val saved = favoritesPrefs.edit()
+                        .putStringSet("favorite_song_ids", favoritesToRestore)
+                        .commit()
+                    if (!saved) throw IllegalStateException("Could not restore favourites")
+                }
+
+                refreshSettingsFromPreferences()
 
                 withContext(Dispatchers.Main) {
-                    onResult(true, "Backup imported successfully")
+                    onResult(true, "Backup imported: settings, customisation, favourites, playlists and history restored")
                 }
             } catch (e: Exception) {
                 android.util.Log.e("SettingsViewModel", "Failed to import backup", e)
                 withContext(Dispatchers.Main) {
-                    onResult(false, "Import failed: ${e.localizedMessage}")
+                    onResult(false, "Import failed: \${e.localizedMessage ?: "Unknown error"}")
                 }
             }
         }
