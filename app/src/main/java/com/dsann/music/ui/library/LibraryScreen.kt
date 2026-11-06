@@ -3394,6 +3394,8 @@ fun RecapTabContent(
         if (localSongs.isEmpty()) scanLocalFiles(context, viewModel)
     }
     val events by viewModel.listeningHistoryEventsFlow.collectAsStateWithLifecycle(emptyList())
+    val activePlayerSong by viewModel.currentSong.collectAsStateWithLifecycle()
+    val playerIsPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val years = remember(events) {
         events.map { event ->
             java.util.Calendar.getInstance().apply {
@@ -3915,19 +3917,41 @@ fun RecapTabContent(
                             else DsmusicTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.SemiBold
                     )
-                    if (artworkModel != null) {
-                        AsyncImage(
-                            model = artworkModel,
-                            contentDescription = null,
-                            modifier = Modifier.size(52.dp).clip(RoundedCornerShape(10.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Box(
-                            Modifier.size(52.dp).clip(RoundedCornerShape(10.dp))
-                                .background(DsmusicTheme.colorScheme.surfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) { Icon(Icons.Rounded.MusicNote, null) }
+                    val isCurrentReplaySong = activePlayerSong?.let { playingSong ->
+                        playingSong.id == replaySong.id ||
+                            (!playingSong.videoId.isNullOrBlank() &&
+                                playingSong.videoId == replaySong.videoId)
+                    } == true
+                    val replayCoverColor = rememberNowPlayingCoverColor(
+                        artworkModel,
+                        enabled = isCurrentReplaySong
+                    )
+                    Box(
+                        Modifier.size(52.dp).clip(RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (artworkModel != null) {
+                            AsyncImage(
+                                model = artworkModel,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Box(
+                                Modifier.fillMaxSize()
+                                    .background(DsmusicTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) { Icon(Icons.Rounded.MusicNote, null) }
+                        }
+                        if (isCurrentReplaySong) {
+                            NowPlayingCoverIndicator(
+                                isPlaying = true,
+                                coverColor = replayCoverColor,
+                                isAnimating = playerIsPlaying,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {

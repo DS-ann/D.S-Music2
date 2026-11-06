@@ -68,6 +68,7 @@ import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.ThumbUp
@@ -354,18 +355,23 @@ fun WelcomeGreetingBanner(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.GraphicEq,
-                        contentDescription = null,
-                        tint = DsmusicTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(19.dp)
-                    )
-                    Text(
-                        text = "Listening Recap",
-                        style = DsmusicTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = DsmusicTheme.colorScheme.onPrimaryContainer
-                    )
+                    Box(
+                        modifier = Modifier.size(22.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = "Listening Recap",
+                            tint = DsmusicTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Icon(
+                            imageVector = Icons.Rounded.GraphicEq,
+                            contentDescription = null,
+                            tint = DsmusicTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(10.dp)
+                        )
+                    }
                     Icon(
                         imageVector = Icons.Rounded.ChevronRight,
                         contentDescription = null,
