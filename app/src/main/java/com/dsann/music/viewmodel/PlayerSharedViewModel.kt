@@ -42,6 +42,7 @@ import com.dsann.music.viewmodel.lyrics.PlayerLyricsStateController
 import com.google.gson.JsonElement
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -531,6 +532,8 @@ class PlayerSharedViewModel @Inject constructor(
         _songList.value.lastOrNull { !it.videoId.isNullOrBlank() }?.videoId
 
     private var autoplayFetchJob: Job? = null
+    private var autoplayQueueGeneration = 0L
+    private var autoplayFetchGeneration = -1L
     private val autoplayFetchedVideoIds = mutableSetOf<String>()
 
     /**
@@ -565,13 +568,18 @@ class PlayerSharedViewModel @Inject constructor(
         batchSize: Int = AUTOPLAY_REFILL_BATCH_SIZE
     ): Job? {
         if (videoId.isBlank() || !isAutoplayEnabled()) return null
-        autoplayFetchJob?.takeIf { it.isActive }?.let { return it }
+        autoplayFetchJob?.takeIf { it.isActive }?.let { activeJob ->
+            if (autoplayFetchGeneration == autoplayQueueGeneration) return activeJob
+            activeJob.cancel()
+        }
         if (videoId in autoplayFetchedVideoIds) return null
         if (_songList.value.none { it.videoId == videoId }) return null
 
-        val requestJob = viewModelScope.launch {
+        val requestGeneration = autoplayQueueGeneration
+        lateinit var requestJob: Job
+        requestJob = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
-                if (!isAutoplayEnabled()) return@launch
+                if (!isAutoplayEnabled() || requestGeneration != autoplayQueueGeneration) return@launch
 
                 // Continue with a generated radio queue first. If it contains fewer than
                 // the requested batch, merge related tracks as a fallback to reach 20.
@@ -593,7 +601,7 @@ class PlayerSharedViewModel @Inject constructor(
                     }.distinctBy { it.videoId }
                 }
 
-                if (!isAutoplayEnabled()) return@launch
+                if (!isAutoplayEnabled() || requestGeneration != autoplayQueueGeneration) return@launch
 
                 // Do not append recommendations for a queue item that was removed while
                 // the network request was running (for example, after the user cleared it).
@@ -631,10 +639,15 @@ class PlayerSharedViewModel @Inject constructor(
             } catch (error: Exception) {
                 Log.w(TAG, "Autoplay recommendation request failed for $videoId", error)
             } finally {
-                autoplayFetchJob = null
+                if (autoplayFetchJob === requestJob) {
+                    autoplayFetchJob = null
+                    autoplayFetchGeneration = -1L
+                }
             }
         }
+        autoplayFetchGeneration = requestGeneration
         autoplayFetchJob = requestJob
+        requestJob.start()
         return requestJob
     }
 
@@ -1670,6 +1683,12 @@ class PlayerSharedViewModel @Inject constructor(
         // A replacement queue is a new Autoplay session. Do not carry the previous
         // queue's completed radio-seed markers into Cache/Downloaded playlists: an
         // offline copy may reuse a video ID whose recommendations were fetched earlier.
+        // Cancel any request belonging to the previous queue; its finally block must
+        // not clear a newer queue's request when it completes.
+        autoplayQueueGeneration += 1L
+        autoplayFetchJob?.cancel()
+        autoplayFetchJob = null
+        autoplayFetchGeneration = -1L
         autoplayFetchedVideoIds.clear()
         _songList.value = songs
         if (_repeatMode.value == REPEAT_ONCE) resetRepeatOnceCycleFromCurrent()
