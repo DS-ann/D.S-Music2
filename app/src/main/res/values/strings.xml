@@ -9,10 +9,10 @@
     <string name="settings_header_general">General</string>
     <string name="settings_header_about">About</string> <!-- General settings -->
     <string name="setting_dark_mode">Dark Mode</string>
-    <string name="setting_audio_focus">Handle Audio Focus</string>
+    <string name="setting_audio_focus">Pause for other apps</string>
     <!-- Playback settings -->
     <string name="settings_header_playback">Playback</string>
-    <string name="setting_crossfade">Crossfade</string>
+    <string name="setting_crossfade">Song transitions</string>
     <string name="setting_sleep_timer">Sleep Timer</string>
     <string name="setting_sleep_timer_off">Off</string> <!-- Library settings -->
     <string name="settings_header_library">Library</string>
