@@ -515,7 +515,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             long lineStartMs = line.startTimeMs;
             if (line.words != null && !line.words.isEmpty()) {
                 for (com.dsann.music.data.lyrics.LyricWord word : line.words) {
-                    lineStartMs = Math.min(lineStartMs, word.absoluteStartTimeMs);
+                    lineStartMs = Math.min(lineStartMs, word.getAbsoluteStartTimeMs());
                 }
             }
             if (lineStartMs < firstStartMs) {
