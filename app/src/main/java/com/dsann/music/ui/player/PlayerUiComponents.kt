@@ -401,15 +401,11 @@ internal fun WavySliderWithLabels(
             "Cover" -> coverDerivedColor
             else -> DsmusicTheme.colorScheme.primary
         }
-        // Keep user-selected scrubber colours whenever they remain legible. Fall back
-        // to a neutral light/dark colour only when the selected colour blends into the
-        // actual player surface.
-        val activeColor = if (
-            androidx.core.graphics.ColorUtils.calculateContrast(
-                requestedActiveColor.toArgb(),
-                backgroundSurfaceColor.toArgb()
-            ) >= 3.0
-        ) requestedActiveColor else contrastTrackColor
+        // The Progress color setting is an explicit visual choice. Do not silently
+        // replace Accent or White with a neutral colour based on the current artwork.
+        // Keep the inactive track contrast-aware, while the active track and marker
+        // both use the exact selected colour.
+        val activeColor = requestedActiveColor
         val thickness = when (scrubberStyle) {
             "Hairline" -> 2.dp
             "Bold" -> 6.dp
@@ -430,7 +426,7 @@ internal fun WavySliderWithLabels(
             enabled = safeDur != null,
             activeTrackColor = activeColor,
             inactiveTrackColor = contrastTrackColor.copy(alpha = 0.40f),
-            thumbColor = contrastTrackColor,
+            thumbColor = activeColor,
             isPlaying = isPlaying && isPlayerVisible,
             trackHeight = thickness,
             thumbRadius = when (scrubberThumbStyle) {

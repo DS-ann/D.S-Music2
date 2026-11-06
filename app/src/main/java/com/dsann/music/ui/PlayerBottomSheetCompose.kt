@@ -2720,14 +2720,17 @@ private fun MiniPlayerArtworkProgressOverlay(
         "Cover" -> coverDerivedColor
         else -> DsmusicTheme.colorScheme.primary
     }
-    // Match the full-player Progress color choice, but always preserve legibility
-    // against the actual mini-player surface when the cover-derived colour is used.
+    // Accent and White are explicit colour choices and must remain visible as
+    // selected. For Cover only, retain the requested cover-derived hue when it has
+    // enough contrast; otherwise use a contrasting neutral on the artwork-matched
+    // mini-player surface so the progress indicator does not disappear.
+    val coverProgressContrast = androidx.core.graphics.ColorUtils.calculateContrast(
+        requestedProgressColor.toArgb(),
+        backgroundColor.toArgb()
+    )
     val visibleAccentColor = if (
-        androidx.core.graphics.ColorUtils.calculateContrast(
-            requestedProgressColor.toArgb(),
-            backgroundColor.toArgb()
-        ) >= 3.0
-    ) requestedProgressColor else contrastProgressColor
+        scrubberColor == "Cover" && coverProgressContrast < 3.0
+    ) contrastProgressColor else requestedProgressColor
     val progressTrackColor = Color.Transparent
 
     // The frame timestamp is read inside Canvas so only the artwork-progress drawing
