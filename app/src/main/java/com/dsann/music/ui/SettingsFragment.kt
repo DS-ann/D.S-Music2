@@ -4670,10 +4670,10 @@ private fun SettingsAccordionSection(
                     letterSpacing = 1.15.sp,
                     fontWeight = FontWeight.Bold
                 ),
-                modifier = Modifier.padding(start = 9.dp),
-                maxLines = 1
+                modifier = Modifier.weight(1f).padding(start = 9.dp),
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
-            Spacer(Modifier.weight(1f))
             Icon(
                 imageVector = Icons.Rounded.ChevronRight,
                 contentDescription = if (expanded) "Collapse $text" else "Expand $text",

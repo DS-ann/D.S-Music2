@@ -108,8 +108,9 @@ import com.dsann.music.viewmodel.PlayerSharedViewModel
 @Composable
 fun AlbumDetailView(
     albumPage: AlbumPage,
-    currentOnlineSong: OnlineSong?,
+    currentPlayingVideoId: String?,
     isLoadingStream: Boolean,
+    isPlaybackActive: Boolean,
     onBack: () -> Unit,
     onSongClick: (OnlineSong, List<OnlineSong>, Int) -> Unit,
     onSongMenuClick: (OnlineSong) -> Unit,
@@ -159,8 +160,9 @@ fun AlbumDetailView(
         ) { index, song ->
             SearchResultItem(
                 item = SearchItem.Song(song),
-                isCurrentlyPlaying = song.videoId == currentOnlineSong?.videoId,
-                isLoading = isLoadingStream && song.videoId == currentOnlineSong?.videoId,
+                isCurrentlyPlaying = song.videoId == currentPlayingVideoId,
+                isLoading = isLoadingStream && song.videoId == currentPlayingVideoId,
+                isPlaybackActive = isPlaybackActive,
                 onSongMenuClick = onSongMenuClick,
                 onClick = { onSongClick(song, albumPage.songs, index) }
             )
@@ -174,8 +176,9 @@ fun AlbumDetailView(
 @Composable
 fun PlaylistDetailView(
     playlistPage: PlaylistPage,
-    currentOnlineSong: OnlineSong?,
+    currentPlayingVideoId: String?,
     isLoadingStream: Boolean,
+    isPlaybackActive: Boolean,
     onBack: () -> Unit,
     onSongClick: (OnlineSong, List<OnlineSong>, Int) -> Unit,
     onSongMenuClick: (OnlineSong) -> Unit,
@@ -266,8 +269,9 @@ fun PlaylistDetailView(
         ) { index, song ->
             SearchResultItem(
                 item = SearchItem.Song(song),
-                isCurrentlyPlaying = song.videoId == currentOnlineSong?.videoId,
-                isLoading = isLoadingStream && song.videoId == currentOnlineSong?.videoId,
+                isCurrentlyPlaying = song.videoId == currentPlayingVideoId,
+                isLoading = isLoadingStream && song.videoId == currentPlayingVideoId,
+                isPlaybackActive = isPlaybackActive,
                 onSongMenuClick = onSongMenuClick,
                 onClick = { onSongClick(song, playlistPage.songs, index) }
             )
@@ -410,7 +414,8 @@ fun PlaylistDetailView(
 @Composable
 fun ArtistDetailView(
     artistPage: ArtistPage,
-    currentOnlineSong: OnlineSong?,
+    currentPlayingVideoId: String?,
+    isPlaybackActive: Boolean,
     isSubscribed: Boolean = false,
     onBack: () -> Unit,
     onSongClick: (OnlineSong, List<OnlineSong>, Int) -> Unit,
@@ -583,7 +588,7 @@ fun ArtistDetailView(
                         Row(modifier = Modifier.fillMaxWidth()) {
                             chunk.forEachIndexed { colIdx, item ->
                                 val song = item.song
-                                val isPlaying = song.videoId == currentOnlineSong?.videoId
+                                val isPlaying = isPlaybackActive && song.videoId == currentPlayingVideoId
                                 val index = chunkIdx * columns + colIdx
                                 Box(modifier = Modifier.weight(1f)) {
                                     ArtistTopSongItem(
@@ -604,7 +609,8 @@ fun ArtistDetailView(
                 item {
                     HomeSectionRow(
                         section = section,
-                        currentOnlineSong = currentOnlineSong,
+                        currentPlayingVideoId = currentPlayingVideoId,
+                        isPlaybackActive = isPlaybackActive,
                         onSongClick = { song ->
                             val sectionSongs = section.items.filterIsInstance<SearchItem.Song>().map { it.song }
                             val idx = sectionSongs.indexOfFirst { it.videoId == song.videoId }
@@ -1345,8 +1351,9 @@ fun ExpressiveConnectedButtonGroup(
 @Composable
 fun SectionDetailView(
     section: HomeSection,
-    currentOnlineSong: OnlineSong?,
+    currentPlayingVideoId: String?,
     isLoadingStream: Boolean,
+    isPlaybackActive: Boolean,
     onBack: () -> Unit,
     onSongClick: (OnlineSong, List<OnlineSong>, Int) -> Unit,
     onAlbumClick: (OnlineAlbum) -> Unit,
@@ -1388,8 +1395,9 @@ fun SectionDetailView(
             ) { index, song ->
                 SearchResultItem(
                     item = SearchItem.Song(song),
-                    isCurrentlyPlaying = song.videoId == currentOnlineSong?.videoId,
-                    isLoading = isLoadingStream && song.videoId == currentOnlineSong?.videoId,
+                    isCurrentlyPlaying = song.videoId == currentPlayingVideoId,
+                    isLoading = isLoadingStream && song.videoId == currentPlayingVideoId,
+                isPlaybackActive = isPlaybackActive,
                     onSongMenuClick = onSongMenuClick,
                     onClick = { onSongClick(song, songs, index) }
                 )
@@ -1432,8 +1440,8 @@ fun SectionDetailView(
                         Box(modifier = Modifier.weight(1f)) {
                             HomeCarouselItem(
                                 item = item,
-                                isPlaying = when (item) {
-                                    is SearchItem.Song -> item.song.videoId == currentOnlineSong?.videoId
+                                isPlaying = isPlaybackActive && when (item) {
+                                    is SearchItem.Song -> item.song.videoId == currentPlayingVideoId
                                     else -> false
                                 },
                                 onClick = {

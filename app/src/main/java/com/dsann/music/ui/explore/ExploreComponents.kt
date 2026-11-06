@@ -573,6 +573,7 @@ fun SearchTopResultCard(
     item: SearchItem,
     isCurrentlyPlaying: Boolean,
     isLoading: Boolean,
+    isPlaybackActive: Boolean = false,
     onSongMenuClick: ((OnlineSong) -> Unit)? = null,
     onTouchDown: () -> Unit = {},
     onCollectionMenuClick: ((SearchItem) -> Unit)? = null,
@@ -603,6 +604,9 @@ fun SearchTopResultCard(
             (item.playlist.author?.name?.let { " • $it" } ?: "")
     }
     val imageShape = if (item is SearchItem.Artist) CircleShape else RoundedCornerShape(14.dp)
+    val isSongPlaying = item is SearchItem.Song && isCurrentlyPlaying &&
+        isPlaybackActive && !isLoading
+    val playingCoverColor = rememberNowPlayingCoverColor(thumbnail, isSongPlaying)
 
     Row(
         modifier = Modifier
@@ -631,12 +635,21 @@ fun SearchTopResultCard(
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AsyncImage(
-            model = rememberExploreImageRequest(thumbnail, 320),
-            contentDescription = null,
-            modifier = Modifier.size(92.dp).clip(imageShape),
-            contentScale = ContentScale.Crop
-        )
+        Box(modifier = Modifier.size(92.dp)) {
+            AsyncImage(
+                model = rememberExploreImageRequest(thumbnail, 320),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().clip(imageShape),
+                contentScale = ContentScale.Crop
+            )
+            if (isSongPlaying) {
+                NowPlayingCoverIndicator(
+                    isPlaying = true,
+                    coverColor = playingCoverColor,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+        }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -904,7 +917,7 @@ private fun openExploreItemMenu(
 @Composable
 fun HomeSectionRow(
     section: HomeSection,
-    currentOnlineSong: OnlineSong?,
+    currentPlayingVideoId: String?,
     isPlaybackActive: Boolean = false,
     onSongClick: (OnlineSong) -> Unit,
     onAlbumClick: (OnlineAlbum) -> Unit,
@@ -1069,7 +1082,7 @@ fun HomeSectionRow(
                                 HomeCarouselItem(
                                     item = item,
                                     isPlaying = isPlaybackActive && item is SearchItem.Song &&
-                                        item.song.videoId == currentOnlineSong?.videoId,
+                                        item.song.videoId == currentPlayingVideoId,
                                     onSongMenuClick = onSongMenuClick,
                                     onCollectionMenuClick = onCollectionMenuClick,
                                     onClick = {
@@ -1440,7 +1453,7 @@ fun HomeSectionRow(
                                     songChunk.forEachIndexed { songIndex, item ->
                                         HomeSongListItem(
                                             song = item.song,
-                                            isPlaying = isPlaybackActive && item.song.videoId == currentOnlineSong?.videoId,
+                                            isPlaying = isPlaybackActive && item.song.videoId == currentPlayingVideoId,
                                             showDivider = songIndex < songChunk.lastIndex,
                                             onTouchDown = { onSongTouchDown(item.song) },
                                             onClick = { onSongClick(item.song) },
@@ -1477,7 +1490,7 @@ fun HomeSectionRow(
                             HomeCarouselItem(
                                 item = item,
                                 isPlaying = isPlaybackActive && when (item) {
-                                    is SearchItem.Song -> item.song.videoId == currentOnlineSong?.videoId
+                                    is SearchItem.Song -> item.song.videoId == currentPlayingVideoId
                                     else -> false
                                 },
                                 onTouchDown = if (item is SearchItem.Song) {
