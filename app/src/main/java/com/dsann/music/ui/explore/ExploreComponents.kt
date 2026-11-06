@@ -1854,6 +1854,7 @@ fun LocalSongActionsBottomSheet(
     selectedSongIndex: Int,
     playerSharedViewModel: PlayerSharedViewModel,
     onDismissRequest: () -> Unit,
+    onDeleteSong: (SongItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -1876,7 +1877,7 @@ fun LocalSongActionsBottomSheet(
         }
     }
 
-    val actionListener = remember(song.id, playerSharedViewModel, localQueue, selectedSongIndex) {
+    val actionListener = remember(song.id, playerSharedViewModel, localQueue, selectedSongIndex, onDeleteSong) {
         object : SongActionsBottomSheet.ActionListener {
             override fun onPlayNext(songItem: SongItem) {
                 playerSharedViewModel.addToQueueNext(songItem)
@@ -1886,7 +1887,7 @@ fun LocalSongActionsBottomSheet(
                 playerSharedViewModel.addToQueue(songItem)
             }
 
-            override fun onDelete(songItem: SongItem) = Unit
+            override fun onDelete(songItem: SongItem) = onDeleteSong(songItem)
             override fun onEdit(songItem: SongItem) = Unit
 
             override fun onPlay(songItem: SongItem) {
@@ -1984,7 +1985,8 @@ fun LocalSongActionsBottomSheet(
                     showAddToPlaylist = false,
                     localSongMode = true,
                     showInfoAction = true,
-                    onShowInfoAction = { showInfo = true }
+                    onShowInfoAction = { showInfo = true },
+                    showStandaloneDelete = true
                 )
             }
         }
