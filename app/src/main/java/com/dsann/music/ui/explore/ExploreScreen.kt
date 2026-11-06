@@ -1892,7 +1892,7 @@ fun ExploreScreen(
                                                                             WelcomeGreetingBanner(
                                                                                 userName = customProfileName.takeIf { it.isNotBlank() }
                                                                                     ?: userProfile?.name,
-                                                                                onReplayClick = if (!isSearchDestination) {
+                                                                                onRecapClick = if (!isSearchDestination) {
                                                                                     { showReplayScreen = true }
                                                                                 } else null
                                                                             )
