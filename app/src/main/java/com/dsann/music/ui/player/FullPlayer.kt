@@ -1320,6 +1320,21 @@ fun FullPlayer(
         // keeping their shared vertical anchor unchanged. Preserve landscape spacing.
         val titleToActionsSpacerWeight =
             if (isLandscapeWindow || compactPortraitLyrics) 2.25f else 1.5f
+        val titleGroupTopSpacerWeight =
+            if (isLandscapeWindow || compactPortraitLyrics) 0.75f else 1.5f
+        // When the inline lyric line is disabled, move 60% of the blank
+        // visualizer-to-controls spacer above the title/visualizer group. Keeping
+        // the combined weight constant leaves the action row at its existing anchor.
+        val reduceEmptyLyricsGap = !isLandscapeWindow && !showSyncedLyricsInPlayer
+        val effectiveTitleToActionsSpacerWeight =
+            if (reduceEmptyLyricsGap) titleToActionsSpacerWeight * 0.4f
+            else titleToActionsSpacerWeight
+        val effectiveTitleGroupTopSpacerWeight =
+            if (reduceEmptyLyricsGap) {
+                titleGroupTopSpacerWeight + titleToActionsSpacerWeight * 0.6f
+            } else {
+                titleGroupTopSpacerWeight
+            }
         // Match the exact height factor used to position the shared artwork layer.
         // Multi-window mode may compact controls, but must not shrink the artwork slot.
         val portraitArtHeightFactor = when {
@@ -1446,7 +1461,7 @@ fun FullPlayer(
             // retain their exact vertical position while the group moves down.
             Spacer(
                 modifier = Modifier.weight(
-                    if (isLandscapeWindow || compactPortraitLyrics) 0.75f else 1.5f,
+                    effectiveTitleGroupTopSpacerWeight,
                     fill = true
                 )
             )
@@ -1607,7 +1622,7 @@ fun FullPlayer(
             } else {
                 Spacer(
                     modifier = Modifier.weight(
-                        titleToActionsSpacerWeight,
+                        effectiveTitleToActionsSpacerWeight,
                         fill = true
                     )
                 )
