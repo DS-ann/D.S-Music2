@@ -84,6 +84,20 @@ internal fun formatDuration(ms: Long): String {
     return String.format(java.util.Locale.getDefault(), "%02d:%02d", minutes, seconds)
 }
 
+internal fun bestProgressContrastColor(backgroundColor: Color): Color {
+    val dark = Color(0xFF1C1B1F)
+    val backgroundArgb = backgroundColor.toArgb()
+    val darkContrast = androidx.core.graphics.ColorUtils.calculateContrast(
+        dark.toArgb(),
+        backgroundArgb
+    )
+    val lightContrast = androidx.core.graphics.ColorUtils.calculateContrast(
+        Color.White.toArgb(),
+        backgroundArgb
+    )
+    return if (darkContrast >= lightContrast) dark else Color.White
+}
+
 internal fun deriveArtworkSurfaceColor(
     sourceColor: Color,
     isDark: Boolean,
@@ -381,13 +395,11 @@ internal fun WavySliderWithLabels(
             .fillMaxWidth()
             .padding(horizontal = 8.dp)
     ) {
-        val contrastTrackColor = if (
-            androidx.core.graphics.ColorUtils.calculateLuminance(backgroundSurfaceColor.toArgb()) > 0.5
-        ) Color(0xFF1C1B1F) else Color.White
+        val contrastTrackColor = bestProgressContrastColor(backgroundSurfaceColor)
         val requestedActiveColor = when (scrubberColor) {
             "White" -> Color.White
             "Cover" -> coverDerivedColor
-            else -> dynamicAccentColor
+            else -> DsmusicTheme.colorScheme.primary
         }
         // Keep user-selected scrubber colours whenever they remain legible. Fall back
         // to a neutral light/dark colour only when the selected colour blends into the

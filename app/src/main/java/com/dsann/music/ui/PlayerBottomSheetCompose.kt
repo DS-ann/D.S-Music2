@@ -120,6 +120,7 @@ import com.dsann.music.R
 import com.dsann.music.model.PlayerGestureAction
 import com.dsann.music.model.SongItem
 import com.dsann.music.ui.player.ArtworkPager
+import com.dsann.music.ui.player.bestProgressContrastColor
 import com.dsann.music.ui.player.DsmCoverShapes
 import com.dsann.music.ui.player.FullPlayerScreen
 import com.dsann.music.ui.player.PlayerUiState
@@ -449,6 +450,7 @@ fun BoxScope.UnifiedPlayerMiniAndFullLayers(
                 isPlaying = isPlaying,
                 accentColor = baseAccentColor,
                 miniPlayerBackgroundColor = miniPlayerBackgroundColor,
+                coverDerivedColor = Color(playerBackgroundColor),
                 showLegacyCompactArtwork = showLegacyCompactArtwork,
                 expansionFraction = playerContentExpansionFraction,
                 onClick = {
@@ -2178,6 +2180,7 @@ fun PlayerBottomSheetCompose(
                                 viewModel = viewModel,
                                 accentColor = baseAccentColor,
                                 backgroundColor = dynamicBgColor,
+                                coverDerivedColor = Color(playerBackgroundColor),
                                 expansionFraction = playerContentExpansionFraction,
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -2314,6 +2317,7 @@ private fun MiniPlayerContentInternal(
     isPlaying: Boolean,
     accentColor: Color,
     miniPlayerBackgroundColor: Color,
+    coverDerivedColor: Color,
     showLegacyCompactArtwork: Boolean,
     expansionFraction: Animatable<Float, AnimationVector1D>,
     onClick: () -> Unit,
@@ -2457,6 +2461,7 @@ private fun MiniPlayerContentInternal(
                     viewModel = viewModel,
                     accentColor = accentColor,
                     backgroundColor = miniPlayerBackgroundColor,
+                    coverDerivedColor = coverDerivedColor,
                     expansionFraction = expansionFraction,
                     centerOnArtworkEdge = true,
                     modifier = Modifier.size(48.dp).graphicsLayer {
@@ -2650,6 +2655,7 @@ private fun MiniPlayerArtworkProgressOverlay(
     viewModel: PlayerSharedViewModel,
     accentColor: Color,
     backgroundColor: Color,
+    coverDerivedColor: Color,
     expansionFraction: Animatable<Float, AnimationVector1D>,
     centerOnArtworkEdge: Boolean = false,
     modifier: Modifier = Modifier
@@ -2664,6 +2670,7 @@ private fun MiniPlayerArtworkProgressOverlay(
         context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
     }
     val style by preferences.observeKey("mini_player_progress", "Ring")
+    val scrubberColor by preferences.observeKey("scrubber_color", "Accent")
     val artworkShapeName by preferences.observeKey("player_artwork_shape", "Rounded")
     val artworkLayout by preferences.observeKey("player_layout", "Standard")
     val matchingCoverShape = remember(artworkShapeName, artworkLayout) {
@@ -2687,15 +2694,20 @@ private fun MiniPlayerArtworkProgressOverlay(
         initialValue = viewModel.currentPosition.value
     )
     val duration by viewModel.duration.collectAsStateWithLifecycle()
-    val contrastProgressColor = if (
-        androidx.core.graphics.ColorUtils.calculateLuminance(backgroundColor.toArgb()) > 0.5
-    ) Color(0xFF1C1B1F) else Color.White
+    val contrastProgressColor = bestProgressContrastColor(backgroundColor)
+    val requestedProgressColor = when (scrubberColor) {
+        "White" -> Color.White
+        "Cover" -> coverDerivedColor
+        else -> DsmusicTheme.colorScheme.primary
+    }
+    // Match the full-player Progress color choice, but always preserve legibility
+    // against the actual mini-player surface when the cover-derived colour is used.
     val visibleAccentColor = if (
         androidx.core.graphics.ColorUtils.calculateContrast(
-            accentColor.toArgb(),
+            requestedProgressColor.toArgb(),
             backgroundColor.toArgb()
         ) >= 3.0
-    ) accentColor else contrastProgressColor
+    ) requestedProgressColor else contrastProgressColor
     val progressTrackColor = Color.Transparent
 
     // The frame timestamp is read inside Canvas so only the artwork-progress drawing
