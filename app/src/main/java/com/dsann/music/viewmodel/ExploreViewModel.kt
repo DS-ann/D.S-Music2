@@ -1825,6 +1825,30 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /**
+     * Re-read user-owned Explore preferences after a Settings backup is imported.
+     * The ExploreViewModel is activity-scoped and can outlive the restore screen,
+     * so constructor-only loading would otherwise leave its UI state stale.
+     */
+    fun reloadRestoredPreferences() {
+        loadSearchHistory()
+        val pinnedSongs = getPinnedSpeedDialSongs()
+        val notInterested = prefs.getStringSet("not_interested_ids", emptySet()).orEmpty()
+        _uiState.update { state ->
+            val filteredSections = state.homeSections.map { section ->
+                section.copy(items = section.items.filterNot { item ->
+                    item is SearchItem.Song && item.song.videoId in notInterested
+                })
+            }.filter { it.items.isNotEmpty() }
+            state.copy(
+                pinnedSpeedDialIds = pinnedSongs.map { it.videoId }.toSet(),
+                notInterestedIds = notInterested,
+                homeSections = filteredSections
+            )
+        }
+        homeLoaded = false
+    }
+
     private fun savePinnedSpeedDialSongs(songs: List<OnlineSong>) {
         prefs.edit { putString("speed_dial_songs_json", gson.toJson(songs)) }
         _uiState.update { state -> state.copy(pinnedSpeedDialIds = songs.map { it.videoId }.toSet()) }
