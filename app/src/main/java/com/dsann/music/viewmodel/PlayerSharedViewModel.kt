@@ -1667,9 +1667,13 @@ class PlayerSharedViewModel @Inject constructor(
     // ========== LIBRARY MANAGEMENT ==========
 
     fun setSongList(songs: List<SongItem>) {
+        // A replacement queue is a new Autoplay session. Do not carry the previous
+        // queue's completed radio-seed markers into Cache/Downloaded playlists: an
+        // offline copy may reuse a video ID whose recommendations were fetched earlier.
+        autoplayFetchedVideoIds.clear()
         _songList.value = songs
         if (_repeatMode.value == REPEAT_ONCE) resetRepeatOnceCycleFromCurrent()
-        Log.d(TAG, "Song list updated: ${songs.size} songs")
+        Log.d(TAG, "Song list updated: ${songs.size} songs; reset Autoplay seed history")
         
         // Proactive queue warmer
         if (songs.isNotEmpty()) {
