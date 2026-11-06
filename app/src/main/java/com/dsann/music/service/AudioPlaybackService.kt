@@ -3127,9 +3127,12 @@ class AudioPlaybackService : MediaSessionService() {
      * the last word end is its final timing boundary. The full text stays together
      * until the next line begins, matching the portrait player's one-active-line model.
      */
-    private fun currentWidgetLyricText(positionMs: Long): CharSequence {
+    private fun currentWidgetLyricText(positionMs: Long, playbackDurationMs: Long): CharSequence {
         val timeline = LineSyncedLyricTimeline.build(widgetSyncedLyrics)
-        val durationMs = player.duration.takeIf {
+        // Use the duration snapshot captured on the player's application looper. This
+        // renderer is also called from Dispatchers.Default during widget progress updates,
+        // where touching ExoPlayer would violate Media3's thread-affinity requirement.
+        val durationMs = playbackDurationMs.takeIf {
             it > 0L && it != androidx.media3.common.C.TIME_UNSET
         } ?: 0L
         val activeIndex = LineSyncedLyricTimeline.activeIndexAt(
@@ -3280,7 +3283,7 @@ class AudioPlaybackService : MediaSessionService() {
             this,
             pos.toInt(),
             dur.toInt(),
-            currentWidgetLyricText(pos)
+            currentWidgetLyricText(pos, dur)
         )
     }
 
@@ -3328,7 +3331,7 @@ class AudioPlaybackService : MediaSessionService() {
             isPlaying,
             position.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
             duration.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-            currentWidgetLyricText(position),
+            currentWidgetLyricText(position, duration),
             currentWidgetRepeatIconResource()
         )
     }
