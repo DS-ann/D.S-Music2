@@ -1467,8 +1467,14 @@ class AudioPlaybackService : MediaSessionService() {
         }
 
         currentSongName = song.title
-        currentAlbumArt = null
-        currentAlbumArtSongId = null
+        // Keep the already loaded cover when the same song is being re-resolved after
+        // buffering or a stream error. Clearing it here makes the notification lose its
+        // artwork even though the player still has that song's cover available.
+        // A different song must never inherit the previous song's notification artwork.
+        if (currentAlbumArtSongId != songId) {
+            currentAlbumArt = null
+            currentAlbumArtSongId = null
+        }
         refreshMediaNotification()
     }
 
