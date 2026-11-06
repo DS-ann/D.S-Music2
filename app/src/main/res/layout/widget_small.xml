@@ -32,8 +32,8 @@
 
             <ImageView
                 android:id="@+id/widget_album_art"
-                android:layout_width="46dp"
-                android:layout_height="46dp"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
                 android:background="@drawable/shape_album_art_round"
                 android:clipToOutline="true"
                 android:scaleType="centerCrop"
@@ -42,7 +42,7 @@
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="6dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -57,9 +57,10 @@
                     android:includeFontPadding="false" />
 
                 <TextView
+                    android:id="@+id/widget_song_title"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="3dp"
                     android:ellipsize="end"
                     android:maxLines="1"
                     android:text="Now Playing"
@@ -69,6 +70,7 @@
                     android:includeFontPadding="false" />
 
                 <TextView
+                    android:id="@+id/widget_artist_name"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
@@ -90,21 +92,21 @@
 
             <ImageButton
                 android:id="@+id/widget_prev"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:background="@drawable/widget_control_background"
                 android:contentDescription="Previous"
-                android:padding="7dp"
+                android:padding="6dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_skip_previous"
                 android:tint="@android:color/white" />
 
             <ImageButton
                 android:id="@+id/widget_play_pause"
-                android:layout_width="34dp"
-                android:layout_height="34dp"
-                android:layout_marginStart="7dp"
-                android:layout_marginEnd="7dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
                 android:background="@drawable/widget_control_background"
                 android:contentDescription="Play or Pause"
                 android:padding="8dp"
@@ -114,11 +116,11 @@
 
             <ImageButton
                 android:id="@+id/widget_next"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:background="@drawable/widget_control_background"
                 android:contentDescription="Next"
-                android:padding="7dp"
+                android:padding="6dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_skip_next"
                 android:tint="@android:color/white" />
