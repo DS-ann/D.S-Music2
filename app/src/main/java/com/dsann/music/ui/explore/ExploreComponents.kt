@@ -1978,6 +1978,117 @@ fun LocalSongActionsBottomSheet(
     }
 }
 
+
+/**
+ * Queue row actions use the same Compose sheet shell as Explore and Downloaded songs.
+ * Only queue-relevant actions are exposed; there is no duplicate add-to-queue, like,
+ * share, download, playlist or delete action.
+ */
+@Composable
+fun QueueSongActionsBottomSheet(
+    song: SongItem,
+    playerSharedViewModel: PlayerSharedViewModel,
+    onDismissRequest: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val modalGeometry = rememberDsmusicModalSheetGeometry()
+    var showInfo by remember(song.id) { mutableStateOf(false) }
+
+    val actionListener = remember(song.id, playerSharedViewModel) {
+        object : SongActionsBottomSheet.ActionListener {
+            override fun onPlayNext(songItem: SongItem) {
+                playerSharedViewModel.addToQueueNext(songItem)
+            }
+
+            override fun onAddToQueue(songItem: SongItem) = Unit
+
+            override fun onDelete(songItem: SongItem) {
+                playerSharedViewModel.removeFromQueue(songItem.id)
+            }
+
+            override fun onEdit(songItem: SongItem) = Unit
+
+            override fun onPlay(songItem: SongItem) {
+                playerSharedViewModel.playSong(songItem)
+            }
+
+            override fun onFavorite(songItem: SongItem, isFav: Boolean) = Unit
+            override fun onShare(songItem: SongItem) = Unit
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        sheetState = sheetState,
+        sheetMaxWidth = if (isLandscape) modalGeometry.width else Dp.Unspecified,
+        centeredLandscape = true,
+        centerOffsetX = modalGeometry.centerOffsetX,
+        containerColor = DsmusicTheme.colorScheme.surfaceContainerHigh,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp, start = 14.dp, end = 14.dp, top = 4.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            ExploreActionSheetHeader(
+                thumbnailUrl = song.getAlbumArtUri()?.toString(),
+                title = song.title,
+                subtitle = song.artist,
+                trailingContent = {
+                    DsmusicIconButton(onClick = onDismissRequest) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "Close",
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+            )
+
+            HorizontalDivider(
+                color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+            )
+
+            if (showInfo) {
+                DsmusicTextButton(
+                    onClick = { showInfo = false },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Back to song actions")
+                }
+                InfoContent(song)
+            } else {
+                OptionsContent(
+                    song = song,
+                    isFavorite = false,
+                    onFavoriteChange = {},
+                    actionListener = actionListener,
+                    onAddToPlaylist = {},
+                    showAddToQueue = false,
+                    onDismiss = onDismissRequest,
+                    showDelete = false,
+                    showRemoveFromQueue = true,
+                    hasDownloadedOpus = false,
+                    isConvertingToMp3 = false,
+                    showLikeAndShare = false,
+                    showAddToPlaylist = false,
+                    localSongMode = true,
+                    showInfoAction = true,
+                    onShowInfoAction = { showInfo = true }
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun OnlineSongBottomSheet(
     song: OnlineSong,
