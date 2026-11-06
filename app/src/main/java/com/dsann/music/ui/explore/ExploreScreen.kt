@@ -70,7 +70,6 @@ import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Settings
 import com.dsann.music.ui.theme.LoadingIndicator
 import com.dsann.music.ui.theme.FilterChip
 import com.dsann.music.ui.theme.FilterChipDefaults
@@ -117,6 +116,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -132,6 +132,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.dsann.music.MainActivity
+import com.dsann.music.R
 import com.dsann.music.data.innertube.OnlineSong
 import com.dsann.music.data.innertube.SearchFilter
 import com.dsann.music.data.innertube.SearchItem
@@ -2983,7 +2984,7 @@ private fun ExploreCustomizerDialog(
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.Settings,
+                            painter = painterResource(R.drawable.ic_settings_customize),
                             contentDescription = "Customize Explore",
                             modifier = Modifier.size(21.dp),
                             tint = DsmusicTheme.colorScheme.onSurfaceVariant
