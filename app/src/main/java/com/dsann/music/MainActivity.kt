@@ -1084,6 +1084,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // A FOLLOW_SYSTEM change can recreate this Activity while the ViewModelStore is
+        // retained. Refresh the theme-dependent Settings controls from the new resources.
+        ViewModelProvider(this)[SettingsViewModel::class.java].refreshSystemTheme()
         setupSystemBars()
     }
 

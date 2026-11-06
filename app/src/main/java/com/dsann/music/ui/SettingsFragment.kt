@@ -149,6 +149,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.dsann.music.BuildConfig
+import com.dsann.music.applyDsmusicNightMode
 import com.dsann.music.MainActivity
 import com.dsann.music.model.PlayerGestureAction
 import com.dsann.music.model.PlayerGestureSettings
@@ -226,7 +227,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
         _themeMode.value = safe
         _darkMode.value = resolvedDark
-        // MainActivity applies the selection through Compose without recreating the Activity.
+        applyDsmusicNightMode(safe)
     }
 
     fun setDarkMode(enabled: Boolean) {
@@ -237,7 +238,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
         _themeMode.value = mode
         _darkMode.value = enabled
-        // Compose theme reacts to the preference without Activity recreation.
+        applyDsmusicNightMode(mode)
+    }
+
+    /** Refresh the appearance toggle after Android reports a system night-mode change. */
+    fun refreshSystemTheme() {
+        if (_themeMode.value != "system") return
+        val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+        if (_darkMode.value != systemDark) {
+            _darkMode.value = systemDark
+            prefs.edit { putBoolean(KEY_DARK_MODE, systemDark) }
+        }
     }
 
     // ── YouTube Music Cookies ──────────────────────────────────────────────────

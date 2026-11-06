@@ -17,6 +17,20 @@ import com.dsann.music.data.innertube.NewPipeStreamExtractor
 import com.dsann.music.util.CacheManager
 import dagger.hilt.android.HiltAndroidApp
 
+/**
+ * Keep Android/AppCompat resources in sync with the app's visible theme choice.
+ * MODE_NIGHT_FOLLOW_SYSTEM is essential: resolving System to a saved boolean
+ * pins the app to yesterday's device theme and prevents future system changes.
+ */
+internal fun applyDsmusicNightMode(themeMode: String?) {
+    val appCompatMode = when (themeMode?.lowercase()) {
+        "dark" -> AppCompatDelegate.MODE_NIGHT_YES
+        "light" -> AppCompatDelegate.MODE_NIGHT_NO
+        else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+    }
+    AppCompatDelegate.setDefaultNightMode(appCompatMode)
+}
+
 @HiltAndroidApp
 class DsmusicApplication : Application(), ImageLoaderFactory {
 
@@ -92,17 +106,9 @@ class DsmusicApplication : Application(), ImageLoaderFactory {
         }, "D.S-Music-Startup").start()
 
         val prefs = getSharedPreferences("AppSettings", MODE_PRIVATE)
-        val isDarkMode = prefs.getString("theme_mode", "system")?.let { mode ->
-            when (mode) {
-                "dark" -> true
-                "light" -> false
-                else -> prefs.getBoolean("dark_mode", true)
-            }
-        } ?: true
-        AppCompatDelegate.setDefaultNightMode(
-            if (isDarkMode) AppCompatDelegate.MODE_NIGHT_YES
-            else AppCompatDelegate.MODE_NIGHT_NO
-        )
+        // Do not turn "system" into a one-time light/dark snapshot. Android must
+        // remain subscribed to device night-mode changes for this preference.
+        applyDsmusicNightMode(prefs.getString("theme_mode", "system"))
 
         // Load saved YouTube Music cookies for account-backed features.
         prefs.getString("yt_cookies", null)?.let { InnerTubeClient.cookie = it }
