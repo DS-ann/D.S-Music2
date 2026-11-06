@@ -731,6 +731,11 @@ class AudioPlaybackService : MediaSessionService() {
     private var originalSourceUri: Uri? = null
     private var isNextSongPreCached = false
 
+    // Cancellable, generation-checked work for speculative next-track queue insertion.
+    private var nextQueuePreloadGeneration: Long = 0L
+    private var nextQueuePreloadJob: Job? = null
+    private var scheduledQueuePreload: Runnable? = null
+
     // Complete the active remote track in SimpleCache, not just ExoPlayer's short playback buffer.
     private var fullTrackCacheJob: Job? = null
     @Volatile private var fullTrackCacheKey: String? = null

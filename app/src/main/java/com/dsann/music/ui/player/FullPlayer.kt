@@ -1530,10 +1530,17 @@ fun FullPlayer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(titleToActionsSpacerWeight, fill = true)
-                        // Clip text to its measured slot on every Android version. If the
-                        // measured lyric/action bounds collide, reallocate vertical space
-                        // above this slot and use the compact single-line text treatment.
-                        .clipToBounds()
+                        // Android 6 can measure the legacy-font lyric line a few pixels
+                        // taller than its weighted slot. Let it draw into the surrounding
+                        // spacer instead of cropping glyph edges; the bounds-based collision
+                        // check above still keeps the line clear of the action buttons.
+                        .then(
+                            if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M) {
+                                Modifier
+                            } else {
+                                Modifier.clipToBounds()
+                            }
+                        )
                         .then(
                             if (isCompactPortraitMultiWindow) Modifier.heightIn(min = 36.dp)
                             else Modifier
