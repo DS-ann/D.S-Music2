@@ -76,6 +76,34 @@ import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 import android.media.AudioAttributes as LegacyAudioAttributes
 
+/**
+ * App/session fallback labels are not song titles. Reject them before they can be
+ * persisted as Cache metadata or override a real title already saved for the stream.
+ */
+private fun usableCacheTrackTitle(value: String?): String? {
+    val candidate = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    return candidate.takeUnless {
+        it.equals("D.S Music", ignoreCase = true) ||
+            it.equals("SpatialFlow", ignoreCase = true) ||
+            it.equals("Unknown Title", ignoreCase = true) ||
+            it.equals("<unknown>", ignoreCase = true) ||
+            it.equals("Unknown", ignoreCase = true) ||
+            it.equals("Now Playing", ignoreCase = true)
+    }
+}
+
+private fun usableCacheTrackArtist(value: String?): String? {
+    val candidate = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    return candidate.takeUnless {
+        it.equals("D.S Music", ignoreCase = true) ||
+            it.equals("SpatialFlow", ignoreCase = true) ||
+            it.equals("Unknown Artist", ignoreCase = true) ||
+            it.equals("<unknown>", ignoreCase = true) ||
+            it.equals("Unknown", ignoreCase = true) ||
+            it.equals("Now Playing", ignoreCase = true)
+    }
+}
+
 @OptIn(UnstableApi::class)
 data class CachedMediaMetadata(
     val title: String,
@@ -374,14 +402,22 @@ class AudioPlaybackService : MediaSessionService() {
             albumName: String = "",
             thumbnailUrl: String = ""
         ) {
-            if (cacheKey.isBlank() || title.isBlank()) return
+            if (cacheKey.isBlank()) return
             val digestKey = cacheMetadataEntryKey(cacheKey)
             // Keep the video ID when a cache playlist later reopens a track using its direct
             // cached URL (that offline queue intentionally has no online resolver ID).
             val previousMetadata = getCachedMediaMetadata(context, cacheKey)
+            // currentSongName can be the app name when playback is restored without a
+            // matching queue item. Never store that fallback as the actual track title.
+            val safeTitle = usableCacheTrackTitle(title)
+                ?: usableCacheTrackTitle(previousMetadata?.title)
+                ?: return
+            val safeArtist = usableCacheTrackArtist(artist)
+                ?: usableCacheTrackArtist(previousMetadata?.artist)
+                ?: "Unknown Artist"
             val payload = org.json.JSONObject()
-                .put("title", title)
-                .put("artist", artist.ifBlank { previousMetadata?.artist.orEmpty() })
+                .put("title", safeTitle)
+                .put("artist", safeArtist)
                 .put("songId", songId.ifBlank { previousMetadata?.songId.orEmpty() })
                 .put("durationMs", durationMs.takeIf { it > 0L } ?: previousMetadata?.durationMs ?: 0L)
                 .put("videoId", videoId.ifBlank { previousMetadata?.videoId.orEmpty() })
@@ -1809,11 +1845,15 @@ class AudioPlaybackService : MediaSessionService() {
         val songId = item.mediaId.takeIf { it.isNotBlank() }
             ?: song?.id?.toString()?.takeIf { it.isNotBlank() }
             ?: return
-        val title = item.mediaMetadata.title?.toString()?.takeIf { it.isNotBlank() }
-            ?: song?.title?.takeIf { it.isNotBlank() }
+        val existingMetadata = getCachedMediaMetadata(applicationContext, cacheKey)
+        val title = usableCacheTrackTitle(song?.title)
+            ?: usableCacheTrackTitle(item.mediaMetadata.title?.toString())
+            ?: usableCacheTrackTitle(existingMetadata?.title)
             ?: return
-        val artist = item.mediaMetadata.artist?.toString()?.takeIf { it.isNotBlank() }
-            ?: song?.artist.orEmpty()
+        val artist = usableCacheTrackArtist(song?.artist)
+            ?: usableCacheTrackArtist(item.mediaMetadata.artist?.toString())
+            ?: usableCacheTrackArtist(existingMetadata?.artist)
+            ?: "Unknown Artist"
         val durationMs = player.duration.takeIf {
             it > 0L && it != C.TIME_UNSET
         } ?: song?.duration ?: 0L
@@ -2139,15 +2179,19 @@ class AudioPlaybackService : MediaSessionService() {
         } else {
             null
         }
-        val resolvedTitle = title.takeIf { it.isNotBlank() } ?: cachedMetadata?.title.orEmpty()
-        val resolvedArtist = artist.takeIf { it.isNotBlank() } ?: cachedMetadata?.artist.orEmpty()
+        val resolvedTitle = usableCacheTrackTitle(activeSong?.title)
+            ?: usableCacheTrackTitle(title)
+            ?: usableCacheTrackTitle(cachedMetadata?.title)
+        val resolvedArtist = usableCacheTrackArtist(activeSong?.artist)
+            ?: usableCacheTrackArtist(artist)
+            ?: usableCacheTrackArtist(cachedMetadata?.artist)
         val resolvedAlbum = activeSong?.albumName?.takeIf { it.isNotBlank() }
             ?: cachedMetadata?.albumName?.takeIf { it.isNotBlank() }
         val resolvedThumbnail = activeSong?.thumbnailUrl?.takeIf { it.isNotBlank() }
             ?: cachedMetadata?.thumbnailUrl?.takeIf { it.isNotBlank() }
         val metadataBuilder = androidx.media3.common.MediaMetadata.Builder()
-            .setTitle(resolvedTitle)
-            .setArtist(resolvedArtist)
+        resolvedTitle?.let { metadataBuilder.setTitle(it) }
+        resolvedArtist?.let { metadataBuilder.setArtist(it) }
         resolvedAlbum?.let { metadataBuilder.setAlbumTitle(it) }
         resolvedThumbnail?.let { metadataBuilder.setArtworkUri(it.toUri()) }
 
@@ -2163,17 +2207,19 @@ class AudioPlaybackService : MediaSessionService() {
         if (uri.scheme == "http" || uri.scheme == "https") {
             val cachedSong = viewModel?.songList?.value?.firstOrNull { it.id.toString() == songId }
                 ?: viewModel?.currentSong?.value?.takeIf { it.id.toString() == songId }
-            rememberMediaCacheMetadata(
-                this,
-                uri.toString(),
-                title,
-                artist,
-                songId,
-                cachedSong?.duration ?: 0L,
-                cachedSong?.videoId.orEmpty(),
-                albumName = cachedSong?.albumName.orEmpty(),
-                thumbnailUrl = cachedSong?.thumbnailUrl.orEmpty()
-            )
+            resolvedTitle?.let { safeTitle ->
+                rememberMediaCacheMetadata(
+                    this,
+                    uri.toString(),
+                    safeTitle,
+                    resolvedArtist ?: "Unknown Artist",
+                    songId,
+                    cachedSong?.duration ?: 0L,
+                    cachedSong?.videoId.orEmpty(),
+                    albumName = cachedSong?.albumName.orEmpty(),
+                    thumbnailUrl = cachedSong?.thumbnailUrl.orEmpty()
+                )
+            }
         }
 
         return MediaItem.Builder()
@@ -2219,11 +2265,20 @@ class AudioPlaybackService : MediaSessionService() {
         val durationMs = player.duration.takeIf {
             it > 0L && it != androidx.media3.common.C.TIME_UNSET
         } ?: activeSong?.duration ?: 0L
+        val existingMetadata = getCachedMediaMetadata(applicationContext, uri.toString())
+        val safeTitle = usableCacheTrackTitle(activeSong?.title)
+            ?: usableCacheTrackTitle(item.mediaMetadata.title?.toString())
+            ?: usableCacheTrackTitle(existingMetadata?.title)
+            ?: return
+        val safeArtist = usableCacheTrackArtist(activeSong?.artist)
+            ?: usableCacheTrackArtist(item.mediaMetadata.artist?.toString())
+            ?: usableCacheTrackArtist(existingMetadata?.artist)
+            ?: "Unknown Artist"
         rememberMediaCacheMetadata(
             applicationContext,
             uri.toString(),
-            item.mediaMetadata.title?.toString() ?: activeSong?.title.orEmpty(),
-            item.mediaMetadata.artist?.toString() ?: activeSong?.artist.orEmpty(),
+            safeTitle,
+            safeArtist,
             item.mediaId.ifBlank { activeSong?.id?.toString().orEmpty() },
             durationMs,
             activeSong?.videoId.orEmpty(),
