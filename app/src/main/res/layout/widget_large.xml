@@ -15,10 +15,6 @@
         android:scaleType="centerCrop"
         android:visibility="visible" />
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@drawable/widget_scrim" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -118,10 +114,11 @@
                     android:padding="8dp"
                     android:src="@drawable/ic_favorite_border" />
 
-                <Space
+                <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="1dp"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:orientation="vertical" />
 
                 <ImageButton
                     android:id="@+id/widget_prev"
@@ -153,10 +150,11 @@
                     android:padding="12dp"
                     android:src="@drawable/ic_skip_next" />
 
-                <Space
+                <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="1dp"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:orientation="vertical" />
 
                 <ImageButton
                     android:id="@+id/widget_repeat"

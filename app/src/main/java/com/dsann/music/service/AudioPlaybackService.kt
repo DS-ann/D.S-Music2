@@ -3074,7 +3074,8 @@ class AudioPlaybackService : MediaSessionService() {
             else -> "sans-serif"
         }
         val output = SpannableString(value)
-        output.setSpan(TypefaceSpan(family), 0, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        val typeface = Typeface.create(family, Typeface.NORMAL)
+        output.setSpan(TypefaceSpan(typeface), 0, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         output.setSpan(StyleSpan(Typeface.BOLD), 0, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
 
         val widgetPrefs = getSharedPreferences("dsmusic_widget_prefs", Context.MODE_PRIVATE)
