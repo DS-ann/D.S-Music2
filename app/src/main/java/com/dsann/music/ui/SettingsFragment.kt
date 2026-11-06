@@ -3058,7 +3058,7 @@ private fun AppearanceScreen(
             })
             SettingsGroupCard(listOf {
                 SettingsChoiceRow(
-                    title = "Genre card gradients",
+                    title = "Genre card colours",
                     description = "Choose the colours used on genre cards. Theme uses your app colours; the other choices use different colour blends.",
                     selected = genreGradientStyle,
                     options = listOf("Theme", "Aurora", "Ocean", "Sunset", "Forest", "Berry"),
@@ -3271,7 +3271,7 @@ private fun AppearanceScreen(
             SettingsGroupCard(listOf(
                 {
                     SettingsChoiceRow(
-                        title = "Background treatment",
+                        title = "Player background",
                         description = "Choose the player background: album cover, app theme, black, or a soft blend of colours based on the cover.",
                         selected = playerBackgroundStyle,
                         options = listOf("Artwork", "Theme", "Black", "Gradient"),
@@ -3368,7 +3368,7 @@ private fun AppearanceScreen(
                 {
                     SettingsChoiceRow(
                         title = "Lyrics colour",
-                        description = "Choose the lyrics colour: D.S Launcher gradient, app theme, or white.",
+                        description = "Choose between colourful lyrics, app colours, or white lyrics.",
                         selected = lyricsColorStyle,
                         options = listOf("Home Studio Gradient", "UI Matching", "White"),
                         onSelected = onLyricsColorStyleChange
@@ -5602,7 +5602,7 @@ fun YouTubeMusicLoginDialog(
         text = {
             Column(modifier = Modifier.fillMaxWidth().height(420.dp)) {
                 Text(
-                    text = "Sign in to access your real playlists, library, and personalized interests.",
+                    text = "Sign in to see your playlists, music library and recommendations.",
                     style = DsmusicTheme.typography.bodyMedium,
                     modifier = Modifier.padding(bottom = 8.dp),
                     color = DsmusicTheme.colorScheme.onSurfaceVariant
