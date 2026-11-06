@@ -206,11 +206,17 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         return false;
     }
 
-    private static void applyLyricsPresentation(Context context, RemoteViews views, CharSequence lyrics) {
+    private static void applyLyricsPresentation(Context context, RemoteViews views, CharSequence lyrics, int layoutId) {
         views.setTextViewText(R.id.widget_lyrics_text, lyrics != null ? lyrics : "...");
         SharedPreferences appearance = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE);
         String size = appearance.getString("lyrics_text_size", "Standard");
-        float textSize = "Small".equals(size) ? 16.5f : "Large".equals(size) ? 21.5f : 19f;
+        float textSize;
+        if (layoutId == R.layout.widget_medium) {
+            // The 4x2 widget has room for a larger, readable two-line lyric preview.
+            textSize = "Small".equals(size) ? 18.5f : "Large".equals(size) ? 23.5f : 21f;
+        } else {
+            textSize = "Small".equals(size) ? 16.5f : "Large".equals(size) ? 21.5f : 19f;
+        }
         views.setTextViewTextSize(
                 R.id.widget_lyrics_text, TypedValue.COMPLEX_UNIT_SP, textSize);
         String alignment = appearance.getString("lyrics_alignment", "Original");
@@ -355,7 +361,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                     : 0;
             views.setProgressBar(R.id.widget_progress, 100, Math.max(0, Math.min(100, progress)), false);
             if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
-                applyLyricsPresentation(context, views, currentLyric);
+                applyLyricsPresentation(context, views, currentLyric, layoutId);
             }
             manager.partiallyUpdateAppWidget(id, views);
         } catch (Exception e) {
@@ -431,12 +437,12 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             views.setProgressBar(R.id.widget_progress, 100, Math.max(0, Math.min(100, progress)), false);
 
             if (layoutId == R.layout.widget_medium) {
-                applyLyricsPresentation(context, views, currentLyric);
+                applyLyricsPresentation(context, views, currentLyric, layoutId);
                 boolean isLyricsMode = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                         .getBoolean(PREF_LYRICS_MODE + id, false);
                 views.setDisplayedChild(R.id.widget_flipper, isLyricsMode ? 1 : 0);
             } else if (layoutId == R.layout.widget_large) {
-                applyLyricsPresentation(context, views, currentLyric);
+                applyLyricsPresentation(context, views, currentLyric, layoutId);
             }
 
             // Apply icon resources, tint, and click actions on every full refresh,

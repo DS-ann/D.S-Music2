@@ -70,7 +70,7 @@ object LineSyncedLyricTimeline {
         }
         if (index < timeline.lastIndex) {
             return timeline[index].completionTimeMs
-                .takeIf { it != Long.MAX_VALUE && it > positionMs + 20L }
+                .takeIf { it != Long.MAX_VALUE && it > positionMs }
         }
         return timeline.last().lastWordEndMs?.plus(1_001L)?.takeIf { it > positionMs }
     }

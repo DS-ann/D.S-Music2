@@ -2969,15 +2969,15 @@ class AudioPlaybackService : MediaSessionService() {
                         // itself fires at the next timed lyric/word boundary.
                         scheduleNextWidgetLyricRefresh(pos)
                     }
-                    val widgetProgressIntervalMs = if (
-                        Build.VERSION.SDK_INT <= Build.VERSION_CODES.M && !lyricsWidgetActive
-                    ) 5_000L else 1_000L
+                    // Keep widget progress predictable across Android versions. Synced lyric
+                    // boundaries below still trigger independent immediate updates.
+                    val widgetProgressIntervalMs = 2_000L
                     if (player.isPlaying &&
                         nowMs - lastWidgetProgressUpdateAtMs >= widgetProgressIntervalMs
                     ) {
                         lastWidgetProgressUpdateAtMs = nowMs
-                        // API 23 keeps ordinary progress updates inexpensive. Lyrics pages
-                        // receive separate boundary-timed updates instead of waiting 5 seconds.
+                        // Lyrics pages also receive independent boundary-timed updates; this
+                        // timer is only the regular progress refresh.
                         serviceScope.launch(Dispatchers.Default) {
                             updateWidgetProgress(pos, dur)
                         }
@@ -3262,14 +3262,20 @@ class AudioPlaybackService : MediaSessionService() {
 
         cancelWidgetLyricRefresh()
         val speed = player.playbackParameters.speed.takeIf { it.isFinite() && it > 0f } ?: 1f
-        val delayMs = (((nextEvent - positionMs).toDouble() / speed.toDouble()).roundToInt() + 24L)
-            .coerceAtLeast(60L)
-            .coerceAtMost(60_000L)
+        val delayMs = kotlin.math.ceil(
+            (nextEvent - positionMs).coerceAtLeast(0L).toDouble() / speed.toDouble()
+        ).toLong().coerceIn(1L, 60_000L)
         val update = Runnable {
             widgetLyricUpdateRunnable = null
             widgetLyricScheduledBoundaryMs = null
             if (!player.isPlaying) return@Runnable
             val position = player.currentPosition.coerceAtLeast(0L)
+            // Handler timing may wake a fraction early. Never publish the old line at a
+            // boundary: reschedule for the remaining playback time instead.
+            if (position < nextEvent) {
+                scheduleNextWidgetLyricRefresh(position)
+                return@Runnable
+            }
             updateWidgetProgress(position, player.duration.coerceAtLeast(0L))
             scheduleNextWidgetLyricRefresh(position)
         }
