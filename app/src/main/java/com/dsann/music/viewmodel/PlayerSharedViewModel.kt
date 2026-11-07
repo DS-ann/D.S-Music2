@@ -2091,16 +2091,19 @@ class PlayerSharedViewModel @Inject constructor(
     }
 
     private fun scheduleNextSongPrefetch(selectedSongId: Long) {
+        // Resolve the predicted neighbour on Main because shuffle/repeat cursors are
+        // ViewModel-owned state. Only the network prefetch itself runs on IO.
+        val nextIndex = getNextSongIndex()
+        val nextSong = _songList.value.getOrNull(nextIndex) ?: return
+        if (nextSong.isCachedTrack || nextSong.isDownloadedOffline) return
+        val nextVideoId = nextSong.videoId?.takeIf { it.isNotBlank() } ?: return
+
         nextSongPrefetchJob?.cancel()
         nextSongPrefetchJob = bgScope.launch(Dispatchers.IO) {
             // A fast Next/Previous burst should prefetch only for the final selected song.
             delay(280L)
             if (_currentSong.value?.id != selectedSongId) return@launch
-            val nextIndex = getNextSongIndex()
-            val nextSong = _songList.value.getOrNull(nextIndex) ?: return@launch
-            if (!nextSong.isCachedTrack && !nextSong.isDownloadedOffline) {
-                nextSong.videoId?.let { YouTubeMusic.prefetchStream(it) }
-            }
+            YouTubeMusic.prefetchStream(nextVideoId)
         }
     }
 
