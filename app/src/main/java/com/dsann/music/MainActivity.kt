@@ -1006,7 +1006,7 @@ class MainActivity : AppCompatActivity() {
                             contentAlignment = Alignment.Center
                         ) {
                             Image(
-                                painter = painterResource(id = R.mipmap.ic_launcher),
+                                painter = painterResource(id = R.drawable.ic_launcher_art),
                                 contentDescription = "D.S Music",
                                 modifier = Modifier.size(280.dp)
                             )
