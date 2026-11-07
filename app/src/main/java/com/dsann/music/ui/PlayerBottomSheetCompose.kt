@@ -2357,9 +2357,10 @@ private fun MiniPlayerContentInternal(
     val miniArtworkShape = remember(artworkShapeName, artworkLayout) {
         DsmCoverShapes.forPlayerLayout(artworkLayout, artworkShapeName)
     }
-    val legacyDownloadedArtwork = if (
-        android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M &&
-        currentSong.isDownloadedOffline
+    val savedCurrentArtwork = if (
+        currentSong.isCachedTrack ||
+        (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M &&
+            currentSong.isDownloadedOffline)
     ) {
         embeddedCurrentArtwork?.takeIf { it.isNotEmpty() }
     } else {
@@ -2367,10 +2368,10 @@ private fun MiniPlayerContentInternal(
     }
     val miniArtworkModel: Any? = remember(
         currentSong.id, currentSong.thumbnailUrl, currentSong.videoId,
-        currentSong.albumId, currentSong.path, currentSong.isDownloadedOffline,
-        legacyDownloadedArtwork
+        currentSong.albumId, currentSong.path, currentSong.isCachedTrack,
+        currentSong.isDownloadedOffline, savedCurrentArtwork
     ) {
-        legacyDownloadedArtwork
+        savedCurrentArtwork
             ?: currentSong.thumbnailUrl?.takeIf { it.isNotBlank() }
                 ?.let { SongItem.enhanceThumbnailUrl(it) }
             ?: currentSong.videoId?.takeIf { it.isNotBlank() }

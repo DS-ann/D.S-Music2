@@ -1163,11 +1163,23 @@ class PlayerSharedViewModel @Inject constructor(
                 _isCurrentSongDisliked.value = false
                 if (song != null) {
                     SongDownloader.refreshDownloadedStatus(appContext, song)
-                    // Clear the previous track's image immediately. Downloaded-file art is
-                    // then reloaded from the active file:// or content:// playback source.
+                    // Clear the previous track's image immediately. Cached-track artwork is
+                    // loaded from D.S Music's persistent artwork store; downloaded-file artwork
+                    // continues to come from the active file:// or content:// playback source.
                     _currentSongArtwork.value = null
-                    // Load embedded artwork bytes for legacy notification and player artwork.
-                    val embedded = withContext(Dispatchers.IO) { song.getEmbeddedPicture(appContext) }
+                    val embedded = withContext(Dispatchers.IO) {
+                        val savedCacheArtwork = if (song.isCachedTrack) {
+                            runCatching {
+                                AudioPlaybackService.getCachedMediaArtworkFile(
+                                    appContext,
+                                    song.id.toString()
+                                ).takeIf { it.isFile && it.length() > 0L }?.readBytes()
+                            }.getOrNull()
+                        } else {
+                            null
+                        }
+                        savedCacheArtwork ?: song.getEmbeddedPicture(appContext)
+                    }
                     _currentSongArtwork.value = embedded
                     
                     val colors = extractColorsFromArtwork(song, embedded)

@@ -141,19 +141,21 @@ fun ArtworkPager(
             val artworkUrl = remember(song.id, song.thumbnailUrl, song.albumId, song.path, videoId) {
                 resolveArtworkUrl(song)
             }
-            // Android 6 Coil cannot turn a downloaded audio file URI into its embedded
-            // cover. The ViewModel extracts the file's tagged artwork on IO and publishes
-            // the bytes for the current downloaded track; prefer those bytes to its audio URI.
-            val embeddedArtworkForPage = if (
-                android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M &&
+            // Cached tracks keep their cover in D.S Music's persistent artwork store.
+            // Downloaded-file covers still use the ViewModel bytes on Android 6, where Coil
+            // cannot reliably decode embedded artwork from the active file URI.
+            val savedArtworkForPage = if (
                 song.id == currentSong.id &&
-                song.isDownloadedOffline
+                (song.isCachedTrack || (
+                    android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.M &&
+                    song.isDownloadedOffline
+                ))
             ) {
                 embeddedCurrentArtwork?.takeIf { it.isNotEmpty() }
             } else {
                 null
             }
-            val artworkModel: Any? = embeddedArtworkForPage ?: artworkUrl?.toUri()
+            val artworkModel: Any? = savedArtworkForPage ?: artworkUrl?.toUri()
             val imageRequest = remember(context, artworkModel, artworkTargetSizePx) {
                 artworkModel?.let {
                     ImageRequest.Builder(context)
@@ -165,7 +167,7 @@ fun ArtworkPager(
                 }
             }
 
-            var isError by remember(artworkUrl, embeddedArtworkForPage) { mutableStateOf(false) }
+            var isError by remember(artworkUrl, savedArtworkForPage) { mutableStateOf(false) }
 
             Box(
                 modifier = Modifier
