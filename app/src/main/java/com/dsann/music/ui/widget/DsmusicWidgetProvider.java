@@ -45,6 +45,8 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
     private static final String ACTION_PREVIOUS = "com.dsann.music.ACTION_PREVIOUS";
     private static final String ACTION_NEXT = "com.dsann.music.ACTION_NEXT";
     private static final String ACTION_TOGGLE_LYRICS = "com.dsann.music.ACTION_TOGGLE_LYRICS";
+    private static final String ACTION_WIDGET_TOGGLE_PLAY_PAUSE =
+            "com.dsann.music.ACTION_WIDGET_TOGGLE_PLAY_PAUSE";
     
     private static final String PREFS_NAME = "dsmusic_widget_prefs";
     private static final String PREF_LYRICS_MODE = "lyrics_mode_";
@@ -350,21 +352,14 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         Context appContext = update.context;
         AppWidgetManager manager = AppWidgetManager.getInstance(appContext);
         try {
-            int[] smallIds = manager.getAppWidgetIds(
-                    new ComponentName(appContext, WidgetSmallProvider.class));
             int[] mediumIds = manager.getAppWidgetIds(
                     new ComponentName(appContext, WidgetMediumProvider.class));
             int[] largeIds = manager.getAppWidgetIds(
                     new ComponentName(appContext, WidgetLargeProvider.class));
-            if (smallIds.length == 0 && mediumIds.length == 0 && largeIds.length == 0) {
+            if (mediumIds.length == 0 && largeIds.length == 0) {
                 return;
             }
 
-            for (int id : smallIds) {
-                updateWidgetProgress(
-                        appContext, manager, id, update.position, update.duration,
-                        R.layout.widget_small);
-            }
             for (int id : mediumIds) {
                 updateWidgetProgress(
                         appContext, manager, id, update.position, update.duration,
@@ -449,14 +444,15 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             int layoutId,
             int repeatIconResId
     ) {
+        // The 2x2 layout is artwork-only; its click action toggles playback directly.
+        if (layoutId == R.layout.widget_small) return;
+
         // Set drawable resources explicitly instead of relying on the launcher's
         // interpretation of XML ImageButton defaults or inherited theme tints.
         setWidgetIcon(views, R.id.widget_play_pause,
                 isPlaying ? R.drawable.widget_ic_pause : R.drawable.widget_ic_play);
 
-        if (layoutId == R.layout.widget_small ||
-                layoutId == R.layout.widget_medium ||
-                layoutId == R.layout.widget_large) {
+        if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
             setWidgetIcon(views, R.id.widget_prev, R.drawable.widget_ic_previous);
             setWidgetIcon(views, R.id.widget_next, R.drawable.widget_ic_next);
         }
@@ -487,9 +483,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         try {
             RemoteViews views = hideSkeleton(context, layoutId);
 
-            if (layoutId == R.layout.widget_small ||
-                    layoutId == R.layout.widget_medium ||
-                    layoutId == R.layout.widget_large) {
+            if (layoutId != R.layout.widget_small) {
                 views.setTextViewText(
                         R.id.widget_song_title,
                         song != null && song.title != null ? song.title : "D.S Music"
@@ -498,12 +492,13 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                         R.id.widget_artist_name,
                         song != null && song.artist != null ? song.artist : "Select a song"
                 );
-            }
 
-            int progress = duration > 0
-                    ? (int) (((float) Math.max(0, position) / duration) * 100f)
-                    : 0;
-            views.setProgressBar(R.id.widget_progress, 100, Math.max(0, Math.min(100, progress)), false);
+                int progress = duration > 0
+                        ? (int) (((float) Math.max(0, position) / duration) * 100f)
+                        : 0;
+                views.setProgressBar(
+                        R.id.widget_progress, 100, Math.max(0, Math.min(100, progress)), false);
+            }
 
             if (layoutId == R.layout.widget_medium) {
                 applyLyricsPresentation(context, views, currentLyric, layoutId);
@@ -533,10 +528,12 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                     } catch (Exception artworkError) {
                         Log.w(TAG, "Could not load widget album art for " + song.title, artworkError);
                     }
-                    try {
-                        loadBlurredAura(context, views, artworkUri, id);
-                    } catch (Exception artworkError) {
-                        Log.w(TAG, "Could not load widget aura for " + song.title, artworkError);
+                    if (layoutId != R.layout.widget_small) {
+                        try {
+                            loadBlurredAura(context, views, artworkUri, id);
+                        } catch (Exception artworkError) {
+                            Log.w(TAG, "Could not load widget aura for " + song.title, artworkError);
+                        }
                     }
                 }
             }
@@ -544,9 +541,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             Log.e(TAG, "Failed to update widget " + id, error);
             try {
                 RemoteViews fallback = new RemoteViews(context.getPackageName(), layoutId);
-                if (layoutId == R.layout.widget_small ||
-                        layoutId == R.layout.widget_medium ||
-                        layoutId == R.layout.widget_large) {
+                if (layoutId != R.layout.widget_small) {
                     fallback.setTextViewText(
                             R.id.widget_song_title,
                             song != null && song.title != null ? song.title : "D.S Music"
@@ -555,11 +550,12 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                             R.id.widget_artist_name,
                             song != null && song.artist != null ? song.artist : "Select a song"
                     );
+                    int progress = duration > 0
+                            ? (int) (((float) Math.max(0, position) / duration) * 100f)
+                            : 0;
+                    fallback.setProgressBar(
+                            R.id.widget_progress, 100, Math.max(0, Math.min(100, progress)), false);
                 }
-                int progress = duration > 0
-                        ? (int) (((float) Math.max(0, position) / duration) * 100f)
-                        : 0;
-                fallback.setProgressBar(R.id.widget_progress, 100, Math.max(0, Math.min(100, progress)), false);
                 if (layoutId == R.layout.widget_medium) {
                     applyLyricsPresentation(context, fallback, currentLyric, R.layout.widget_medium);
                     boolean isLyricsMode = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -900,14 +896,23 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
     }
 
     private static void setupPendingIntents(Context context, RemoteViews views, boolean isPlaying, int layoutId, Class<?> providerClass, int widgetId) {
-        // App Launch Intent (On Art)
+        if (layoutId == R.layout.widget_small) {
+            // The 2x2 widget is a single artwork control. Resolve play/pause from live
+            // player state in the service instead of relying on a possibly stale icon state.
+            PendingIntent artworkToggle = getServicePendingIntent(
+                    context, ACTION_WIDGET_TOGGLE_PLAY_PAUSE, 15);
+            views.setOnClickPendingIntent(R.id.widget_album_art, artworkToggle);
+            return;
+        }
+
+        // Larger widgets retain the existing app-launch behavior on the artwork.
         Intent launchIntent = new Intent(context, com.dsann.music.MainActivity.class);
         launchIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent piLaunch = PendingIntent.getActivity(context, 0, launchIntent, 
+        PendingIntent piLaunch = PendingIntent.getActivity(context, 0, launchIntent,
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-        
+
         views.setOnClickPendingIntent(R.id.widget_album_art, piLaunch);
-        
+
         // Lyrics Toggle (Medium Widget only)
         if (layoutId == R.layout.widget_medium) {
             Intent toggleIntent = new Intent(context, providerClass);
@@ -977,6 +982,34 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             } catch (Exception e) {
                 Log.w(TAG, "Could not request lyrics for widget", e);
             }
+        }
+    }
+
+    /**
+     * Small widget tap feedback. RemoteViews cannot run a ViewPropertyAnimator, so send
+     * a short three-frame scale pulse through supported View.setScaleX/Y methods.
+     */
+    public static void animateSmallWidgetArtwork(Context context) {
+        final Context appContext = context.getApplicationContext();
+        final Handler handler = new Handler(Looper.getMainLooper());
+        handler.post(() -> applySmallArtworkScale(appContext, 0.94f));
+        handler.postDelayed(() -> applySmallArtworkScale(appContext, 1.035f), 65L);
+        handler.postDelayed(() -> applySmallArtworkScale(appContext, 1.0f), 135L);
+    }
+
+    private static void applySmallArtworkScale(Context context, float scale) {
+        try {
+            AppWidgetManager manager = AppWidgetManager.getInstance(context);
+            int[] ids = manager.getAppWidgetIds(
+                    new ComponentName(context, WidgetSmallProvider.class));
+            for (int id : ids) {
+                RemoteViews feedback = new RemoteViews(context.getPackageName(), R.layout.widget_small);
+                feedback.setFloat(R.id.widget_album_art, "setScaleX", scale);
+                feedback.setFloat(R.id.widget_album_art, "setScaleY", scale);
+                manager.partiallyUpdateAppWidget(id, feedback);
+            }
+        } catch (Exception error) {
+            Log.w(TAG, "Could not animate 2x2 artwork tap", error);
         }
     }
 

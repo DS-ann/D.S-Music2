@@ -163,6 +163,7 @@ class AudioPlaybackService : MediaSessionService() {
         const val ACTION_SESSION_CUSTOM_PREFIX = "com.dsann.music.ACTION_SESSION_CUSTOM."
         const val ACTION_WIDGET_FETCH_LYRICS = "com.dsann.music.ACTION_WIDGET_FETCH_LYRICS"
         const val ACTION_WIDGET_REFRESH_STATE = "com.dsann.music.ACTION_WIDGET_REFRESH_STATE"
+        const val ACTION_WIDGET_TOGGLE_PLAY_PAUSE = "com.dsann.music.ACTION_WIDGET_TOGGLE_PLAY_PAUSE"
 
         private const val PREFS_NAME = "AppSettings"
         private const val KEY_CROSSFADE_DURATION = "crossfade_duration"
@@ -1203,6 +1204,10 @@ class AudioPlaybackService : MediaSessionService() {
 
     private fun handleServiceAction(action: String) {
         when {
+            action == ACTION_WIDGET_TOGGLE_PLAY_PAUSE -> {
+                DsmusicWidgetProvider.animateSmallWidgetArtwork(applicationContext)
+                if (player.isPlaying || player.playWhenReady) pause() else play()
+            }
             action == ACTION_PLAY -> play()
             action == ACTION_PAUSE -> pause()
             action == ACTION_PREVIOUS -> playPrevious()
