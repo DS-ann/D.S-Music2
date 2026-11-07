@@ -173,6 +173,7 @@ import kotlin.math.log10
 import kotlin.math.pow
 
 private const val KEY_SAVED_APPEARANCE_LOOKS = "saved_appearance_looks"
+private const val MAX_BACKUP_HISTORY_EVENTS = 200
 
 private val SmoothSpring = spring<Float>(
     dampingRatio = Spring.DampingRatioNoBouncy,
@@ -195,6 +196,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     // restoration anchor if Compose has to rebuild the nested host.
     private val _currentSettingsRoute = MutableStateFlow(SettingsRoute.Main.route)
     val currentSettingsRoute: StateFlow<String> = _currentSettingsRoute.asStateFlow()
+
+    private val _includeListeningHistoryInBackup = MutableStateFlow(
+        prefs.getBoolean(KEY_BACKUP_INCLUDE_HISTORY, true)
+    )
+    val includeListeningHistoryInBackup: StateFlow<Boolean> =
+        _includeListeningHistoryInBackup.asStateFlow()
+
+    fun setIncludeListeningHistoryInBackup(include: Boolean) {
+        _includeListeningHistoryInBackup.value = include
+        prefs.edit { putBoolean(KEY_BACKUP_INCLUDE_HISTORY, include) }
+    }
 
     fun setCurrentSettingsRoute(route: String) {
         if (route.isNotBlank()) _currentSettingsRoute.value = route
@@ -1240,7 +1252,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private val excludedBackupPreferenceKeys = setOf(
         // Authentication cookies are credentials. The receiving device must sign in separately.
-        "yt_cookies"
+        "yt_cookies",
+        // This controls how future backups are created; it is not a user setting to restore.
+        KEY_BACKUP_INCLUDE_HISTORY
     )
 
     private val exploreBackupPreferenceKeys = setOf(
@@ -1382,7 +1396,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         calculateCacheSize()
     }
 
-    fun exportBackup(context: Context, uri: Uri, onResult: (Boolean, String) -> Unit) {
+    fun exportBackup(
+        context: Context,
+        uri: Uri,
+        includeHistory: Boolean = true,
+        onResult: (Boolean, String) -> Unit
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val settings = encodePreferences(
@@ -1405,7 +1424,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 playlists.forEach { playlist ->
                     playlistSongs.addAll(playlistDao.getSongsForPlaylist(playlist.id).first())
                 }
-                val historyEvents = playlistDao.getAllHistoryEventsFlow().first()
+                // The DAO orders history by timestamp descending, so take() keeps the
+                // newest events and avoids exporting hundreds of repeated artwork URLs.
+                val historyEvents = if (includeHistory) {
+                    playlistDao.getAllHistoryEventsFlow().first().take(MAX_BACKUP_HISTORY_EVENTS)
+                } else null
 
                 val gson = com.google.gson.Gson()
                 val backupObject = com.google.gson.JsonObject().apply {
@@ -1423,7 +1446,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
                     add("playlists", gson.toJsonTree(playlists))
                     add("playlist_songs", gson.toJsonTree(playlistSongs))
-                    add("history_events", gson.toJsonTree(historyEvents))
+                    // Omit the property entirely when history is excluded. Older importers
+                    // already interpret a missing history array as "leave local history alone".
+                    historyEvents?.let { add("history_events", gson.toJsonTree(it)) }
                 }
 
                 val output = context.contentResolver.openOutputStream(uri, "wt")
@@ -1431,7 +1456,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 output.use { it.write(backupObject.toString().toByteArray(Charsets.UTF_8)) }
 
                 withContext(Dispatchers.Main) {
-                    onResult(true, "Backup exported with settings, favourites, playlists and listening history")
+                    onResult(
+                        true,
+                        if (includeHistory) {
+                            "Backup exported with settings, favourites, playlists and up to $MAX_BACKUP_HISTORY_EVENTS recent history events"
+                        } else {
+                            "Backup exported without listening history"
+                        }
+                    )
                 }
             } catch (e: Exception) {
                 android.util.Log.e("SettingsViewModel", "Failed to export backup", e)
@@ -1646,6 +1678,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     companion object {
         const val PREFS_NAME = "AppSettings"
+        const val KEY_BACKUP_INCLUDE_HISTORY = "backup_include_listening_history"
         const val KEY_TAPERED_SONG_DIVIDERS = "tapered_song_dividers"
         const val KEY_DARK_MODE = "dark_mode"
         const val KEY_CROSSFADE_ENABLED = "crossfade_enabled"
@@ -1790,6 +1823,7 @@ fun SettingsScreenContent(
 
 
     val ytCookies by viewModel.ytCookies.collectAsStateWithLifecycle()
+    val includeListeningHistoryInBackup by viewModel.includeListeningHistoryInBackup.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
 
@@ -1820,7 +1854,7 @@ fun SettingsScreenContent(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
         uri?.let {
-            viewModel.exportBackup(context, it) { _, msg ->
+            viewModel.exportBackup(context, it, includeHistory = includeListeningHistoryInBackup) { _, msg ->
                 (context as? MainActivity)?.showSnackbar(msg, 0)
             }
         }
@@ -1979,7 +2013,9 @@ fun SettingsScreenContent(
             BackupRestoreScreen(
                 navController = navController,
                 onBackupClick = { exportBackupLauncher.launch("D.S-Music-backup.json") },
-                onRestoreClick = { importBackupLauncher.launch(arrayOf("application/json")) }
+                onRestoreClick = { importBackupLauncher.launch(arrayOf("application/json")) },
+                includeListeningHistory = includeListeningHistoryInBackup,
+                onIncludeListeningHistoryChange = viewModel::setIncludeListeningHistoryInBackup
             )
         }
         composable(SettingsRoute.Account.route) {
@@ -2875,7 +2911,9 @@ private fun MusicManagementScreen(
 private fun BackupRestoreScreen(
     navController: androidx.navigation.NavController,
     onBackupClick: () -> Unit,
-    onRestoreClick: () -> Unit
+    onRestoreClick: () -> Unit,
+    includeListeningHistory: Boolean,
+    onIncludeListeningHistoryChange: (Boolean) -> Unit
 ) {
     Scaffold(
         topBar = { SettingsDetailTopBar("Backup & Restore") { navController.popBackStack() } }
@@ -2896,7 +2934,7 @@ private fun BackupRestoreScreen(
                         content = {
                             Column {
                                 Text("Export Settings & Library", style = DsmusicTheme.typography.bodyLarge)
-                                Text("Save settings, appearance, player customisation, favourites, playlists, Explore preferences and listening history", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
+                                Text("Save settings, appearance, player customisation, favourites, playlists and Explore preferences", style = DsmusicTheme.typography.bodyMedium, color = DsmusicTheme.colorScheme.onSurfaceVariant)
                             }
                         },
                         leadingContent = {
@@ -2905,6 +2943,28 @@ private fun BackupRestoreScreen(
                                 contentDescription = null,
                                 tint = DsmusicTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(24.dp)
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                }
+                add {
+                    DsmusicListItem(
+                        onClick = { onIncludeListeningHistoryChange(!includeListeningHistory) },
+                        content = {
+                            Column {
+                                Text("Include listening history", style = DsmusicTheme.typography.bodyLarge)
+                                Text(
+                                    if (includeListeningHistory) "Export only the latest 200 listening events" else "Keep listening history out of the backup",
+                                    style = DsmusicTheme.typography.bodyMedium,
+                                    color = DsmusicTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = includeListeningHistory,
+                                onCheckedChange = onIncludeListeningHistoryChange
                             )
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
