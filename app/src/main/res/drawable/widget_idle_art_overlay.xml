@@ -6,25 +6,25 @@
     android:viewportHeight="64">
 
     <path
-        android:pathData="M32,3 A29,29 0,1 1,31.99 3 Z"
+        android:pathData="M32,3 C48,3 61,16 61,32 C61,48 48,61 32,61 C16,61 3,48 3,32 C3,16 16,3 32,3 Z"
         android:fillColor="#182544"
         android:strokeColor="#6681C2"
         android:strokeWidth="1.2" />
 
     <path
-        android:pathData="M32,8 A24,24 0,1 1,31.99 8"
+        android:pathData="M32,8 C45.3,8 56,18.7 56,32 C56,45.3 45.3,56 32,56 C18.7,56 8,45.3 8,32 C8,18.7 18.7,8 32,8 Z"
         android:fillColor="#00000000"
         android:strokeColor="#5B76B7"
         android:strokeWidth="1.15" />
 
     <path
-        android:pathData="M32,14 A18,18 0,1 1,31.99 14"
+        android:pathData="M32,14 C41.9,14 50,22.1 50,32 C50,41.9 41.9,50 32,50 C22.1,50 14,41.9 14,32 C14,22.1 22.1,14 32,14 Z"
         android:fillColor="#00000000"
         android:strokeColor="#425C96"
         android:strokeWidth="1.0" />
 
     <path
-        android:pathData="M32,22 A10,10 0,1 1,31.99 22"
+        android:pathData="M32,22 C37.5,22 42,26.5 42,32 C42,37.5 37.5,42 32,42 C26.5,42 22,37.5 22,32 C22,26.5 26.5,22 32,22 Z"
         android:fillColor="#344B83"
         android:strokeColor="#8DA8F0"
         android:strokeWidth="1.1" />
