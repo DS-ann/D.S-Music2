@@ -68,6 +68,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
@@ -122,6 +124,7 @@ import com.dsann.music.viewmodel.ExploreViewModel
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -210,6 +213,22 @@ class MainActivity : AppCompatActivity() {
             val dynamicAlbumColor = if (currentSong != null) playerBackgroundColor else null
 
             DsmusicAppTheme(darkTheme = isDarkTheme, dynamicAlbumColor = dynamicAlbumColor) {
+                // The platform splash is a solid colour. Follow it with a short branded
+                // gradient layer so the opening transition matches the launcher artwork.
+                var showStartupOverlay by remember { mutableStateOf(savedInstanceState == null) }
+                val startupOverlayAlpha by animateFloatAsState(
+                    targetValue = if (showStartupOverlay) 1f else 0f,
+                    animationSpec = tween(durationMillis = 320),
+                    label = "startupSplashAlpha"
+                )
+                LaunchedEffect(Unit) {
+                    if (showStartupOverlay) {
+                        delay(220)
+                        showStartupOverlay = false
+                    }
+                }
+
+                Box(modifier = Modifier.fillMaxSize()) {
                 // The settings screen and the navigation chrome share the Activity-scoped
                 // SettingsViewModel. Using the same StateFlows makes dock changes immediate
                 // and prevents the dock from becoming stale while its root tab is cached.
@@ -968,6 +987,31 @@ class MainActivity : AppCompatActivity() {
                     enabled = isPlayerBackActive
                 ) {
                     playerViewModel.requestPlayerCollapseFromBack()
+                }
+
+                    if (startupOverlayAlpha > 0.001f) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { alpha = startupOverlayAlpha }
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            Color(0xB3474747),
+                                            Color(0xB3242730),
+                                            Color(0xB3000000)
+                                        )
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.mipmap.ic_launcher),
+                                contentDescription = "D.S Music",
+                                modifier = Modifier.size(280.dp)
+                            )
+                        }
+                    }
                 }
             }
         }

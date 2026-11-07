@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="dsmusic_splash_system_background">#FF292B32</color>
 
     <!-- 🌈 Base seed (Fallback for pre-Android 12) -->
     <!-- 💜 PURPLE VIBE (Light) -->
