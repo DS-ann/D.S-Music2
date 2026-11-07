@@ -17,7 +17,14 @@ object LineSyncedLyricTimeline {
         val sorted = lines.mapIndexedNotNull { index, line ->
             if (line.isInterlude || line.content.isBlank()) null
             else {
-                val firstWordStart = line.words.minOfOrNull { it.absoluteStartTimeMs }
+                // Standard line-synced providers may attach auxiliary word metadata, but
+                // their authoritative boundary is still the line timestamp. Only genuine
+                // karaoke lines may shift to the first word timestamp.
+                val firstWordStart = if (line.isWordByWord && line.words.isNotEmpty()) {
+                    line.words.minOfOrNull { it.absoluteStartTimeMs }
+                } else {
+                    null
+                }
                 Triple(index, line, firstWordStart ?: line.startTimeMs)
             }
         }.sortedWith(
@@ -25,10 +32,14 @@ object LineSyncedLyricTimeline {
         )
 
         return sorted.mapIndexed { index, (_, line, start) ->
-            val lastWordEnd = line.words.asSequence()
+            // Do not let incidental word metadata shorten an ordinary synced line.
+            // The widget displays one complete line; word timing is used only for
+            // sources explicitly classified as word-by-word karaoke.
+            val lastWordEnd = if (line.isWordByWord) line.words.asSequence()
                 .filter { it.durationMs > 0L }
                 .map { it.absoluteStartTimeMs + it.durationMs }
                 .maxOrNull()
+            else null
             val nextStart = sorted.getOrNull(index + 1)?.third
             val completion = when {
                 nextStart == null -> lastWordEnd ?: Long.MAX_VALUE

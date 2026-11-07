@@ -1546,7 +1546,7 @@ class AudioPlaybackService : MediaSessionService() {
         widgetLyricsObserverJob?.cancel()
         widgetLyricsObserverJob = serviceScope.launch {
             vm.syncedLyrics.collect { lyrics ->
-                widgetSyncedLyrics = lyrics.orEmpty().sortedBy { it.startTimeMs }
+                widgetSyncedLyrics = lyrics.orEmpty().sortedBy { widgetLyricStartMs(it) }
                 if (widgetSyncedLyrics.isNotEmpty()) widgetPlainLyrics = null
                 else if (vm.plainLyrics.value.isNullOrBlank()) widgetPlainLyrics = null
 
@@ -3515,7 +3515,11 @@ class AudioPlaybackService : MediaSessionService() {
      * spans for the selected lyrics font/colour and the available karaoke word timing.
      */
     private fun widgetLyricStartMs(line: LyricLine): Long =
-        line.words.minOfOrNull { it.absoluteStartTimeMs } ?: line.startTimeMs
+        if (line.isWordByWord && line.words.isNotEmpty()) {
+            line.words.minOfOrNull { it.absoluteStartTimeMs } ?: line.startTimeMs
+        } else {
+            line.startTimeMs
+        }
 
     /** Last timed word boundary; used as the end of a karaoke-origin line window. */
     private fun widgetLyricEndMs(line: LyricLine): Long =
