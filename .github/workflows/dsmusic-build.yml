@@ -55,7 +55,9 @@ jobs:
       - name: Assemble ARM64 release APK
         run: |
           set -euo pipefail
-          gradle --build-cache --parallel assembleRelease
+          # This workflow produces a fast, installable test APK. Keep R8/resource
+          # shrinking and full release lint for manual publication, not every UI test build.
+          gradle --build-cache --parallel -PfastCiBuild=true -x lintVitalRelease assembleRelease
           SOURCE_APK="app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk"
           test -f "$SOURCE_APK"
           mkdir -p app/build/outputs/apk/dsmusic-artifact
