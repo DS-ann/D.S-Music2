@@ -2393,7 +2393,7 @@ private fun LocalPlaylistSongsList(
                 }
             }
         } else {
-            items(songs, key = { it.id }) { song ->
+            itemsIndexed(items = songs, key = { index, song -> "playlist-song:" + song.id + ":" + index }) { _, song ->
                 LocalPlaylistSongRow(
                     playlist = playlist,
                     songs = songs,
@@ -2878,7 +2878,7 @@ private fun LocalPlaylistDetailsScreen(
                                 }
                             }
                         } else {
-                            items(songs, key = { it.id }) { song ->
+                            itemsIndexed(items = songs, key = { index, song -> "playlist-song:" + song.id + ":" + index }) { _, song ->
                                 LocalPlaylistSongRow(
                                     playlist = playlist,
                                     songs = songs,

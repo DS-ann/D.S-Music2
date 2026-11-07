@@ -166,23 +166,40 @@ class QueueBottomSheet : BottomSheetDialogFragment() {
  * A queue row during drag preview. The dragged song is temporarily replaced by one
  * stable placeholder; all remaining songs keep their own keys and animate into place.
  */
-internal data class QueueDisplayEntry(val song: SongItem) {
-    val stableKey: Long get() = song.id
-}
+internal data class QueueDisplayEntry(
+    val song: SongItem,
+    /** Index in the canonical queue. This distinguishes repeated copies of one track. */
+    val sourceIndex: Int,
+    /** Bundle-saveable, unique key for this occurrence of a track in the queue. */
+    val stableKey: String
+)
 
 internal fun buildQueueDisplayEntries(
     songs: List<SongItem>,
-    draggedSongId: Long?,
+    draggedEntryKey: String?,
     targetIndex: Int?
 ): List<QueueDisplayEntry> {
-    if (draggedSongId == null || targetIndex == null) {
-        return songs.map { QueueDisplayEntry(it) }
+    // SongItem.id is not unique per queue occurrence: online IDs use String.hashCode(),
+    // and the same track may intentionally be queued more than once. Give each occurrence
+    // a deterministic key while keeping that key attached to its row during drag preview.
+    val occurrenceCounts = HashMap<Long, Int>()
+    val entries = songs.mapIndexed { index, song ->
+        val occurrence = occurrenceCounts[song.id] ?: 0
+        occurrenceCounts[song.id] = occurrence + 1
+        QueueDisplayEntry(
+            song = song,
+            sourceIndex = index,
+            stableKey = "queue:" + song.id + ":" + occurrence
+        )
     }
-    val fromIndex = songs.indexOfFirst { it.id == draggedSongId }
-    if (fromIndex < 0 || songs.isEmpty()) return songs.map { QueueDisplayEntry(it) }
-    val safeTarget = targetIndex.coerceIn(0, songs.lastIndex)
-    val previewOrder = com.dsann.music.util.OrderUtils.move(songs, fromIndex, safeTarget)
-    return previewOrder.map { QueueDisplayEntry(it) }
+
+    if (draggedEntryKey == null || targetIndex == null || entries.isEmpty()) {
+        return entries
+    }
+    val fromIndex = entries.indexOfFirst { it.stableKey == draggedEntryKey }
+    if (fromIndex < 0) return entries
+    val safeTarget = targetIndex.coerceIn(0, entries.lastIndex)
+    return com.dsann.music.util.OrderUtils.move(entries, fromIndex, safeTarget)
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -213,9 +230,9 @@ fun QueueBottomSheetContent(
             }
         }
     )
-    val draggedSongId = dragDropState.draggedItemKey as? Long
+    val draggedEntryKey = dragDropState.draggedItemKey as? String
     val displayEntries = remember(songList, draggedSongId, dragDropState.currentIndexOfDraggedItem) {
-        buildQueueDisplayEntries(songList, draggedSongId, dragDropState.currentIndexOfDraggedItem)
+        buildQueueDisplayEntries(songList, draggedEntryKey, dragDropState.currentIndexOfDraggedItem)
     }
     ClearRecentDraggedItemAnimationSkip(dragDropState)
 
@@ -353,7 +370,7 @@ fun QueueBottomSheetContent(
                                 key = { _, entry -> entry.stableKey },
                                 contentType = { _, _ -> "queue-song" }
                             ) { displayIndex, entry ->
-                                val recentlyDropped = entry.song?.id == dragDropState.recentlyDraggedItemKey
+                                val recentlyDropped = entry.stableKey == dragDropState.recentlyDraggedItemKey
                                 val animatedModifier = if (recentlyDropped) Modifier else Modifier.animateItem(
                                     fadeInSpec = null,
                                     fadeOutSpec = null,
@@ -377,6 +394,7 @@ fun QueueBottomSheetContent(
                         }
                         QueueDraggedSongOverlay(
                             songs = displayedSongs,
+                            displayEntries = displayEntries,
                             currentSongIndex = currentSongIndex,
                             dragDropState = dragDropState,
                             contentPadding = PaddingValues(start = 20.dp, end = 20.dp),
@@ -504,7 +522,7 @@ fun QueueBottomSheetContent(
                                     key = { _, entry -> entry.stableKey },
                                     contentType = { _, _ -> "queue-song" }
                                 ) { displayIndex, entry ->
-                                    val recentlyDropped = entry.song?.id == dragDropState.recentlyDraggedItemKey
+                                    val recentlyDropped = entry.stableKey == dragDropState.recentlyDraggedItemKey
                                     val animatedModifier = if (recentlyDropped) Modifier else Modifier.animateItem(
                                         fadeInSpec = null,
                                         fadeOutSpec = null,
@@ -850,9 +868,10 @@ internal fun QueueDisplayRow(
     onPlaySongAtIndex: (Int) -> Unit
 ) {
     val song = entry.song
-    val originalIndex = songs.indexOfFirst { it.id == song.id }
-    val isPlaying = songs.getOrNull(currentSongIndex)?.id == song.id
-    val isDragged = song.id == dragDropState.draggedItemKey
+    val originalIndex = entry.sourceIndex
+    val isPlaying = currentSongIndex == originalIndex &&
+        songs.getOrNull(currentSongIndex)?.id == song.id
+    val isDragged = entry.stableKey == dragDropState.draggedItemKey
     val shapes = ListItemDefaults.segmentedShapes(index = displayIndex, count = songs.size)
 
     // Keep this keyed item composed so its long-press pointer gesture survives
@@ -879,6 +898,7 @@ internal fun QueueDisplayRow(
 @Composable
 internal fun QueueDraggedSongOverlay(
     songs: List<SongItem>,
+    displayEntries: List<QueueDisplayEntry>,
     currentSongIndex: Int,
     dragDropState: DragDropState,
     contentPadding: PaddingValues,
@@ -886,14 +906,16 @@ internal fun QueueDraggedSongOverlay(
     onSwipeRemove: (SongItem) -> Unit,
     onPlaySongAtIndex: (Int) -> Unit
 ) {
-    val draggedId = dragDropState.draggedItemKey as? Long ?: return
-    val song = songs.firstOrNull { it.id == draggedId } ?: return
+    val draggedEntryKey = dragDropState.draggedItemKey as? String ?: return
+    val entry = displayEntries.firstOrNull { it.stableKey == draggedEntryKey } ?: return
+    val song = entry.song
     val y = dragDropState.draggedItemOffset ?: return
     val targetIndex = dragDropState.currentIndexOfDraggedItem
         ?.coerceIn(0, (songs.size - 1).coerceAtLeast(0)) ?: return
-    val originalIndex = songs.indexOfFirst { it.id == draggedId }
-    if (originalIndex < 0) return
-    val isPlaying = songs.getOrNull(currentSongIndex)?.id == song.id
+    val originalIndex = entry.sourceIndex
+    if (originalIndex !in songs.indices) return
+    val isPlaying = currentSongIndex == originalIndex &&
+        songs.getOrNull(currentSongIndex)?.id == song.id
     val shapes = ListItemDefaults.segmentedShapes(index = targetIndex, count = songs.size)
 
     Box(

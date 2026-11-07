@@ -189,9 +189,9 @@ fun SlidingQueueDrawer(
                     }
                 }
             )
-            val draggedSongId = dragDropState.draggedItemKey as? Long
+            val draggedEntryKey = dragDropState.draggedItemKey as? String
             val displayEntries = remember(songList, draggedSongId, dragDropState.currentIndexOfDraggedItem) {
-                buildQueueDisplayEntries(songList, draggedSongId, dragDropState.currentIndexOfDraggedItem)
+                buildQueueDisplayEntries(songList, draggedEntryKey, dragDropState.currentIndexOfDraggedItem)
             }
             ClearRecentDraggedItemAnimationSkip(dragDropState)
 
@@ -333,7 +333,7 @@ fun SlidingQueueDrawer(
                             key = { _, entry -> entry.stableKey },
                             contentType = { _, entry -> if (entry.song == null) "queue-drag-placeholder" else "queue-song" }
                         ) { displayIndex, entry ->
-                            val recentlyDropped = entry.song?.id == dragDropState.recentlyDraggedItemKey
+                            val recentlyDropped = entry.stableKey == dragDropState.recentlyDraggedItemKey
                             val animatedModifier = if (recentlyDropped) Modifier else Modifier.animateItem(
                                 fadeInSpec = null,
                                 fadeOutSpec = null,
@@ -357,6 +357,7 @@ fun SlidingQueueDrawer(
                     }
                     QueueDraggedSongOverlay(
                         songs = songList,
+                        displayEntries = displayEntries,
                         currentSongIndex = currentSongIndex,
                         dragDropState = dragDropState,
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp),
