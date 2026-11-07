@@ -851,7 +851,10 @@ class AudioPlaybackService : MediaSessionService() {
     private var currentSongName = "D.S Music"
     private var currentAlbumArt: Bitmap? = null
     private var currentAlbumArtSongId: String? = null
-    private var artworkRequestGeneration: Long = 0L
+    @Volatile private var artworkRequestGeneration: Long = 0L
+    private var artworkLoadTarget: com.bumptech.glide.request.target.CustomTarget<Bitmap>? = null
+    private var artworkDecodeJob: Job? = null
+    private var artworkProcessingJob: Job? = null
     private var lastWidgetProgressUpdateAtMs: Long = 0L
     private var lastPositionPersistedAtMs: Long = 0L
     private var lastTelemetryUpdateAtMs: Long = 0L
@@ -1337,7 +1340,7 @@ class AudioPlaybackService : MediaSessionService() {
                 position.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             )
             if (viewModel != null) {
-                viewModel?.savePlaybackState()
+                viewModel?.savePlaybackStateImmediately()
             } else {
                 widgetRestoredSong?.let { song ->
                     com.dsann.music.util.PlaybackStateManager.saveState(
@@ -1387,6 +1390,7 @@ class AudioPlaybackService : MediaSessionService() {
         }
         abandonAudioFocus()
         cancelCurrentTrackCache()
+        beginArtworkRequest()
 
         if (isPlayerInitialized) {
             viewModel?.cleanupBgScope()
@@ -2654,7 +2658,9 @@ class AudioPlaybackService : MediaSessionService() {
         // Bitmap crop/scale and PNG encoding used to run on the main thread every time
         // artwork arrived. On API 23 that can stall all pages during local track changes.
         // Keep player/session mutations on Main, but do all pixel work on a worker thread.
-        serviceScope.launch(Dispatchers.Default) {
+        artworkProcessingJob?.cancel()
+        artworkProcessingJob = serviceScope.launch(Dispatchers.Default) {
+            if (requestGeneration != artworkRequestGeneration) return@launch
             val processedArtwork = try {
                 val size = min(albumArt.width, albumArt.height)
                 Bitmap.createBitmap(
@@ -2680,6 +2686,7 @@ class AudioPlaybackService : MediaSessionService() {
                     null
                 }
             }
+            if (requestGeneration != artworkRequestGeneration) return@launch
             withContext(Dispatchers.Main) {
                 applySongMetadata(
                     resolvedSongName,
@@ -2734,13 +2741,28 @@ class AudioPlaybackService : MediaSessionService() {
         refreshMediaNotification()
     }
 
+    /** Cancel artwork work belonging to tracks skipped before the current selection. */
+    private fun beginArtworkRequest(): Long {
+        artworkLoadTarget?.let { target ->
+            runCatching { com.bumptech.glide.Glide.with(applicationContext).clear(target) }
+        }
+        artworkLoadTarget = null
+        artworkDecodeJob?.cancel()
+        artworkDecodeJob = null
+        artworkProcessingJob?.cancel()
+        artworkProcessingJob = null
+        return ++artworkRequestGeneration
+    }
+
     private fun setSongMetadataFromCache(songName: String?, artworkFile: File, expectedSongId: String) {
         if (expectedSongId.isBlank()) return
-        val requestGeneration = ++artworkRequestGeneration
-        serviceScope.launch(Dispatchers.IO) {
+        val requestGeneration = beginArtworkRequest()
+        artworkDecodeJob = serviceScope.launch(Dispatchers.IO) {
             val cachedArtwork = BitmapFactory.decodeFile(artworkFile.absolutePath)
             if (cachedArtwork == null) artworkFile.delete()
             withContext(Dispatchers.Main) {
+                if (requestGeneration != artworkRequestGeneration) return@withContext
+                artworkDecodeJob = null
                 if (cachedArtwork != null) {
                     setSongMetadata(
                         songName,
@@ -2803,9 +2825,9 @@ class AudioPlaybackService : MediaSessionService() {
 
     fun setSongMetadataById(songName: String?, albumId: Long) {
         val expectedSongId = viewModel?.currentSong?.value?.id?.toString() ?: return
-        val requestGeneration = ++artworkRequestGeneration
+        val requestGeneration = beginArtworkRequest()
         setSongMetadata(songName, null, expectedSongId, requestGeneration)
-        serviceScope.launch(Dispatchers.IO) {
+        artworkDecodeJob = serviceScope.launch(Dispatchers.IO) {
             var albumArt: Bitmap? = null
             if (albumId > 0) {
                 try {
@@ -2818,6 +2840,8 @@ class AudioPlaybackService : MediaSessionService() {
                 } catch (_: Exception) {}
             }
             withContext(Dispatchers.Main) {
+                if (requestGeneration != artworkRequestGeneration) return@withContext
+                artworkDecodeJob = null
                 setSongMetadata(songName, albumArt, expectedSongId, requestGeneration)
             }
         }
@@ -2826,7 +2850,7 @@ class AudioPlaybackService : MediaSessionService() {
     fun setSongMetadataByUrl(songName: String?, url: String?) {
         val activeSong = viewModel?.currentSong?.value ?: return
         val expectedSongId = activeSong.id.toString()
-        val requestGeneration = ++artworkRequestGeneration
+        val requestGeneration = beginArtworkRequest()
         setSongMetadata(songName, null, expectedSongId, requestGeneration)
 
         val resolvedUrl = url?.takeIf { it.isNotBlank() }
@@ -2834,19 +2858,25 @@ class AudioPlaybackService : MediaSessionService() {
                 ?.let { "https://img.youtube.com/vi/$it/hqdefault.jpg" }
         if (resolvedUrl.isNullOrBlank()) return
 
+        val target = object : com.bumptech.glide.request.target.CustomTarget<Bitmap>() {
+            override fun onResourceReady(resource: Bitmap, transition: com.bumptech.glide.request.transition.Transition<in Bitmap>?) {
+                if (artworkLoadTarget === this) artworkLoadTarget = null
+                setSongMetadata(songName, resource, expectedSongId, requestGeneration)
+            }
+            override fun onLoadCleared(placeholder: android.graphics.drawable.Drawable?) {
+                if (artworkLoadTarget === this) artworkLoadTarget = null
+            }
+            override fun onLoadFailed(errorDrawable: android.graphics.drawable.Drawable?) {
+                if (artworkLoadTarget === this) artworkLoadTarget = null
+                setSongMetadata(songName, null, expectedSongId, requestGeneration)
+            }
+        }
+        artworkLoadTarget = target
         com.bumptech.glide.Glide.with(applicationContext)
             .asBitmap()
             .load(resolvedUrl)
             .override(512, 512)
-            .into(object : com.bumptech.glide.request.target.CustomTarget<Bitmap>() {
-                override fun onResourceReady(resource: Bitmap, transition: com.bumptech.glide.request.transition.Transition<in Bitmap>?) {
-                    setSongMetadata(songName, resource, expectedSongId, requestGeneration)
-                }
-                override fun onLoadCleared(placeholder: android.graphics.drawable.Drawable?) {}
-                override fun onLoadFailed(errorDrawable: android.graphics.drawable.Drawable?) {
-                    setSongMetadata(songName, null, expectedSongId, requestGeneration)
-                }
-            })
+            .into(target)
     }
 
     fun isPlaying(): Boolean = player.isPlaying

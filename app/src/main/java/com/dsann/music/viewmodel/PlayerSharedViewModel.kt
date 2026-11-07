@@ -63,6 +63,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.Calendar
 import java.util.Locale
 import java.util.Random
@@ -540,6 +542,8 @@ class PlayerSharedViewModel @Inject constructor(
     private var autoplayQueueGeneration = 0L
     private var autoplayFetchGeneration = -1L
     private val autoplayFetchedVideoIds = mutableSetOf<String>()
+    private var pendingRapidSkipLoadJob: Job? = null
+    private var nextSongPrefetchJob: Job? = null
 
     /**
      * Add another batch before the queue runs out. The current song is excluded from the
@@ -1433,19 +1437,60 @@ class PlayerSharedViewModel @Inject constructor(
         }
     }
 
-    fun savePlaybackState() {
-        val song = _currentSong.value ?: return
-        val queue = _songList.value
-        val idx = _currentSongIndex.value
-        val pos = _currentPosition.value
+    private var playbackStateSaveJob: Job? = null
+    private var playbackStateSaveGeneration = 0L
+    private val playbackStateSaveMutex = Mutex()
 
-        PlaybackStateManager.saveState(
-            appContext,
-            song,
-            pos.toLong(),
-            queue,
-            idx
-        )
+    private fun copySongForPlaybackSnapshot(song: SongItem): SongItem = song.copy().apply {
+        thumbnailUrl = song.thumbnailUrl
+        mediaStoreRelativePath = song.mediaStoreRelativePath
+        albumName = song.albumName
+        playbackContextName = song.playbackContextName
+        videoId = song.videoId
+        artistId = song.artistId
+        artistRefs = ArrayList(song.artistRefs)
+        lufs = song.lufs
+        isCachedTrack = song.isCachedTrack
+        isDownloadedOffline = song.isDownloadedOffline
+        isAutoplayRecommendation = song.isAutoplayRecommendation
+        contentUri = song.contentUri
+    }
+
+    fun savePlaybackState() {
+        val generation = ++playbackStateSaveGeneration
+        playbackStateSaveJob?.cancel()
+        playbackStateSaveJob = bgScope.launch {
+            // Coalesce rapid track changes, then serialize/write only the latest snapshot.
+            delay(180L)
+            val song = _currentSong.value?.let(::copySongForPlaybackSnapshot) ?: return@launch
+            val queue = _songList.value.map(::copySongForPlaybackSnapshot)
+            val index = _currentSongIndex.value
+            val position = _currentPosition.value.toLong()
+
+            withContext(Dispatchers.IO) {
+                playbackStateSaveMutex.withLock {
+                    if (generation != playbackStateSaveGeneration) return@withLock
+                    PlaybackStateManager.saveState(appContext, song, position, queue, index)
+                }
+            }
+        }
+    }
+
+    /** Immediate background persistence for lifecycle shutdown/task removal. */
+    fun savePlaybackStateImmediately() {
+        val generation = ++playbackStateSaveGeneration
+        playbackStateSaveJob?.cancel()
+        playbackStateSaveJob = null
+        val song = _currentSong.value?.let(::copySongForPlaybackSnapshot) ?: return
+        val queue = _songList.value.map(::copySongForPlaybackSnapshot)
+        val index = _currentSongIndex.value
+        val position = _currentPosition.value.toLong()
+        bgScope.launch(Dispatchers.IO) {
+            playbackStateSaveMutex.withLock {
+                if (generation != playbackStateSaveGeneration) return@withLock
+                PlaybackStateManager.saveState(appContext, song, position, queue, index)
+            }
+        }
     }
 
     // ========== SERVICE & MANAGERS ==========
@@ -1755,7 +1800,11 @@ class PlayerSharedViewModel @Inject constructor(
         _songUri.value = song.contentUri
     }
 
-    fun playSongAtIndex(index: Int, preserveRepeatOnceCycle: Boolean = false) {
+    fun playSongAtIndex(
+        index: Int,
+        preserveRepeatOnceCycle: Boolean = false,
+        debouncePlaybackLoadMs: Long = 0L
+    ) {
         val songs = _songList.value
         if (index !in songs.indices) {
             Log.w(TAG, "Invalid song index: $index")
@@ -1808,26 +1857,47 @@ class PlayerSharedViewModel @Inject constructor(
 
 
 
-        audioService?.let {
-            // 1. Start playback immediately
-            it.loadAndPlay(song.contentUri)
-            
-            // 2. Set metadata asynchronously
-            if (song.thumbnailUrl != null) {
-                it.setSongMetadataByUrl(song.title, song.thumbnailUrl)
-            } else {
-                it.setSongMetadataById(song.title, song.albumId)
+        dispatchSelectedSongPlayback(song, debouncePlaybackLoadMs)
+    }
+
+    /**
+     * Repeated Next/Previous presses still update the selected queue index immediately,
+     * but only the final selection in a rapid burst starts a stream resolution. This avoids
+     * spawning/cancelling several network resolvers, MediaSession updates and artwork jobs
+     * for tracks the listener has already skipped past.
+     */
+    private fun dispatchSelectedSongPlayback(song: SongItem, debounceMs: Long) {
+        pendingRapidSkipLoadJob?.cancel()
+        pendingRapidSkipLoadJob = null
+
+        if (debounceMs > 0L) {
+            pendingRapidSkipLoadJob = viewModelScope.launch {
+                delay(debounceMs)
+                val latestSong = _currentSong.value?.takeIf { it.id == song.id } ?: return@launch
+                pendingRapidSkipLoadJob = null
+                startSelectedSongPlayback(latestSong)
             }
-            
-            // Personalization history
-            updateRecentArtists(song.artist)
+        } else {
+            startSelectedSongPlayback(song)
+        }
+    }
+
+    private fun startSelectedSongPlayback(song: SongItem) {
+        val selectedSong = _currentSong.value?.takeIf { it.id == song.id } ?: song
+        audioService?.let { service ->
+            service.loadAndPlay(selectedSong.contentUri)
+            if (!selectedSong.thumbnailUrl.isNullOrBlank()) {
+                service.setSongMetadataByUrl(selectedSong.title, selectedSong.thumbnailUrl)
+            } else {
+                service.setSongMetadataById(selectedSong.title, selectedSong.albumId)
+            }
+            updateRecentArtists(selectedSong.artist)
         } ?: run {
-            // Service not yet bound — queue for when it connects
             Log.w(TAG, "AudioService not bound yet, song queued for cold-start loading")
         }
-        
+
         savePlaybackState()
-        prefetchNextPredictedSongs()
+        scheduleNextSongPrefetch(selectedSong.id)
     }
 
     private fun updateRecentArtists(artist: String?) {
@@ -1914,7 +1984,8 @@ class PlayerSharedViewModel @Inject constructor(
             if (activeRepeatMode == REPEAT_ONCE) advanceRepeatOnceCursor(nextIndex)
             playSongAtIndex(
                 nextIndex,
-                preserveRepeatOnceCycle = activeRepeatMode == REPEAT_ONCE
+                preserveRepeatOnceCycle = activeRepeatMode == REPEAT_ONCE,
+                debouncePlaybackLoadMs = 140L
             )
         } else if (activeRepeatMode == REPEAT_ONCE) {
             // Repeat Once is finite: do not let Autoplay extend the queue after its
@@ -1984,7 +2055,7 @@ class PlayerSharedViewModel @Inject constructor(
         if (prevIndex < 0) {
             audioService?.seekTo(0)
         } else {
-            playSongAtIndex(prevIndex)
+            playSongAtIndex(prevIndex, debouncePlaybackLoadMs = 140L)
         }
     }
 
@@ -2019,14 +2090,16 @@ class PlayerSharedViewModel @Inject constructor(
         return if (next >= songs.size) -1 else next
     }
 
-    private fun prefetchNextPredictedSongs() {
-        val nextIdx = getNextSongIndex()
-        if (nextIdx >= 0) {
-            val songs = _songList.value
-            if (nextIdx < songs.size) {
-                songs[nextIdx].takeIf {
-                    !it.isCachedTrack && !it.isDownloadedOffline
-                }?.videoId?.let { YouTubeMusic.prefetchStream(it) }
+    private fun scheduleNextSongPrefetch(selectedSongId: Long) {
+        nextSongPrefetchJob?.cancel()
+        nextSongPrefetchJob = bgScope.launch(Dispatchers.IO) {
+            // A fast Next/Previous burst should prefetch only for the final selected song.
+            delay(280L)
+            if (_currentSong.value?.id != selectedSongId) return@launch
+            val nextIndex = getNextSongIndex()
+            val nextSong = _songList.value.getOrNull(nextIndex) ?: return@launch
+            if (!nextSong.isCachedTrack && !nextSong.isDownloadedOffline) {
+                nextSong.videoId?.let { YouTubeMusic.prefetchStream(it) }
             }
         }
     }
