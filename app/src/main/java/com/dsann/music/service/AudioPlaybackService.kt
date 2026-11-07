@@ -1228,6 +1228,12 @@ class AudioPlaybackService : MediaSessionService() {
                     loadRestoredWidgetSnapshot()
                 }
                 updateWidgetState(player.isPlaying)
+                // The 4x4 widget always exposes its lyric row. When it is added while
+                // playback is already running, start the lyric pipeline immediately even
+                // if no 4x2 widget has ever switched to its lyrics page.
+                if (isWidgetLyricsPageActive(forceRefresh = true)) {
+                    requestWidgetLyrics()
+                }
             }
         }
     }
