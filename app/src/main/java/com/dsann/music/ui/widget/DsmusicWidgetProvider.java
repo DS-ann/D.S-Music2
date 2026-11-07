@@ -12,6 +12,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 import android.util.TypedValue;
 import android.widget.RemoteViews;
@@ -26,6 +27,7 @@ import com.dsann.music.model.SongItem;
 
 import java.io.File;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -47,6 +49,26 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
     private static final String ACTION_TOGGLE_LYRICS = "com.dsann.music.ACTION_TOGGLE_LYRICS";
     private static final String ACTION_WIDGET_TOGGLE_PLAY_PAUSE =
             "com.dsann.music.ACTION_WIDGET_TOGGLE_PLAY_PAUSE";
+    private static final String ACTION_SMALL_LEFT_TAP = "com.dsann.music.ACTION_SMALL_LEFT_TAP";
+    private static final String ACTION_SMALL_RIGHT_TAP = "com.dsann.music.ACTION_SMALL_RIGHT_TAP";
+    private static final String PREF_SMALL_ART_SONG_PREFIX = "small_art_song_";
+    private static final String PREF_SMALL_ART_DIRECTION = "small_art_transition_direction";
+    private static final long SMALL_WIDGET_DOUBLE_TAP_MS = 300L;
+
+    private static final Handler SMALL_WIDGET_TAP_HANDLER = new Handler(Looper.getMainLooper());
+    private static final Map<Integer, PendingSmallArtworkTap> PENDING_SMALL_ART_TAPS = new HashMap<>();
+
+    private static final class PendingSmallArtworkTap {
+        final int direction;
+        final long firstTapAtMs;
+        final Runnable singleTapAction;
+
+        PendingSmallArtworkTap(int direction, long firstTapAtMs, Runnable singleTapAction) {
+            this.direction = direction;
+            this.firstTapAtMs = firstTapAtMs;
+            this.singleTapAction = singleTapAction;
+        }
+    }
     
     private static final String PREFS_NAME = "dsmusic_widget_prefs";
     private static final String PREF_LYRICS_MODE = "lyrics_mode_";
@@ -513,7 +535,13 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             // including the initial empty-state refresh before a song is selected.
             applyWidgetActionIcons(views, isPlaying, layoutId, repeatIconResId);
             setupPendingIntents(context, views, isPlaying, layoutId, providerClass, id);
-            manager.updateAppWidget(id, views);
+            // The small widget's initialLayout is already inflated by the launcher.
+            // A partial update keeps the old cover visible until Glide has the next one.
+            if (layoutId == R.layout.widget_small) {
+                manager.partiallyUpdateAppWidget(id, views);
+            } else {
+                manager.updateAppWidget(id, views);
+            }
 
             if (song != null) {
                 Uri artworkUri = null;
@@ -523,8 +551,23 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                     Log.w(TAG, "Could not resolve widget artwork for " + song.title, artworkError);
                 }
                 if (artworkUri != null) {
+                    boolean animateSmallCover = false;
+                    int smallCoverDirection = 1;
+                    if (layoutId == R.layout.widget_small) {
+                        SharedPreferences widgetPrefs =
+                                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                        String artKey = song.id + "|" + artworkUri.toString();
+                        String previousArtKey = widgetPrefs.getString(
+                                PREF_SMALL_ART_SONG_PREFIX + id, null);
+                        animateSmallCover = previousArtKey != null && !previousArtKey.equals(artKey);
+                        smallCoverDirection = widgetPrefs.getInt(PREF_SMALL_ART_DIRECTION, 1);
+                        widgetPrefs.edit().putString(
+                                PREF_SMALL_ART_SONG_PREFIX + id, artKey).apply();
+                    }
                     try {
-                        loadAlbumArt(context, views, artworkUri, id);
+                        loadAlbumArt(
+                                context, views, artworkUri, id,
+                                animateSmallCover, smallCoverDirection);
                     } catch (Exception artworkError) {
                         Log.w(TAG, "Could not load widget album art for " + song.title, artworkError);
                     }
@@ -566,7 +609,11 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                 }
                 applyWidgetActionIcons(fallback, isPlaying, layoutId, repeatIconResId);
                 setupPendingIntents(context, fallback, isPlaying, layoutId, providerClass, id);
-                manager.updateAppWidget(id, fallback);
+                if (layoutId == R.layout.widget_small) {
+                    manager.partiallyUpdateAppWidget(id, fallback);
+                } else {
+                    manager.updateAppWidget(id, fallback);
+                }
             } catch (Exception fallbackError) {
                 Log.e(TAG, "Widget fallback rendering failed for " + id, fallbackError);
             }
@@ -610,8 +657,39 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         return new RemoteViews(context.getPackageName(), layoutId);
     }
 
-    private static void loadAlbumArt(Context context, RemoteViews views, Uri artUri, int widgetId) {
-        AppWidgetTarget target = new AppWidgetTarget(context, R.id.widget_album_art, views, widgetId);
+    private static void loadAlbumArt(
+            Context context,
+            RemoteViews views,
+            Uri artUri,
+            int widgetId,
+            boolean animateSmallCover,
+            int slideDirection
+    ) {
+        AppWidgetTarget target;
+        if (animateSmallCover) {
+            final Context appContext = context.getApplicationContext();
+            final String artKey = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    .getString(PREF_SMALL_ART_SONG_PREFIX + widgetId, null);
+            final int direction = slideDirection < 0 ? -1 : 1;
+            target = new AppWidgetTarget(
+                    context, R.id.widget_album_art, views, widgetId) {
+                @Override
+                public void onResourceReady(
+                        @NonNull Bitmap resource,
+                        com.bumptech.glide.request.transition.Transition<? super Bitmap> transition
+                ) {
+                    String currentKey = appContext.getSharedPreferences(
+                            PREFS_NAME, Context.MODE_PRIVATE)
+                            .getString(PREF_SMALL_ART_SONG_PREFIX + widgetId, null);
+                    // Do not allow a late Glide response for an older song to replace
+                    // the artwork belonging to the latest queue item.
+                    if (artKey == null || !artKey.equals(currentKey)) return;
+                    animateSmallArtworkArrival(appContext, widgetId, resource, direction);
+                }
+            };
+        } else {
+            target = new AppWidgetTarget(context, R.id.widget_album_art, views, widgetId);
+        }
 
         Glide.with(context.getApplicationContext())
                 .asBitmap()
@@ -620,6 +698,54 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                 .error(R.drawable.default_album_art)
                 .centerCrop()
                 .into(target);
+    }
+
+    private static void animateSmallArtworkArrival(
+            Context context, int widgetId, Bitmap artwork, int direction) {
+        final Context appContext = context.getApplicationContext();
+        final float offsetPx = 28f * appContext.getResources().getDisplayMetrics().density;
+        try {
+            AppWidgetManager manager = AppWidgetManager.getInstance(appContext);
+            RemoteViews entering = new RemoteViews(
+                    appContext.getPackageName(), R.layout.widget_small);
+            entering.setImageViewBitmap(R.id.widget_album_art, artwork);
+            entering.setFloat(R.id.widget_album_art, "setTranslationX", direction * offsetPx);
+            entering.setFloat(R.id.widget_album_art, "setAlpha", 0.30f);
+            entering.setFloat(R.id.widget_album_art, "setScaleX", 0.94f);
+            entering.setFloat(R.id.widget_album_art, "setScaleY", 0.94f);
+            manager.partiallyUpdateAppWidget(widgetId, entering);
+
+            Handler animationHandler = new Handler(Looper.getMainLooper());
+            animationHandler.postDelayed(
+                    () -> applySmallArtworkArrivalFrame(appContext, widgetId,
+                            direction * offsetPx * 0.45f, 0.72f, 0.98f),
+                    48L);
+            animationHandler.postDelayed(
+                    () -> applySmallArtworkArrivalFrame(appContext, widgetId,
+                            0f, 1f, 1f),
+                    105L);
+        } catch (Exception error) {
+            Log.w(TAG, "Could not animate the incoming 2x2 artwork", error);
+            RemoteViews fallback = new RemoteViews(
+                    appContext.getPackageName(), R.layout.widget_small);
+            fallback.setImageViewBitmap(R.id.widget_album_art, artwork);
+            AppWidgetManager.getInstance(appContext).partiallyUpdateAppWidget(widgetId, fallback);
+        }
+    }
+
+    private static void applySmallArtworkArrivalFrame(
+            Context context, int widgetId, float translationX, float alpha, float scale) {
+        try {
+            RemoteViews frame = new RemoteViews(
+                    context.getPackageName(), R.layout.widget_small);
+            frame.setFloat(R.id.widget_album_art, "setTranslationX", translationX);
+            frame.setFloat(R.id.widget_album_art, "setAlpha", alpha);
+            frame.setFloat(R.id.widget_album_art, "setScaleX", scale);
+            frame.setFloat(R.id.widget_album_art, "setScaleY", scale);
+            AppWidgetManager.getInstance(context).partiallyUpdateAppWidget(widgetId, frame);
+        } catch (Exception error) {
+            Log.w(TAG, "Could not advance the 2x2 artwork transition", error);
+        }
     }
 
     private static void loadBlurredAura(Context context, RemoteViews views, Uri artUri, int widgetId) {
@@ -897,11 +1023,22 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
 
     private static void setupPendingIntents(Context context, RemoteViews views, boolean isPlaying, int layoutId, Class<?> providerClass, int widgetId) {
         if (layoutId == R.layout.widget_small) {
-            // The 2x2 widget is a single artwork control. Resolve play/pause from live
-            // player state in the service instead of relying on a possibly stale icon state.
-            PendingIntent artworkToggle = getServicePendingIntent(
-                    context, ACTION_WIDGET_TOGGLE_PLAY_PAUSE, 15);
-            views.setOnClickPendingIntent(R.id.widget_album_art, artworkToggle);
+            Intent leftTap = new Intent(context, providerClass);
+            leftTap.setAction(ACTION_SMALL_LEFT_TAP);
+            leftTap.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
+            PendingIntent leftTapIntent = PendingIntent.getBroadcast(
+                    context, 30_000 + widgetId * 2, leftTap,
+                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+
+            Intent rightTap = new Intent(context, providerClass);
+            rightTap.setAction(ACTION_SMALL_RIGHT_TAP);
+            rightTap.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
+            PendingIntent rightTapIntent = PendingIntent.getBroadcast(
+                    context, 30_001 + widgetId * 2, rightTap,
+                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+
+            views.setOnClickPendingIntent(R.id.widget_art_left_zone, leftTapIntent);
+            views.setOnClickPendingIntent(R.id.widget_art_right_zone, rightTapIntent);
             return;
         }
 
@@ -954,6 +1091,14 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
     public void onReceive(Context context, Intent intent) {
         migrateWidgetPreferences(context);
         super.onReceive(context, intent);
+        if (ACTION_SMALL_LEFT_TAP.equals(intent.getAction())) {
+            handleSmallArtworkTap(context, intent, -1);
+            return;
+        }
+        if (ACTION_SMALL_RIGHT_TAP.equals(intent.getAction())) {
+            handleSmallArtworkTap(context, intent, 1);
+            return;
+        }
         if (ACTION_TOGGLE_LYRICS.equals(intent.getAction())) {
             AppWidgetManager manager = AppWidgetManager.getInstance(context);
             int requestedWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1);
@@ -1010,6 +1155,54 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             }
         } catch (Exception error) {
             Log.w(TAG, "Could not animate 2x2 artwork tap", error);
+        }
+    }
+
+    private static void handleSmallArtworkTap(Context context, Intent intent, int direction) {
+        int widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1);
+        if (widgetId < 0) return;
+
+        PendingSmallArtworkTap pending = PENDING_SMALL_ART_TAPS.remove(widgetId);
+        long now = SystemClock.uptimeMillis();
+        if (pending != null &&
+                pending.direction == direction &&
+                now - pending.firstTapAtMs <= SMALL_WIDGET_DOUBLE_TAP_MS) {
+            SMALL_WIDGET_TAP_HANDLER.removeCallbacks(pending.singleTapAction);
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit().putInt(PREF_SMALL_ART_DIRECTION, direction).apply();
+            dispatchSmallWidgetPlaybackAction(
+                    context, direction > 0 ? ACTION_NEXT : ACTION_PREVIOUS,
+                    31_000 + widgetId);
+            return;
+        }
+
+        if (pending != null) {
+            // A tap on the opposite half is a separate single tap, not a double-tap pair.
+            SMALL_WIDGET_TAP_HANDLER.removeCallbacks(pending.singleTapAction);
+            dispatchSmallWidgetPlaybackAction(
+                    context, ACTION_WIDGET_TOGGLE_PLAY_PAUSE, 32_000 + widgetId);
+        }
+
+        Runnable singleTap = () -> {
+            PendingSmallArtworkTap current = PENDING_SMALL_ART_TAPS.get(widgetId);
+            if (current != null && current.firstTapAtMs == now &&
+                    current.direction == direction) {
+                PENDING_SMALL_ART_TAPS.remove(widgetId);
+                dispatchSmallWidgetPlaybackAction(
+                        context, ACTION_WIDGET_TOGGLE_PLAY_PAUSE, 32_000 + widgetId);
+            }
+        };
+        PENDING_SMALL_ART_TAPS.put(
+                widgetId, new PendingSmallArtworkTap(direction, now, singleTap));
+        SMALL_WIDGET_TAP_HANDLER.postDelayed(singleTap, SMALL_WIDGET_DOUBLE_TAP_MS);
+    }
+
+    private static void dispatchSmallWidgetPlaybackAction(
+            Context context, String action, int requestCode) {
+        try {
+            getServicePendingIntent(context, action, requestCode).send();
+        } catch (PendingIntent.CanceledException error) {
+            Log.w(TAG, "Could not dispatch 2x2 widget action " + action, error);
         }
     }
 
