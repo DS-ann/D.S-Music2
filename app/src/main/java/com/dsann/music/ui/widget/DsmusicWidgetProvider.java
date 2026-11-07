@@ -613,7 +613,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                 }
             } else {
                 Bitmap retainedArtwork = getWidgetArtworkForSnapshot(
-                        context, id, song.id.toString(), artworkKey);
+                        context, id, String.valueOf(song.id), artworkKey);
                 if (retainedArtwork != null) {
                     views.setImageViewBitmap(R.id.widget_album_art, retainedArtwork);
                 } else if (layoutId == R.layout.widget_small) {
@@ -626,7 +626,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             manager.updateAppWidget(id, views);
 
             if (artworkUri != null && song != null) {
-                boolean hasSongArtworkCache = hasWidgetArtworkCache(context, song.id.toString(), artworkKey);
+                boolean hasSongArtworkCache = hasWidgetArtworkCache(context, String.valueOf(song.id), artworkKey);
                 boolean requestInFlight = isWidgetArtworkRequestActive(id, artworkKey)
                         || isWidgetArtworkRetryPending(id, artworkKey);
                 // Avoid restarting the same image request on every pause/resume or metadata
@@ -637,7 +637,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                                 context, artworkUri, id,
                                 layoutId == R.layout.widget_small,
                                 animateSmallCover, smallCoverDirection,
-                                layoutId, artworkKey, song.id.toString(), 0, false);
+                                layoutId, artworkKey, String.valueOf(song.id), 0, false);
                     } catch (Exception artworkError) {
                         clearActiveWidgetArtworkRequest(id);
                         Log.w(TAG, "Could not load widget album art for " + song.title, artworkError);
@@ -646,7 +646,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                 if (layoutId != R.layout.widget_small) {
                     try {
                         Object artworkModel = resolveWidgetArtworkModel(
-                                context, song.id.toString(), artworkKey, artworkUri);
+                                context, String.valueOf(song.id), artworkKey, artworkUri);
                         loadBlurredAura(context, artworkModel, id, layoutId, artworkKey);
                     } catch (Exception artworkError) {
                         Log.w(TAG, "Could not load widget aura for " + song.title, artworkError);
