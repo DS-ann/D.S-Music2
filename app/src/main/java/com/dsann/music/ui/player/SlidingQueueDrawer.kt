@@ -174,7 +174,6 @@ fun SlidingQueueDrawer(
             val queueScope = rememberCoroutineScope()
             // Keep the rendered queue fixed while the dragged row follows the pointer.
             // The actual reorder is committed only after the user releases the handle.
-            val songList = songList
             val dragDropState = rememberDragDropState(
                 lazyListState = lazyListState,
                 onDragFinished = { from, to, commit ->
