@@ -51,7 +51,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             "com.dsann.music.ACTION_WIDGET_TOGGLE_PLAY_PAUSE";
     private static final String ACTION_SMALL_LEFT_TAP = "com.dsann.music.ACTION_SMALL_LEFT_TAP";
     private static final String ACTION_SMALL_RIGHT_TAP = "com.dsann.music.ACTION_SMALL_RIGHT_TAP";
-    private static final String PREF_SMALL_ART_SONG_PREFIX = "small_art_song_";
+    private static final String PREF_ARTWORK_SONG_PREFIX = "small_art_song_";
     private static final String PREF_SMALL_ART_DIRECTION = "small_art_transition_direction";
     private static final long SMALL_WIDGET_DOUBLE_TAP_MS = 300L;
 
@@ -549,52 +549,59 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             // including the initial empty-state refresh before a song is selected.
             applyWidgetActionIcons(views, isPlaying, layoutId, repeatIconResId);
             setupPendingIntents(context, views, isPlaying, layoutId, providerClass, id);
-            if (layoutId == R.layout.widget_small && song == null) {
-                applySmallWidgetIdleArtwork(context, views, id);
-            }
-            // The small widget's initialLayout is already inflated by the launcher.
-            // A partial update keeps the old cover visible until Glide has the next one.
-            manager.updateAppWidget(id, views);
-
+            Uri artworkUri = null;
             if (song != null) {
-                Uri artworkUri = null;
                 try {
                     artworkUri = song.getAlbumArtUri();
                 } catch (Exception artworkError) {
                     Log.w(TAG, "Could not resolve widget artwork for " + song.title, artworkError);
                 }
-                if (artworkUri != null) {
-                    boolean animateSmallCover = false;
-                    int smallCoverDirection = 1;
-                    if (layoutId == R.layout.widget_small) {
-                        SharedPreferences widgetPrefs =
-                                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-                        String artKey = song.id + "|" + artworkUri.toString();
-                        String previousArtKey = widgetPrefs.getString(
-                                PREF_SMALL_ART_SONG_PREFIX + id, null);
-                        animateSmallCover = previousArtKey != null && !previousArtKey.equals(artKey);
-                        smallCoverDirection = widgetPrefs.getInt(PREF_SMALL_ART_DIRECTION, 1);
-                        widgetPrefs.edit().putString(
-                                PREF_SMALL_ART_SONG_PREFIX + id, artKey).apply();
-                    }
+            }
+
+            String artworkKey = "__no_art__";
+            boolean animateSmallCover = false;
+            int smallCoverDirection = 1;
+            SharedPreferences widgetPrefs =
+                    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            String artworkPrefKey = PREF_ARTWORK_SONG_PREFIX + id;
+            String previousArtworkKey = widgetPrefs.getString(artworkPrefKey, null);
+            if (artworkUri != null && song != null) {
+                artworkKey = song.id + "|" + artworkUri.toString();
+                if (layoutId == R.layout.widget_small) {
+                    animateSmallCover = previousArtworkKey != null &&
+                            !previousArtworkKey.equals(artworkKey);
+                    smallCoverDirection = widgetPrefs.getInt(PREF_SMALL_ART_DIRECTION, 1);
+                }
+            }
+            // Invalidate previous requests before publishing the new widget snapshot.
+            widgetPrefs.edit().putString(artworkPrefKey, artworkKey).apply();
+
+            // Never leave the preceding track's cover visible while this song's image loads.
+            if (layoutId == R.layout.widget_small) {
+                views.setImageViewResource(R.id.widget_album_art, R.drawable.widget_idle_art);
+                if (artworkUri == null) applySmallWidgetIdleArtwork(context, views, id);
+            } else {
+                views.setImageViewResource(R.id.widget_album_art, R.drawable.widget_default_art);
+            }
+
+            manager.updateAppWidget(id, views);
+
+            if (artworkUri != null && song != null) {
+                try {
+                    loadAlbumArt(
+                            context, artworkUri, id,
+                            layoutId == R.layout.widget_small,
+                            animateSmallCover, smallCoverDirection,
+                            layoutId, artworkKey);
+                } catch (Exception artworkError) {
+                    Log.w(TAG, "Could not load widget album art for " + song.title, artworkError);
+                }
+                if (layoutId != R.layout.widget_small) {
                     try {
-                        loadAlbumArt(
-                                context, views, artworkUri, id,
-                                layoutId == R.layout.widget_small,
-                                animateSmallCover, smallCoverDirection);
+                        loadBlurredAura(context, artworkUri, id, layoutId, artworkKey);
                     } catch (Exception artworkError) {
-                        Log.w(TAG, "Could not load widget album art for " + song.title, artworkError);
+                        Log.w(TAG, "Could not load widget aura for " + song.title, artworkError);
                     }
-                    if (layoutId != R.layout.widget_small) {
-                        try {
-                            loadBlurredAura(context, views, artworkUri, id);
-                        } catch (Exception artworkError) {
-                            Log.w(TAG, "Could not load widget aura for " + song.title, artworkError);
-                        }
-                    }
-                } else if (layoutId == R.layout.widget_small) {
-                    // A selected track without artwork should use the same polished idle cover.
-                    applySmallWidgetIdleArtwork(context, null, id);
                 }
             }
         } catch (Exception error) {
@@ -681,7 +688,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         idle.setFloat(R.id.widget_album_art, "setScaleX", 1f);
         idle.setFloat(R.id.widget_album_art, "setScaleY", 1f);
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit().putString(PREF_SMALL_ART_SONG_PREFIX + widgetId, "__idle__").apply();
+                .edit().putString(PREF_ARTWORK_SONG_PREFIX + widgetId, "__idle__").apply();
         try {
             AppWidgetManager.getInstance(context).partiallyUpdateAppWidget(widgetId, idle);
         } catch (Exception error) {
@@ -689,35 +696,38 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         }
     }
 
+    private static boolean isWidgetArtworkCurrent(
+            Context context, int widgetId, String expectedArtworkKey) {
+        if (expectedArtworkKey == null) return false;
+        String currentKey = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(PREF_ARTWORK_SONG_PREFIX + widgetId, null);
+        return expectedArtworkKey.equals(currentKey);
+    }
+
     private static void loadAlbumArt(
             Context context,
-            RemoteViews views,
             Uri artUri,
             int widgetId,
             boolean smallWidget,
             boolean animateSmallCover,
-            int slideDirection
+            int slideDirection,
+            int layoutId,
+            String expectedArtworkKey
     ) {
-        AppWidgetTarget target;
-        if (smallWidget) {
-            final Context appContext = context.getApplicationContext();
-            final String artKey = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                    .getString(PREF_SMALL_ART_SONG_PREFIX + widgetId, null);
-            final int direction = slideDirection < 0 ? -1 : 1;
-            target = new AppWidgetTarget(
-                    context, R.id.widget_album_art, views, widgetId) {
-                @Override
-                public void onResourceReady(
-                        @NonNull Bitmap resource,
-                        com.bumptech.glide.request.transition.Transition<? super Bitmap> transition
-                ) {
-                    String currentKey = appContext.getSharedPreferences(
-                            PREFS_NAME, Context.MODE_PRIVATE)
-                            .getString(PREF_SMALL_ART_SONG_PREFIX + widgetId, null);
-                    // Ignore stale requests so a slow prior cover cannot replace the newest song.
-                    if (artKey == null || !artKey.equals(currentKey)) return;
+        final Context appContext = context.getApplicationContext();
+        final int direction = slideDirection < 0 ? -1 : 1;
+        com.bumptech.glide.request.target.CustomTarget<Bitmap> target =
+                new com.bumptech.glide.request.target.CustomTarget<Bitmap>() {
+            @Override
+            public void onResourceReady(
+                    @NonNull Bitmap resource,
+                    com.bumptech.glide.request.transition.Transition<? super Bitmap> transition
+            ) {
+                if (!isWidgetArtworkCurrent(appContext, widgetId, expectedArtworkKey)) return;
+                if (smallWidget) {
                     if (animateSmallCover) {
-                        animateSmallArtworkArrival(appContext, widgetId, resource, direction);
+                        animateSmallArtworkArrival(
+                                appContext, widgetId, resource, direction, expectedArtworkKey);
                     } else {
                         RemoteViews cover = new RemoteViews(
                                 appContext.getPackageName(), R.layout.widget_small);
@@ -725,24 +735,31 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                         AppWidgetManager.getInstance(appContext)
                                 .partiallyUpdateAppWidget(widgetId, cover);
                     }
+                } else {
+                    RemoteViews cover = new RemoteViews(appContext.getPackageName(), layoutId);
+                    cover.setImageViewBitmap(R.id.widget_album_art, resource);
+                    AppWidgetManager.getInstance(appContext)
+                            .partiallyUpdateAppWidget(widgetId, cover);
                 }
-            };
-        } else {
-            target = new AppWidgetTarget(context, R.id.widget_album_art, views, widgetId);
-        }
+            }
 
-        Glide.with(context.getApplicationContext())
+            @Override
+            public void onLoadCleared(android.graphics.drawable.Drawable placeholder) {
+                // The current full RemoteViews snapshot already contains a neutral cover.
+            }
+        };
+
+        Glide.with(appContext)
                 .asBitmap()
                 .load(artUri)
-                .placeholder(R.drawable.widget_idle_art)
-                .error(R.drawable.widget_idle_art)
                 .centerCrop()
                 .into(target);
     }
 
     private static void animateSmallArtworkArrival(
-            Context context, int widgetId, Bitmap artwork, int direction) {
+            Context context, int widgetId, Bitmap artwork, int direction, String expectedArtworkKey) {
         final Context appContext = context.getApplicationContext();
+        if (!isWidgetArtworkCurrent(appContext, widgetId, expectedArtworkKey)) return;
         final float offsetPx = 28f * appContext.getResources().getDisplayMetrics().density;
         try {
             AppWidgetManager manager = AppWidgetManager.getInstance(appContext);
@@ -758,14 +775,15 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             Handler animationHandler = new Handler(Looper.getMainLooper());
             animationHandler.postDelayed(
                     () -> applySmallArtworkArrivalFrame(appContext, widgetId,
-                            direction * offsetPx * 0.45f, 0.72f, 0.98f),
+                            direction * offsetPx * 0.45f, 0.72f, 0.98f, expectedArtworkKey),
                     48L);
             animationHandler.postDelayed(
                     () -> applySmallArtworkArrivalFrame(appContext, widgetId,
-                            0f, 1f, 1f),
+                            0f, 1f, 1f, expectedArtworkKey),
                     105L);
         } catch (Exception error) {
             Log.w(TAG, "Could not animate the incoming 2x2 artwork", error);
+            if (!isWidgetArtworkCurrent(appContext, widgetId, expectedArtworkKey)) return;
             RemoteViews fallback = new RemoteViews(
                     appContext.getPackageName(), R.layout.widget_small);
             fallback.setImageViewBitmap(R.id.widget_album_art, artwork);
@@ -774,7 +792,9 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
     }
 
     private static void applySmallArtworkArrivalFrame(
-            Context context, int widgetId, float translationX, float alpha, float scale) {
+            Context context, int widgetId, float translationX, float alpha, float scale,
+            String expectedArtworkKey) {
+        if (!isWidgetArtworkCurrent(context, widgetId, expectedArtworkKey)) return;
         try {
             RemoteViews frame = new RemoteViews(
                     context.getPackageName(), R.layout.widget_small);
@@ -788,10 +808,30 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         }
     }
 
-    private static void loadBlurredAura(Context context, RemoteViews views, Uri artUri, int widgetId) {
-        AppWidgetTarget auraTarget = new AppWidgetTarget(context, R.id.widget_aura, views, widgetId);
+    private static void loadBlurredAura(
+            Context context, Uri artUri, int widgetId, int layoutId, String expectedArtworkKey) {
+        final Context appContext = context.getApplicationContext();
+        com.bumptech.glide.request.target.CustomTarget<Bitmap> auraTarget =
+                new com.bumptech.glide.request.target.CustomTarget<Bitmap>() {
+            @Override
+            public void onResourceReady(
+                    @NonNull Bitmap resource,
+                    com.bumptech.glide.request.transition.Transition<? super Bitmap> transition
+            ) {
+                if (!isWidgetArtworkCurrent(appContext, widgetId, expectedArtworkKey)) return;
+                RemoteViews aura = new RemoteViews(appContext.getPackageName(), layoutId);
+                aura.setImageViewBitmap(R.id.widget_aura, resource);
+                AppWidgetManager.getInstance(appContext)
+                        .partiallyUpdateAppWidget(widgetId, aura);
+            }
 
-        Glide.with(context.getApplicationContext())
+            @Override
+            public void onLoadCleared(android.graphics.drawable.Drawable placeholder) {
+                // Ignore cleared requests; the current widget state remains visible.
+            }
+        };
+
+        Glide.with(appContext)
                 .asBitmap()
                 .load(artUri)
                 .centerCrop()

@@ -921,6 +921,10 @@ class AudioPlaybackService : MediaSessionService() {
     private var artworkLoadTarget: com.bumptech.glide.request.target.CustomTarget<Bitmap>? = null
     private var artworkDecodeJob: Job? = null
     private var artworkProcessingJob: Job? = null
+    private var artworkRetryJob: Job? = null
+    private val artworkRetryDelaysMs = longArrayOf(
+        2_000L, 5_000L, 12_000L, 25_000L, 45_000L, 60_000L, 60_000L, 60_000L
+    )
     private var lastWidgetProgressUpdateAtMs: Long = 0L
     private var lastPositionPersistedAtMs: Long = 0L
     private var lastTelemetryUpdateAtMs: Long = 0L
@@ -2920,20 +2924,22 @@ class AudioPlaybackService : MediaSessionService() {
             val metadataBuilder = mediaItem.mediaMetadata.buildUpon()
                 .setTitle(currentSongName)
                 .setArtist(activeSong.artist.ifBlank { "Unknown Artist" })
-            activeSong.thumbnailUrl?.takeIf { it.isNotBlank() }?.let {
-                metadataBuilder.setArtworkUri(it.toUri())
-            }
-            if (encodedArtwork != null) {
-                metadataBuilder.setArtworkData(
+                .setArtworkUri(activeSong.thumbnailUrl?.takeIf { it.isNotBlank() }?.toUri())
+                // Explicitly replace/clear artwork bytes; otherwise a prior song's bitmap
+                // can remain attached while this song's cover is still downloading.
+                .setArtworkData(
                     encodedArtwork,
                     androidx.media3.common.MediaMetadata.PICTURE_TYPE_FRONT_COVER
                 )
-            }
             player.replaceMediaItem(
                 player.currentMediaItemIndex,
                 mediaItem.buildUpon().setMediaMetadata(metadataBuilder.build()).build()
             )
         }
+        // Audio can begin before its remote cover finishes downloading. Re-publish the
+        // widget snapshot when the cover arrives so the widget does not stay on its first
+        // empty/stale artwork render.
+        if (isPlayerInitialized) updateWidgetState(player.isPlaying)
         refreshMediaNotification()
     }
 
@@ -2947,6 +2953,8 @@ class AudioPlaybackService : MediaSessionService() {
         artworkDecodeJob = null
         artworkProcessingJob?.cancel()
         artworkProcessingJob = null
+        artworkRetryJob?.cancel()
+        artworkRetryJob = null
         return ++artworkRequestGeneration
     }
 
@@ -3054,17 +3062,53 @@ class AudioPlaybackService : MediaSessionService() {
                 ?.let { "https://img.youtube.com/vi/$it/hqdefault.jpg" }
         if (resolvedUrl.isNullOrBlank()) return
 
+        loadSongArtworkByUrl(
+            songName = songName,
+            resolvedUrl = resolvedUrl,
+            expectedSongId = expectedSongId,
+            requestGeneration = requestGeneration,
+            retryAttempt = 0
+        )
+    }
+
+    private fun loadSongArtworkByUrl(
+        songName: String?,
+        resolvedUrl: String,
+        expectedSongId: String,
+        requestGeneration: Long,
+        retryAttempt: Int
+    ) {
+        val activeSong = viewModel?.currentSong?.value
+        if (requestGeneration != artworkRequestGeneration ||
+            activeSong?.id?.toString() != expectedSongId
+        ) return
+
         val target = object : com.bumptech.glide.request.target.CustomTarget<Bitmap>() {
-            override fun onResourceReady(resource: Bitmap, transition: com.bumptech.glide.request.transition.Transition<in Bitmap>?) {
+            override fun onResourceReady(
+                resource: Bitmap,
+                transition: com.bumptech.glide.request.transition.Transition<in Bitmap>?
+            ) {
                 if (artworkLoadTarget === this) artworkLoadTarget = null
+                if (requestGeneration != artworkRequestGeneration) return
+                artworkRetryJob?.cancel()
+                artworkRetryJob = null
                 setSongMetadata(songName, resource, expectedSongId, requestGeneration)
             }
+
             override fun onLoadCleared(placeholder: android.graphics.drawable.Drawable?) {
                 if (artworkLoadTarget === this) artworkLoadTarget = null
             }
+
             override fun onLoadFailed(errorDrawable: android.graphics.drawable.Drawable?) {
                 if (artworkLoadTarget === this) artworkLoadTarget = null
-                setSongMetadata(songName, null, expectedSongId, requestGeneration)
+                if (requestGeneration != artworkRequestGeneration) return
+                scheduleSongArtworkRetry(
+                    songName,
+                    resolvedUrl,
+                    expectedSongId,
+                    requestGeneration,
+                    retryAttempt + 1
+                )
             }
         }
         artworkLoadTarget = target
@@ -3072,7 +3116,41 @@ class AudioPlaybackService : MediaSessionService() {
             .asBitmap()
             .load(resolvedUrl)
             .override(512, 512)
+            .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
             .into(target)
+    }
+
+    /** Retry temporary image/network failures without restarting or blocking audio playback. */
+    private fun scheduleSongArtworkRetry(
+        songName: String?,
+        resolvedUrl: String,
+        expectedSongId: String,
+        requestGeneration: Long,
+        nextAttempt: Int
+    ) {
+        if (nextAttempt > artworkRetryDelaysMs.size) {
+            Log.w(TAG, "Artwork retry limit reached for song $expectedSongId")
+            return
+        }
+
+        artworkRetryJob?.cancel()
+        val waitMs = artworkRetryDelaysMs[nextAttempt - 1]
+        artworkRetryJob = serviceScope.launch {
+            delay(waitMs)
+            val activeSong = viewModel?.currentSong?.value
+            if (requestGeneration != artworkRequestGeneration ||
+                activeSong?.id?.toString() != expectedSongId
+            ) return@launch
+
+            artworkRetryJob = null
+            loadSongArtworkByUrl(
+                songName = songName,
+                resolvedUrl = resolvedUrl,
+                expectedSongId = expectedSongId,
+                requestGeneration = requestGeneration,
+                retryAttempt = nextAttempt
+            )
+        }
     }
 
     fun isPlaying(): Boolean = player.isPlaying

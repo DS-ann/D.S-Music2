@@ -2198,10 +2198,12 @@ private fun PlaylistsTabContent(
         )
     }
 
-    selectedLocalPlaylist?.let { playlist ->
+    selectedLocalPlaylist?.let { selected ->
+        val playlist = localPlaylists.firstOrNull { it.id == selected.id } ?: selected
         LocalPlaylistDetailsScreen(
             playlist = playlist,
             viewModel = viewModel,
+            accountViewModel = accountViewModel,
             onDismiss = { selectedLocalPlaylist = null }
         )
     }
@@ -2505,11 +2507,90 @@ private fun LocalPlaylistSongRow(
 private fun LocalPlaylistDetailsScreen(
     playlist: PlaylistEntity,
     viewModel: PlayerSharedViewModel,
+    accountViewModel: AccountViewModel?,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val songsEntity by viewModel.getSongsForLocalPlaylist(playlist.id).collectAsStateWithLifecycle(emptyList())
     val songs = remember(songsEntity) { songsEntity.map { it.toSongItem() } }
+    // Only YouTube video IDs can be copied into a YouTube Music playlist. Local MediaStore
+    // IDs and malformed/legacy rows are deliberately left in the device-only playlist.
+    val uploadableVideoIds = remember(songsEntity) {
+        songsEntity.mapNotNull { entry ->
+            entry.songId.takeIf { id ->
+                id.length == 11 && id.all { character ->
+                    character in 'A'..'Z' || character in 'a'..'z' ||
+                        character in '0'..'9' || character == '_' || character == '-'
+                }
+            }
+        }.distinct()
+    }
+    val alreadyUploaded = !playlist.youtubePlaylistId.isNullOrBlank()
+    var isUploading by remember(playlist.id) { mutableStateOf(false) }
+
+    val uploadLocalPlaylist: () -> Unit = {
+        when {
+            alreadyUploaded -> {
+                com.dsann.music.ui.SnackbarController.showMessage(
+                    "This playlist has already been uploaded to YouTube Music."
+                )
+            }
+            !AccountManager.isLoggedIn(context) -> {
+                com.dsann.music.ui.SnackbarController.showMessage(
+                    "Sign in to YouTube Music before uploading this playlist."
+                )
+            }
+            uploadableVideoIds.isEmpty() -> {
+                com.dsann.music.ui.SnackbarController.showMessage(
+                    "There are no YouTube Music tracks to upload. Local audio files cannot be added to a YouTube playlist."
+                )
+            }
+            isUploading -> Unit
+            else -> {
+                isUploading = true
+                scope.launch {
+                    try {
+                        val remotePlaylistId = YouTubeMusic.createPlaylist(
+                            title = playlist.title,
+                            description = "Created with D.S Music",
+                            privacyStatus = "PRIVATE",
+                            videoIds = uploadableVideoIds
+                        ).getOrThrow()
+
+                        try {
+                            viewModel.markLocalPlaylistUploaded(playlist.id, remotePlaylistId)
+                        } catch (saveError: Exception) {
+                            com.dsann.music.ui.SnackbarController.showMessage(
+                                "Uploaded to YouTube Music, but D.S Music could not save the link. Do not upload again."
+                            )
+                            return@launch
+                        }
+
+                        accountViewModel?.loadLibrary()
+                        val skipped = (songsEntity.size - uploadableVideoIds.size).coerceAtLeast(0)
+                        val message = buildString {
+                            append("Uploaded ")
+                            append(uploadableVideoIds.size)
+                            append(" tracks as a private YouTube Music playlist. Your local playlist was kept.")
+                            if (skipped > 0) {
+                                append(" ")
+                                append(skipped)
+                                append(" local or duplicate entries were skipped.")
+                            }
+                        }
+                        com.dsann.music.ui.SnackbarController.showMessage(message)
+                    } catch (error: Exception) {
+                        com.dsann.music.ui.SnackbarController.showMessage(
+                            error.message ?: "Could not upload this playlist to YouTube Music."
+                        )
+                    } finally {
+                        isUploading = false
+                    }
+                }
+            }
+        }
+    }
     val artworkUrl = playlist.thumbnailUrl?.takeIf { it.isNotBlank() }
         ?: songs.firstOrNull { !it.thumbnailUrl.isNullOrBlank() }?.thumbnailUrl
     val isLandscapeLayout =
@@ -2590,6 +2671,20 @@ private fun LocalPlaylistDetailsScreen(
                                 )
                             }
                             Spacer(Modifier.weight(1f))
+                            if (alreadyUploaded) {
+                                Text(
+                                    "Uploaded",
+                                    style = DsmusicTheme.typography.labelSmall,
+                                    color = DsmusicTheme.colorScheme.primary
+                                )
+                            } else {
+                                DsmusicTextButton(
+                                    onClick = uploadLocalPlaylist,
+                                    enabled = !isUploading
+                                ) {
+                                    Text(if (isUploading) "Uploading…" else "Upload")
+                                }
+                            }
                             DsmusicIconButton(
                                 onClick = {
                                     viewModel.deleteLocalPlaylist(playlist.id)
@@ -2687,6 +2782,20 @@ private fun LocalPlaylistDetailsScreen(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        if (alreadyUploaded) {
+                            Text(
+                                "Uploaded",
+                                style = DsmusicTheme.typography.labelSmall,
+                                color = DsmusicTheme.colorScheme.primary
+                            )
+                        } else {
+                            DsmusicTextButton(
+                                onClick = uploadLocalPlaylist,
+                                enabled = !isUploading
+                            ) {
+                                Text(if (isUploading) "Uploading…" else "Upload")
+                            }
+                        }
                         DsmusicIconButton(
                             onClick = {
                                 viewModel.deleteLocalPlaylist(playlist.id)

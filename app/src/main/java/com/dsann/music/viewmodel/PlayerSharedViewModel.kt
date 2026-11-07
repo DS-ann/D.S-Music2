@@ -340,6 +340,14 @@ class PlayerSharedViewModel @Inject constructor(
         }
     }
 
+    suspend fun markLocalPlaylistUploaded(playlistId: Long, youtubePlaylistId: String) {
+        withContext(Dispatchers.IO) {
+            val playlist = playlistDao.getPlaylistById(playlistId)
+                ?: throw IllegalStateException("The local playlist no longer exists.")
+            playlistDao.updatePlaylist(playlist.copy(youtubePlaylistId = youtubePlaylistId))
+        }
+    }
+
     fun deleteLocalPlaylist(playlistId: Long) {
         bgScope.launch(Dispatchers.IO) {
             val playlist = playlistDao.getPlaylistById(playlistId)

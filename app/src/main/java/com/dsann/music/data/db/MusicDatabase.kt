@@ -8,7 +8,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [PlaylistEntity::class, PlaylistSongEntity::class, HistoryEventEntity::class], version = 3, exportSchema = false)
+@Database(entities = [PlaylistEntity::class, PlaylistSongEntity::class, HistoryEventEntity::class], version = 4, exportSchema = false)
 abstract class MusicDatabase : RoomDatabase() {
 
     abstract fun playlistDao(): PlaylistDao
@@ -27,7 +27,7 @@ abstract class MusicDatabase : RoomDatabase() {
                     MusicDatabase::class.java,
                     DATABASE_NAME
                 )
-                .addMigrations(MIGRATION_2_3)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration(false)
                 .build()
                 INSTANCE = instance
@@ -81,6 +81,12 @@ abstract class MusicDatabase : RoomDatabase() {
         val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE playlist_songs ADD COLUMN lufs REAL DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE playlists ADD COLUMN youtubePlaylistId TEXT")
             }
         }
     }
