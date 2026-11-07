@@ -231,7 +231,7 @@ fun QueueBottomSheetContent(
         }
     )
     val draggedEntryKey = dragDropState.draggedItemKey as? String
-    val displayEntries = remember(songList, draggedSongId, dragDropState.currentIndexOfDraggedItem) {
+    val displayEntries = remember(songList, draggedEntryKey, dragDropState.currentIndexOfDraggedItem) {
         buildQueueDisplayEntries(songList, draggedEntryKey, dragDropState.currentIndexOfDraggedItem)
     }
     ClearRecentDraggedItemAnimationSkip(dragDropState)
@@ -546,6 +546,7 @@ fun QueueBottomSheetContent(
                             }
                             QueueDraggedSongOverlay(
                                 songs = displayedSongs,
+                                displayEntries = displayEntries,
                                 currentSongIndex = currentSongIndex,
                                 dragDropState = dragDropState,
                                 contentPadding = PaddingValues(end = 20.dp),

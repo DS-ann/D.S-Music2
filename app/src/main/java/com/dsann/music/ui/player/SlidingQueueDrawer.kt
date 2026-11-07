@@ -190,7 +190,7 @@ fun SlidingQueueDrawer(
                 }
             )
             val draggedEntryKey = dragDropState.draggedItemKey as? String
-            val displayEntries = remember(songList, draggedSongId, dragDropState.currentIndexOfDraggedItem) {
+            val displayEntries = remember(songList, draggedEntryKey, dragDropState.currentIndexOfDraggedItem) {
                 buildQueueDisplayEntries(songList, draggedEntryKey, dragDropState.currentIndexOfDraggedItem)
             }
             ClearRecentDraggedItemAnimationSkip(dragDropState)
