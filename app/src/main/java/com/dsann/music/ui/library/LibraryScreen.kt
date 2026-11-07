@@ -4419,13 +4419,14 @@ private fun StreamCacheTabContent(
     val scope = rememberCoroutineScope()
     val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
     val favoriteIds by viewModel.favoriteSongIds.collectAsStateWithLifecycle(emptySet())
+    val mediaCacheRevision by AudioPlaybackService.mediaCacheRevision.collectAsStateWithLifecycle()
     val rootTabActive = LocalRootTabActive.current
     val isLandscapeLayout = LocalConfiguration.current.orientation ==
         android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     // Poll only while the Library root tab is active. Cache stays in the root content
     // viewport, above the persistent navigation and mini-player overlays.
-    LaunchedEffect(context, lyricsCache, rootTabActive) {
+    LaunchedEffect(context, lyricsCache, rootTabActive, mediaCacheRevision) {
         if (!rootTabActive) return@LaunchedEffect
         var snapshot = readCacheTabSnapshot(context).entries
         cacheEntries = snapshot

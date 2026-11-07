@@ -74,6 +74,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 import java.util.TreeSet
 import java.nio.ByteBuffer
@@ -182,6 +185,13 @@ class AudioPlaybackService : MediaSessionService() {
 
         private var cache: SimpleCache? = null
         private var cacheEvictor: AdjustableCacheEvictor? = null
+        private val _mediaCacheRevision = MutableStateFlow(0L)
+        @JvmStatic val mediaCacheRevision: StateFlow<Long> = _mediaCacheRevision.asStateFlow()
+        @Volatile private var activeService: AudioPlaybackService? = null
+
+        private fun notifyMediaCacheChanged() {
+            _mediaCacheRevision.value = _mediaCacheRevision.value + 1L
+        }
 
         /**
          * Audio cache is user-valued offline data, not disposable temporary data.
@@ -639,29 +649,48 @@ class AudioPlaybackService : MediaSessionService() {
                 Context.MODE_PRIVATE
             )
             val metadataEditor = metadataPrefs.edit()
-            var removedResources = 0
+            val metadataKeysToRemove = metadataPrefs.all.mapNotNull { (preferenceKey, rawValue) ->
+                val metadata = parseCachedMediaMetadata(rawValue as? String) ?: return@mapNotNull null
+                val matchesSong = songId.isNotBlank() && metadata.songId == songId
+                val matchesVideo = videoId.isNotBlank() && metadata.videoId == videoId
+                if (matchesSong || matchesVideo) preferenceKey else null
+            }.toMutableSet()
+            if (cacheUri.isNotBlank()) {
+                metadataKeysToRemove.add(cacheMetadataEntryKey(cacheUri))
+            }
 
-            currentCache.keys.toList().forEach { key ->
+            val cacheKeysToRemove = currentCache.keys.toList().filter { key ->
                 val metadata = getCachedMediaMetadata(appContext, key)
-                val matchesSong = songId.isNotBlank() && metadata?.songId == songId
-                val matchesVideo = videoId.isNotBlank() && metadata?.videoId == videoId
-                val matchesExactUri = cacheUri.isNotBlank() && key == cacheUri
-                if (!matchesSong && !matchesVideo && !matchesExactUri) return@forEach
+                (songId.isNotBlank() && metadata?.songId == songId) ||
+                    (videoId.isNotBlank() && metadata?.videoId == videoId) ||
+                    (cacheUri.isNotBlank() && key == cacheUri)
+            }.toSet()
 
+            // Block keys before deleting spans. If the currently playing stream still has an
+            // open CacheDataSource, later chunks for that same URL must not recreate the entry.
+            cacheEvictor?.blockKeys(currentCache, cacheKeysToRemove)
+            activeService?.cancelCurrentTrackCacheForKeys(cacheKeysToRemove)
+
+            var removedResources = 0
+            cacheKeysToRemove.forEach { key ->
                 try {
                     currentCache.removeResource(key)
-                    metadataEditor.remove(cacheMetadataEntryKey(key))
                     removedResources++
                 } catch (error: Exception) {
                     Log.w(TAG, "Could not remove cached resource for song $songId", error)
                 }
             }
-
+            metadataKeysToRemove.forEach(metadataEditor::remove)
             metadataEditor.apply()
+
             if (songId.isNotBlank()) {
                 getCachedMediaArtworkFile(appContext, songId).delete()
             }
             cacheEvictor?.refresh(currentCache)
+            if (removedResources > 0 || metadataKeysToRemove.isNotEmpty()) {
+                notifyMediaCacheChanged()
+                activeService?.onCachedSongRemoved(songId, videoId, cacheKeysToRemove)
+            }
             return removedResources
         }
 
@@ -707,21 +736,44 @@ class AudioPlaybackService : MediaSessionService() {
 
         @Synchronized
         fun clearMediaCache(context: Context) {
-            context.getSharedPreferences(PREF_MEDIA_CACHE_METADATA, Context.MODE_PRIVATE).edit().clear().apply()
-            // Clear both locations so a cache created by an older app version cannot be left behind.
-            File(context.filesDir, "media_artwork").deleteRecursively()
-            File(context.cacheDir, "media_artwork").deleteRecursively()
+            val appContext = context.applicationContext
+            val metadata = appContext.getSharedPreferences(
+                PREF_MEDIA_CACHE_METADATA,
+                Context.MODE_PRIVATE
+            )
             val currentCache = cache
+            val service = activeService
+            service?.cancelCurrentTrackCache()
+
+            val keys = currentCache?.keys?.toSet().orEmpty()
+            val activeUri = runCatching {
+                service?.takeIf { it.isPlayerInitialized }
+                    ?.player?.currentMediaItem?.localConfiguration?.uri?.toString()
+            }.getOrNull()
+            val blockedKeys = keys + listOfNotNull(activeUri)
+            currentCache?.let { cacheEvictor?.blockKeys(it, blockedKeys) }
+
+            metadata.edit().clear().commit()
+            // Artwork is part of the managed song cache, not the separate image cache.
+            File(appContext.filesDir, "media_artwork").deleteRecursively()
+            File(appContext.cacheDir, "media_artwork").deleteRecursively()
+
             if (currentCache == null) {
-                File(context.filesDir, "media_cache").deleteRecursively()
-                File(context.cacheDir, "media_cache").deleteRecursively()
-                return
+                File(appContext.filesDir, "media_cache").deleteRecursively()
+                File(appContext.cacheDir, "media_cache").deleteRecursively()
+            } else {
+                currentCache.keys.toList().forEach { key ->
+                    try {
+                        currentCache.removeResource(key)
+                    } catch (error: Exception) {
+                        Log.w(TAG, "Could not clear one cached resource", error)
+                    }
+                }
+                cacheEvictor?.refresh(currentCache)
             }
-            currentCache.keys.toList().forEach { key ->
-                try { currentCache.removeResource(key) }
-                catch (error: Exception) { Log.w(TAG, "Could not clear one cached resource", error) }
-            }
-            cacheEvictor?.refresh(currentCache)
+
+            notifyMediaCacheChanged()
+            service?.onMediaCacheCleared(blockedKeys)
         }
     }
 
@@ -1197,6 +1249,7 @@ class AudioPlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+        activeService = this
         // No-op for behavior in older Media3 or if unresolved
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         handler = Handler(Looper.getMainLooper())
@@ -1401,6 +1454,7 @@ class AudioPlaybackService : MediaSessionService() {
         mediaSession?.release()
         playerReadyCallbacks.clear()
         serviceScope.cancel()
+        if (activeService === this) activeService = null
     }
 
     private fun configurePlayerAudio(target: ExoPlayer) {
@@ -1654,7 +1708,63 @@ class AudioPlaybackService : MediaSessionService() {
         resolveTargetSongId = null
         viewModel?.setLoading(true)
         originalSourceUri = uri
-        if (uri.scheme == "innertube") {
+        val selectedSong = viewModel?.currentSong?.value
+        val staleCachedItem = selectedSong?.takeIf {
+            it.isCachedTrack &&
+                it.contentUri == uri &&
+                (uri.scheme == "http" || uri.scheme == "https")
+        }
+        if (staleCachedItem != null) {
+            // Cache playlist rows intentionally carry their exact HTTP cache key. Verify that
+            // the full resource still exists before selecting an offline-only MediaSource.
+            resolveTargetSongId = staleCachedItem.videoId ?: staleCachedItem.id.toString()
+            resolveJob = serviceScope.launch {
+                try {
+                    val stillComplete = withContext(Dispatchers.IO) {
+                        getCompleteCachedPlaybackUriForKey(applicationContext, uri.toString()) != null
+                    }
+                    ensureActive()
+                    if (
+                        requestGeneration != playbackResolveGeneration ||
+                        viewModel?.currentSong?.value?.id != staleCachedItem.id
+                    ) return@launch
+
+                    if (stillComplete) {
+                        loadAudioInternal(uri, keepPlayingUntilReady = true)
+                    } else {
+                        val liveUri = staleCachedItem.videoId
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { "innertube://$it".toUri() }
+                            ?: uri
+                        viewModel?.refreshCurrentSongSource(
+                            staleCachedItem.withPlaybackSource(
+                                liveUri,
+                                cached = false,
+                                downloaded = false
+                            )
+                        )
+                        Log.i(TAG, "Cached entry was removed or incomplete; falling back to online playback")
+                        val resumePosition = pendingSeekPos.takeIf { it >= 0L }
+                            ?: getStablePlaybackPositionMs()
+                        loadAndPlay(liveUri, resumePosition)
+                    }
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    if (requestGeneration == playbackResolveGeneration) {
+                        Log.w(TAG, "Could not validate cached playback source; retrying online", error)
+                        val liveUri = staleCachedItem.videoId
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { "innertube://$it".toUri() }
+                            ?: uri
+                        viewModel?.refreshCurrentSongSource(
+                            staleCachedItem.withPlaybackSource(liveUri, cached = false, downloaded = false)
+                        )
+                        loadAndPlay(liveUri, getStablePlaybackPositionMs())
+                    }
+                }
+            }
+        } else if (uri.scheme == "innertube") {
             val videoId = uri.host
             if (videoId.isNullOrBlank()) {
                 viewModel?.setLoading(false)
@@ -2084,6 +2194,66 @@ class AudioPlaybackService : MediaSessionService() {
         }
     }
 
+    private fun cancelCurrentTrackCacheForKeys(keys: Set<String>) {
+        val activeKey = fullTrackCacheKey
+        if (!activeKey.isNullOrBlank() && activeKey in keys) {
+            cancelCurrentTrackCache()
+        }
+    }
+
+    private fun onCachedSongRemoved(songId: String, videoId: String, cacheKeys: Set<String>) {
+        serviceScope.launch {
+            if (!isPlayerInitialized) return@launch
+            val song = viewModel?.currentSong?.value ?: return@launch
+            val matchesSong = songId.isNotBlank() && song.id.toString() == songId
+            val matchesVideo = videoId.isNotBlank() && song.videoId == videoId
+            if (!song.isCachedTrack || (!matchesSong && !matchesVideo)) return@launch
+            if (cacheKeys.isNotEmpty() && song.contentUri.toString() !in cacheKeys) return@launch
+
+            cancelCurrentTrackCache()
+            val resumePosition = getStablePlaybackPositionMs()
+            val liveUri = song.videoId?.takeIf { it.isNotBlank() }
+                ?.let { "innertube://$it".toUri() }
+                ?: song.contentUri
+            viewModel?.refreshCurrentSongSource(
+                song.withPlaybackSource(liveUri, cached = false, downloaded = false)
+            )
+            if (player.isPlaying) {
+                loadAndPlay(liveUri, resumePosition)
+            } else {
+                shouldAutoPlay = false
+                pendingSeekPos = resumePosition
+                resolveAndLoad(liveUri)
+            }
+        }
+    }
+
+    private fun onMediaCacheCleared(blockedKeys: Set<String>) {
+        serviceScope.launch {
+            if (!isPlayerInitialized) return@launch
+            val song = viewModel?.currentSong?.value ?: return@launch
+            val currentUri = player.currentMediaItem?.localConfiguration?.uri?.toString()
+                ?: song.contentUri.toString()
+            if (!song.isCachedTrack || currentUri !in blockedKeys) return@launch
+
+            cancelCurrentTrackCache()
+            val resumePosition = getStablePlaybackPositionMs()
+            val liveUri = song.videoId?.takeIf { it.isNotBlank() }
+                ?.let { "innertube://$it".toUri() }
+                ?: song.contentUri
+            viewModel?.refreshCurrentSongSource(
+                song.withPlaybackSource(liveUri, cached = false, downloaded = false)
+            )
+            if (player.isPlaying) {
+                loadAndPlay(liveUri, resumePosition)
+            } else {
+                shouldAutoPlay = false
+                pendingSeekPos = resumePosition
+                resolveAndLoad(liveUri)
+            }
+        }
+    }
+
     private fun cancelCurrentTrackCache() {
         activeFullTrackCacheWriter?.cancel()
         activeFullTrackCacheWriter = null
@@ -2219,6 +2389,7 @@ class AudioPlaybackService : MediaSessionService() {
                         "Full-track cache finished for '$title': " +
                             "${completedFacts?.cachedBytes ?: 0L} bytes, complete=${completedFacts?.isComplete == true}"
                     )
+                    if (completedFacts?.isComplete == true) notifyMediaCacheChanged()
                 } finally {
                     synchronized(this@AudioPlaybackService) {
                         if (activeFullTrackCacheWriter === writer) {
@@ -4459,6 +4630,7 @@ private class AdjustableCacheEvictor(initialEnabled: Boolean, initialMaxBytes: L
             if (keyOrder != 0) keyOrder else a.position.compareTo(b.position)
         }
     })
+    private val blockedKeys = HashSet<String>()
     @Volatile private var enabled = initialEnabled
     @Volatile private var maxBytes = initialMaxBytes
     @Volatile private var initialized = false
@@ -4475,8 +4647,36 @@ private class AdjustableCacheEvictor(initialEnabled: Boolean, initialMaxBytes: L
     }
     override fun onSpanAdded(cache: Cache, span: CacheSpan) {
         activeCache = cache
-        synchronized(lock) { spans.add(span) }
+        val blocked = synchronized(lock) {
+            if (span.key in blockedKeys) true else {
+                spans.add(span)
+                false
+            }
+        }
+        if (blocked) {
+            // A still-open player data source may finish a write after a user removes a
+            // cached song. Drop that span immediately instead of resurrecting the entry.
+            try {
+                cache.removeSpan(span)
+            } catch (error: Exception) {
+                android.util.Log.w("DsmusicCache", "Unable to discard a removed cache span", error)
+            }
+            return
+        }
         if (initialized) evictIfNeeded(cache)
+    }
+    fun blockKeys(cache: Cache, keys: Set<String>) {
+        if (keys.isEmpty()) return
+        synchronized(lock) { blockedKeys.addAll(keys) }
+        keys.forEach { key ->
+            cache.getCachedSpans(key).forEach { span ->
+                try {
+                    cache.removeSpan(span)
+                } catch (error: Exception) {
+                    android.util.Log.w("DsmusicCache", "Unable to clear blocked cache span", error)
+                }
+            }
+        }
     }
     override fun onSpanRemoved(cache: Cache, span: CacheSpan) {
         activeCache = cache
@@ -4499,7 +4699,9 @@ private class AdjustableCacheEvictor(initialEnabled: Boolean, initialMaxBytes: L
         activeCache = cache
         synchronized(lock) {
             spans.clear()
-            cache.keys.forEach { key -> spans.addAll(cache.getCachedSpans(key)) }
+            cache.keys.forEach { key ->
+                if (key !in blockedKeys) spans.addAll(cache.getCachedSpans(key))
+            }
         }
         if (initialized) evictIfNeeded(cache)
     }

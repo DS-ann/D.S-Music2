@@ -1580,6 +1580,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             
             var totalCacheSize = getDirSize(context.cacheDir)
             totalCacheSize += getDirSize(context.codeCacheDir)
+            // Online audio and its artwork are deliberately stored under filesDir so Android's
+            // cache cleaner cannot evict them. Include those managed stores in the real totals.
+            totalCacheSize += getDirSize(File(context.filesDir, "media_cache"))
+            totalCacheSize += getDirSize(File(context.filesDir, "media_artwork"))
             val songSize = (totalCacheSize - imageSize).coerceAtLeast(0L)
 
             _imageCacheSize.value = formatFileSize(imageSize)
@@ -1589,6 +1593,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun clearSongCache(onComplete: () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
+            // Clear the persistent Media3 stream cache and its song artwork before deleting
+            // disposable cache directories. Deleting cacheDir alone misses filesDir/media_cache.
+            com.dsann.music.service.AudioPlaybackService.clearMediaCache(context.applicationContext)
             context.cacheDir.listFiles()?.forEach { file ->
                 if (file.name != "image_cache") {
                     deleteDir(file)

@@ -2140,7 +2140,9 @@ fun FullPlayer(
                     initialValue = SongFileMetadata(isRemote = SongFileMetadataReader.isRemoteSong(song)),
                     key1 = song.id,
                     key2 = song.path,
-                    key3 = song.data
+                    key3 = song.data,
+                    key4 = song.contentUri.toString(),
+                    key5 = song.isCachedTrack
                 ) {
                     value = withContext(Dispatchers.IO) {
                         SongFileMetadataReader.read(context.applicationContext, song)
@@ -2162,12 +2164,14 @@ fun FullPlayer(
                 val onlineStreamMetadata by produceState<OnlineStreamMetadata?>(
                     initialValue = null,
                     key1 = song.videoId,
-                    key2 = isVideoMode
+                    key2 = isVideoMode,
+                    key3 = song.isCachedTrack,
+                    key4 = songFileMetadata.isRemote
                 ) {
                     value = if (
                         !isVideoMode &&
                         !song.videoId.isNullOrBlank() &&
-                        !song.isCachedTrack &&
+                        (!song.isCachedTrack || songFileMetadata.isRemote) &&
                         !song.isDownloadedOffline
                     ) {
                         withContext(Dispatchers.IO) {
@@ -2267,8 +2271,8 @@ fun FullPlayer(
                            else "Audio format not exposed by file provider"
                 }
                 val sourceText = when {
-                    song.isCachedTrack -> "D.S Music cache (cached audio stream)"
                     song.isDownloadedOffline -> "Downloaded audio file (offline)"
+                    song.isCachedTrack && !songFileMetadata.isRemote -> "D.S Music cache (cached audio stream)"
                     !song.videoId.isNullOrBlank() && songFileMetadata.isRemote -> "YouTube Music stream"
                     songFileMetadata.isRemote -> "Remote audio stream"
                     else -> "Device audio file"

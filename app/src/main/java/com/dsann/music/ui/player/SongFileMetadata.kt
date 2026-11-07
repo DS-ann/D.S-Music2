@@ -120,7 +120,7 @@ internal object SongFileMetadataReader {
                     song.contentUri.toString()
                 )
             }.getOrNull()
-            if (facts != null) {
+            if (facts != null && facts.isComplete && facts.cachedBytes > 0L) {
                 val duration = song.duration.takeIf { it > 0L }
                 val bytes = facts.totalBytes ?: facts.cachedBytes
                 val estimatedBitrate = if (duration != null && duration > 0L && bytes > 0L) {
@@ -138,10 +138,11 @@ internal object SongFileMetadataReader {
                         ?.takeIf { it.isNotBlank() }
                 )
             }
-            // A cache item remains identified as cached even when Media3 temporarily exposes
-            // no length/MIME values; do not initiate a fresh online metadata probe.
+            // The cached flag is only a queue hint. If its complete backing resource is gone,
+            // report the real source as remote so Song Info and its metadata lookup cannot claim
+            // that a deleted cache file is still playing.
             return SongFileMetadata(
-                isRemote = false,
+                isRemote = true,
                 durationMs = song.duration.takeIf { it > 0L },
                 mimeType = null
             )

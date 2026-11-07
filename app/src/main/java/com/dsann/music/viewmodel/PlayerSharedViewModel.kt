@@ -1798,6 +1798,14 @@ class PlayerSharedViewModel @Inject constructor(
         if (_currentSong.value?.id != song.id) return
         _currentSong.value = song
         _songUri.value = song.contentUri
+
+        // Keep the selected queue row in sync with the resolved source. Otherwise a Cache
+        // playlist row can remain marked offline-only after its cache entry has been removed.
+        val queue = _songList.value
+        val queueIndex = queue.indexOfFirst { it.id == song.id && it.videoId == song.videoId }
+        if (queueIndex >= 0 && queue[queueIndex] != song) {
+            _songList.value = queue.toMutableList().also { it[queueIndex] = song }
+        }
     }
 
     fun playSongAtIndex(
