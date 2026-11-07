@@ -183,19 +183,103 @@ class AudioPlaybackService : MediaSessionService() {
         private var cache: SimpleCache? = null
         private var cacheEvictor: AdjustableCacheEvictor? = null
 
+        /**
+         * Audio cache is user-valued offline data, not disposable temporary data.
+         * Keep it under filesDir so Android's cache cleaner does not treat it as evictable.
+         * Move the previous cacheDir folder on the first run after upgrade.
+         */
+        @Synchronized
+        private fun getPersistentMediaDirectory(context: Context, directoryName: String): File {
+            val appContext = context.applicationContext
+            val persistentDirectory = File(appContext.filesDir, directoryName)
+            val legacyDirectory = File(appContext.cacheDir, directoryName)
+
+            if (legacyDirectory.exists()) {
+                if (!persistentDirectory.exists() && legacyDirectory.renameTo(persistentDirectory)) {
+                    Log.i(TAG, "Migrated $directoryName from cacheDir to persistent app storage")
+                } else if (legacyDirectory.exists()) {
+                    if (mergeLegacyDirectory(legacyDirectory, persistentDirectory)) {
+                        Log.i(TAG, "Merged legacy $directoryName into persistent app storage")
+                    } else {
+                        // Keep the legacy folder intact when any file cannot be migrated.
+                        // The persistent directory remains the active location for new writes.
+                        Log.w(TAG, "Some legacy $directoryName files could not be migrated; original files were retained")
+                    }
+                }
+            }
+
+            if (!persistentDirectory.exists() && !persistentDirectory.mkdirs()) {
+                throw IllegalStateException("Unable to create persistent media directory: ${persistentDirectory.absolutePath}")
+            }
+            return persistentDirectory
+        }
+
+        /**
+         * Merge a legacy directory without overwriting files already present in the destination.
+         * Files are copied through a temporary sibling and renamed only after the copy is complete.
+         */
+        private fun mergeLegacyDirectory(source: File, destination: File): Boolean {
+            if (!source.exists()) return true
+            if (!destination.exists() && !destination.mkdirs()) return false
+            val children = source.listFiles() ?: return false
+
+            for (child in children) {
+                val target = File(destination, child.name)
+                if (child.isDirectory) {
+                    if (!mergeLegacyDirectory(child, target)) return false
+                } else if (target.exists()) {
+                    if (target.length() != child.length()) {
+                        Log.w(TAG, "Skipped conflicting legacy cache file: ${child.name}")
+                        return false
+                    }
+                    if (!child.delete()) return false
+                } else {
+                    val staged = File(destination, child.name + ".migration.tmp")
+                    if (staged.exists() && !staged.delete()) return false
+                    try {
+                        java.io.FileInputStream(child).use { input ->
+                            java.io.FileOutputStream(staged).use { output ->
+                                val buffer = ByteArray(64 * 1024)
+                                while (true) {
+                                    val count = input.read(buffer)
+                                    if (count < 0) break
+                                    output.write(buffer, 0, count)
+                                }
+                                output.flush()
+                                output.fd.sync()
+                            }
+                        }
+                        if (!staged.renameTo(target)) {
+                            staged.delete()
+                            return false
+                        }
+                        if (!child.delete()) return false
+                    } catch (error: Exception) {
+                        staged.delete()
+                        Log.w(TAG, "Unable to migrate legacy cache file: ${child.name}", error)
+                        return false
+                    }
+                }
+            }
+
+            return source.delete() || !source.exists()
+        }
+
         @Synchronized
         fun getCache(context: Context): SimpleCache {
             cache?.let { return it }
 
-            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val appContext = context.applicationContext
+            val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val enabled = prefs.getBoolean(KEY_MEDIA_CACHE_ENABLED, true)
             val limitBytes = prefs.getInt(KEY_MEDIA_CACHE_LIMIT_GB, DEFAULT_MEDIA_CACHE_LIMIT_GB)
                 .coerceIn(1, 10).toLong() * BYTES_PER_GB
             val evictor = AdjustableCacheEvictor(enabled, limitBytes)
+            val cacheDirectory = getPersistentMediaDirectory(appContext, "media_cache")
             val createdCache = SimpleCache(
-                File(context.cacheDir, "media_cache"),
+                cacheDirectory,
                 evictor,
-                StandaloneDatabaseProvider(context)
+                StandaloneDatabaseProvider(appContext)
             )
             try {
                 // SimpleCache already reports its loaded spans to the evictor during construction.
@@ -470,7 +554,7 @@ class AudioPlaybackService : MediaSessionService() {
 
         @JvmStatic
         fun getCachedMediaArtworkFile(context: Context, songId: String): File {
-            val directory = File(context.cacheDir, "media_artwork")
+            val directory = getPersistentMediaDirectory(context.applicationContext, "media_artwork")
             return File(directory, cacheMetadataEntryKey("artwork:" + songId) + ".jpg")
         }
 
@@ -624,9 +708,12 @@ class AudioPlaybackService : MediaSessionService() {
         @Synchronized
         fun clearMediaCache(context: Context) {
             context.getSharedPreferences(PREF_MEDIA_CACHE_METADATA, Context.MODE_PRIVATE).edit().clear().apply()
+            // Clear both locations so a cache created by an older app version cannot be left behind.
+            File(context.filesDir, "media_artwork").deleteRecursively()
             File(context.cacheDir, "media_artwork").deleteRecursively()
             val currentCache = cache
             if (currentCache == null) {
+                File(context.filesDir, "media_cache").deleteRecursively()
                 File(context.cacheDir, "media_cache").deleteRecursively()
                 return
             }
