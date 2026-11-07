@@ -32,7 +32,6 @@ import com.dsann.music.R
 import com.dsann.music.model.SongItem
 import com.dsann.music.ui.QueueListItem
 import com.dsann.music.ui.QueueSyncedLyricPreview
-import com.dsann.music.ui.QueueDisplayEntry
 import com.dsann.music.ui.buildQueueDisplayEntries
 import com.dsann.music.ui.QueueDisplayRow
 import com.dsann.music.ui.QueueDraggedSongOverlay
