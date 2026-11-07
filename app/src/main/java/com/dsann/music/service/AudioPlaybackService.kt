@@ -908,6 +908,8 @@ class AudioPlaybackService : MediaSessionService() {
     // Complete the active remote track in SimpleCache, not just ExoPlayer's short playback buffer.
     private var fullTrackCacheJob: Job? = null
     @Volatile private var fullTrackCacheKey: String? = null
+    // After a user explicitly removes/clears a playing track, do not immediately refill it.
+    @Volatile private var cacheSuppressedSongId: String? = null
     @Volatile private var activeFullTrackCacheWriter: CacheWriter? = null
     private var cacheAssetsSongId: Long? = null
     @Volatile private var activeVideoCacheVideoId: String? = null
@@ -2222,6 +2224,7 @@ class AudioPlaybackService : MediaSessionService() {
             if (!song.isCachedTrack || (!matchesSong && !matchesVideo)) return@launch
             if (cacheKeys.isNotEmpty() && song.contentUri.toString() !in cacheKeys) return@launch
 
+            cacheSuppressedSongId = song.id.toString()
             cancelCurrentTrackCache()
             val resumePosition = getStablePlaybackPositionMs()
             val liveUri = song.videoId?.takeIf { it.isNotBlank() }
@@ -2246,9 +2249,14 @@ class AudioPlaybackService : MediaSessionService() {
             val song = viewModel?.currentSong?.value ?: return@launch
             val currentUri = player.currentMediaItem?.localConfiguration?.uri?.toString()
                 ?: song.contentUri.toString()
-            if (!song.isCachedTrack || currentUri !in blockedKeys) return@launch
+            if (currentUri !in blockedKeys) return@launch
 
+            // A clear operation must not immediately refill the current track, even when it
+            // had been streaming online rather than marked as a Cache playlist item.
+            cacheSuppressedSongId = song.id.toString()
             cancelCurrentTrackCache()
+            if (!song.isCachedTrack) return@launch
+
             val resumePosition = getStablePlaybackPositionMs()
             val liveUri = song.videoId?.takeIf { it.isNotBlank() }
                 ?.let { "innertube://$it".toUri() }
@@ -2293,6 +2301,11 @@ class AudioPlaybackService : MediaSessionService() {
         if (uri.scheme != "http" && uri.scheme != "https") return
 
         val song = viewModel?.currentSong?.value
+        val songIdForCache = song?.id?.toString()
+        if (cacheSuppressedSongId != null && cacheSuppressedSongId != songIdForCache) {
+            cacheSuppressedSongId = null
+        }
+        if (songIdForCache != null && cacheSuppressedSongId == songIdForCache) return
         if (song?.isCachedTrack == true || song?.isDownloadedOffline == true) return
 
         val cacheKey = uri.toString()
