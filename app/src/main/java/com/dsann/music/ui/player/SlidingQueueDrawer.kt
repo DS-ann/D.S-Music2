@@ -32,6 +32,10 @@ import com.dsann.music.R
 import com.dsann.music.model.SongItem
 import com.dsann.music.ui.QueueListItem
 import com.dsann.music.ui.QueueSyncedLyricPreview
+import com.dsann.music.ui.QueueDisplayEntry
+import com.dsann.music.ui.buildQueueDisplayEntries
+import com.dsann.music.ui.QueueDisplayRow
+import com.dsann.music.ui.QueueDraggedSongOverlay
 import com.dsann.music.ui.ClearRecentDraggedItemAnimationSkip
 import com.dsann.music.ui.rememberDragDropState
 import com.dsann.music.viewmodel.PlayerSharedViewModel
@@ -183,6 +187,10 @@ fun SlidingQueueDrawer(
                     }
                 }
             )
+            val draggedSongId = dragDropState.draggedItemKey as? Long
+            val displayEntries = remember(songList, draggedSongId, dragDropState.currentIndexOfDraggedItem) {
+                buildQueueDisplayEntries(songList, draggedSongId, dragDropState.currentIndexOfDraggedItem)
+            }
             ClearRecentDraggedItemAnimationSkip(dragDropState)
 
             // Scroll active track into view on first open
@@ -290,60 +298,55 @@ fun SlidingQueueDrawer(
 
                 HorizontalDivider(color = DsmusicTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
-                // Queue List
-                LazyColumn(
-                    state = lazyListState,
+                // Queue List: the placeholder moves through the list while the dragged
+                // song itself is drawn independently above the animated rows.
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
-                    verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
+                        .weight(1f)
                 ) {
-                    itemsIndexed(
-                        items = songList,
-                        key = { _, song -> song.id },
-                        contentType = { _, _ -> "queue-song" }
-                    ) { index, song ->
-                        val isPlaying = (index == currentSongIndex)
-                        val shapes = ListItemDefaults.segmentedShapes(index = index, count = songList.size)
-                        val isDragging = song.id == dragDropState.draggedItemKey
-                        val displacement = if (isDragging) dragDropState.elementDisplacement ?: 0f else 0f
-
-                        Box(
-                            modifier = Modifier
-                                .then(
-                                    if (dragDropState.isDragging || dragDropState.recentlyDraggedItemKey == song.id) Modifier
-                                    else Modifier.animateItem(
-                                        fadeInSpec = null,
-                                        fadeOutSpec = null,
-                                        placementSpec = spring(
-                                            dampingRatio = Spring.DampingRatioNoBouncy,
-                                            stiffness = Spring.StiffnessMediumLow
-                                        )
-                                    )
+                    LazyColumn(
+                        state = lazyListState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
+                        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
+                    ) {
+                        itemsIndexed(
+                            items = displayEntries,
+                            key = { _, entry -> entry.stableKey },
+                            contentType = { _, entry -> if (entry.song == null) "queue-drag-placeholder" else "queue-song" }
+                        ) { displayIndex, entry ->
+                            val recentlyDropped = entry.song?.id == dragDropState.recentlyDraggedItemKey
+                            val animatedModifier = if (recentlyDropped) Modifier else Modifier.animateItem(
+                                fadeInSpec = null,
+                                fadeOutSpec = null,
+                                placementSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessMediumLow
                                 )
-                                .zIndex(if (isDragging) 1f else 0f)
-                                .graphicsLayer {
-                                    translationY = displacement
-                                    val liftScale = if (isDragging) 1.05f else 1f
-                                    scaleX = liftScale
-                                    scaleY = liftScale
-                                    shadowElevation = 0f
-                                    shape = RoundedCornerShape(18.dp)
-                                }
-                        ) {
-                            QueueListItem(
-                                song = song,
-                                isPlaying = isPlaying,
-                                shapes = shapes,
-                                dragDropState = if (isQueueExpanded) dragDropState else null,
-                                index = index,
-                                onLongClick = { onSongLongClick(song) },
-                                onSwipeRemove = { onRemoveFromQueue(song) },
-                                onClick = { onPlaySongAtIndex(index) }
+                            )
+                            QueueDisplayRow(
+                                entry = entry,
+                                displayIndex = displayIndex,
+                                songs = songList,
+                                currentSongIndex = currentSongIndex,
+                                dragDropState = dragDropState,
+                                itemModifier = animatedModifier,
+                                onLongClick = onSongLongClick,
+                                onSwipeRemove = onRemoveFromQueue,
+                                onPlaySongAtIndex = onPlaySongAtIndex
                             )
                         }
                     }
+                    QueueDraggedSongOverlay(
+                        songs = songList,
+                        currentSongIndex = currentSongIndex,
+                        dragDropState = dragDropState,
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp),
+                        onSongLongClick = onSongLongClick,
+                        onSwipeRemove = onRemoveFromQueue,
+                        onPlaySongAtIndex = onPlaySongAtIndex
+                    )
                 }
             } // Column (header + list)
 

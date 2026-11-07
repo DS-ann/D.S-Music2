@@ -157,6 +157,39 @@ class QueueBottomSheet : BottomSheetDialogFragment() {
     }
 }
 
+/**
+ * A queue row during drag preview. The dragged song is temporarily replaced by one
+ * stable placeholder; all remaining songs keep their own keys and animate into place.
+ */
+internal data class QueueDisplayEntry(
+    val song: SongItem?,
+    val placeholderSongId: Long? = null
+) {
+    val stableKey: Any
+        get() = song?.id ?: "queue-drag-placeholder-${placeholderSongId ?: 0L}"
+}
+
+internal fun buildQueueDisplayEntries(
+    songs: List<SongItem>,
+    draggedSongId: Long?,
+    targetIndex: Int?
+): List<QueueDisplayEntry> {
+    if (draggedSongId == null || targetIndex == null || songs.none { it.id == draggedSongId }) {
+        return songs.map { QueueDisplayEntry(song = it) }
+    }
+
+    val remaining = songs.filterNot { it.id == draggedSongId }
+    val insertionIndex = targetIndex.coerceIn(0, remaining.size)
+    return buildList(remaining.size + 1) {
+        for (index in 0..remaining.size) {
+            if (index == insertionIndex) {
+                add(QueueDisplayEntry(song = null, placeholderSongId = draggedSongId))
+            }
+            if (index < remaining.size) add(QueueDisplayEntry(song = remaining[index]))
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun QueueBottomSheetContent(
@@ -183,6 +216,10 @@ fun QueueBottomSheetContent(
             }
         }
     )
+    val draggedSongId = dragDropState.draggedItemKey as? Long
+    val displayEntries = remember(songList, draggedSongId, dragDropState.currentIndexOfDraggedItem) {
+        buildQueueDisplayEntries(songList, draggedSongId, dragDropState.currentIndexOfDraggedItem)
+    }
     ClearRecentDraggedItemAnimationSkip(dragDropState)
 
     // Auto-scroll to currently playing track on initial load
@@ -290,61 +327,46 @@ fun QueueBottomSheetContent(
                     } else {
                         LazyColumn(
                             state = lazyListState,
-                            modifier = Modifier
-                                .fillMaxSize(),
+                            modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 32.dp),
                             verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
                         ) {
                             itemsIndexed(
-                                items = displayedSongs,
-                                key = { _, song -> song.id },
-                                contentType = { _, _ -> "queue-song" }
-                            ) { index, song ->
-                                val isPlaying = (index == currentSongIndex)
-                                val shapes = ListItemDefaults.segmentedShapes(index = index, count = displayedSongs.size)
-                                
-                                val isDragging = song.id == dragDropState.draggedItemKey
-                                val displacement = if (isDragging) dragDropState.elementDisplacement ?: 0f else 0f
-
-                                Box(
-                                    modifier = Modifier
-                                        .then(
-                                            if (dragDropState.isDragging || dragDropState.recentlyDraggedItemKey == song.id) Modifier
-                                            else Modifier.animateItem(
-                                                fadeInSpec = null,
-                                                fadeOutSpec = null,
-                                                placementSpec = spring(
-                                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                                    stiffness = Spring.StiffnessMediumLow
-                                                )
-                                            )
-                                        )
-                                        .zIndex(if (isDragging) 1f else 0f)
-                                        .graphicsLayer {
-                                            translationY = displacement
-                                            val liftScale = if (isDragging) 1.05f else 1f
-                                            scaleX = liftScale
-                                            scaleY = liftScale
-                                            shadowElevation = 0f
-                                            shape = RoundedCornerShape(18.dp)
-                                        }
-                                ) {
-                                    QueueListItem(
-                                        song = song,
-                                        isPlaying = isPlaying,
-                                        shapes = shapes,
-                                        dragDropState = dragDropState,
-                                        index = index,
-                                        showDivider = index < displayedSongs.lastIndex,
-                                        onLongClick = { onSongLongClick(song) },
-                                        onSwipeRemove = { viewModel.removeFromQueue(song.id) },
-                                        onClick = {
-                                            viewModel.playSongAtIndex(index)
-                                        }
+                                items = displayEntries,
+                                key = { _, entry -> entry.stableKey },
+                                contentType = { _, entry -> if (entry.song == null) "queue-drag-placeholder" else "queue-song" }
+                            ) { displayIndex, entry ->
+                                val recentlyDropped = entry.song?.id == dragDropState.recentlyDraggedItemKey
+                                val animatedModifier = if (recentlyDropped) Modifier else Modifier.animateItem(
+                                    fadeInSpec = null,
+                                    fadeOutSpec = null,
+                                    placementSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessMediumLow
                                     )
-                                }
+                                )
+                                QueueDisplayRow(
+                                    entry = entry,
+                                    displayIndex = displayIndex,
+                                    songs = displayedSongs,
+                                    currentSongIndex = currentSongIndex,
+                                    dragDropState = dragDropState,
+                                    itemModifier = animatedModifier,
+                                    onLongClick = onSongLongClick,
+                                    onSwipeRemove = { song -> viewModel.removeFromQueue(song.id) },
+                                    onPlaySongAtIndex = { index -> viewModel.playSongAtIndex(index) }
+                                )
                             }
                         }
+                        QueueDraggedSongOverlay(
+                            songs = displayedSongs,
+                            currentSongIndex = currentSongIndex,
+                            dragDropState = dragDropState,
+                            contentPadding = PaddingValues(start = 20.dp, end = 20.dp),
+                            onSongLongClick = onSongLongClick,
+                            onSwipeRemove = { song -> viewModel.removeFromQueue(song.id) },
+                            onPlaySongAtIndex = { index -> viewModel.playSongAtIndex(index) }
+                        )
                     }
                 }
             } else {
@@ -440,55 +462,41 @@ fun QueueBottomSheetContent(
                                 verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
                             ) {
                                 itemsIndexed(
-                                    items = displayedSongs,
-                                    key = { _, song -> song.id },
-                                    contentType = { _, _ -> "queue-song" }
-                                ) { index, song ->
-                                    val isPlaying = (index == currentSongIndex)
-                                    val shapes = ListItemDefaults.segmentedShapes(index = index, count = displayedSongs.size)
-                                    
-                                    val isDragging = song.id == dragDropState.draggedItemKey
-                                    val displacement = if (isDragging) dragDropState.elementDisplacement ?: 0f else 0f
-
-                                    Box(
-                                        modifier = Modifier
-                                            .then(
-                                            if (dragDropState.isDragging || dragDropState.recentlyDraggedItemKey == song.id) Modifier
-                                            else Modifier.animateItem(
-                                                fadeInSpec = null,
-                                                fadeOutSpec = null,
-                                                placementSpec = spring(
-                                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                                    stiffness = Spring.StiffnessMediumLow
-                                                )
-                                            )
+                                    items = displayEntries,
+                                    key = { _, entry -> entry.stableKey },
+                                    contentType = { _, entry -> if (entry.song == null) "queue-drag-placeholder" else "queue-song" }
+                                ) { displayIndex, entry ->
+                                    val recentlyDropped = entry.song?.id == dragDropState.recentlyDraggedItemKey
+                                    val animatedModifier = if (recentlyDropped) Modifier else Modifier.animateItem(
+                                        fadeInSpec = null,
+                                        fadeOutSpec = null,
+                                        placementSpec = spring(
+                                            dampingRatio = Spring.DampingRatioNoBouncy,
+                                            stiffness = Spring.StiffnessMediumLow
                                         )
-                                            .zIndex(if (isDragging) 1f else 0f)
-                                            .graphicsLayer {
-                                                translationY = displacement
-                                                val liftScale = if (isDragging) 1.05f else 1f
-                                                scaleX = liftScale
-                                                scaleY = liftScale
-                                                shadowElevation = 0f
-                                                shape = RoundedCornerShape(18.dp)
-                                            }
-                                    ) {
-                                        QueueListItem(
-                                            song = song,
-                                            isPlaying = isPlaying,
-                                            shapes = shapes,
-                                            dragDropState = dragDropState,
-                                            index = index,
-                                            showDivider = index < displayedSongs.lastIndex,
-                                            onLongClick = { onSongLongClick(song) },
-                                            onSwipeRemove = { viewModel.removeFromQueue(song.id) },
-                                            onClick = {
-                                                viewModel.playSongAtIndex(index)
-                                            }
-                                        )
-                                    }
+                                    )
+                                    QueueDisplayRow(
+                                        entry = entry,
+                                        displayIndex = displayIndex,
+                                        songs = displayedSongs,
+                                        currentSongIndex = currentSongIndex,
+                                        dragDropState = dragDropState,
+                                        itemModifier = animatedModifier,
+                                        onLongClick = onSongLongClick,
+                                        onSwipeRemove = { song -> viewModel.removeFromQueue(song.id) },
+                                        onPlaySongAtIndex = { index -> viewModel.playSongAtIndex(index) }
+                                    )
                                 }
                             }
+                            QueueDraggedSongOverlay(
+                                songs = displayedSongs,
+                                currentSongIndex = currentSongIndex,
+                                dragDropState = dragDropState,
+                                contentPadding = PaddingValues(end = 20.dp),
+                                onSongLongClick = onSongLongClick,
+                                onSwipeRemove = { song -> viewModel.removeFromQueue(song.id) },
+                                onPlaySongAtIndex = { index -> viewModel.playSongAtIndex(index) }
+                            )
                         }
                     }
                 }
@@ -806,6 +814,91 @@ fun QueueListItem(
 }
 
 @Composable
+internal fun QueueDisplayRow(
+    entry: QueueDisplayEntry,
+    displayIndex: Int,
+    songs: List<SongItem>,
+    currentSongIndex: Int,
+    dragDropState: DragDropState,
+    itemModifier: Modifier,
+    onLongClick: (SongItem) -> Unit,
+    onSwipeRemove: (SongItem) -> Unit,
+    onPlaySongAtIndex: (Int) -> Unit
+) {
+    val draggedHeight = with(LocalDensity.current) { dragDropState.draggedItemHeightPx.toDp() }
+    val song = entry.song
+    if (song == null) {
+        // The empty slot travels through the list as the dragged song moves.
+        Box(itemModifier.fillMaxWidth().height(draggedHeight))
+    } else {
+        val originalIndex = songs.indexOfFirst { it.id == song.id }
+        val isPlaying = songs.getOrNull(currentSongIndex)?.id == song.id
+        val shapes = ListItemDefaults.segmentedShapes(index = displayIndex, count = songs.size)
+        Box(itemModifier.fillMaxWidth()) {
+            QueueListItem(
+                song = song,
+                isPlaying = isPlaying,
+                shapes = shapes,
+                dragDropState = dragDropState,
+                index = originalIndex,
+                showDivider = displayIndex < songs.size,
+                onLongClick = { onLongClick(song) },
+                onSwipeRemove = { onSwipeRemove(song) },
+                onClick = { if (originalIndex >= 0) onPlaySongAtIndex(originalIndex) }
+            )
+        }
+    }
+}
+
+@Composable
+internal fun QueueDraggedSongOverlay(
+    songs: List<SongItem>,
+    currentSongIndex: Int,
+    dragDropState: DragDropState,
+    contentPadding: PaddingValues,
+    onSongLongClick: (SongItem) -> Unit,
+    onSwipeRemove: (SongItem) -> Unit,
+    onPlaySongAtIndex: (Int) -> Unit
+) {
+    val draggedId = dragDropState.draggedItemKey as? Long ?: return
+    val song = songs.firstOrNull { it.id == draggedId } ?: return
+    val y = dragDropState.draggedItemOffset ?: return
+    val targetIndex = dragDropState.currentIndexOfDraggedItem
+        ?.coerceIn(0, (songs.size - 1).coerceAtLeast(0)) ?: return
+    val originalIndex = songs.indexOfFirst { it.id == draggedId }
+    if (originalIndex < 0) return
+    val isPlaying = songs.getOrNull(currentSongIndex)?.id == song.id
+    val shapes = ListItemDefaults.segmentedShapes(index = targetIndex, count = songs.size)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(contentPadding)
+            .zIndex(20f)
+            .graphicsLayer {
+                translationY = y
+                scaleX = 1.035f
+                scaleY = 1.035f
+                shadowElevation = 0f
+                shape = RoundedCornerShape(18.dp)
+            }
+    ) {
+        QueueListItem(
+            song = song,
+            isPlaying = isPlaying,
+            shapes = shapes,
+            dragDropState = null,
+            index = targetIndex,
+            showDivider = targetIndex < songs.lastIndex,
+            onLongClick = { onSongLongClick(song) },
+            onSwipeRemove = { onSwipeRemove(song) },
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { onPlaySongAtIndex(originalIndex) }
+        )
+    }
+}
+
+@Composable
 fun QueueSidebarItem(
     label: String,
     isSelected: Boolean,
@@ -848,6 +941,8 @@ class DragDropState(
     var initiallyDraggedElement by mutableStateOf<LazyListItemInfo?>(null)
     var currentIndexOfDraggedItem by mutableStateOf<Int?>(null)
     private var pointerY = 0f
+    private var slotStepPx = 1f
+    private var targetMovementRemainderPx = 0f
     var recentlyDraggedItemKey: Any? by mutableStateOf(null)
         private set
     private var autoScrollDirection = 0f
@@ -860,16 +955,26 @@ class DragDropState(
     val isDragging: Boolean
         get() = currentIndexOfDraggedItem != null
 
-    val elementDisplacement: Float?
+    val draggedItemOffset: Float?
         get() = initiallyDraggedElement?.let { anchor ->
-            lazyListState.layoutInfo.visibleItemsInfo
-                .firstOrNull { it.key == anchor.key }
-                ?.let { item -> anchor.offset.toFloat() + draggedDistance - item.offset }
+            anchor.offset.toFloat() + draggedDistance
         }
+
+    val draggedItemHeightPx: Int
+        get() = initiallyDraggedElement?.size ?: 0
 
     private fun beginDrag(item: LazyListItemInfo, initialIndex: Int, initialPointerY: Float) {
         stopAutoScroll()
         draggedDistance = 0f
+        targetMovementRemainderPx = 0f
+        val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
+        val next = visibleItems.firstOrNull { it.index == item.index + 1 }
+        val previous = visibleItems.firstOrNull { it.index == item.index - 1 }
+        slotStepPx = when {
+            next != null -> abs(next.offset - item.offset).toFloat()
+            previous != null -> abs(item.offset - previous.offset).toFloat()
+            else -> item.size.toFloat()
+        }.coerceAtLeast(item.size.toFloat()).coerceAtLeast(1f)
         initiallyDraggedElement = item
         currentIndexOfDraggedItem = initialIndex
         pointerY = initialPointerY
@@ -915,32 +1020,36 @@ class DragDropState(
     }
 
     /**
-     * Hit-test the pointer against the unchanged queue layout. The rows keep their
-     * original positions until release, so the dragged card is never displaced by
-     * a live list reorder.
+     * Accumulated movement advances the placeholder after the dragged row crosses
+     * roughly half a slot. The floating card is independent of LazyColumn placement.
      */
     fun clearRecentlyDraggedItemKey(key: Any?) {
         if (recentlyDraggedItemKey == key) recentlyDraggedItemKey = null
     }
 
-    private fun moveDraggedItemToPointer() {
+    private fun advanceTargetBy(deltaPx: Float) {
         val anchor = initiallyDraggedElement ?: return
-        val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
-        if (visibleItems.none { it.key == anchor.key }) return
-
-        val firstVisibleIndex = visibleItems.minOfOrNull { it.index } ?: return
-        val rowsBeforePointer = visibleItems.count { item ->
-            item.key != anchor.key && pointerY > item.offset + item.size / 2f
-        }
+        targetMovementRemainderPx += deltaPx
+        val threshold = slotStepPx * 0.55f
         val lastIndex = (lazyListState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-        currentIndexOfDraggedItem = (firstVisibleIndex + rowsBeforePointer).coerceIn(0, lastIndex)
+        var target = currentIndexOfDraggedItem ?: anchor.index
+
+        while (targetMovementRemainderPx > threshold && target < lastIndex) {
+            target += 1
+            targetMovementRemainderPx -= slotStepPx
+        }
+        while (targetMovementRemainderPx < -threshold && target > 0) {
+            target -= 1
+            targetMovementRemainderPx += slotStepPx
+        }
+        currentIndexOfDraggedItem = target
     }
 
     fun onDrag(dragAmount: Offset) {
         if (initiallyDraggedElement == null) return
         draggedDistance += dragAmount.y
         pointerY += dragAmount.y
-        moveDraggedItemToPointer()
+        advanceTargetBy(dragAmount.y)
         updateAutoScroll()
     }
 
@@ -990,6 +1099,8 @@ class DragDropState(
                 val requested = autoScrollDirection * pixelsPerSecond *
                     (elapsedNanos / 1_000_000_000f)
                 val consumed = lazyListState.scrollBy(requested)
+                // Scrolling the list under a stationary finger advances the target too.
+                if (kotlin.math.abs(consumed) >= 0.1f) advanceTargetBy(consumed)
 
                 if (kotlin.math.abs(consumed) < 0.1f) {
                     // At the absolute list boundary. A new drag event can restart this
@@ -999,7 +1110,6 @@ class DragDropState(
                     autoScrollJob = null
                     break
                 }
-                moveDraggedItemToPointer()
             }
         }
     }
