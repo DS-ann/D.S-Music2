@@ -1170,10 +1170,21 @@ class PlayerSharedViewModel @Inject constructor(
                     val embedded = withContext(Dispatchers.IO) {
                         val savedCacheArtwork = if (song.isCachedTrack) {
                             runCatching {
-                                AudioPlaybackService.getCachedMediaArtworkFile(
-                                    appContext,
-                                    song.id.toString()
-                                ).takeIf { it.isFile && it.length() > 0L }?.readBytes()
+                                // Cache playlist rows carry the exact artwork file URI. Prefer it
+                                // over deriving the cache key from SongItem.id, since older cache
+                                // metadata may use a non-numeric song ID.
+                                val artworkFromSongUri = song.thumbnailUrl
+                                    ?.takeIf { it.startsWith("file://", ignoreCase = true) }
+                                    ?.let { android.net.Uri.parse(it).path }
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?.let { java.io.File(it) }
+                                    ?.takeIf { it.isFile && it.length() > 0L }
+                                val artworkFile = artworkFromSongUri
+                                    ?: AudioPlaybackService.getCachedMediaArtworkFile(
+                                        appContext,
+                                        song.id.toString()
+                                    ).takeIf { it.isFile && it.length() > 0L }
+                                artworkFile?.readBytes()
                             }.getOrNull()
                         } else {
                             null
