@@ -375,6 +375,7 @@ class PlayerSharedViewModel @Inject constructor(
         const val REPEAT_ONCE = 1
         const val REPEAT_INFINITY = 2
         private const val HISTORY_PROGRESS_PERSIST_INTERVAL_MS = 15_000L
+        private const val RAPID_NAVIGATION_SETTLE_MS = 220L
     }
 
     private val shuffleRandom = Random()
@@ -543,6 +544,11 @@ class PlayerSharedViewModel @Inject constructor(
     private var autoplayFetchGeneration = -1L
     private val autoplayFetchedVideoIds = mutableSetOf<String>()
     private var pendingRapidSkipLoadJob: Job? = null
+    // During a burst of Next/Previous presses, keep only the intended song ID here.
+    // UI, lyrics, persistence, metadata and stream resolution are updated once the burst settles.
+    private var pendingRapidNavigationJob: Job? = null
+    private var pendingRapidNavigationSongId: Long? = null
+    private var pendingRapidNavigationPreserveRepeatOnce = false
     private var nextSongPrefetchJob: Job? = null
 
     /**
@@ -1823,6 +1829,8 @@ class PlayerSharedViewModel @Inject constructor(
         preserveRepeatOnceCycle: Boolean = false,
         debouncePlaybackLoadMs: Long = 0L
     ) {
+        // A direct queue selection takes priority over a pending Next/Previous burst.
+        cancelPendingRapidNavigation()
         val songs = _songList.value
         if (index !in songs.indices) {
             Log.w(TAG, "Invalid song index: $index")
@@ -1982,14 +1990,80 @@ class PlayerSharedViewModel @Inject constructor(
 
     fun findSongIndexById(songId: Long): Int = _songList.value.indexOfFirst { it.id == songId }
 
+    /**
+     * Coalesce rapid navigation into one final selection. Intermediate taps only advance a
+     * lightweight target ID; they do not clear lyric state, recompose the player for every
+     * skipped track, update the notification, or start/cancel stream and artwork work.
+     */
+    private fun scheduleRapidNavigation(song: SongItem, preserveRepeatOnceCycle: Boolean = false) {
+        pendingRapidNavigationJob?.cancel()
+        pendingRapidNavigationSongId = song.id
+        pendingRapidNavigationPreserveRepeatOnce = preserveRepeatOnceCycle
+        pendingRapidNavigationJob = viewModelScope.launch {
+            delay(RAPID_NAVIGATION_SETTLE_MS)
+            val targetId = pendingRapidNavigationSongId ?: return@launch
+            val preserveRepeatOnce = pendingRapidNavigationPreserveRepeatOnce
+            pendingRapidNavigationJob = null
+            pendingRapidNavigationSongId = null
+            pendingRapidNavigationPreserveRepeatOnce = false
+
+            // Resolve by stable ID so a concurrent queue edit cannot turn the pending
+            // selection into a different song merely because its index changed.
+            val finalIndex = findSongIndexById(targetId)
+            if (finalIndex >= 0) {
+                playSongAtIndex(
+                    finalIndex,
+                    preserveRepeatOnceCycle = preserveRepeatOnce
+                )
+            }
+        }
+    }
+
+    private fun commitPendingRapidNavigation(): Boolean {
+        val targetId = pendingRapidNavigationSongId ?: return false
+        val preserveRepeatOnce = pendingRapidNavigationPreserveRepeatOnce
+        pendingRapidNavigationJob?.cancel()
+        pendingRapidNavigationJob = null
+        pendingRapidNavigationSongId = null
+        pendingRapidNavigationPreserveRepeatOnce = false
+
+        val finalIndex = findSongIndexById(targetId)
+        if (finalIndex < 0) return false
+        playSongAtIndex(
+            finalIndex,
+            preserveRepeatOnceCycle = preserveRepeatOnce
+        )
+        return true
+    }
+
+    private fun cancelPendingRapidNavigation() {
+        pendingRapidNavigationJob?.cancel()
+        pendingRapidNavigationJob = null
+        pendingRapidNavigationSongId = null
+        pendingRapidNavigationPreserveRepeatOnce = false
+    }
+
+    private fun pendingRapidNavigationIndex(): Int? {
+        val targetId = pendingRapidNavigationSongId ?: return null
+        return findSongIndexById(targetId).takeIf { it >= 0 }
+    }
+
     fun playNextSong(force: Boolean = false) {
+        val songs = _songList.value
+        val navigationBaseIndex = pendingRapidNavigationIndex() ?: _currentSongIndex.value
+
         if (!force) {
             if (_sleepTimerMode.value == SleepTimerMode.END_OF_SONG) {
+                cancelPendingRapidNavigation()
                 pauseAudio()
                 setSleepTimerMode(SleepTimerMode.OFF)
                 return
             }
-            if (_sleepTimerMode.value == SleepTimerMode.END_OF_QUEUE && _currentSongIndex.value == _songList.value.size - 1) {
+            if (
+                _sleepTimerMode.value == SleepTimerMode.END_OF_QUEUE &&
+                navigationBaseIndex == songs.lastIndex
+            ) {
+                commitPendingRapidNavigation()
                 pauseAudio()
                 setSleepTimerMode(SleepTimerMode.OFF)
                 return
@@ -1997,15 +2071,24 @@ class PlayerSharedViewModel @Inject constructor(
         }
 
         val activeRepeatMode = _repeatMode.value
-        val nextIndex = getNextSongIndex()
+        val nextIndex = getNextSongIndexFrom(navigationBaseIndex)
         if (nextIndex >= 0) {
             if (activeRepeatMode == REPEAT_ONCE) advanceRepeatOnceCursor(nextIndex)
-            playSongAtIndex(
-                nextIndex,
-                preserveRepeatOnceCycle = activeRepeatMode == REPEAT_ONCE,
-                debouncePlaybackLoadMs = 140L
+            scheduleRapidNavigation(
+                songs[nextIndex],
+                preserveRepeatOnceCycle = activeRepeatMode == REPEAT_ONCE
             )
-        } else if (activeRepeatMode == REPEAT_ONCE) {
+            return
+        }
+
+        // If a burst has already selected the last available track, let that target
+        // commit instead of cancelling it or pausing the track that preceded the burst.
+        if (pendingRapidNavigationSongId != null) {
+            commitPendingRapidNavigation()
+            return
+        }
+
+        if (activeRepeatMode == REPEAT_ONCE) {
             // Repeat Once is finite: do not let Autoplay extend the queue after its
             // second complete pass.
             pauseAudio()
@@ -2057,31 +2140,32 @@ class PlayerSharedViewModel @Inject constructor(
         val songs = _songList.value
         if (songs.isEmpty()) return
 
-        // Previous is an explicit track-navigation command. Do not turn the first tap
-        // into a restart based on the current playback position.
-        val currentIdx = _currentSongIndex.value
+        // Base subsequent taps on the pending destination, not the still-playing song.
+        val currentIdx = pendingRapidNavigationIndex() ?: _currentSongIndex.value
         val shuffle = _isShuffleEnabled.value
-        
+
         if (shuffle && songs.size > 1) {
-            var prev = currentIdx
-            while (prev == currentIdx) prev = shuffleRandom.nextInt(songs.size)
-            playSongAtIndex(prev)
+            var previous = currentIdx
+            while (previous == currentIdx) previous = shuffleRandom.nextInt(songs.size)
+            scheduleRapidNavigation(songs[previous])
             return
         }
-        
-        val prevIndex = currentIdx - 1
-        if (prevIndex < 0) {
+
+        val previousIndex = currentIdx - 1
+        if (previousIndex < 0) {
+            commitPendingRapidNavigation()
             audioService?.seekTo(0)
         } else {
-            playSongAtIndex(prevIndex, debouncePlaybackLoadMs = 140L)
+            scheduleRapidNavigation(songs[previousIndex])
         }
     }
 
-    fun getNextSongIndex(): Int {
+    fun getNextSongIndex(): Int = getNextSongIndexFrom(_currentSongIndex.value)
+
+    private fun getNextSongIndexFrom(currentIdx: Int): Int {
         val songs = _songList.value
         if (songs.isEmpty()) return -1
-        
-        val currentIdx = _currentSongIndex.value
+
         val mode = _repeatMode.value
         val shuffle = _isShuffleEnabled.value
 
