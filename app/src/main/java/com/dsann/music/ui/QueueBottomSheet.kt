@@ -29,7 +29,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -203,7 +203,7 @@ fun QueueBottomSheetContent(
 
     val lazyListState = rememberLazyListState()
     val dragHandleWidthPx = with(LocalDensity.current) { 48.dp.toPx() }
-    val dragHandleTrailingInsetPx = with(LocalDensity.current) { 20.dp.toPx() }
+    val dragHandleTrailingInsetPx = with(LocalDensity.current) { 26.dp.toPx() }
     val dragDropState = rememberDragDropState(
         lazyListState = lazyListState,
         onDragFinished = { from, to, commit ->
@@ -1226,35 +1226,52 @@ fun Modifier.queueDragHandleInput(
                 val event = awaitPointerEvent(PointerEventPass.Initial)
             } while (event.changes.any { it.pressed })
         } else {
-            val longPress = awaitLongPressOrCancellation(
-                pointerId = down.id,
-                pass = PointerEventPass.Initial
-            )
-            val started = longPress != null &&
-                dragDropState.onDragStartAtPosition(
-                    position = longPress.position,
+            var lastObservedPosition = down.position
+            // Watch in the Initial pass so the child handle's no-op clickable cannot
+            // consume the down before the stable parent sees the long-press timeout.
+            val longPressReached = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull { it.id == down.id }
+                        ?: return@withTimeoutOrNull false
+                    if (!change.pressed) return@withTimeoutOrNull false
+                    lastObservedPosition = change.position
+                    if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                        // A pre-long-press move remains available to LazyColumn scrolling.
+                        return@withTimeoutOrNull false
+                    }
+                }
+                false
+            } == null
+
+            if (longPressReached) {
+                val started = dragDropState.onDragStartAtPosition(
+                    position = down.position,
                     containerWidthPx = size.width.toFloat(),
                     handleWidthPx = handleWidthPx,
                     trailingInsetPx = trailingInsetPx
                 )
+                if (started) {
+                    // Include any small in-bounds finger drift during the long-press wait.
+                    val initialDrift = lastObservedPosition - down.position
+                    if (initialDrift != Offset.Zero) dragDropState.onDrag(initialDrift)
 
-            if (started && longPress != null) {
-                longPress.consume()
-                var pointerStillDown = true
-                while (pointerStillDown) {
-                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                    if (!change.pressed) {
-                        pointerStillDown = false
-                    } else {
-                        val delta = change.position - change.previousPosition
-                        if (delta != Offset.Zero) dragDropState.onDrag(delta)
-                        change.consume()
+                    var pointerStillDown = true
+                    while (pointerStillDown) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) {
+                            pointerStillDown = false
+                        } else {
+                            val delta = change.position - change.previousPosition
+                            if (delta != Offset.Zero) dragDropState.onDrag(delta)
+                            change.consume()
+                        }
                     }
+                    dragDropState.onDragInterrupted(commit = true)
                 }
-                dragDropState.onDragInterrupted(commit = true)
             } else {
-                // Long press was cancelled or the row left the viewport before it began.
+                // The gesture ended or moved before long-press; leave it to the row/list.
                 do {
                     val event = awaitPointerEvent(PointerEventPass.Initial)
                 } while (event.changes.any { it.pressed })
