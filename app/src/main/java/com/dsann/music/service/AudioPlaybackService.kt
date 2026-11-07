@@ -450,17 +450,35 @@ class AudioPlaybackService : MediaSessionService() {
             streamUri: String? = null
         ): CachedAudioFacts? {
             val currentCache = getCache(context.applicationContext)
+
+            // Song Info describes the selected playback source, not another cached quality
+            // for the same song. When a URI is supplied, only that exact Media3 cache key counts.
+            if (!streamUri.isNullOrBlank()) {
+                if (streamUri !in currentCache.keys) return null
+                val metadata = getCachedMediaMetadata(context, streamUri)
+                val cachedBytes = currentCache.getCachedSpans(streamUri).sumOf { it.length }
+                if (cachedBytes <= 0L) return null
+                val contentLength = androidx.media3.datasource.cache.ContentMetadata
+                    .getContentLength(currentCache.getContentMetadata(streamUri))
+                    .takeIf { it > 0L }
+                val complete = contentLength != null &&
+                    currentCache.isCached(streamUri, 0L, contentLength)
+                return CachedAudioFacts(
+                    cachedBytes = cachedBytes,
+                    totalBytes = contentLength,
+                    mimeType = metadata?.mimeType?.takeIf { it.isNotBlank() },
+                    isComplete = complete
+                )
+            }
+
             val candidates = currentCache.keys.mapNotNull { key ->
-                val metadata = getCachedMediaMetadata(context, key)
-                val isExactUri = !streamUri.isNullOrBlank() && key == streamUri
-                val matchesMetadata = metadata != null && (
+                val metadata = getCachedMediaMetadata(context, key) ?: return@mapNotNull null
+                val matchesMetadata =
                     (songId.isNotBlank() && metadata.songId == songId) ||
                     (!videoId.isNullOrBlank() && metadata.videoId == videoId)
-                )
-                if (!matchesMetadata && !isExactUri) return@mapNotNull null
+                if (!matchesMetadata) return@mapNotNull null
 
-                val spans = currentCache.getCachedSpans(key)
-                val cachedBytes = spans.sumOf { it.length }
+                val cachedBytes = currentCache.getCachedSpans(key).sumOf { it.length }
                 if (cachedBytes <= 0L) return@mapNotNull null
                 val contentLength = androidx.media3.datasource.cache.ContentMetadata
                     .getContentLength(currentCache.getContentMetadata(key))
@@ -470,19 +488,13 @@ class AudioPlaybackService : MediaSessionService() {
                 CachedAudioFacts(
                     cachedBytes = cachedBytes,
                     totalBytes = contentLength,
-                    mimeType = metadata?.mimeType?.takeIf { it.isNotBlank() },
+                    mimeType = metadata.mimeType.takeIf { it.isNotBlank() },
                     isComplete = complete
-                ) to isExactUri
+                )
             }
-            // The currently playing cache key is authoritative. Otherwise prefer complete
-            // variants, then the largest cached byte range as a best-effort fallback.
-            val exactCandidates = candidates.filter { it.second }
-            if (exactCandidates.isNotEmpty()) {
-                return exactCandidates.maxByOrNull { it.first.cachedBytes }?.first
-            }
-            val completeCandidates = candidates.filter { it.first.isComplete }
+            val completeCandidates = candidates.filter { it.isComplete }
             return completeCandidates.ifEmpty { candidates }
-                .maxByOrNull { it.first.totalBytes ?: it.first.cachedBytes }?.first
+                .maxByOrNull { it.totalBytes ?: it.cachedBytes }
         }
 
         /**

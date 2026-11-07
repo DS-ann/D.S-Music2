@@ -1948,7 +1948,7 @@ fun SettingsScreenContent(
                 imageCacheSize = imageCacheSize,
                 onClearSongCache = {
                     viewModel.clearSongCache {
-                        (context as? MainActivity)?.showSnackbar("Temporary song files cleared", 0)
+                        (context as? MainActivity)?.showSnackbar("Song and audio cache cleared", 0)
                     }
                 },
                 onClearImageCache = {
