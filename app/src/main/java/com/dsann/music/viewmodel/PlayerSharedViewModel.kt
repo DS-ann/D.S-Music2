@@ -1438,7 +1438,7 @@ class PlayerSharedViewModel @Inject constructor(
     }
 
     private var playbackStateSaveJob: Job? = null
-    private var playbackStateSaveGeneration = 0L
+    @Volatile private var playbackStateSaveGeneration = 0L
     private val playbackStateSaveMutex = Mutex()
 
     private fun copySongForPlaybackSnapshot(song: SongItem): SongItem = song.copy().apply {
