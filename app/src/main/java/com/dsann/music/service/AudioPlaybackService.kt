@@ -1572,15 +1572,36 @@ class AudioPlaybackService : MediaSessionService() {
         }
         widgetSongObserverJob?.cancel()
         widgetSongObserverJob = serviceScope.launch {
-            var previousSongId = vm.currentSong.value?.id
+            // Treat the first StateFlow value as an attach-time snapshot. Seeding this
+            // from vm.currentSong.value can swallow that first value if a track was
+            // already selected/restored before the collector starts, leaving the widget
+            // without a lyric request until the next track change.
+            var previousSongId: Long? = null
             vm.currentSong.collect { song ->
                 if (song?.id != previousSongId) {
                     previousSongId = song?.id
-                    widgetSyncedLyrics = emptyList()
-                    widgetPlainLyrics = null
+
+                    // Read the ViewModel's current lyric snapshot instead of unconditionally
+                    // clearing it. The synced/plain observers may already have delivered
+                    // their initial values before this song observer gets scheduled.
+                    widgetSyncedLyrics = vm.syncedLyrics.value.orEmpty()
+                        .sortedBy { widgetLyricStartMs(it) }
+                    widgetPlainLyrics = vm.plainLyrics.value?.takeIf { it.isNotBlank() }
                     cancelWidgetLyricRefresh()
+
                     if (hasLyricsWidgetInstalled() && song != null) {
-                        vm.fetchLyricsForCurrentSong()
+                        val hasSyncedLyrics = !vm.syncedLyrics.value.isNullOrEmpty()
+                        val hasPlainLyrics = !vm.plainLyrics.value.isNullOrBlank()
+                        // Avoid restarting a fetch already started by the player UI.
+                        // The first non-null emission now also covers restored/current tracks.
+                        if (!hasSyncedLyrics && !hasPlainLyrics && !vm.isLyricsLoading.value) {
+                            Log.d(TAG, "Starting widget lyric fetch for current track: ${song.title}")
+                            vm.fetchLyricsForCurrentSong()
+                        } else {
+                            val position = player.currentPosition.coerceAtLeast(0L)
+                            updateWidgetProgress(position, player.duration.coerceAtLeast(0L))
+                            scheduleNextWidgetLyricRefresh(position)
+                        }
                     }
                 }
             }
