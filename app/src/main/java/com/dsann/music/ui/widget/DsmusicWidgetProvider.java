@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Handler;
@@ -28,6 +29,7 @@ import com.dsann.music.model.SongItem;
 import java.io.File;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -52,7 +54,26 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
     private static final String ACTION_SMALL_LEFT_TAP = "com.dsann.music.ACTION_SMALL_LEFT_TAP";
     private static final String ACTION_SMALL_RIGHT_TAP = "com.dsann.music.ACTION_SMALL_RIGHT_TAP";
     private static final String PREF_ARTWORK_SONG_PREFIX = "small_art_song_";
+    private static final String PREF_ARTWORK_CACHE_FILE_PREFIX = "widget_artwork_file_";
+    private static final String PREF_ARTWORK_LOADED_KEY_PREFIX = "widget_artwork_loaded_key_";
     private static final String PREF_SMALL_ART_DIRECTION = "small_art_transition_direction";
+    private static final int MAX_RETAINED_WIDGET_ARTWORKS = 8;
+    private static final long[] WIDGET_ARTWORK_RETRY_DELAYS_MS =
+            new long[]{2_000L, 5_000L, 12_000L, 25_000L, 45_000L, 60_000L};
+
+    private static final Object WIDGET_ARTWORK_LOCK = new Object();
+    private static final LinkedHashMap<Integer, Bitmap> LAST_WIDGET_ARTWORKS =
+            new LinkedHashMap<Integer, Bitmap>(MAX_RETAINED_WIDGET_ARTWORKS, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<Integer, Bitmap> eldest) {
+                    return size() > MAX_RETAINED_WIDGET_ARTWORKS;
+                }
+            };
+    private static final Map<Integer, String> LAST_WIDGET_ARTWORK_KEYS = new HashMap<>();
+    private static final Map<Integer, String> ACTIVE_WIDGET_ARTWORK_REQUESTS = new HashMap<>();
+    private static final Map<Integer, Runnable> PENDING_WIDGET_ARTWORK_RETRIES = new HashMap<>();
+    private static final Handler WIDGET_ARTWORK_RETRY_HANDLER =
+            new Handler(Looper.getMainLooper());
     private static final long SMALL_WIDGET_DOUBLE_TAP_MS = 300L;
 
     private static final Handler SMALL_WIDGET_TAP_HANDLER = new Handler(Looper.getMainLooper());
@@ -558,47 +579,75 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                 }
             }
 
-            String artworkKey = "__no_art__";
+            String artworkKey = song != null
+                    ? song.id + "|" + (artworkUri != null ? artworkUri.toString() : "__no_art_uri__")
+                    : "__no_art__";
             boolean animateSmallCover = false;
             int smallCoverDirection = 1;
             SharedPreferences widgetPrefs =
                     context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String artworkPrefKey = PREF_ARTWORK_SONG_PREFIX + id;
             String previousArtworkKey = widgetPrefs.getString(artworkPrefKey, null);
-            if (artworkUri != null && song != null) {
-                artworkKey = song.id + "|" + artworkUri.toString();
-                if (layoutId == R.layout.widget_small) {
-                    animateSmallCover = previousArtworkKey != null &&
-                            !previousArtworkKey.equals(artworkKey);
-                    smallCoverDirection = widgetPrefs.getInt(PREF_SMALL_ART_DIRECTION, 1);
-                }
+            boolean artworkRequestKeyChanged = !Objects.equals(previousArtworkKey, artworkKey);
+
+            if (artworkUri != null && song != null && layoutId == R.layout.widget_small) {
+                animateSmallCover = previousArtworkKey != null &&
+                        !previousArtworkKey.equals(artworkKey);
+                smallCoverDirection = widgetPrefs.getInt(PREF_SMALL_ART_DIRECTION, 1);
             }
-            // Invalidate previous requests before publishing the new widget snapshot.
+
+            if (artworkRequestKeyChanged) {
+                cancelWidgetArtworkRetry(id);
+                clearActiveWidgetArtworkRequest(id);
+            }
+            // The current request key rejects late responses from a previous song. Keep the
+            // last successfully rendered bitmap visible while a new cover is loading.
             widgetPrefs.edit().putString(artworkPrefKey, artworkKey).apply();
 
-            // Never leave the preceding track's cover visible while this song's image loads.
-            if (layoutId == R.layout.widget_small) {
-                views.setImageViewResource(R.id.widget_album_art, R.drawable.widget_idle_art);
-                if (artworkUri == null) applySmallWidgetIdleArtwork(context, views, id);
+            if (song == null) {
+                clearRetainedWidgetArtwork(context, id);
+                if (layoutId == R.layout.widget_small) {
+                    views.setImageViewResource(R.id.widget_album_art, R.drawable.widget_idle_art);
+                } else {
+                    views.setImageViewResource(R.id.widget_album_art, R.drawable.widget_default_art);
+                }
             } else {
-                views.setImageViewResource(R.id.widget_album_art, R.drawable.widget_default_art);
+                Bitmap retainedArtwork = getWidgetArtworkForSnapshot(
+                        context, id, song.id.toString(), artworkKey);
+                if (retainedArtwork != null) {
+                    views.setImageViewBitmap(R.id.widget_album_art, retainedArtwork);
+                } else if (layoutId == R.layout.widget_small) {
+                    views.setImageViewResource(R.id.widget_album_art, R.drawable.widget_idle_art);
+                } else {
+                    views.setImageViewResource(R.id.widget_album_art, R.drawable.widget_default_art);
+                }
             }
 
             manager.updateAppWidget(id, views);
 
             if (artworkUri != null && song != null) {
-                try {
-                    loadAlbumArt(
-                            context, artworkUri, id,
-                            layoutId == R.layout.widget_small,
-                            animateSmallCover, smallCoverDirection,
-                            layoutId, artworkKey);
-                } catch (Exception artworkError) {
-                    Log.w(TAG, "Could not load widget album art for " + song.title, artworkError);
+                boolean hasSongArtworkCache = hasWidgetArtworkCache(context, song.id.toString(), artworkKey);
+                boolean requestInFlight = isWidgetArtworkRequestActive(id, artworkKey)
+                        || isWidgetArtworkRetryPending(id, artworkKey);
+                // Avoid restarting the same image request on every pause/resume or metadata
+                // refresh. A failed network request has its own bounded retry schedule.
+                if (!hasSongArtworkCache && !requestInFlight) {
+                    try {
+                        loadAlbumArt(
+                                context, artworkUri, id,
+                                layoutId == R.layout.widget_small,
+                                animateSmallCover, smallCoverDirection,
+                                layoutId, artworkKey, song.id.toString(), 0, false);
+                    } catch (Exception artworkError) {
+                        clearActiveWidgetArtworkRequest(id);
+                        Log.w(TAG, "Could not load widget album art for " + song.title, artworkError);
+                    }
                 }
                 if (layoutId != R.layout.widget_small) {
                     try {
-                        loadBlurredAura(context, artworkUri, id, layoutId, artworkKey);
+                        Object artworkModel = resolveWidgetArtworkModel(
+                                context, song.id.toString(), artworkKey, artworkUri);
+                        loadBlurredAura(context, artworkModel, id, layoutId, artworkKey);
                     } catch (Exception artworkError) {
                         Log.w(TAG, "Could not load widget aura for " + song.title, artworkError);
                     }
@@ -633,6 +682,12 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                 }
                 applyWidgetActionIcons(fallback, isPlaying, layoutId, repeatIconResId);
                 setupPendingIntents(context, fallback, isPlaying, layoutId, providerClass, id);
+                if (song != null) {
+                    Bitmap retainedArtwork = getRetainedWidgetArtwork(context, id);
+                    if (retainedArtwork != null) {
+                        fallback.setImageViewBitmap(R.id.widget_album_art, retainedArtwork);
+                    }
+                }
                 manager.updateAppWidget(id, fallback);
             } catch (Exception fallbackError) {
                 Log.e(TAG, "Widget fallback rendering failed for " + id, fallbackError);
@@ -677,11 +732,264 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         return new RemoteViews(context.getPackageName(), layoutId);
     }
 
+    private static File getWidgetArtworkCacheFile(Context context, String artworkKey) {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(artworkKey.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder name = new StringBuilder(digest.length * 2);
+            final char[] hex = "0123456789abcdef".toCharArray();
+            for (byte value : digest) {
+                int unsigned = value & 0xff;
+                name.append(hex[unsigned >>> 4]).append(hex[unsigned & 0x0f]);
+            }
+            File directory = new File(context.getFilesDir(), "widget_artwork");
+            if (!directory.exists()) directory.mkdirs();
+            return new File(directory, name + ".jpg");
+        } catch (Exception error) {
+            Log.w(TAG, "Could not create widget artwork cache key", error);
+            return new File(context.getCacheDir(), "widget_artwork_fallback.jpg");
+        }
+    }
+
+    private static File getServiceArtworkCacheFile(Context context, String songId) {
+        try {
+            return com.dsann.music.service.AudioPlaybackService.getCachedMediaArtworkFile(
+                    context.getApplicationContext(), songId);
+        } catch (Exception error) {
+            Log.w(TAG, "Could not resolve the shared artwork cache", error);
+            return null;
+        }
+    }
+
+    private static Object resolveWidgetArtworkModel(
+            Context context, String songId, String artworkKey, Uri fallbackUri) {
+        File widgetCache = getWidgetArtworkCacheFile(context, artworkKey);
+        if (widgetCache.isFile() && widgetCache.length() > 0L) return widgetCache;
+        File serviceCache = getServiceArtworkCacheFile(context, songId);
+        if (serviceCache != null && serviceCache.isFile() && serviceCache.length() > 0L) {
+            return serviceCache;
+        }
+        return fallbackUri;
+    }
+
+    private static Bitmap decodeWidgetArtwork(File file) {
+        if (file == null || !file.isFile() || file.length() <= 0L) return null;
+        Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
+        if (bitmap == null) {
+            // A truncated cache entry must not permanently block a fresh network fetch.
+            file.delete();
+        }
+        return bitmap;
+    }
+
+    private static void rememberWidgetArtwork(int widgetId, String artworkKey, Bitmap bitmap) {
+        if (bitmap == null || bitmap.isRecycled()) return;
+        synchronized (WIDGET_ARTWORK_LOCK) {
+            LAST_WIDGET_ARTWORKS.put(widgetId, bitmap);
+            LAST_WIDGET_ARTWORK_KEYS.put(widgetId, artworkKey);
+        }
+    }
+
+    private static Bitmap getRetainedWidgetArtwork(Context context, int widgetId) {
+        synchronized (WIDGET_ARTWORK_LOCK) {
+            Bitmap memory = LAST_WIDGET_ARTWORKS.get(widgetId);
+            if (memory != null && !memory.isRecycled()) return memory;
+        }
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String cachedPath = prefs.getString(PREF_ARTWORK_CACHE_FILE_PREFIX + widgetId, null);
+        if (cachedPath == null) return null;
+        Bitmap decoded = decodeWidgetArtwork(new File(cachedPath));
+        if (decoded != null) {
+            String loadedKey = prefs.getString(PREF_ARTWORK_LOADED_KEY_PREFIX + widgetId, "");
+            rememberWidgetArtwork(widgetId, loadedKey, decoded);
+        }
+        return decoded;
+    }
+
+    private static Bitmap getWidgetArtworkForSnapshot(
+            Context context, int widgetId, String songId, String artworkKey) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        synchronized (WIDGET_ARTWORK_LOCK) {
+            Bitmap memory = LAST_WIDGET_ARTWORKS.get(widgetId);
+            String memoryKey = LAST_WIDGET_ARTWORK_KEYS.get(widgetId);
+            if (memory != null && !memory.isRecycled() && artworkKey.equals(memoryKey)) {
+                return memory;
+            }
+        }
+
+        File exactTrackCache = getWidgetArtworkCacheFile(context, artworkKey);
+        Bitmap exactTrackBitmap = decodeWidgetArtwork(exactTrackCache);
+        if (exactTrackBitmap == null) {
+            File serviceCache = getServiceArtworkCacheFile(context, songId);
+            exactTrackBitmap = decodeWidgetArtwork(serviceCache);
+        }
+        if (exactTrackBitmap != null) {
+            rememberWidgetArtwork(widgetId, artworkKey, exactTrackBitmap);
+            prefs.edit()
+                    .putString(PREF_ARTWORK_CACHE_FILE_PREFIX + widgetId,
+                            exactTrackCache.isFile() ? exactTrackCache.getAbsolutePath()
+                                    : getServiceArtworkCacheFile(context, songId).getAbsolutePath())
+                    .putString(PREF_ARTWORK_LOADED_KEY_PREFIX + widgetId, artworkKey)
+                    .apply();
+            return exactTrackBitmap;
+        }
+
+        // A new track's artwork may still be downloading. Keep the previous successfully
+        // rendered cover rather than flashing the no-song placeholder.
+        return getRetainedWidgetArtwork(context, widgetId);
+    }
+
+    private static boolean hasWidgetArtworkCache(Context context, String songId, String artworkKey) {
+        File widgetCache = getWidgetArtworkCacheFile(context, artworkKey);
+        if (widgetCache.isFile() && widgetCache.length() > 0L) return true;
+        File serviceCache = getServiceArtworkCacheFile(context, songId);
+        return serviceCache != null && serviceCache.isFile() && serviceCache.length() > 0L;
+    }
+
+    private static boolean isWidgetArtworkRequestActive(int widgetId, String artworkKey) {
+        synchronized (WIDGET_ARTWORK_LOCK) {
+            return artworkKey.equals(ACTIVE_WIDGET_ARTWORK_REQUESTS.get(widgetId));
+        }
+    }
+
+    private static void markWidgetArtworkRequestActive(int widgetId, String artworkKey) {
+        synchronized (WIDGET_ARTWORK_LOCK) {
+            ACTIVE_WIDGET_ARTWORK_REQUESTS.put(widgetId, artworkKey);
+        }
+    }
+
+    private static void clearActiveWidgetArtworkRequest(int widgetId) {
+        synchronized (WIDGET_ARTWORK_LOCK) {
+            ACTIVE_WIDGET_ARTWORK_REQUESTS.remove(widgetId);
+        }
+    }
+
+    private static void clearActiveWidgetArtworkRequest(int widgetId, String artworkKey) {
+        synchronized (WIDGET_ARTWORK_LOCK) {
+            if (artworkKey.equals(ACTIVE_WIDGET_ARTWORK_REQUESTS.get(widgetId))) {
+                ACTIVE_WIDGET_ARTWORK_REQUESTS.remove(widgetId);
+            }
+        }
+    }
+
+    private static boolean isWidgetArtworkRetryPending(int widgetId, String artworkKey) {
+        synchronized (WIDGET_ARTWORK_LOCK) {
+            Runnable pending = PENDING_WIDGET_ARTWORK_RETRIES.get(widgetId);
+            String current = contextFreeRetryKey(widgetId);
+            return pending != null && artworkKey.equals(current);
+        }
+    }
+
+    private static String contextFreeRetryKey(int widgetId) {
+        synchronized (WIDGET_ARTWORK_LOCK) {
+            return PENDING_WIDGET_ARTWORK_RETRY_KEYS.get(widgetId);
+        }
+    }
+
+    private static final Map<Integer, String> PENDING_WIDGET_ARTWORK_RETRY_KEYS = new HashMap<>();
+
+    private static void cancelWidgetArtworkRetry(int widgetId) {
+        Runnable pending;
+        synchronized (WIDGET_ARTWORK_LOCK) {
+            pending = PENDING_WIDGET_ARTWORK_RETRIES.remove(widgetId);
+            PENDING_WIDGET_ARTWORK_RETRY_KEYS.remove(widgetId);
+        }
+        if (pending != null) WIDGET_ARTWORK_RETRY_HANDLER.removeCallbacks(pending);
+    }
+
+    private static void scheduleWidgetArtworkRetry(
+            Context context, Uri artUri, int widgetId, String songId,
+            boolean smallWidget, boolean animateSmallCover, int slideDirection,
+            int layoutId, String artworkKey, int nextAttempt) {
+        if (nextAttempt > WIDGET_ARTWORK_RETRY_DELAYS_MS.length ||
+                !isWidgetArtworkCurrent(context, widgetId, artworkKey)) return;
+
+        cancelWidgetArtworkRetry(widgetId);
+        Runnable retry = () -> {
+            synchronized (WIDGET_ARTWORK_LOCK) {
+                PENDING_WIDGET_ARTWORK_RETRIES.remove(widgetId);
+                PENDING_WIDGET_ARTWORK_RETRY_KEYS.remove(widgetId);
+            }
+            if (!isWidgetArtworkCurrent(context, widgetId, artworkKey)) return;
+            loadAlbumArt(
+                    context, artUri, widgetId, smallWidget, animateSmallCover,
+                    slideDirection, layoutId, artworkKey, songId, nextAttempt, true);
+        };
+        synchronized (WIDGET_ARTWORK_LOCK) {
+            PENDING_WIDGET_ARTWORK_RETRIES.put(widgetId, retry);
+            PENDING_WIDGET_ARTWORK_RETRY_KEYS.put(widgetId, artworkKey);
+        }
+        WIDGET_ARTWORK_RETRY_HANDLER.postDelayed(
+                retry, WIDGET_ARTWORK_RETRY_DELAYS_MS[nextAttempt - 1]);
+    }
+
+    private static void persistWidgetArtwork(
+            Context context, int widgetId, String songId, String artworkKey, Bitmap bitmap) {
+        if (!isWidgetArtworkCurrent(context, widgetId, artworkKey) ||
+                bitmap == null || bitmap.isRecycled()) return;
+        File file = getWidgetArtworkCacheFile(context, artworkKey);
+        File staged = new File(file.getParentFile(), file.getName() + ".tmp");
+        try {
+            if (file.getParentFile() != null && !file.getParentFile().exists()) {
+                file.getParentFile().mkdirs();
+            }
+            try (java.io.FileOutputStream output = new java.io.FileOutputStream(staged)) {
+                if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output)) {
+                    staged.delete();
+                    return;
+                }
+                output.flush();
+                output.getFD().sync();
+            }
+            if (!isWidgetArtworkCurrent(context, widgetId, artworkKey)) {
+                staged.delete();
+                return;
+            }
+            if (file.exists() && !file.delete()) {
+                staged.delete();
+                return;
+            }
+            if (!staged.renameTo(file)) {
+                staged.delete();
+                return;
+            }
+            SharedPreferences.Editor editor = context.getSharedPreferences(
+                    PREFS_NAME, Context.MODE_PRIVATE).edit();
+            editor.putString(PREF_ARTWORK_CACHE_FILE_PREFIX + widgetId, file.getAbsolutePath());
+            editor.putString(PREF_ARTWORK_LOADED_KEY_PREFIX + widgetId, artworkKey);
+            editor.apply();
+
+            // Share the same offline artwork snapshot with the playback service/notifications.
+            if (songId != null && !songId.isEmpty()) {
+                com.dsann.music.service.AudioPlaybackService.storeCachedMediaArtwork(
+                        context.getApplicationContext(), songId, bitmap);
+            }
+        } catch (Exception error) {
+            staged.delete();
+            Log.w(TAG, "Could not persist widget artwork for " + songId, error);
+        }
+    }
+
+    private static void clearRetainedWidgetArtwork(Context context, int widgetId) {
+        synchronized (WIDGET_ARTWORK_LOCK) {
+            LAST_WIDGET_ARTWORKS.remove(widgetId);
+            LAST_WIDGET_ARTWORK_KEYS.remove(widgetId);
+            ACTIVE_WIDGET_ARTWORK_REQUESTS.remove(widgetId);
+        }
+        cancelWidgetArtworkRetry(widgetId);
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .remove(PREF_ARTWORK_CACHE_FILE_PREFIX + widgetId)
+                .remove(PREF_ARTWORK_LOADED_KEY_PREFIX + widgetId)
+                .apply();
+    }
+
     private static void applySmallWidgetIdleArtwork(
             Context context, RemoteViews existingViews, int widgetId) {
         RemoteViews idle = existingViews != null
                 ? existingViews
                 : new RemoteViews(context.getPackageName(), R.layout.widget_small);
+        clearRetainedWidgetArtwork(context, widgetId);
         idle.setImageViewResource(R.id.widget_album_art, R.drawable.widget_idle_art);
         idle.setFloat(R.id.widget_album_art, "setTranslationX", 0f);
         idle.setFloat(R.id.widget_album_art, "setAlpha", 1f);
@@ -712,10 +1020,17 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             boolean animateSmallCover,
             int slideDirection,
             int layoutId,
-            String expectedArtworkKey
+            String expectedArtworkKey,
+            String songId,
+            int retryAttempt,
+            boolean forceRemote
     ) {
         final Context appContext = context.getApplicationContext();
         final int direction = slideDirection < 0 ? -1 : 1;
+        final Object artworkModel = forceRemote
+                ? artUri
+                : resolveWidgetArtworkModel(appContext, songId, expectedArtworkKey, artUri);
+        markWidgetArtworkRequestActive(widgetId, expectedArtworkKey);
         com.bumptech.glide.request.target.CustomTarget<Bitmap> target =
                 new com.bumptech.glide.request.target.CustomTarget<Bitmap>() {
             @Override
@@ -724,6 +1039,10 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                     com.bumptech.glide.request.transition.Transition<? super Bitmap> transition
             ) {
                 if (!isWidgetArtworkCurrent(appContext, widgetId, expectedArtworkKey)) return;
+                clearActiveWidgetArtworkRequest(widgetId, expectedArtworkKey);
+                cancelWidgetArtworkRetry(widgetId);
+                rememberWidgetArtwork(widgetId, expectedArtworkKey, resource);
+
                 if (smallWidget) {
                     if (animateSmallCover) {
                         animateSmallArtworkArrival(
@@ -741,19 +1060,49 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                     AppWidgetManager.getInstance(appContext)
                             .partiallyUpdateAppWidget(widgetId, cover);
                 }
+
+                try {
+                    PARTIAL_WIDGET_UPDATE_EXECUTOR.execute(() ->
+                            persistWidgetArtwork(appContext, widgetId, songId,
+                                    expectedArtworkKey, resource));
+                } catch (RuntimeException persistError) {
+                    Log.w(TAG, "Could not schedule widget artwork persistence", persistError);
+                }
+            }
+
+            @Override
+            public void onLoadFailed(android.graphics.drawable.Drawable errorDrawable) {
+                clearActiveWidgetArtworkRequest(widgetId, expectedArtworkKey);
+                // Keep the previous good bitmap in place. Retry remote retrieval later, and
+                // never replace the widget cover with a no-song drawable because of a timeout.
+                scheduleWidgetArtworkRetry(
+                        appContext, artUri, widgetId, songId,
+                        smallWidget, animateSmallCover, direction,
+                        layoutId, expectedArtworkKey, retryAttempt + 1);
             }
 
             @Override
             public void onLoadCleared(android.graphics.drawable.Drawable placeholder) {
-                // The current full RemoteViews snapshot already contains a neutral cover.
+                // A request cancellation must not erase the last successfully rendered cover.
             }
         };
 
-        Glide.with(appContext)
-                .asBitmap()
-                .load(artUri)
-                .centerCrop()
-                .into(target);
+        try {
+            Glide.with(appContext)
+                    .asBitmap()
+                    .load(artworkModel)
+                    .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+                    .override(512, 512)
+                    .centerCrop()
+                    .into(target);
+        } catch (RuntimeException loadError) {
+            clearActiveWidgetArtworkRequest(widgetId, expectedArtworkKey);
+            scheduleWidgetArtworkRetry(
+                    appContext, artUri, widgetId, songId,
+                    smallWidget, animateSmallCover, direction,
+                    layoutId, expectedArtworkKey, retryAttempt + 1);
+            Log.w(TAG, "Widget artwork load failed to start", loadError);
+        }
     }
 
     private static void animateSmallArtworkArrival(
@@ -809,7 +1158,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
     }
 
     private static void loadBlurredAura(
-            Context context, Uri artUri, int widgetId, int layoutId, String expectedArtworkKey) {
+            Context context, Object artworkModel, int widgetId, int layoutId, String expectedArtworkKey) {
         final Context appContext = context.getApplicationContext();
         com.bumptech.glide.request.target.CustomTarget<Bitmap> auraTarget =
                 new com.bumptech.glide.request.target.CustomTarget<Bitmap>() {
@@ -833,7 +1182,8 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
 
         Glide.with(appContext)
                 .asBitmap()
-                .load(artUri)
+                .load(artworkModel)
+                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
                 .centerCrop()
                 .override(150, 150) // Scale down for performance
                 .transform(new com.bumptech.glide.load.resource.bitmap.BitmapTransformation() {
