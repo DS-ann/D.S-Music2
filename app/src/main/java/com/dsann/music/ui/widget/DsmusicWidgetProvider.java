@@ -567,6 +567,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                     try {
                         loadAlbumArt(
                                 context, views, artworkUri, id,
+                                layoutId == R.layout.widget_small,
                                 animateSmallCover, smallCoverDirection);
                     } catch (Exception artworkError) {
                         Log.w(TAG, "Could not load widget album art for " + song.title, artworkError);
@@ -662,11 +663,12 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             RemoteViews views,
             Uri artUri,
             int widgetId,
+            boolean smallWidget,
             boolean animateSmallCover,
             int slideDirection
     ) {
         AppWidgetTarget target;
-        if (animateSmallCover) {
+        if (smallWidget) {
             final Context appContext = context.getApplicationContext();
             final String artKey = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                     .getString(PREF_SMALL_ART_SONG_PREFIX + widgetId, null);
@@ -681,10 +683,17 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                     String currentKey = appContext.getSharedPreferences(
                             PREFS_NAME, Context.MODE_PRIVATE)
                             .getString(PREF_SMALL_ART_SONG_PREFIX + widgetId, null);
-                    // Do not allow a late Glide response for an older song to replace
-                    // the artwork belonging to the latest queue item.
+                    // Ignore stale requests so a slow prior cover cannot replace the newest song.
                     if (artKey == null || !artKey.equals(currentKey)) return;
-                    animateSmallArtworkArrival(appContext, widgetId, resource, direction);
+                    if (animateSmallCover) {
+                        animateSmallArtworkArrival(appContext, widgetId, resource, direction);
+                    } else {
+                        RemoteViews cover = new RemoteViews(
+                                appContext.getPackageName(), R.layout.widget_small);
+                        cover.setImageViewBitmap(R.id.widget_album_art, resource);
+                        AppWidgetManager.getInstance(appContext)
+                                .partiallyUpdateAppWidget(widgetId, cover);
+                    }
                 }
             };
         } else {
