@@ -259,8 +259,9 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         String size = appearance.getString("lyrics_text_size", "Standard");
         float textSize;
         if (layoutId == R.layout.widget_medium) {
-            // The 4x2 widget has room for a larger, readable two-line lyric preview.
-            textSize = "Small".equals(size) ? 18.5f : "Large".equals(size) ? 23.5f : 21f;
+            // The switchable 4x2 widget uses oversized lyrics; its TextView consumes
+            // the available text-column height and wraps the full lyric without a card.
+            textSize = ("Small".equals(size) ? 18.5f : "Large".equals(size) ? 23.5f : 21f) * 2f;
         } else {
             textSize = "Small".equals(size) ? 16.5f : "Large".equals(size) ? 21.5f : 19f;
         }
