@@ -303,7 +303,7 @@ fun QueueBottomSheetContent(
                             color = DsmusicTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.Bold
                         )
-                        if (displayedSongs.size > 1 && draggedSongId == null) {
+                        if (displayedSongs.size > 1 && draggedEntryKey == null) {
                             IconButton(onClick = { viewModel.clearQueueExceptCurrentSong() }) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_delete),
@@ -440,7 +440,7 @@ fun QueueBottomSheetContent(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
-                            if (displayedSongs.size > 1 && draggedSongId == null) {
+                            if (displayedSongs.size > 1 && draggedEntryKey == null) {
                                 IconButton(onClick = { viewModel.clearQueueExceptCurrentSong() }) {
                                     Icon(
                                         painter = painterResource(id = R.drawable.ic_delete),
