@@ -2519,7 +2519,8 @@ private fun LocalPlaylistDetailsScreen(
     val uploadableVideoIds = remember(songsEntity) {
         songsEntity.mapNotNull { entry ->
             entry.songId.takeIf { id ->
-                id.length == 11 && id.all { character ->
+                id.toLongOrNull() == null &&
+                    id.length == 11 && id.all { character ->
                     character in 'A'..'Z' || character in 'a'..'z' ||
                         character in '0'..'9' || character == '_' || character == '-'
                 }
