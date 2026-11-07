@@ -224,14 +224,27 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         });
     }
 
-    /** True only while at least one installed medium widget is displaying its lyrics page. */
+    /**
+     * True when any installed widget is actively showing lyrics:
+     * - The 4x4 widget always displays its lyric line.
+     * - A 4x2 widget displays lyrics only while its ViewFlipper is on the lyrics page.
+     *
+     * The 2x2 artwork-only widget does not request lyric refreshes.
+     */
     public static boolean hasLyricsModeWidget(Context context) {
         try {
             AppWidgetManager manager = AppWidgetManager.getInstance(context.getApplicationContext());
-            int[] ids = manager.getAppWidgetIds(
+
+            // The large layout always contains a visible lyrics row, so it must keep
+            // receiving line-boundary updates even when no medium widget is installed.
+            int[] largeIds = manager.getAppWidgetIds(
+                    new ComponentName(context, WidgetLargeProvider.class));
+            if (largeIds.length > 0) return true;
+
+            int[] mediumIds = manager.getAppWidgetIds(
                     new ComponentName(context, WidgetMediumProvider.class));
             SharedPreferences preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            for (int id : ids) {
+            for (int id : mediumIds) {
                 if (preferences.getBoolean(PREF_LYRICS_MODE + id, false)) return true;
             }
         } catch (RuntimeException error) {
