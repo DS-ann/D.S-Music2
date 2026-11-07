@@ -607,7 +607,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             if (song == null) {
                 clearRetainedWidgetArtwork(context, id);
                 if (layoutId == R.layout.widget_small) {
-                    views.setImageViewResource(R.id.widget_album_art, R.drawable.widget_idle_art);
+                    applySmallWidgetIdleArtwork(context, views, id);
                 } else {
                     views.setImageViewResource(R.id.widget_album_art, R.drawable.widget_default_art);
                 }
@@ -818,17 +818,16 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         }
 
         File exactTrackCache = getWidgetArtworkCacheFile(context, artworkKey);
+        File cacheFileUsed = exactTrackCache;
         Bitmap exactTrackBitmap = decodeWidgetArtwork(exactTrackCache);
         if (exactTrackBitmap == null) {
-            File serviceCache = getServiceArtworkCacheFile(context, songId);
-            exactTrackBitmap = decodeWidgetArtwork(serviceCache);
+            cacheFileUsed = getServiceArtworkCacheFile(context, songId);
+            exactTrackBitmap = decodeWidgetArtwork(cacheFileUsed);
         }
-        if (exactTrackBitmap != null) {
+        if (exactTrackBitmap != null && cacheFileUsed != null) {
             rememberWidgetArtwork(widgetId, artworkKey, exactTrackBitmap);
             prefs.edit()
-                    .putString(PREF_ARTWORK_CACHE_FILE_PREFIX + widgetId,
-                            exactTrackCache.isFile() ? exactTrackCache.getAbsolutePath()
-                                    : getServiceArtworkCacheFile(context, songId).getAbsolutePath())
+                    .putString(PREF_ARTWORK_CACHE_FILE_PREFIX + widgetId, cacheFileUsed.getAbsolutePath())
                     .putString(PREF_ARTWORK_LOADED_KEY_PREFIX + widgetId, artworkKey)
                     .apply();
             return exactTrackBitmap;
