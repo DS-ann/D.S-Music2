@@ -803,7 +803,6 @@ fun QueueListItem(
         ) {
             Text(
                 text = "=",
-                contentDescription = null,
                 color = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                 fontSize = 27.sp,
                 fontWeight = FontWeight.Bold,
