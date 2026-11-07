@@ -1793,6 +1793,16 @@ class PlayerSharedViewModel @Inject constructor(
         _currentSong.value = song
     }
 
+    /**
+     * Pushes the final reordered queue into the native Media3 queue. Drag gestures defer this
+     * until release so each intermediate pointer movement does not rebuild the player queue.
+     */
+    fun syncQueueWithPlaybackService() {
+        audioService?.let { service ->
+            service.runWhenPlayerReady { service.refreshNativeQueue() }
+        }
+    }
+
     /** Publish a same-ID replacement when its actual playback source changes. */
     fun refreshCurrentSongSource(song: SongItem) {
         if (_currentSong.value?.id != song.id) return

@@ -2140,9 +2140,7 @@ fun FullPlayer(
                     initialValue = SongFileMetadata(isRemote = SongFileMetadataReader.isRemoteSong(song)),
                     key1 = song.id,
                     key2 = song.path,
-                    key3 = song.data,
-                    key4 = song.contentUri.toString(),
-                    key5 = song.isCachedTrack
+                    key3 = listOf(song.data, song.contentUri.toString(), song.isCachedTrack)
                 ) {
                     value = withContext(Dispatchers.IO) {
                         SongFileMetadataReader.read(context.applicationContext, song)
@@ -2165,8 +2163,7 @@ fun FullPlayer(
                     initialValue = null,
                     key1 = song.videoId,
                     key2 = isVideoMode,
-                    key3 = song.isCachedTrack,
-                    key4 = songFileMetadata.isRemote
+                    key3 = listOf(song.isCachedTrack, songFileMetadata.isRemote)
                 ) {
                     value = if (
                         !isVideoMode &&
