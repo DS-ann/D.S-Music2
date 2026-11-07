@@ -152,7 +152,11 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
-        migrateWidgetPreferences(context);
+        try {
+            migrateWidgetPreferences(context);
+        } catch (RuntimeException migrationError) {
+            Log.w(TAG, "Widget preference migration failed; using current defaults", migrationError);
+        }
         int layoutId = R.layout.widget_medium;
         Class<?> providerClass = WidgetMediumProvider.class;
         if (this instanceof WidgetSmallProvider) {
@@ -550,11 +554,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             }
             // The small widget's initialLayout is already inflated by the launcher.
             // A partial update keeps the old cover visible until Glide has the next one.
-            if (layoutId == R.layout.widget_small) {
-                manager.partiallyUpdateAppWidget(id, views);
-            } else {
-                manager.updateAppWidget(id, views);
-            }
+            manager.updateAppWidget(id, views);
 
             if (song != null) {
                 Uri artworkUri = null;
@@ -626,11 +626,7 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                 }
                 applyWidgetActionIcons(fallback, isPlaying, layoutId, repeatIconResId);
                 setupPendingIntents(context, fallback, isPlaying, layoutId, providerClass, id);
-                if (layoutId == R.layout.widget_small) {
-                    manager.partiallyUpdateAppWidget(id, fallback);
-                } else {
-                    manager.updateAppWidget(id, fallback);
-                }
+                manager.updateAppWidget(id, fallback);
             } catch (Exception fallbackError) {
                 Log.e(TAG, "Widget fallback rendering failed for " + id, fallbackError);
             }
