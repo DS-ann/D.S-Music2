@@ -93,12 +93,14 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
     private static final ExecutorService PARTIAL_WIDGET_UPDATE_EXECUTOR =
             Executors.newSingleThreadExecutor(runnable -> {
                 Thread worker = new Thread(runnable, "DsmusicWidgetUpdates");
-                worker.setPriority(Thread.MIN_PRIORITY);
+                worker.setPriority(Thread.NORM_PRIORITY);
                 return worker;
             });
     // Progress ticks arrive once per second. Keep only the newest pending snapshot so a
     // slow AppWidgetManager/Binder call cannot build an unbounded queue of stale positions.
     private static final AtomicReference<WidgetProgressUpdate> PENDING_PARTIAL_WIDGET_UPDATE =
+            new AtomicReference<>();
+    private static final AtomicReference<WidgetLyricsUpdate> PENDING_WIDGET_LYRICS_UPDATE =
             new AtomicReference<>();
     private static final AtomicBoolean PARTIAL_WIDGET_UPDATE_SCHEDULED = new AtomicBoolean(false);
 
@@ -106,12 +108,20 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         final Context context;
         final int position;
         final int duration;
-        final CharSequence currentLyric;
 
-        WidgetProgressUpdate(Context context, int position, int duration, CharSequence currentLyric) {
+        WidgetProgressUpdate(Context context, int position, int duration) {
             this.context = context;
             this.position = position;
             this.duration = duration;
+        }
+    }
+
+    private static final class WidgetLyricsUpdate {
+        final Context context;
+        final CharSequence currentLyric;
+
+        WidgetLyricsUpdate(Context context, CharSequence currentLyric) {
+            this.context = context;
             this.currentLyric = currentLyric;
         }
     }
@@ -226,11 +236,27 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                 horizontalGravity | Gravity.CENTER_VERTICAL);
     }
 
-    public static void updateAllWidgetsPartial(Context context, int position, int duration, CharSequence currentLyric) {
+    /** Queues a progress-only update. It never changes the displayed lyric line. */
+    public static void updateAllWidgetsProgress(Context context, int position, int duration) {
         final Context appContext = context.getApplicationContext();
         PENDING_PARTIAL_WIDGET_UPDATE.set(
-                new WidgetProgressUpdate(appContext, position, duration, currentLyric));
+                new WidgetProgressUpdate(appContext, position, duration));
         schedulePartialWidgetUpdateDrain();
+    }
+
+    /** Queues a lyric-boundary update independently from periodic progress ticks. */
+    public static void updateAllWidgetsLyrics(Context context, CharSequence currentLyric) {
+        final Context appContext = context.getApplicationContext();
+        PENDING_WIDGET_LYRICS_UPDATE.set(
+                new WidgetLyricsUpdate(appContext, currentLyric != null ? currentLyric : "..."));
+        schedulePartialWidgetUpdateDrain();
+    }
+
+    /** Compatibility entry point for callers that need both values refreshed together. */
+    public static void updateAllWidgetsPartial(
+            Context context, int position, int duration, CharSequence currentLyric) {
+        updateAllWidgetsProgress(context, position, duration);
+        updateAllWidgetsLyrics(context, currentLyric);
     }
 
     /**
@@ -291,15 +317,24 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         try {
             PARTIAL_WIDGET_UPDATE_EXECUTOR.execute(() -> {
                 while (true) {
-                    WidgetProgressUpdate update = PENDING_PARTIAL_WIDGET_UPDATE.getAndSet(null);
-                    if (update != null) {
-                        applyPartialWidgetProgress(update);
+                    // Apply lyric changes first. They are independent from progress and cannot
+                    // be overwritten by a later 2-second progress snapshot.
+                    WidgetLyricsUpdate lyricsUpdate =
+                            PENDING_WIDGET_LYRICS_UPDATE.getAndSet(null);
+                    if (lyricsUpdate != null) {
+                        applyPartialWidgetLyrics(lyricsUpdate);
+                    }
+
+                    WidgetProgressUpdate progressUpdate =
+                            PENDING_PARTIAL_WIDGET_UPDATE.getAndSet(null);
+                    if (progressUpdate != null) {
+                        applyPartialWidgetProgress(progressUpdate);
                     }
 
                     PARTIAL_WIDGET_UPDATE_SCHEDULED.set(false);
-                    // If another tick arrived during the Binder update, process only its newest
-                    // snapshot. If a producer already scheduled a worker, let that worker run.
-                    if (PENDING_PARTIAL_WIDGET_UPDATE.get() == null ||
+                    // Handle updates arriving during Binder work without losing either channel.
+                    if ((PENDING_PARTIAL_WIDGET_UPDATE.get() == null &&
+                            PENDING_WIDGET_LYRICS_UPDATE.get() == null) ||
                             !PARTIAL_WIDGET_UPDATE_SCHEDULED.compareAndSet(false, true)) {
                         return;
                     }
@@ -328,17 +363,17 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             for (int id : smallIds) {
                 updateWidgetProgress(
                         appContext, manager, id, update.position, update.duration,
-                        null, R.layout.widget_small);
+                        R.layout.widget_small);
             }
             for (int id : mediumIds) {
                 updateWidgetProgress(
                         appContext, manager, id, update.position, update.duration,
-                        update.currentLyric, R.layout.widget_medium);
+                        R.layout.widget_medium);
             }
             for (int id : largeIds) {
                 updateWidgetProgress(
                         appContext, manager, id, update.position, update.duration,
-                        update.currentLyric, R.layout.widget_large);
+                        R.layout.widget_large);
             }
         } catch (Exception error) {
             Log.w(TAG, "Widget progress update failed", error);
@@ -351,7 +386,6 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             int id,
             int position,
             int duration,
-            CharSequence currentLyric,
             int layoutId
     ) {
         try {
@@ -360,12 +394,47 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                     ? (int) (((float) Math.max(0, position) / duration) * 100f)
                     : 0;
             views.setProgressBar(R.id.widget_progress, 100, Math.max(0, Math.min(100, progress)), false);
-            if (layoutId == R.layout.widget_medium || layoutId == R.layout.widget_large) {
-                applyLyricsPresentation(context, views, currentLyric, layoutId);
-            }
             manager.partiallyUpdateAppWidget(id, views);
         } catch (Exception e) {
             Log.e(TAG, "Error in partial widget update: " + e.getMessage());
+        }
+    }
+
+    private static void applyPartialWidgetLyrics(WidgetLyricsUpdate update) {
+        Context appContext = update.context;
+        AppWidgetManager manager = AppWidgetManager.getInstance(appContext);
+        try {
+            int[] mediumIds = manager.getAppWidgetIds(
+                    new ComponentName(appContext, WidgetMediumProvider.class));
+            int[] largeIds = manager.getAppWidgetIds(
+                    new ComponentName(appContext, WidgetLargeProvider.class));
+
+            for (int id : mediumIds) {
+                updateWidgetLyrics(
+                        appContext, manager, id, update.currentLyric, R.layout.widget_medium);
+            }
+            for (int id : largeIds) {
+                updateWidgetLyrics(
+                        appContext, manager, id, update.currentLyric, R.layout.widget_large);
+            }
+        } catch (Exception error) {
+            Log.w(TAG, "Widget lyric-boundary update failed", error);
+        }
+    }
+
+    private static void updateWidgetLyrics(
+            Context context,
+            AppWidgetManager manager,
+            int id,
+            CharSequence currentLyric,
+            int layoutId
+    ) {
+        try {
+            RemoteViews views = new RemoteViews(context.getPackageName(), layoutId);
+            applyLyricsPresentation(context, views, currentLyric, layoutId);
+            manager.partiallyUpdateAppWidget(id, views);
+        } catch (Exception error) {
+            Log.w(TAG, "Error applying widget lyrics for " + id, error);
         }
     }
 

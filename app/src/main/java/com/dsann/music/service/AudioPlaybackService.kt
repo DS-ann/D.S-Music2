@@ -2978,11 +2978,10 @@ class AudioPlaybackService : MediaSessionService() {
                         nowMs - lastWidgetProgressUpdateAtMs >= widgetProgressIntervalMs
                     ) {
                         lastWidgetProgressUpdateAtMs = nowMs
-                        // Lyrics pages also receive independent boundary-timed updates; this
-                        // timer is only the regular progress refresh.
-                        serviceScope.launch(Dispatchers.Default) {
-                            updateWidgetProgress(pos, dur)
-                        }
+                        // Progress runs on its own channel. It must never publish a lyric
+                        // snapshot, because a delayed progress job could overwrite a newer
+                        // line-boundary event with stale lyric text.
+                        updateWidgetProgress(pos, dur, updateLyrics = false)
                     }
 
                     if (player.isPlaying && crossfadeDurationMs > 0 && dur > 0 &&
@@ -3279,7 +3278,7 @@ class AudioPlaybackService : MediaSessionService() {
                 scheduleNextWidgetLyricRefresh(position)
                 return@Runnable
             }
-            updateWidgetProgress(position, player.duration.coerceAtLeast(0L))
+            updateWidgetLyrics(position, player.duration.coerceAtLeast(0L))
             scheduleNextWidgetLyricRefresh(position)
         }
         widgetLyricScheduledBoundaryMs = nextEvent
@@ -3287,14 +3286,29 @@ class AudioPlaybackService : MediaSessionService() {
         handler.postDelayed(update, delayMs)
     }
 
-    private fun updateWidgetProgress(pos: Long, dur: Long) {
-        // Do not build styled lyric spans or dispatch RemoteViews work unless at least
-        // one D.S Music widget is actually installed on the current launcher.
+    private fun updateWidgetProgress(
+        pos: Long,
+        dur: Long,
+        updateLyrics: Boolean = true
+    ) {
+        // Do not dispatch RemoteViews work unless at least one D.S Music widget is installed.
         if (!DsmusicWidgetProvider.hasAnyWidgets(applicationContext)) return
-        DsmusicWidgetProvider.updateAllWidgetsPartial(
+        DsmusicWidgetProvider.updateAllWidgetsProgress(
             this,
-            pos.toInt(),
-            dur.toInt(),
+            pos.coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            dur.coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        )
+        if (updateLyrics) updateWidgetLyrics(pos, dur)
+    }
+
+    /**
+     * Publishes only the current complete lyric line. Progress refreshes use a separate
+     * queue so they cannot replace this event with an older lyric snapshot.
+     */
+    private fun updateWidgetLyrics(pos: Long, dur: Long) {
+        if (!DsmusicWidgetProvider.hasAnyWidgets(applicationContext)) return
+        DsmusicWidgetProvider.updateAllWidgetsLyrics(
+            this,
             currentWidgetLyricText(pos, dur)
         )
     }
