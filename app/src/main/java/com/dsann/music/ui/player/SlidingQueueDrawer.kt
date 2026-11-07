@@ -36,6 +36,7 @@ import com.dsann.music.ui.buildQueueDisplayEntries
 import com.dsann.music.ui.QueueDisplayRow
 import com.dsann.music.ui.QueueDraggedSongOverlay
 import com.dsann.music.ui.ClearRecentDraggedItemAnimationSkip
+import com.dsann.music.ui.queueDragHandleInput
 import com.dsann.music.ui.rememberDragDropState
 import com.dsann.music.viewmodel.PlayerSharedViewModel
 import kotlin.math.abs
@@ -175,6 +176,8 @@ fun SlidingQueueDrawer(
             val boxScope = this
             val lazyListState = rememberLazyListState()
             val queueScope = rememberCoroutineScope()
+            val dragHandleWidthPx = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() }
+            val dragHandleTrailingInsetPx = with(androidx.compose.ui.platform.LocalDensity.current) { 16.dp.toPx() }
             // Keep the rendered queue fixed while the dragged row follows the pointer.
             // The actual reorder is committed only after the user releases the handle.
             val dragDropState = rememberDragDropState(
@@ -313,6 +316,11 @@ fun SlidingQueueDrawer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
+                        .queueDragHandleInput(
+                            dragDropState = dragDropState,
+                            handleWidthPx = dragHandleWidthPx,
+                            trailingInsetPx = dragHandleTrailingInsetPx
+                        )
                 ) {
                     LazyColumn(
                         state = lazyListState,

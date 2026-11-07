@@ -27,6 +27,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -80,6 +83,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
@@ -198,6 +202,8 @@ fun QueueBottomSheetContent(
     val displayedSongs = songList
 
     val lazyListState = rememberLazyListState()
+    val dragHandleWidthPx = with(LocalDensity.current) { 48.dp.toPx() }
+    val dragHandleTrailingInsetPx = with(LocalDensity.current) { 20.dp.toPx() }
     val dragDropState = rememberDragDropState(
         lazyListState = lazyListState,
         onDragFinished = { from, to, commit ->
@@ -308,6 +314,11 @@ fun QueueBottomSheetContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 520.dp)
+                        .queueDragHandleInput(
+                            dragDropState = dragDropState,
+                            handleWidthPx = dragHandleWidthPx,
+                            trailingInsetPx = dragHandleTrailingInsetPx
+                        )
                 ) {
                     if (displayedSongs.isEmpty()) {
                         Column(
@@ -456,6 +467,11 @@ fun QueueBottomSheetContent(
                         modifier = Modifier
                             .weight(0.6f)
                             .fillMaxHeight()
+                            .queueDragHandleInput(
+                                dragDropState = dragDropState,
+                                handleWidthPx = dragHandleWidthPx,
+                                trailingInsetPx = dragHandleTrailingInsetPx
+                            )
                     ) {
                         if (displayedSongs.isEmpty()) {
                             Column(
@@ -621,7 +637,6 @@ fun QueueListItem(
     @SuppressLint("ModifierParameter") modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val latestIndex = rememberUpdatedState(index)
     val latestSwipeRemove = rememberUpdatedState(onSwipeRemove)
     val swipeThresholdPx = with(LocalDensity.current) { 88.dp.toPx() }
     val swipeOffset = remember(song.id) { Animatable(0f) }
@@ -808,28 +823,7 @@ fun QueueListItem(
                     interactionSource = remember(song.id) { MutableInteractionSource() },
                     indication = null,
                     onClick = {}
-                )
-                .pointerInput(dragDropState, song.id) {
-                    val state = dragDropState ?: return@pointerInput
-                    detectDragGesturesAfterLongPress(
-                        onDragStart = { offset ->
-                            val startIndex = latestIndex.value
-                            if (startIndex >= 0) {
-                                state.onDragStartAtIndex(
-                                    index = startIndex,
-                                    handleLocalY = offset.y,
-                                    handleHeightPx = size.height.toFloat()
-                                )
-                            }
-                        },
-                        onDragEnd = { state.onDragInterrupted(commit = true) },
-                        onDragCancel = { state.onDragInterrupted(commit = false) },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            state.onDrag(dragAmount)
-                        }
-                    )
-                },
+                ),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -1009,6 +1003,25 @@ class DragDropState(
         pointerY = initialPointerY
     }
 
+    fun hasVisibleRowAt(y: Float): Boolean =
+        lazyListState.layoutInfo.visibleItemsInfo.any { y >= it.offset && y < it.offset + it.size }
+
+    fun onDragStartAtPosition(
+        position: Offset,
+        containerWidthPx: Float,
+        handleWidthPx: Float,
+        trailingInsetPx: Float
+    ): Boolean {
+        val handleRight = containerWidthPx - trailingInsetPx
+        val handleLeft = handleRight - handleWidthPx
+        if (position.x !in handleLeft..handleRight) return false
+        val item = lazyListState.layoutInfo.visibleItemsInfo.firstOrNull {
+            position.y >= it.offset && position.y < it.offset + it.size
+        } ?: return false
+        beginDrag(item, item.index, position.y)
+        return true
+    }
+
     fun onDragStart(offset: Offset) {
         val item = lazyListState.layoutInfo.visibleItemsInfo.firstOrNull {
             offset.y.toInt() in it.offset..(it.offset + it.size)
@@ -1181,6 +1194,72 @@ fun rememberDragDropState(
             maxAutoScrollSpeedPxPerSecond = maxAutoScrollSpeedPxPerSecond,
             onDragFinished = { from, to, commit -> currentOnDragFinished.value(from, to, commit) }
         )
+    }
+}
+
+
+/**
+ * Keep queue drag pointer ownership outside LazyColumn's virtualized rows.
+ *
+ * A row-local pointerInput is cancelled when edge auto-scroll moves that row outside
+ * LazyColumn's composition window. This stable viewport handler survives that scroll,
+ * while accepting long-press starts only inside the trailing 48dp drag handle.
+ */
+fun Modifier.queueDragHandleInput(
+    dragDropState: DragDropState,
+    handleWidthPx: Float,
+    trailingInsetPx: Float
+): Modifier = pointerInput(dragDropState, handleWidthPx, trailingInsetPx) {
+    awaitEachGesture {
+        val down = awaitFirstDown(
+            requireUnconsumed = false,
+            pass = PointerEventPass.Initial
+        )
+        val handleRight = size.width.toFloat() - trailingInsetPx
+        val handleLeft = handleRight - handleWidthPx
+        val startsOnHandle = down.position.x in handleLeft..handleRight &&
+            dragDropState.hasVisibleRowAt(down.position.y)
+
+        if (!startsOnHandle) {
+            // Observe but do not consume normal row taps, swipes or parent gestures.
+            do {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+            } while (event.changes.any { it.pressed })
+        } else {
+            val longPress = awaitLongPressOrCancellation(
+                pointerId = down.id,
+                pass = PointerEventPass.Initial
+            )
+            val started = longPress != null &&
+                dragDropState.onDragStartAtPosition(
+                    position = longPress.position,
+                    containerWidthPx = size.width.toFloat(),
+                    handleWidthPx = handleWidthPx,
+                    trailingInsetPx = trailingInsetPx
+                )
+
+            if (started && longPress != null) {
+                longPress.consume()
+                var pointerStillDown = true
+                while (pointerStillDown) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    if (!change.pressed) {
+                        pointerStillDown = false
+                    } else {
+                        val delta = change.position - change.previousPosition
+                        if (delta != Offset.Zero) dragDropState.onDrag(delta)
+                        change.consume()
+                    }
+                }
+                dragDropState.onDragInterrupted(commit = true)
+            } else {
+                // Long press was cancelled or the row left the viewport before it began.
+                do {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                } while (event.changes.any { it.pressed })
+            }
+        }
     }
 }
 
