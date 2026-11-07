@@ -755,8 +755,8 @@ class AudioPlaybackService : MediaSessionService() {
     private var widgetSongObserverJob: Job? = null
     @Volatile private var widgetSyncedLyrics: List<LyricLine> = emptyList()
     @Volatile private var widgetPlainLyrics: String? = null
-    @Volatile private var widgetLyricsPageActiveCached = false
-    @Volatile private var lastWidgetLyricsModeCheckAtMs = 0L
+    @Volatile private var lyricsWidgetInstalledCached = false
+    @Volatile private var lastLyricsWidgetInstalledCheckAtMs = 0L
     private var widgetLyricUpdateRunnable: Runnable? = null
     private var widgetLyricScheduledBoundaryMs: Long? = null
     private lateinit var handler: Handler
@@ -1062,7 +1062,7 @@ class AudioPlaybackService : MediaSessionService() {
             viewModel?.setCurrentPosition(
                 positionSnapshot.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             )
-            if (isWidgetLyricsPageActive()) {
+            if (hasLyricsWidgetInstalled()) {
                 // Paused seeks do not run the playback progress loop. Update the widget
                 // immediately so its displayed line follows the seek just like the player.
                 val seekPosition = positionSnapshot
@@ -1155,7 +1155,7 @@ class AudioPlaybackService : MediaSessionService() {
             updateWidgetState(player.isPlaying)
             // The ViewModel song observer refetches lyrics when it is attached.
             // The service-only widget fetch is needed only when no Activity ViewModel exists.
-            if (viewModel == null && isWidgetLyricsPageActive()) {
+            if (viewModel == null && hasLyricsWidgetInstalled()) {
                 requestWidgetLyrics()
             }
             if (player.isPlaying) {
@@ -1315,10 +1315,9 @@ class AudioPlaybackService : MediaSessionService() {
                     loadRestoredWidgetSnapshot()
                 }
                 updateWidgetState(player.isPlaying)
-                // The 4x4 widget always exposes its lyric row. When it is added while
-                // playback is already running, start the lyric pipeline immediately even
-                // if no 4x2 widget has ever switched to its lyrics page.
-                if (isWidgetLyricsPageActive(forceRefresh = true)) {
+                // Start the lyric pipeline whenever a lyrics-capable widget is installed.
+                // Its refresh loop must not depend on another widget's lyrics switch state.
+                if (hasLyricsWidgetInstalled(forceRefresh = true)) {
                     requestWidgetLyrics()
                 }
             }
@@ -1463,7 +1462,7 @@ class AudioPlaybackService : MediaSessionService() {
             oldVm.cleanupBgScope()
         }
         this.viewModel = vm
-        isWidgetLyricsPageActive(forceRefresh = true)
+        hasLyricsWidgetInstalled(forceRefresh = true)
         if (player.isPlaying) startProgressFrameUpdates()
 
         // Retain the lyric timeline in the service so widgets stay live even after
@@ -1477,7 +1476,7 @@ class AudioPlaybackService : MediaSessionService() {
 
                 val position = player.currentPosition.coerceAtLeast(0L)
                 val duration = player.duration.coerceAtLeast(0L)
-                if (isWidgetLyricsPageActive()) {
+                if (hasLyricsWidgetInstalled()) {
                     updateWidgetProgress(position, duration)
                     scheduleNextWidgetLyricRefresh(position)
                 }
@@ -1488,7 +1487,7 @@ class AudioPlaybackService : MediaSessionService() {
             vm.plainLyrics.collect { plain ->
                 if (vm.syncedLyrics.value.isNullOrEmpty()) {
                     widgetPlainLyrics = plain?.takeIf { it.isNotBlank() }
-                    if (isWidgetLyricsPageActive() && !plain.isNullOrBlank()) {
+                    if (hasLyricsWidgetInstalled() && !plain.isNullOrBlank()) {
                         val position = player.currentPosition.coerceAtLeast(0L)
                         updateWidgetProgress(position, player.duration.coerceAtLeast(0L))
                     }
@@ -1504,7 +1503,7 @@ class AudioPlaybackService : MediaSessionService() {
                     widgetSyncedLyrics = emptyList()
                     widgetPlainLyrics = null
                     cancelWidgetLyricRefresh()
-                    if (isWidgetLyricsPageActive() && song != null) {
+                    if (hasLyricsWidgetInstalled() && song != null) {
                         vm.fetchLyricsForCurrentSong()
                     }
                 }
@@ -3063,7 +3062,7 @@ class AudioPlaybackService : MediaSessionService() {
                         lastPositionPersistedAtMs = nowMs
                     }
 
-                    val lyricsWidgetActive = isWidgetLyricsPageActive()
+                    val lyricsWidgetActive = hasLyricsWidgetInstalled()
                     if (player.isPlaying && lyricsWidgetActive) {
                         // Re-evaluate after seeks and track changes, but the scheduled task
                         // itself fires at the next timed lyric/word boundary.
@@ -3118,7 +3117,7 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     private fun requestWidgetLyrics() {
-        if (!isWidgetLyricsPageActive(forceRefresh = true)) {
+        if (!hasLyricsWidgetInstalled(forceRefresh = true)) {
             cancelWidgetLyricRefresh()
             return
         }
@@ -3317,14 +3316,14 @@ class AudioPlaybackService : MediaSessionService() {
         return output
     }
 
-    private fun isWidgetLyricsPageActive(forceRefresh: Boolean = false): Boolean {
+    private fun hasLyricsWidgetInstalled(forceRefresh: Boolean = false): Boolean {
         val now = System.currentTimeMillis()
-        if (forceRefresh || now - lastWidgetLyricsModeCheckAtMs >= 1_200L) {
-            widgetLyricsPageActiveCached =
-                DsmusicWidgetProvider.hasLyricsModeWidget(applicationContext)
-            lastWidgetLyricsModeCheckAtMs = now
+        if (forceRefresh || now - lastLyricsWidgetInstalledCheckAtMs >= 1_200L) {
+            lyricsWidgetInstalledCached =
+                DsmusicWidgetProvider.hasLyricsWidgetInstalled(applicationContext)
+            lastLyricsWidgetInstalledCheckAtMs = now
         }
-        return widgetLyricsPageActiveCached
+        return lyricsWidgetInstalledCached
     }
 
     private fun cancelWidgetLyricRefresh() {
@@ -3341,7 +3340,7 @@ class AudioPlaybackService : MediaSessionService() {
      */
     private fun scheduleNextWidgetLyricRefresh(positionMs: Long) {
         if (!::handler.isInitialized || !player.isPlaying ||
-            !isWidgetLyricsPageActive() || widgetSyncedLyrics.isEmpty()
+            !hasLyricsWidgetInstalled() || widgetSyncedLyrics.isEmpty()
         ) {
             cancelWidgetLyricRefresh()
             return
