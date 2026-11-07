@@ -14,7 +14,7 @@
         android:clipToOutline="true"
         android:contentDescription="Tap to play or pause; double-tap left for previous or right for next"
         android:scaleType="centerCrop"
-        android:src="@drawable/widget_default_art" />
+        android:src="@drawable/widget_idle_art" />
 
     <LinearLayout
         android:layout_width="match_parent"

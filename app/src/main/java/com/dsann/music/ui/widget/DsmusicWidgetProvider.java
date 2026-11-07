@@ -535,6 +535,9 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
             // including the initial empty-state refresh before a song is selected.
             applyWidgetActionIcons(views, isPlaying, layoutId, repeatIconResId);
             setupPendingIntents(context, views, isPlaying, layoutId, providerClass, id);
+            if (layoutId == R.layout.widget_small && song == null) {
+                applySmallWidgetIdleArtwork(context, views, id);
+            }
             // The small widget's initialLayout is already inflated by the launcher.
             // A partial update keeps the old cover visible until Glide has the next one.
             if (layoutId == R.layout.widget_small) {
@@ -579,6 +582,9 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
                             Log.w(TAG, "Could not load widget aura for " + song.title, artworkError);
                         }
                     }
+                } else if (layoutId == R.layout.widget_small) {
+                    // A selected track without artwork should use the same polished idle cover.
+                    applySmallWidgetIdleArtwork(context, null, id);
                 }
             }
         } catch (Exception error) {
@@ -658,6 +664,25 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         return new RemoteViews(context.getPackageName(), layoutId);
     }
 
+    private static void applySmallWidgetIdleArtwork(
+            Context context, RemoteViews existingViews, int widgetId) {
+        RemoteViews idle = existingViews != null
+                ? existingViews
+                : new RemoteViews(context.getPackageName(), R.layout.widget_small);
+        idle.setImageViewResource(R.id.widget_album_art, R.drawable.widget_idle_art);
+        idle.setFloat(R.id.widget_album_art, "setTranslationX", 0f);
+        idle.setFloat(R.id.widget_album_art, "setAlpha", 1f);
+        idle.setFloat(R.id.widget_album_art, "setScaleX", 1f);
+        idle.setFloat(R.id.widget_album_art, "setScaleY", 1f);
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putString(PREF_SMALL_ART_SONG_PREFIX + widgetId, "__idle__").apply();
+        try {
+            AppWidgetManager.getInstance(context).partiallyUpdateAppWidget(widgetId, idle);
+        } catch (Exception error) {
+            Log.w(TAG, "Could not apply the 2x2 idle artwork", error);
+        }
+    }
+
     private static void loadAlbumArt(
             Context context,
             RemoteViews views,
@@ -703,8 +728,8 @@ public class DsmusicWidgetProvider extends AppWidgetProvider {
         Glide.with(context.getApplicationContext())
                 .asBitmap()
                 .load(artUri)
-                .placeholder(R.drawable.default_album_art)
-                .error(R.drawable.default_album_art)
+                .placeholder(R.drawable.widget_idle_art)
+                .error(R.drawable.widget_idle_art)
                 .centerCrop()
                 .into(target);
     }
