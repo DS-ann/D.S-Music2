@@ -169,41 +169,31 @@ fun QueueBottomSheetContent(
     val songList by viewModel.songListFlow.collectAsStateWithLifecycle()
     val currentSongIndex by viewModel.currentSongIndexFlow.collectAsStateWithLifecycle()
 
-    var previewSongs by remember { mutableStateOf<List<SongItem>?>(null) }
-    val displayedSongs = previewSongs ?: songList
-    val playingSongId = songList.getOrNull(currentSongIndex)?.id
-    val displayedCurrentSongIndex = playingSongId?.let { id ->
-        displayedSongs.indexOfFirst { it.id == id }.takeIf { it >= 0 }
-    } ?: currentSongIndex
+    // The queue stays in its original order while dragging. Only the dragged card
+    // follows the finger; the final reorder is applied when the gesture is released.
+    val displayedSongs = songList
 
     val lazyListState = rememberLazyListState()
     val dragDropState = rememberDragDropState(
         lazyListState = lazyListState,
         onDragFinished = { from, to, commit ->
             if (commit && from in songList.indices && to in songList.indices && from != to) {
-                // Commit the preview exactly once, after the finger is released.
                 viewModel.reorderQueue(from, to, syncPlaybackService = false)
                 viewModel.syncQueueWithPlaybackService()
             }
-            previewSongs = null
         }
-    ) { from, to ->
-        // Preview only: this list belongs to the queue UI. The ViewModel and Media3
-        // queue remain unchanged until onDragFinished commits the final destination.
-        val source = previewSongs ?: songList
-        previewSongs = com.dsann.music.util.OrderUtils.move(source, from, to)
-    }
+    )
     ClearRecentDraggedItemAnimationSkip(dragDropState)
 
     // Auto-scroll to currently playing track on initial load
     LaunchedEffect(currentSongIndex) {
         if (dragDropState.currentIndexOfDraggedItem != null) return@LaunchedEffect
-        if (displayedCurrentSongIndex in displayedSongs.indices) {
-            val distance = abs(lazyListState.firstVisibleItemIndex - displayedCurrentSongIndex)
+        if (currentSongIndex in displayedSongs.indices) {
+            val distance = abs(lazyListState.firstVisibleItemIndex - currentSongIndex)
             if (distance > 24) {
-                lazyListState.scrollToItem(displayedCurrentSongIndex)
+                lazyListState.scrollToItem(currentSongIndex)
             } else {
-                lazyListState.animateScrollToItem(displayedCurrentSongIndex)
+                lazyListState.animateScrollToItem(currentSongIndex)
             }
         }
     }
@@ -310,7 +300,7 @@ fun QueueBottomSheetContent(
                                 key = { _, song -> song.id },
                                 contentType = { _, _ -> "queue-song" }
                             ) { index, song ->
-                                val isPlaying = (index == displayedCurrentSongIndex)
+                                val isPlaying = (index == currentSongIndex)
                                 val shapes = ListItemDefaults.segmentedShapes(index = index, count = displayedSongs.size)
                                 
                                 val isDragging = song.id == dragDropState.draggedItemKey
@@ -454,7 +444,7 @@ fun QueueBottomSheetContent(
                                     key = { _, song -> song.id },
                                     contentType = { _, _ -> "queue-song" }
                                 ) { index, song ->
-                                    val isPlaying = (index == displayedCurrentSongIndex)
+                                    val isPlaying = (index == currentSongIndex)
                                     val shapes = ListItemDefaults.segmentedShapes(index = index, count = displayedSongs.size)
                                     
                                     val isDragging = song.id == dragDropState.draggedItemKey
@@ -852,14 +842,12 @@ class DragDropState(
     private val scope: CoroutineScope,
     private val edgeScrollThresholdPx: Float,
     private val maxAutoScrollSpeedPxPerSecond: Float,
-    private val onDragFinished: (Int, Int, Boolean) -> Unit,
-    private val onMove: (Int, Int) -> Unit
+    private val onDragFinished: (Int, Int, Boolean) -> Unit
 ) {
     var draggedDistance by mutableFloatStateOf(0f)
     var initiallyDraggedElement by mutableStateOf<LazyListItemInfo?>(null)
     var currentIndexOfDraggedItem by mutableStateOf<Int?>(null)
     private var pointerY = 0f
-    private var pendingMoveTargetIndex: Int? = null
     var recentlyDraggedItemKey: Any? by mutableStateOf(null)
         private set
     private var autoScrollDirection = 0f
@@ -885,7 +873,6 @@ class DragDropState(
         initiallyDraggedElement = item
         currentIndexOfDraggedItem = initialIndex
         pointerY = initialPointerY
-        pendingMoveTargetIndex = null
     }
 
     fun onDragStart(offset: Offset) {
@@ -923,16 +910,14 @@ class DragDropState(
 
         initiallyDraggedElement = null
         currentIndexOfDraggedItem = null
-        pendingMoveTargetIndex = null
         draggedDistance = 0f
         pointerY = 0f
     }
 
     /**
-     * Hit-test against the actual visible row centres. Neighbour placement
-     * animations are disabled while dragging, so these are stable targets.
-     * A pending move is acknowledged only when LazyColumn reports the dragged
-     * song at its new stable-key index.
+     * Hit-test the pointer against the unchanged queue layout. The rows keep their
+     * original positions until release, so the dragged card is never displaced by
+     * a live list reorder.
      */
     fun clearRecentlyDraggedItemKey(key: Any?) {
         if (recentlyDraggedItemKey == key) recentlyDraggedItemKey = null
@@ -941,39 +926,14 @@ class DragDropState(
     private fun moveDraggedItemToPointer() {
         val anchor = initiallyDraggedElement ?: return
         val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
-        val draggedItem = visibleItems.firstOrNull { it.key == anchor.key } ?: return
+        if (visibleItems.none { it.key == anchor.key }) return
 
-        val pendingTarget = pendingMoveTargetIndex
-        if (pendingTarget != null) {
-            if (draggedItem.index != pendingTarget) return
-            currentIndexOfDraggedItem = pendingTarget
-            pendingMoveTargetIndex = null
-        } else {
-            currentIndexOfDraggedItem = draggedItem.index
+        val firstVisibleIndex = visibleItems.minOfOrNull { it.index } ?: return
+        val rowsBeforePointer = visibleItems.count { item ->
+            item.key != anchor.key && pointerY > item.offset + item.size / 2f
         }
-
-        val fromIndex = currentIndexOfDraggedItem ?: return
-        val otherItems = visibleItems.filter { it.key != anchor.key }
-
-        // Move through one adjacent slot per acknowledged layout update. A single
-        // pointer sample can span more than one row on fast drags; applying every
-        // crossed index against the pre-layout offsets briefly sends neighbours past
-        // their final slot and makes them jump back on the next frame.
-        val next = otherItems.firstOrNull { it.index == fromIndex + 1 }
-        val previous = otherItems.firstOrNull { it.index == fromIndex - 1 }
-        val targetIndex = when {
-            next != null && pointerY > next.offset + next.size / 2f -> fromIndex + 1
-            previous != null && pointerY < previous.offset + previous.size / 2f -> fromIndex - 1
-            else -> fromIndex
-        }.coerceIn(0, lazyListState.layoutInfo.totalItemsCount - 1)
-        if (targetIndex != fromIndex) {
-            // Update the canonical index before the next pointer/frame callback.
-            // The pending acknowledgement prevents a stale LazyList layout from
-            // issuing the same move twice or bouncing the item back.
-            currentIndexOfDraggedItem = targetIndex
-            pendingMoveTargetIndex = targetIndex
-            onMove(fromIndex, targetIndex)
-        }
+        val lastIndex = (lazyListState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+        currentIndexOfDraggedItem = (firstVisibleIndex + rowsBeforePointer).coerceIn(0, lastIndex)
     }
 
     fun onDrag(dragAmount: Offset) {
@@ -1067,14 +1027,12 @@ internal fun ClearRecentDraggedItemAnimationSkip(dragDropState: DragDropState) {
 @Composable
 fun rememberDragDropState(
     lazyListState: LazyListState,
-    onDragFinished: (Int, Int, Boolean) -> Unit = { _, _, _ -> },
-    onMove: (Int, Int) -> Unit
+    onDragFinished: (Int, Int, Boolean) -> Unit = { _, _, _ -> }
 ): DragDropState {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val edgeScrollThresholdPx = with(density) { 104.dp.toPx() }
     val maxAutoScrollSpeedPxPerSecond = with(density) { 620.dp.toPx() }
-    val currentOnMove = rememberUpdatedState(onMove)
     val currentOnDragFinished = rememberUpdatedState(onDragFinished)
     return remember(lazyListState, edgeScrollThresholdPx, maxAutoScrollSpeedPxPerSecond) {
         DragDropState(
@@ -1082,8 +1040,7 @@ fun rememberDragDropState(
             scope = scope,
             edgeScrollThresholdPx = edgeScrollThresholdPx,
             maxAutoScrollSpeedPxPerSecond = maxAutoScrollSpeedPxPerSecond,
-            onDragFinished = { from, to, commit -> currentOnDragFinished.value(from, to, commit) },
-            onMove = { from, to -> currentOnMove.value(from, to) }
+            onDragFinished = { from, to, commit -> currentOnDragFinished.value(from, to, commit) }
         )
     }
 }
