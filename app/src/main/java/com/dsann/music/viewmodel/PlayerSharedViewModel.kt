@@ -2142,9 +2142,33 @@ class PlayerSharedViewModel @Inject constructor(
         if (syncPlaybackService) audioService?.refreshNativeQueue()
     }
 
-    /** Sync the final drag-reordered list to Media3 once the gesture has ended. */
-    fun syncQueueWithPlaybackService() {
+    /** Clear every queued track except the one that is currently playing. */
+    fun clearQueueExceptCurrentSong() {
+        val playingSong = _currentSong.value
+        val retainedQueue = playingSong?.let(::listOf) ?: emptyList()
+
+        // Invalidate any recommendation request or stream prefetch for the old tail.
+        // A late Autoplay response must not repopulate a queue the user just cleared.
+        autoplayQueueGeneration += 1L
+        autoplayFetchJob?.cancel()
+        autoplayFetchJob = null
+        autoplayFetchGeneration = -1L
+        autoplayFetchedVideoIds.clear()
+        nextSongPrefetchJob?.cancel()
+        nextSongPrefetchJob = null
+
+        _songList.value = retainedQueue
+        _currentSongIndex.value = if (playingSong != null) 0 else -1
+
+        if (_repeatMode.value == REPEAT_ONCE) {
+            resetRepeatOnceCycleFromCurrent()
+        }
+
+        // AudioPlaybackService.refreshNativeQueue() keeps Media3's current item
+        // and removes the remaining native queue entries without restarting playback.
         audioService?.refreshNativeQueue()
+        savePlaybackState()
+        Log.d(TAG, "Queue cleared; retained playing track: ${playingSong?.title ?: "none"}")
     }
 
     fun removeFromQueue(songId: Long) {

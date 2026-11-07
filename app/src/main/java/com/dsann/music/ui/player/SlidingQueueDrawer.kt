@@ -286,6 +286,16 @@ fun SlidingQueueDrawer(
                                 fontWeight = FontWeight.Bold,
                                 color = DsmusicTheme.colorScheme.onSurfaceVariant
                             )
+                            if (songList.size > 1 && draggedSongId == null) {
+                                IconButton(onClick = { playerSharedViewModel.clearQueueExceptCurrentSong() }) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_delete),
+                                        contentDescription = "Clear queue except playing song",
+                                        tint = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }

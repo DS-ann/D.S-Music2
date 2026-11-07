@@ -270,12 +270,27 @@ fun QueueBottomSheetContent(
                         color = DsmusicTheme.colorScheme.onSurface
                     )
 
-                    Text(
-                        text = "${displayedSongs.size} tracks",
-                        style = DsmusicTheme.typography.labelMedium,
-                        color = DsmusicTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "${displayedSongs.size} tracks",
+                            style = DsmusicTheme.typography.labelMedium,
+                            color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (displayedSongs.size > 1 && draggedSongId == null) {
+                            IconButton(onClick = { viewModel.clearQueueExceptCurrentSong() }) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_delete),
+                                    contentDescription = "Clear queue except playing song",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = DsmusicTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
                 }
 
                 QueueSyncedLyricPreview(
@@ -375,21 +390,37 @@ fun QueueBottomSheetContent(
                             .padding(bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Column {
-                            Text(
-                                text = "Audio Queue",
-                                style = DsmusicTheme.typography.headlineSmall.copy(
-                                    fontWeight = FontWeight.ExtraBold,
-                                    letterSpacing = (-0.5).sp
-                                ),
-                                color = DsmusicTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "${displayedSongs.size} tracks loaded",
-                                style = DsmusicTheme.typography.bodySmall,
-                                color = DsmusicTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.Bold
-                            )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Audio Queue",
+                                    style = DsmusicTheme.typography.headlineSmall.copy(
+                                        fontWeight = FontWeight.ExtraBold,
+                                        letterSpacing = (-0.5).sp
+                                    ),
+                                    color = DsmusicTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "${displayedSongs.size} tracks loaded",
+                                    style = DsmusicTheme.typography.bodySmall,
+                                    color = DsmusicTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            if (displayedSongs.size > 1 && draggedSongId == null) {
+                                IconButton(onClick = { viewModel.clearQueueExceptCurrentSong() }) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_delete),
+                                        contentDescription = "Clear queue except playing song",
+                                        modifier = Modifier.size(20.dp),
+                                        tint = DsmusicTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
 
                         QueueSyncedLyricPreview(
