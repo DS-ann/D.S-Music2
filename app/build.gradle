@@ -8,10 +8,6 @@ plugins {
     id("com.github.ben-manes.versions") version "0.54.0"
 }
 
-// Fast CI APKs are for device testing and keep the exact same source/ABI/minSdk.
-// The manual publication workflow does not set this property and remains minified.
-def fastCiBuild = project.findProperty("fastCiBuild")?.toString()?.toBoolean() ?: false
-
 android {
     namespace 'com.dsann.music'
     compileSdk 37
@@ -61,8 +57,8 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled !fastCiBuild
-            shrinkResources !fastCiBuild
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
 
