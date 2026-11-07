@@ -801,11 +801,13 @@ fun QueueListItem(
                 },
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Rounded.Menu,
-                contentDescription = "Drag to reorder",
-                tint = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                modifier = Modifier.size(25.dp)
+            Text(
+                text = "=",
+                contentDescription = null,
+                color = DsmusicTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                fontSize = 27.sp,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 27.sp
             )
         }
     }
